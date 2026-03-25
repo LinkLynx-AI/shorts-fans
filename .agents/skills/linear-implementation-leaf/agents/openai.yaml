@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linear Implementation Leaf"
+  short_description: "Run leaf-issue single delivery workflow"
+  default_prompt: "Use $linear-implementation-leaf to execute a leaf issue run for a child issue or standalone issue."

@@ -1,0 +1,54 @@
+[features]
+multi_agent = true
+
+[agents]
+max_depth = 2
+max_threads = 10
+
+[agents.explorer]
+description = "Read-heavy exploration. Return a concise summary with file paths and recommendations."
+config_file = "agents/explorer.toml"
+
+[agents.worker]
+description = "Implementation agent. Keep diffs scoped and follow Plan.md."
+config_file = "agents/worker.toml"
+
+[agents.reviewer]
+description = "Meta reviewer orchestrator. Spawn specialist reviewers, consolidate outputs, deduplicate findings, and make final gate decisions."
+config_file = "agents/reviewer.toml"
+
+[agents.reviewer_security]
+description = "Security reviewer. Focus on authn/authz, input validation, injection risk, secret handling, and abuse vectors."
+config_file = "agents/reviewer_security.toml"
+
+[agents.reviewer_correctness]
+description = "Correctness reviewer. Focus on specification alignment, edge cases, state transitions, and error-path behavior."
+config_file = "agents/reviewer_correctness.toml"
+
+[agents.reviewer_performance]
+description = "Performance reviewer. Focus on hot paths, unnecessary allocations/work, query patterns, and scalability risks."
+config_file = "agents/reviewer_performance.toml"
+
+[agents.reviewer_test_quality]
+description = "Test-quality reviewer. Focus on test coverage gaps, brittle tests, missing regression cases, and validation quality."
+config_file = "agents/reviewer_test_quality.toml"
+
+[agents.reviewer_coding_rules]
+description = "Coding-rules reviewer. Validate compliance with repository AGENTS.md conventions and language-specific implementation rules."
+config_file = "agents/reviewer_coding_rules.toml"
+
+[agents.reviewer_ui_guard]
+description = "UI change guard. Detect whether the current diff includes frontend UI changes and decide if UI checks should run."
+config_file = "agents/reviewer_ui_guard.toml"
+
+[agents.reviewer_ui]
+description = "UI reviewer. Run UI-focused checks only when reviewer_ui_guard says UI changes exist."
+config_file = "agents/reviewer_ui.toml"
+
+[agents.reviewer_simple]
+description = "Lightweight unified reviewer that covers security, correctness, performance, test quality, coding rules, and UI impact checks."
+config_file = "agents/reviewer_simple.toml"
+
+[agents.monitor]
+description = "Run validations (lint/typecheck/tests/build) and summarize failures."
+config_file = "agents/monitor.toml"

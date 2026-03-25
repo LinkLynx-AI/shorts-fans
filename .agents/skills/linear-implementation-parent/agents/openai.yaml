@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linear Implementation Parent"
+  short_description: "Run parent-issue sequential delivery workflow"
+  default_prompt: "Use $linear-implementation-parent to execute a parent issue by processing child issues sequentially."

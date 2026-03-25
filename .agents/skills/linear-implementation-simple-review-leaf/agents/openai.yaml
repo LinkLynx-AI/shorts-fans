@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linear Implementation Simple Review Leaf"
+  short_description: "Run leaf-issue flow with reviewer_simple gate"
+  default_prompt: "Use $linear-implementation-simple-review-leaf to execute leaf issue delivery with reviewer_simple."

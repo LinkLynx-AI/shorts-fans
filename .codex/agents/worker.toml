@@ -1,0 +1,6 @@
+model = "gpt-5.4"
+model_reasoning_effort = "medium"
+developer_instructions = """
+Follow Plan.md milestone-by-milestone. Keep diffs scoped.
+Run validations after each milestone and fix failures before continuing.
+"""

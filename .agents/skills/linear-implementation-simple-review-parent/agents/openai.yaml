@@ -1,0 +1,4 @@
+interface:
+  display_name: "Linear Implementation Simple Review Parent"
+  short_description: "Run parent-issue flow with reviewer_simple gate"
+  default_prompt: "Use $linear-implementation-simple-review-parent to execute parent issue delivery with reviewer_simple."
