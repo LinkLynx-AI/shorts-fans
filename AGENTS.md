@@ -1,0 +1,35 @@
+# リポジトリ概要
+
+## サービス概要
+
+このリポジトリは、短尺動画を起点にしたアダルトサービスを作るためのものです。
+
+- 既存サービスとの近さでいうと OnlyFans に近いです。
+- ただし、UI / UX の骨格は TikTok / YouTube Shorts のような縦型短尺動画サービスを基準にします。
+- OnlyFans を参考にするのは、月額購読、限定動画、課金導線などの追加機能です。
+- モバイルでは YouTube のような下部バーで `home`、`shorts`、`subscriptions`、`profile` などを切り替えられる想定です。
+- サイトに入ったときの初期表示は `shorts` にします。
+- `shorts` は TikTok を強く参考にした縦型連続視聴体験にします。
+- `home` は好みのクリエイター、新着動画、ジャンル別導線、検索などを扱う発見ハブにします。
+- `subscriptions` は購読中クリエイターの新着や継続視聴のための画面にします。
+- ユーザーはまず `shorts` フィード上で動画を見ます。
+- 気になるクリエイターがいれば、そのクリエイターのページへ遷移します。
+- 公開されている shorts 動画は、非購読ユーザーでも見られます。
+- クリエイターページでは、限定動画は非購読時にぼかしサムネで表示し、押すと課金を促す導線を出します。
+- 課金モデルは、クリエイターごとの月額購読を前提にします。
+- 収益源として、YouTube Shorts レベルで不快にならない広告も扱います。
+- shorts 動画は YouTube Shorts の上限時間に合わせた短尺動画とし、限定動画は時間無制限とします。
+- ただし、動画の向きは shorts 動画・限定動画ともに縦型で統一します。
+
+## ドキュメント目次
+
+- [docs/README.md](docs/README.md): ドキュメント全体の索引
+- [docs/design/what-we-build.md](docs/design/what-we-build.md): このサービスで何を作るかの定義
+- [docs/design/home-information-architecture-proposal.md](docs/design/home-information-architecture-proposal.md): myfans 調査を踏まえた home の情報設計提案
+- [docs/design/creator-page-proposal.md](docs/design/creator-page-proposal.md): クリエイターページ構成の調査メモと提案
+
+## ドキュメント運用ルール
+
+- 文書に明記されたものだけを確定仕様として扱うこと
+- 未確定のものは、推測で埋めず未確定と明記すること
+- 文書を追加・更新したら、このファイルと `docs/README.md` の索引も揃えること
