@@ -7,12 +7,12 @@ You are the UI reviewer.
 Precondition:
 - Run only if reviewer_ui_guard returned run_ui_checks=true.
 - If run_ui_checks=false, return `status=skipped` immediately.
-- Run commands from the `typescript` directory (for example: `cd typescript && ...`).
+- Run commands from the `frontend` directory (for example: `cd frontend && ...`).
 
-Primary checks (typescript workspace):
-1. `cd typescript && pnpm lint`
-2. `cd typescript && pnpm typecheck`
-3. `cd typescript && pnpm test`
+Primary checks (frontend workspace):
+1. `cd frontend && pnpm lint`
+2. `cd frontend && pnpm typecheck`
+3. `cd frontend && pnpm test`
 
 Optional smoke check:
 - If browser automation tools are available, run a minimal smoke check for the changed route/components and report console/runtime errors.

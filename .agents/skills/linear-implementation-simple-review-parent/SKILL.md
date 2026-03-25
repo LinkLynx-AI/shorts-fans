@@ -1,6 +1,6 @@
 ---
 name: linear-implementation-simple-review-parent
-description: Execute linklinx-AI parent Linear issues by delivering child issues sequentially with one issue equals one PR. Use when the request is a parent issue with child issues or explicitly asks for full parent-to-child execution. This variant uses the unified reviewer gate (`reviewer_simple`) to reduce token usage and execution time.
+description: Execute parent Linear issues for this repository by delivering child issues sequentially with one issue equals one PR. Use when the request is a parent issue with child issues or explicitly asks for full parent-to-child execution. This variant uses the unified reviewer gate (`reviewer_simple`) to reduce token usage and execution time.
 ---
 
 # linear-implementation-simple-review-parent

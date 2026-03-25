@@ -5,7 +5,7 @@
 2. Determine execution order by:
 - explicit order markers in title or body
 - dependency relations
-- fallback layer order: database, API, realtime, UI, end-to-end
+- fallback layer order: contract/domain, backend, frontend data/state, frontend UI, end-to-end
 3. Execute child issues sequentially in that order.
 4. Treat a child issue as complete only when all mandatory delivery loop steps and evidence are complete.
 
@@ -15,9 +15,9 @@
 3. Execute review gates defined in `references/review-gates.md`.
 4. If review or validation gate fails, fix and repeat from implementation.
 5. For non-trivial changes, run runtime smoke gate:
-- run `make dev` and verify startup
-- access primary route(s) and check for fatal runtime errors
-- run Playwright smoke checks for primary flow(s)
+- start the affected app(s) in `backend/` and/or `frontend/` if local runtime is available
+- verify changed route(s) or endpoint(s) and check for fatal runtime errors
+- run Playwright smoke checks for primary user-visible flow(s) when frontend UI is touched
 6. If runtime smoke fails, fix and repeat from implementation.
 7. Open PR from child branch to the parent branch.
 8. Apply merge policy from `references/core-policy.md`.
@@ -25,7 +25,7 @@
 
 ## Required Per-child Evidence
 - Child issue key and branch name.
-- `make validate` result and additional validation results.
+- Touched-area validation results and additional issue-specific validation results.
 - Review gate result and blocking finding disposition.
 - UI gate result and UI review result when applicable.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.

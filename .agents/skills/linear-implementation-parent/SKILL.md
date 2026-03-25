@@ -1,6 +1,6 @@
 ---
 name: linear-implementation-parent
-description: Execute linklinx-AI parent Linear issues by delivering child issues sequentially with one issue equals one PR. Use when the request is a parent issue that has child issues or explicitly asks to run full parent-to-child implementation flow. This variant uses the full reviewer stack with meta review (`reviewer`) and specialist reviewers.
+description: Execute parent Linear issues for this repository by delivering child issues sequentially with one issue equals one PR. Use when the request is a parent issue that has child issues or explicitly asks to run full parent-to-child implementation flow. This variant uses the full reviewer stack with meta review (`reviewer`) and specialist reviewers.
 ---
 
 # linear-implementation-parent

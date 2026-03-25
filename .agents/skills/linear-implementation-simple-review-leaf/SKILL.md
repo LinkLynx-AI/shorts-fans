@@ -1,6 +1,6 @@
 ---
 name: linear-implementation-simple-review-leaf
-description: Execute linklinx-AI leaf issue runs with one issue equals one PR delivery. Use when the request starts from a child issue or from a standalone smallest-unit issue that does not require parent-child decomposition. This variant uses the unified reviewer gate (`reviewer_simple`) to reduce token usage and execution time.
+description: Execute leaf issue runs for this repository with one issue equals one PR delivery. Use when the request starts from a child issue or from a standalone smallest-unit issue that does not require parent-child decomposition. This variant uses the unified reviewer gate (`reviewer_simple`) to reduce token usage and execution time.
 ---
 
 # linear-implementation-simple-review-leaf

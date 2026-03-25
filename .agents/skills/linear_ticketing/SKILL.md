@@ -1,6 +1,6 @@
 ---
 name: linear-ticketing
-description: Create and structure Linear issues for linklinx-AI using parent and child issue decomposition with explicit execution order, dependencies, acceptance criteria, and Do/Don't scope. Use when users ask to split features into actionable tasks, create parent and child issues, or prepare implementation-ready issue plans without writing code.
+description: Create and structure Linear issues for this repository using parent and child issue decomposition with explicit execution order, dependencies, acceptance criteria, and Do/Don't scope. Use when users ask to split features into actionable tasks, create parent and child issues, or prepare implementation-ready issue plans without writing code.
 ---
 
 # linear-ticketing
@@ -13,7 +13,7 @@ description: Create and structure Linear issues for linklinx-AI using parent and
 
 ## Required Input
 - Feature summary with business purpose.
-- Target area such as frontend, backend, or infra.
+- Target area such as frontend, backend, AI, or infra.
 
 ## Optional Input
 - Team, project, label policies in Linear.
@@ -47,18 +47,17 @@ Create the following issue structure.
 
 Template text is available at `assets/templates.md`.
 
-## Standard Decomposition for Messaging MVP
-- [01] Database schema and migration
-- [02] API create message
-- [03] API list messages with pagination
-- [04] Realtime publish via websocket
-- [05] UI timeline view
-- [06] UI composer send flow
-- [07] End to end send and receive path
-- [08] Observability and logging baseline
+## Standard Decomposition for Backend/Frontend Product Features
+- [01] Contract, schema, or domain decision
+- [02] Backend domain logic or API implementation
+- [03] Backend integration, persistence, or external service wiring
+- [04] Frontend data access, validation, or state management
+- [05] Frontend page, component, or user flow
+- [06] End-to-end verification and edge-case handling
+- [07] Observability, analytics, or operational follow-up
 
 ## How to Determine Order
-- Prefer strong dependency direction: database, then API, then realtime, then UI, then end to end.
+- Prefer strong dependency direction: contract/domain, then backend, then frontend data/state, then frontend UI, then end to end.
 - Resolve blocked by issues first.
 - If a child task cannot close in one PR, split it and reassign order.
 

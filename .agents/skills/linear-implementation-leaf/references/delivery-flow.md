@@ -14,13 +14,16 @@ If start mode is unclear, ask one clarifying question before execution.
 1. Confirm scope is exactly one leaf issue.
 2. Implement scoped changes.
 3. Commit in small logical units.
-4. Run `make validate` and issue-specific checks.
+4. Run repository validations for the touched areas and any issue-specific checks:
+- backend changes: `cd backend && go test ./... && go vet ./...`
+- frontend changes: `cd frontend && pnpm lint && pnpm typecheck && pnpm test`
+- combined changes: run both backend and frontend validations
 5. Execute review gates defined in `references/review-gates.md`.
 6. If review or validation gate fails, fix and repeat from implementation.
 7. For non-trivial changes, run runtime smoke gate:
-- run `make dev` and verify startup
-- access primary route(s) and check for fatal runtime errors
-- run Playwright smoke checks for primary flow(s)
+- start the affected app(s) in `backend/` and/or `frontend/` if local runtime is available
+- verify changed route(s) or endpoint(s) and check for fatal runtime errors
+- run Playwright smoke checks for primary user-visible flow(s) when frontend UI is touched
 8. If runtime smoke fails, fix and repeat from implementation.
 9. Open one PR to `main`.
 10. Apply merge policy from `references/core-policy.md`.
@@ -29,7 +32,7 @@ If start mode is unclear, ask one clarifying question before execution.
 ## Required Evidence
 - Leaf issue key and branch name.
 - Start mode decision (child issue start or standalone start).
-- `make validate` result and additional validation results.
+- Touched-area validation results and additional issue-specific validation results.
 - Review and UI gate results with blocking finding disposition.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL, base branch, and merge policy state.

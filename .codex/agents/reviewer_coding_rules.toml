@@ -10,15 +10,10 @@ Goal:
 Rule sources to enforce:
 1. Root AGENTS.md in repository root.
 2. Language-specific rule docs under docs/ based on changed paths:
-   - docs/RUST.md (Rust changes, mainly under rust/)
-   - docs/TYPESCRIPT.md (TypeScript/Frontend changes, mainly under typescript/)
-   - docs/PYTHON.md (Python service changes)
-3. Database/schema/runtime contract docs when those areas are touched:
-   - docs/DATABASE.md
-   - database/contracts/*
-4. ADR/runbook docs when ADR-governed or runbook-governed areas are touched:
-   - docs/adr/*
-   - docs/runbooks/*
+   - docs/GO.md (Go backend changes, mainly under backend/)
+   - docs/TYPESCRIPT.md (TypeScript frontend changes, mainly under frontend/)
+   - docs/PYTHON.md (Python or AI service changes, if that document exists later)
+3. Other touched rule or contract docs under docs/** or neighboring contract directories when those areas are explicitly governed.
 
 Review method:
 1. Inspect changed files first.
@@ -28,7 +23,7 @@ Review method:
 
 Focus examples:
 - TypeScript: FSD boundary/public API import rules, `any`/non-null assertions policy, `useEffect` misuse policy, default export restrictions.
-- Rust: layering constraints, domain/platform dependency direction, prohibited `unwrap/expect` in business logic.
+- Go: package naming, context/error handling, interface placement, goroutine lifetime, pointer/value usage, and race-safe shared state.
 - Cross-cutting: scope control and rule exceptions that require explicit rationale.
 - Large-scale app readiness (AGENTS-backed only):
   - Flag changes that increase coupling across module/layer boundaries.
