@@ -24,6 +24,7 @@
 ## ドキュメント目次
 
 - [docs/README.md](docs/README.md): ドキュメント全体の索引
+- [docs/TECH_STACK.md](docs/TECH_STACK.md): Frontend / Backend / Infra / Payment / Analytics を含む技術選定
 - [docs/GO.md](docs/GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [docs/TYPESCRIPT.md](docs/TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 
