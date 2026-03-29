@@ -8,18 +8,18 @@ import (
 	awssqs "github.com/aws/aws-sdk-go-v2/service/sqs"
 )
 
-// Config describes the minimal SQS client configuration.
+// Config は最小限の SQS client 設定を表します。
 type Config struct {
 	Region   string
 	QueueURL string
 }
 
-// Enabled reports whether SQS configuration is fully supplied.
+// Enabled は SQS 設定が一式そろっているか返します。
 func (c Config) Enabled() bool {
 	return c.Region != "" && c.QueueURL != ""
 }
 
-// Validate checks that SQS configuration is internally consistent.
+// Validate は SQS 設定の整合性を検証します。
 func (c Config) Validate() error {
 	switch {
 	case c.Region == "" && c.QueueURL == "":
@@ -33,7 +33,7 @@ func (c Config) Validate() error {
 	}
 }
 
-// NewClient builds an AWS SQS client when configuration is present.
+// NewClient は設定がそろっている場合に AWS SQS client を構築します。
 func NewClient(ctx context.Context, cfg Config) (*awssqs.Client, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err

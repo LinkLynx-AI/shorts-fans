@@ -11,7 +11,7 @@ const (
 	defaultAppEnv  = "development"
 )
 
-// Config contains runtime configuration for backend commands.
+// Config は backend コマンドの実行時設定を保持します。
 type Config struct {
 	AppEnv      string
 	APIAddr     string
@@ -21,12 +21,12 @@ type Config struct {
 	SQSQueueURL string
 }
 
-// Load reads configuration from process environment and applies defaults.
+// Load はプロセス環境変数から設定を読み込み、既定値を適用します。
 func Load() Config {
 	return LoadFromEnv(os.Getenv)
 }
 
-// LoadFromEnv builds Config from an arbitrary lookup function.
+// LoadFromEnv は任意の lookup 関数から Config を構築します。
 func LoadFromEnv(lookup func(string) string) Config {
 	cfg := Config{
 		AppEnv:      strings.TrimSpace(lookup("APP_ENV")),
@@ -47,7 +47,7 @@ func LoadFromEnv(lookup func(string) string) Config {
 	return cfg
 }
 
-// ValidateAPI verifies that API server configuration is complete.
+// ValidateAPI は API サーバー設定が不足なく与えられているか検証します。
 func (c Config) ValidateAPI() error {
 	var missing []string
 	if c.PostgresDSN == "" {
@@ -63,7 +63,7 @@ func (c Config) ValidateAPI() error {
 	return nil
 }
 
-// ValidateWorker verifies that worker configuration is internally consistent.
+// ValidateWorker は worker 設定の整合性を検証します。
 func (c Config) ValidateWorker() error {
 	switch {
 	case c.AWSRegion == "" && c.SQSQueueURL == "":

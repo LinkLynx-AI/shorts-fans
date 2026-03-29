@@ -7,12 +7,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ReadinessChecker validates PostgreSQL readiness through pgxpool.
+// ReadinessChecker は pgxpool を通じて PostgreSQL の readiness を検証します。
 type ReadinessChecker struct {
 	pool *pgxpool.Pool
 }
 
-// NewPool constructs and validates a pgxpool.Pool.
+// NewPool は pgxpool.Pool を初期化し、接続確認まで行います。
 func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -27,12 +27,12 @@ func NewPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	return pool, nil
 }
 
-// NewReadinessChecker wraps a pool for readiness checks.
+// NewReadinessChecker は readiness check 用に pool を包みます。
 func NewReadinessChecker(pool *pgxpool.Pool) ReadinessChecker {
 	return ReadinessChecker{pool: pool}
 }
 
-// CheckReadiness verifies that PostgreSQL responds to ping.
+// CheckReadiness は PostgreSQL が ping に応答できるか検証します。
 func (c ReadinessChecker) CheckReadiness(ctx context.Context) error {
 	if c.pool == nil {
 		return fmt.Errorf("postgres pool is nil")

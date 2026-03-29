@@ -12,31 +12,31 @@ import (
 
 const readinessTimeout = 2 * time.Second
 
-// ReadinessChecker validates that a dependency can serve requests.
+// ReadinessChecker は依存先がリクエストを処理可能か検証します。
 type ReadinessChecker interface {
 	CheckReadiness(ctx context.Context) error
 }
 
-// Dependency names a readiness check dependency.
+// Dependency は readiness check の対象依存先を表します。
 type Dependency struct {
 	Name    string
 	Checker ReadinessChecker
 }
 
-// Config configures the HTTP server runtime.
+// Config は HTTP サーバーの実行設定を表します。
 type Config struct {
 	Addr            string
 	ShutdownTimeout time.Duration
 }
 
-// Server manages Gin startup and graceful shutdown.
+// Server は Gin の起動と graceful shutdown を管理します。
 type Server struct {
 	config     Config
 	httpServer *http.Server
 	logger     *slog.Logger
 }
 
-// NewHandler builds the Gin router for the API server.
+// NewHandler は API サーバー用の Gin router を構築します。
 func NewHandler(dependencies []Dependency) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
@@ -74,7 +74,7 @@ func NewHandler(dependencies []Dependency) *gin.Engine {
 	return router
 }
 
-// New constructs a Server from runtime config and dependencies.
+// New は実行設定と依存先から Server を構築します。
 func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 10 * time.Second
@@ -95,7 +95,7 @@ func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
 	}
 }
 
-// Run starts the HTTP server and shuts it down when ctx is canceled.
+// Run は HTTP サーバーを起動し、ctx が終了したら停止します。
 func (s *Server) Run(ctx context.Context) error {
 	errCh := make(chan error, 1)
 	go func() {

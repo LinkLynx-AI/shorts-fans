@@ -7,12 +7,12 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 )
 
-// ReadinessChecker validates Redis readiness through a redis client.
+// ReadinessChecker は Redis client を通じて Redis の readiness を検証します。
 type ReadinessChecker struct {
 	client *goredis.Client
 }
 
-// NewClient constructs and validates a Redis client.
+// NewClient は Redis client を初期化し、接続確認まで行います。
 func NewClient(ctx context.Context, addr string) (*goredis.Client, error) {
 	client := goredis.NewClient(&goredis.Options{
 		Addr: addr,
@@ -29,12 +29,12 @@ func NewClient(ctx context.Context, addr string) (*goredis.Client, error) {
 	return client, nil
 }
 
-// NewReadinessChecker wraps a Redis client for readiness checks.
+// NewReadinessChecker は readiness check 用に Redis client を包みます。
 func NewReadinessChecker(client *goredis.Client) ReadinessChecker {
 	return ReadinessChecker{client: client}
 }
 
-// CheckReadiness verifies that Redis responds to ping.
+// CheckReadiness は Redis が ping に応答できるか検証します。
 func (c ReadinessChecker) CheckReadiness(ctx context.Context) error {
 	if c.client == nil {
 		return fmt.Errorf("redis client is nil")
