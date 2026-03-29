@@ -17,21 +17,29 @@ pnpm dev
 - `pnpm dev`: 開発サーバーを起動
 - `pnpm lint`: ESLint を実行
 - `pnpm typecheck`: TypeScript の型検査を実行
+- `pnpm test:unit`: Vitest の unit / component test を実行
+- `pnpm test:coverage:check`: Vitest の coverage 計測を実行
+- `pnpm test:e2e`: Playwright の smoke test を実行
+- `pnpm test:e2e:install`: Playwright の Chromium を導入
 - `pnpm build`: production build を実行
 - `pnpm start`: build 済みアプリを起動
 
 ## Structure
 
-- `src/app`: App Router の route / layout
-- `src/app/layout.tsx`: root layout
-- `src/app/page.tsx`: `/` の初期ページ
-- `src/app/globals.css`: アプリ全体の基礎スタイル
+- `src/app`: App Router の route / layout / file conventions
+- `src/shared`: UI primitive, env, API client, styles
+- `src/entities`: 共有 domain type
+- `src/features`: 画面に組み込む振る舞い単位
+- `src/widgets`: route shell や画面ブロック
+- `tests/e2e`: Playwright smoke test
 
 ## Notes
 
 - routing は `App Router` を前提にします。
 - import alias は `@/*` を使用します。
 - 追加の設計ルールは repo 直下の `AGENTS.md` と `docs/TYPESCRIPT.md` に従います。
+- UI は `Tailwind CSS v4 + shadcn/ui 互換 primitive + Radix Primitives` を前提にします。
+- `.env.example` に frontend 起動時の最小 env 契約を定義しています。
 
 ## Deploy on Vercel
 

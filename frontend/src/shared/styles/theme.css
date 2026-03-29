@@ -1,0 +1,30 @@
+:root {
+  --background: #f5ecdf;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-strong: #fff8f0;
+  --foreground: #211613;
+  --muted: #6a5a51;
+  --border: rgba(94, 56, 27, 0.14);
+  --accent: #d15c18;
+  --accent-strong: #8f2e13;
+  --ring: rgba(209, 92, 24, 0.42);
+}
+
+@theme inline {
+  --font-sans:
+    "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN",
+    "Yu Gothic",
+    "YuGothic",
+    "Noto Sans JP",
+    sans-serif;
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-strong: var(--surface-strong);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-ring: var(--ring);
+}
