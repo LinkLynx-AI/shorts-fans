@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    schema:
+      - "db/migrations/000001_bootstrap.up.sql"
+    queries: "db/queries"
+    gen:
+      go:
+        package: "sqlc"
+        out: "internal/postgres/sqlc"
+        sql_package: "pgx/v5"
