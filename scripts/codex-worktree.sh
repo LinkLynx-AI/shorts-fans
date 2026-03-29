@@ -10,7 +10,7 @@ Usage:
 Behavior:
   - Creates a git worktree under $HOME/.codex/worktrees by default.
   - The worktree directory name is derived from the branch name.
-  - Launches codex with --cd <worktree-path>.
+  - Launches codex with --ask-for-approval never and --cd <worktree-path>.
 
 Environment:
   CODEX_WORKTREE_ROOT  Destination root for created worktrees
@@ -131,4 +131,4 @@ echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
 echo "base: ${base_ref}"
 
-exec codex --cd "$target_worktree_path" "$@"
+exec codex --ask-for-approval never --cd "$target_worktree_path" "$@"
