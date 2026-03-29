@@ -24,10 +24,6 @@
 ## ドキュメント目次
 
 - [docs/README.md](docs/README.md): ドキュメント全体の索引
-- [docs/design/what-we-build.md](docs/design/what-we-build.md): このサービスで何を作るかの定義
-- [docs/design/technical-stack-baseline.md](docs/design/technical-stack-baseline.md): Frontend / Backend / Infra の技術スタック前提
-- [docs/design/home-information-architecture-proposal.md](docs/design/home-information-architecture-proposal.md): myfans 調査を踏まえた home の情報設計提案
-- [docs/design/creator-page-proposal.md](docs/design/creator-page-proposal.md): クリエイターページ構成の調査メモと提案
 - [docs/GO.md](docs/GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [docs/TYPESCRIPT.md](docs/TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 
