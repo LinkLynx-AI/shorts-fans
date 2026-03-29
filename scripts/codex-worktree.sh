@@ -8,8 +8,13 @@ Usage:
   scripts/codex-worktree.sh <branch-name> [-- <codex-args...>]
 
 Behavior:
-  - Creates or reuses a git worktree at /codex/<branch-name>.
-  - Launches codex inside the target worktree.
+  - Creates a git worktree under $HOME/.codex/worktrees by default.
+  - The worktree directory name is derived from the branch name.
+  - Launches codex with --cd <worktree-path>.
+
+Environment:
+  CODEX_WORKTREE_ROOT  Destination root for created worktrees
+                       (default: $HOME/.codex/worktrees)
 
 Examples:
   scripts/codex-worktree.sh feat/frontend-shell
@@ -26,26 +31,44 @@ require_command() {
   fi
 }
 
-sanitize_worktree_name() {
-  printf '%s' "$1" \
-    | tr '/:@ ' '----' \
-    | tr -cd '[:alnum:]._-'
+slugify() {
+  local value="$1"
+
+  value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')"
+  value="$(printf '%s' "$value" | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//; s/-{2,}/-/g')"
+
+  printf '%s' "$value"
 }
 
-find_existing_worktree_for_branch() {
-  local branch_name="$1"
+resolve_default_base_ref() {
+  local repo_root="$1"
+  local current_branch
 
-  git worktree list --porcelain | awk -v target_branch="refs/heads/${branch_name}" '
-    $1 == "worktree" {
-      current_worktree = $2
-      next
-    }
+  current_branch="$(git -C "$repo_root" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+  if [[ -n "$current_branch" ]]; then
+    printf '%s\n' "$current_branch"
+    return
+  fi
 
-    $1 == "branch" && $2 == target_branch {
-      print current_worktree
-      exit
-    }
-  '
+  local origin_head
+
+  origin_head="$(git -C "$repo_root" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+  if [[ -n "$origin_head" ]]; then
+    printf '%s\n' "$origin_head"
+    return
+  fi
+
+  if git -C "$repo_root" show-ref --verify --quiet refs/heads/main; then
+    printf 'main\n'
+    return
+  fi
+
+  if git -C "$repo_root" show-ref --verify --quiet refs/heads/master; then
+    printf 'master\n'
+    return
+  fi
+
+  git -C "$repo_root" rev-parse --short HEAD
 }
 
 require_command git
@@ -70,39 +93,42 @@ fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git -C "${script_dir}/.." rev-parse --show-toplevel)"
-base_ref="main"
-
-if ! git show-ref --verify --quiet "refs/heads/${base_ref}"; then
-  base_ref="$(git rev-parse --abbrev-ref HEAD)"
-fi
-
-worktree_name="$(sanitize_worktree_name "$branch_name")"
+base_ref="$(resolve_default_base_ref "$repo_root")"
+worktree_name="$(slugify "${branch_name#codex/}")"
 
 if [[ -z "$worktree_name" ]]; then
   echo "error: failed to derive a safe worktree identifier from branch '${branch_name}'." >&2
   exit 1
 fi
 
-target_worktree_path="/codex/${branch_name}"
-existing_worktree_path="$(find_existing_worktree_for_branch "$branch_name")"
+if ! git -C "$repo_root" rev-parse --verify --quiet "${base_ref}^{commit}" >/dev/null; then
+  echo "error: base ref not found: ${base_ref}" >&2
+  exit 1
+fi
+
+if git -C "$repo_root" worktree list --porcelain | awk '/^branch / {print $2}' | grep -Fxq "refs/heads/${branch_name}"; then
+  echo "error: branch is already checked out in another worktree: ${branch_name}" >&2
+  exit 1
+fi
+
+worktree_root="${CODEX_WORKTREE_ROOT:-$HOME/.codex/worktrees}"
+mkdir -p "$worktree_root"
+
+session_dir="$(mktemp -d "${worktree_root%/}/${worktree_name}-XXXXXX")"
+session_dir="$(cd "$session_dir" && pwd -P)"
+repo_name="$(basename "$repo_root")"
+target_worktree_path="${session_dir}/${repo_name}"
 
 cd "$repo_root"
 
-if [[ -n "$existing_worktree_path" ]]; then
-  target_worktree_path="$existing_worktree_path"
-elif [[ -e "$target_worktree_path" ]]; then
-  echo "error: target path already exists and is not registered as a worktree: ${target_worktree_path}" >&2
-  exit 1
-elif git show-ref --verify --quiet "refs/heads/${branch_name}"; then
-  mkdir -p "$(dirname "$target_worktree_path")"
+if git show-ref --verify --quiet "refs/heads/${branch_name}"; then
   git worktree add "$target_worktree_path" "$branch_name"
 else
-  mkdir -p "$(dirname "$target_worktree_path")"
   git worktree add -b "$branch_name" "$target_worktree_path" "$base_ref"
 fi
 
 echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
+echo "base: ${base_ref}"
 
-cd "$target_worktree_path"
-exec codex "$@"
+exec codex --cd "$target_worktree_path" "$@"
