@@ -4,6 +4,7 @@
 
 ## 現在ある文書
 
+- [BACKEND_STRUCTURE.md](BACKEND_STRUCTURE.md): backend のディレクトリ構成方針、依存方向、SQL と transport の配置ルール
 - [TECH_STACK.md](TECH_STACK.md): Frontend / Backend / Infra / Payment / Analytics を含む技術選定
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール

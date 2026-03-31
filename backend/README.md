@@ -87,6 +87,8 @@ make backend-vet
 - `db/migrations`: `golang-migrate` 用 SQL
 - `db/queries`: `sqlc` 用 query
 
+今後の feature 追加時の backend 構成方針は `../docs/BACKEND_STRUCTURE.md` を参照してください。
+
 ## Notes
 
 - この段階では business endpoint はまだ入れません。
