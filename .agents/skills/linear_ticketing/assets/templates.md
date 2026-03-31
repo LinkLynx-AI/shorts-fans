@@ -1,51 +1,62 @@
-## Parent Feature template
-- Overview:
-- Goals (DoD):
-- Non-goals:
-- Requirements:
-- Security/Abuse:
+## Discovery discussion checklist
+- Who is the primary user or actor?
+- What outcome should change for that user or for the business?
+- What behavior is explicitly in scope?
+- What behavior is explicitly out of scope?
+- What business rules, permissions, and policy decisions matter?
+- What failure cases, abuse cases, or moderation concerns matter?
+- What non-functional requirements matter here?
+- What dependencies, approvals, or external constraints exist?
+- What is still unknown and must stay as an open question?
+
+## Single issue template
+- Context:
+- Target outcome:
+- In scope:
+- Out of scope:
+- Acceptance Criteria:
+- Non-functional requirements or constraints:
+- Dependencies:
 - Open questions:
-- Execution plan (Order / Task / Dependencies):
 
-## Child Task template
-- Parent:
-- Order:
-- Do:
-- Don't:
+## Parent issue template
+- Context:
+- Target outcome:
+- In scope:
+- Out of scope:
+- Functional requirements:
+- Non-functional requirements:
+- Risks / abuse / policy considerations:
+- Open questions:
+- Child issue map:
+
+## Project template
+- Summary:
+- Target outcome:
+- Why this needs a project:
+- In scope:
+- Out of scope:
+- Success signals:
+- Constraints and risks:
+- Open questions:
+- Milestone plan:
+- Linked issue plan:
+
+## Child issue template
+- Parent or project:
+- Outcome:
+- In scope:
+- Out of scope:
 - Acceptance Criteria:
-- How to test:
+- Non-functional requirements or constraints:
 - Dependencies:
-- Definition of Ready:
+- Open questions:
 
-## Frontend Child Task variant (optional)
-- Parent:
-- Order:
-- Scope:
-- UI states covered:
-- Accessibility requirements:
-- Performance constraints:
-- Acceptance Criteria:
-- How to test (manual + automated):
-- Dependencies:
-
-## Backend Child Task variant (optional)
-- Parent:
-- Order:
-- Scope:
-- API/contract impact:
-- Data model impact:
-- Security constraints:
-- Acceptance Criteria:
-- How to test (unit/integration):
-- Dependencies:
-
-## Infra Child Task variant (optional)
-- Parent:
-- Order:
-- Scope:
-- Environment impact:
-- Rollback plan:
-- Observability requirements:
-- Acceptance Criteria:
-- How to test (deploy/rollback/alerts):
+## Discovery issue template
+- Context:
+- Question to resolve:
+- Why it matters:
+- In scope:
+- Out of scope:
+- Exit criteria:
 - Dependencies:
