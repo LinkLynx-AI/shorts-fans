@@ -1,4 +1,5 @@
 ## Discovery discussion checklist
+- Have all material ambiguities been discussed with the user before ticket writing starts?
 - Who is the primary user or actor?
 - What outcome should change for that user or for the business?
 - What behavior is explicitly in scope?
@@ -8,6 +9,7 @@
 - What non-functional requirements matter here?
 - What dependencies, approvals, or external constraints exist?
 - What is still unknown and must stay as an open question?
+- Has the user explicitly agreed to proceed with any remaining open question?
 
 ## Single issue template
 - Context:
@@ -52,7 +54,9 @@
 - Dependencies:
 - Open questions:
 
-## Discovery issue template
+## Optional discovery issue template
+Use only when the user explicitly wants unresolved investigation work tracked as a ticket after discussion.
+
 - Context:
 - Question to resolve:
 - Why it matters:

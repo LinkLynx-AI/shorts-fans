@@ -23,11 +23,15 @@ description: "Create and structure Linear work for this repository by first disc
 
 ## Core Operating Rules
 - Start with requirement discovery, not ticket creation.
+- Assume this skill is being run in plan mode and use that discussion phase to tighten requirements before creating any Linear artifact.
 - Ask focused follow-up questions until the material scope is stable enough to ticket.
 - Challenge vague, contradictory, or underspecified requests instead of silently filling gaps.
 - Discuss detailed functionality and non-functional requirements thoroughly with the user.
 - Treat implementation approach as out of scope unless the user explicitly says a technical constraint is already fixed and relevant to scope.
-- If important uncertainty remains, either record it as an open question or create discovery issues first.
+- If a new material ambiguity appears while drafting or creating tickets, stop and ask the user before continuing.
+- Do not use discovery issues as the default escape hatch for unclear requirements.
+- Use open questions only for residual uncertainty that the user has explicitly accepted when proceeding.
+- Create a discovery issue only when the user explicitly wants an unresolved investigation tracked as work.
 
 ## What to Discuss
 - Primary user or actor and the target user journey.
@@ -60,8 +64,9 @@ Do not create tickets until all of the following are true.
 - The target outcome is clear.
 - The chosen Linear artifact shape is justified.
 - The main functional scope is settled.
-- Important non-functional requirements or constraints are either settled or explicitly listed as open questions.
+- Important non-functional requirements or constraints have been discussed with the user and are either settled or explicitly accepted as open questions.
 - The split between child issues is understandable without implementation details.
+- No unresolved material question remains that should have been asked before writing.
 
 ## Output Contract
 Create only the artifact shape that matches the decision model.
@@ -115,6 +120,7 @@ Pick one method.
 
 1. Linear MCP preferred for local Codex execution.
 - Use existing Linear MCP configuration when available.
+- Ask the user immediately if any new ambiguity appears during the write process.
 - Create the top-level artifact first, then attach milestones if needed, then create child issues, then wire dependencies and references.
 
 2. If MCP is unavailable.
@@ -127,3 +133,4 @@ Pick one method.
 - Dependencies are explicit.
 - Non-functional requirements are included only when they matter.
 - Open questions remain visible instead of being buried or guessed away.
+- Any remaining open question is something the user knowingly accepted at ticket creation time.
