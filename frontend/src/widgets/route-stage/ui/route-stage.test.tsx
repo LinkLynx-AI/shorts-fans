@@ -7,7 +7,7 @@ describe("RouteStage", () => {
     render(
       <RouteStage
         actions={[
-          { href: "/shorts", label: "shorts を開く" },
+          { href: "/", label: "shorts を開く" },
           { href: "/home", label: "home を確認", variant: "secondary" },
         ]}
         description="route description"
@@ -19,6 +19,6 @@ describe("RouteStage", () => {
 
     expect(screen.getByText("route title")).toBeInTheDocument();
     expect(screen.getByText("one")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "shorts を開く" })).toHaveAttribute("href", "/shorts");
+    expect(screen.getByRole("link", { name: "shorts を開く" })).toHaveAttribute("href", "/");
   });
 });

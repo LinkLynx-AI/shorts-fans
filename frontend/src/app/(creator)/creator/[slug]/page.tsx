@@ -45,7 +45,7 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
           `subscription は ${creator.monthlyPriceLabel} を起点に別 feature で接続`,
         ]}
         actions={[
-          { href: "/shorts", label: "shorts に戻る" },
+          { href: "/", label: "shorts に戻る" },
           { href: "/subscriptions", label: "購読面を見る", variant: "secondary" },
         ]}
       >

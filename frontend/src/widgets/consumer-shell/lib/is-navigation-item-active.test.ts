@@ -3,9 +3,14 @@ import { describe, expect, it } from "vitest";
 import { isNavigationItemActive } from "./is-navigation-item-active";
 
 describe("isNavigationItemActive", () => {
+  it("matches the root tab only on the root pathname", () => {
+    expect(isNavigationItemActive("/", "/")).toBe(true);
+    expect(isNavigationItemActive("/home", "/")).toBe(false);
+  });
+
   it("matches non-nested routes exactly", () => {
     expect(isNavigationItemActive("/home", "/home")).toBe(true);
-    expect(isNavigationItemActive("/shorts", "/home")).toBe(false);
+    expect(isNavigationItemActive("/", "/home")).toBe(false);
   });
 
   it("matches nested routes for non-root tabs", () => {

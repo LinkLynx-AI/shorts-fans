@@ -25,7 +25,7 @@ export function ConsumerShell({ children }: ConsumerShellProps) {
           <div className="flex items-center gap-3">
             <Link
               className="rounded-full border border-white/70 bg-white/82 px-4 py-2 text-sm font-semibold text-foreground shadow-[0_12px_24px_rgba(87,38,8,0.1)]"
-              href="/shorts"
+              href="/"
             >
               primary lane
             </Link>

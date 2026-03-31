@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("consumer shell keeps shorts as the default entry and can move to home", async ({ page }) => {
   await page.goto("/");
 
-  await expect(page).toHaveURL(/\/shorts$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "縦型 feed をこのアプリの主導線として固定する。" })).toBeVisible();
 
   await page.getByRole("link", { name: /home discovery hub/i }).click();
@@ -13,7 +13,7 @@ test("consumer shell keeps shorts as the default entry and can move to home", as
 
   await page.getByRole("link", { name: "shorts を開く" }).click();
 
-  await expect(page).toHaveURL(/\/shorts$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "縦型 feed をこのアプリの主導線として固定する。" })).toBeVisible();
 });
 

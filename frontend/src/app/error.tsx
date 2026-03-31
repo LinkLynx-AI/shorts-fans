@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect } from "react";
 
 import { Button } from "@/shared/ui";
@@ -34,7 +35,7 @@ export default function Error({
         <div className="mt-8 flex flex-wrap gap-3">
           <Button onClick={() => unstable_retry()}>再試行する</Button>
           <Button asChild variant="secondary">
-            <a href="/shorts">shorts に戻る</a>
+            <Link href="/">shorts に戻る</Link>
           </Button>
         </div>
       </section>

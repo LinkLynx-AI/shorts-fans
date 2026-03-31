@@ -5,14 +5,14 @@ export default function HomePage() {
     <RouteStage
       eyebrow="home / discovery hub"
       title="好みの creator を掘るための入口を先に固定する。"
-      description="`/home` は discovery hub として残しつつ、サイト初期表示は `shorts` に合わせます。発見導線、ジャンル入口、creator 回遊の箱は home 側に集約し、初手視聴は shorts に寄せます。"
+      description="`/home` は discovery hub として残しつつ、サイト初期表示は `/` の shorts に合わせます。発見導線、ジャンル入口、creator 回遊の箱は home 側に集約し、初手視聴は shorts に寄せます。"
       highlights={[
         "genre / creator / new arrivals の3系統で発見導線を分離",
-        "初手流入は `/shorts`、探索は `/home` へ切り出して役割分担",
+        "初手流入は `/`、探索は `/home` へ切り出して役割分担",
         "creator 詳細へ移る前の discovery hub として home の責務を固定",
       ]}
       actions={[
-        { href: "/shorts", label: "shorts を開く" },
+        { href: "/", label: "shorts を開く" },
         { href: "/creator/atelier-rin", label: "creator sample を見る", variant: "secondary" },
       ]}
     >

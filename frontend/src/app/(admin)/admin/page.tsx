@@ -22,7 +22,7 @@ export default function AdminPage() {
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild>
-            <Link href="/shorts">consumer に戻る</Link>
+            <Link href="/">consumer に戻る</Link>
           </Button>
           <Button asChild variant="secondary">
             <Link href="/home">home を確認</Link>

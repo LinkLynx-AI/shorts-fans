@@ -2,7 +2,7 @@ import { Compass, Film, House, UserRound, type LucideIcon } from "lucide-react";
 
 export type ConsumerNavigationItem = {
   description: string;
-  href: "/home" | "/profile" | "/shorts" | "/subscriptions";
+  href: "/" | "/home" | "/profile" | "/subscriptions";
   icon: LucideIcon;
   label: string;
 };
@@ -16,7 +16,7 @@ export const consumerNavigationItems: ConsumerNavigationItem[] = [
   },
   {
     description: "primary lane",
-    href: "/shorts",
+    href: "/",
     icon: Film,
     label: "shorts",
   },

@@ -13,7 +13,7 @@ export default function SubscriptionsPage() {
       ]}
       actions={[
         { href: "/profile", label: "profile を確認" },
-        { href: "/shorts", label: "shorts に戻る", variant: "secondary" },
+        { href: "/", label: "shorts に戻る", variant: "secondary" },
       ]}
     />
   );

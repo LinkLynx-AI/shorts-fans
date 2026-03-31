@@ -44,7 +44,7 @@ export function SubscriptionCtaCard({ creator }: SubscriptionCtaCardProps) {
           <Link href="/subscriptions">購読導線の箱を確認</Link>
         </Button>
         <Button asChild variant="secondary">
-          <Link href="/shorts">公開 short に戻る</Link>
+          <Link href="/">公開 short に戻る</Link>
         </Button>
       </div>
     </section>

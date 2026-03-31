@@ -5,7 +5,7 @@ import { ConsumerShell } from "@/widgets/consumer-shell";
 
 describe("ConsumerShell", () => {
   it("renders the shared shell and active navigation state", () => {
-    mockedUsePathname.mockReturnValue("/shorts");
+    mockedUsePathname.mockReturnValue("/");
 
     render(
       <ConsumerShell>
