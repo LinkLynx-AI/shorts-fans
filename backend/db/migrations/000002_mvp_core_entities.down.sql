@@ -1,8 +1,10 @@
+DROP TABLE IF EXISTS app.main_playback_progress;
+DROP TABLE IF EXISTS app.pinned_shorts;
+DROP TABLE IF EXISTS app.creator_follows;
 DROP TABLE IF EXISTS app.main_unlocks;
 DROP TABLE IF EXISTS app.shorts;
 DROP TABLE IF EXISTS app.mains;
 DROP TABLE IF EXISTS app.media_assets;
 DROP TABLE IF EXISTS app.creator_profiles;
-DROP TABLE IF EXISTS app.creator_profile_drafts;
 DROP TABLE IF EXISTS app.creator_capabilities;
 DROP TABLE IF EXISTS app.users;

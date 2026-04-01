@@ -2,7 +2,6 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE app.users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    auth_provider_user_ref TEXT UNIQUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -31,23 +30,21 @@ CREATE TABLE app.creator_capabilities (
 CREATE INDEX idx_creator_capabilities_state
     ON app.creator_capabilities (state);
 
-CREATE TABLE app.creator_profile_drafts (
+CREATE TABLE app.creator_profiles (
     user_id UUID PRIMARY KEY REFERENCES app.creator_capabilities (user_id),
     display_name TEXT,
     avatar_url TEXT,
-    bio TEXT,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE app.creator_profiles (
-    user_id UUID PRIMARY KEY REFERENCES app.creator_capabilities (user_id),
-    display_name TEXT NOT NULL CHECK (length(btrim(display_name)) > 0),
-    avatar_url TEXT,
     bio TEXT NOT NULL DEFAULT '',
-    published_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CHECK (
+        published_at IS NULL
+        OR (
+            display_name IS NOT NULL
+            AND length(btrim(display_name)) > 0
+        )
+    )
 );
 
 CREATE TABLE app.media_assets (
@@ -190,3 +187,43 @@ CREATE INDEX idx_main_unlocks_user_id
 
 CREATE INDEX idx_main_unlocks_main_id
     ON app.main_unlocks (main_id);
+
+CREATE TABLE app.creator_follows (
+    user_id UUID NOT NULL REFERENCES app.users (id),
+    creator_user_id UUID NOT NULL REFERENCES app.creator_capabilities (user_id),
+    followed_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, creator_user_id),
+    CHECK (user_id <> creator_user_id)
+);
+
+CREATE INDEX idx_creator_follows_creator_user_id
+    ON app.creator_follows (creator_user_id);
+
+CREATE TABLE app.pinned_shorts (
+    user_id UUID NOT NULL REFERENCES app.users (id),
+    short_id UUID NOT NULL REFERENCES app.shorts (id),
+    pinned_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, short_id)
+);
+
+CREATE INDEX idx_pinned_shorts_short_id
+    ON app.pinned_shorts (short_id);
+
+CREATE TABLE app.main_playback_progress (
+    user_id UUID NOT NULL,
+    main_id UUID NOT NULL,
+    last_position_ms BIGINT NOT NULL DEFAULT 0 CHECK (last_position_ms >= 0),
+    last_played_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, main_id),
+    FOREIGN KEY (user_id, main_id)
+        REFERENCES app.main_unlocks (user_id, main_id),
+    CHECK (completed_at IS NULL OR completed_at >= created_at)
+);
+
+CREATE INDEX idx_main_playback_progress_user_last_played_at
+    ON app.main_playback_progress (user_id, last_played_at DESC);
