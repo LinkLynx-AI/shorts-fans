@@ -12,10 +12,10 @@ describe("Button", () => {
   it("renders as its child when asChild is enabled", () => {
     render(
       <Button asChild variant="secondary">
-        <a href="/home">home</a>
+        <a href="/sample">sample</a>
       </Button>,
     );
 
-    expect(screen.getByRole("link", { name: "home" })).toHaveAttribute("href", "/home");
+    expect(screen.getByRole("link", { name: "sample" })).toHaveAttribute("href", "/sample");
   });
 });

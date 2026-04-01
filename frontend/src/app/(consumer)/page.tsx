@@ -1,20 +1,16 @@
-import { RouteStage } from "@/widgets/route-stage";
-
-export default function RootEntryPage() {
+export default function RootPage() {
   return (
-    <RouteStage
-      eyebrow="shorts / primary lane"
-      title="縦型 feed をこのアプリの主導線として固定する。"
-      description="本番では連続視聴、縦型アクション、creator 遷移をここに積み上げます。今は shell と route を先に確保し、以後の UI 実装がここを中心に伸びる状態にしています。"
-      highlights={[
-        "mobile bottom nav の既定体験は shorts を中心に設計",
-        "公開 short は非購読でも見られる前提で情報密度を抑制",
-        "creator 遷移・subscription 導線の受け口をここから伸ばす",
-      ]}
-      actions={[
-        { href: "/creator/atelier-rin", label: "creator へ移動" },
-        { href: "/subscriptions", label: "購読 feed を確認", variant: "secondary" },
-      ]}
-    />
+    <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-6 py-12 sm:px-10">
+      <section className="w-full rounded-[2rem] border border-white/80 bg-white/76 p-8 shadow-[0_24px_80px_rgba(87,38,8,0.14)] backdrop-blur-lg sm:p-10">
+        <p className="text-xs font-semibold uppercase tracking-[0.26em] text-accent">frontend foundation</p>
+        <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          ページ構造の仮置きは外し、UI 基盤だけを残しています。
+        </h1>
+        <p className="mt-4 max-w-3xl text-sm leading-7 text-muted sm:text-base">
+          `home`、`subscriptions`、`profile`、`creator` などの route 前提は一旦削除しました。
+          この状態から、必要な画面が固まってから App Router 配下を組み直せます。
+        </p>
+      </section>
+    </main>
   );
 }

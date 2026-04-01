@@ -28,9 +28,7 @@ pnpm dev
 
 - `src/app`: App Router の route / layout / file conventions
 - `src/shared`: UI primitive, env, API client, styles
-- `src/entities`: 共有 domain type
-- `src/features`: 画面に組み込む振る舞い単位
-- `src/widgets`: route shell や画面ブロック
+- `src/{entities,features,widgets}`: 具体的な UI/機能が固まった段階で追加する FSD layer
 - `tests/e2e`: Playwright smoke test
 
 ## Notes

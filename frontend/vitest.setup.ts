@@ -3,12 +3,12 @@ import { cleanup } from "@testing-library/react";
 import { createElement, type AnchorHTMLAttributes, type ReactNode } from "react";
 import { afterEach, vi } from "vitest";
 
-import { mockedUsePathname } from "@/test/mocks/next-navigation";
-
 type MockedLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   children?: ReactNode;
   href: string;
 };
+
+const mockedUsePathname = vi.fn(() => "/");
 
 afterEach(() => {
   cleanup();

@@ -11,14 +11,11 @@ export default function NotFound() {
           指定された route はまだ用意されていません。
         </h1>
         <p className="mt-3 text-sm leading-7 text-muted">
-          App Router の `not-found.tsx` を root に置いて、未定義 URL でも shell ごと崩れない基盤にしています。
+          固定のページ構造を置かない前提なので、未定義 URL は root の `not-found.tsx` でまとめて扱います。
         </p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Button asChild>
-            <Link href="/">shorts を開く</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/home">home に戻る</Link>
+            <Link href="/">トップへ戻る</Link>
           </Button>
         </div>
       </section>
