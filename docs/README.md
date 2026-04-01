@@ -10,7 +10,13 @@
 - [TECH_STACK.md](TECH_STACK.md): Frontend / Backend / Infra / Payment / Analytics を含む技術選定
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
+- [contracts/mvp-core-domain-contract.md](contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
 - [ssot/LOCAL_INDEX.md](ssot/LOCAL_INDEX.md): 外部 repo から取り込んだ SSOT のローカル入口
+
+## 補助ディレクトリ
+
+- `contracts/`: SSOT を置き換えずに、実装者向けの契約や境界責務をまとめる
+- `agent_runs/`: issue ごとの agent 実行ログ、判断、検証記録を残す
 
 ## 今後追加する文書領域
 
