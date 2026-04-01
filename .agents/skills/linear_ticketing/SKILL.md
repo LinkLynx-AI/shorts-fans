@@ -32,6 +32,7 @@ description: "Create and structure Linear work for this repository by first disc
 - Do not use discovery issues as the default escape hatch for unclear requirements.
 - Use open questions only for residual uncertainty that the user has explicitly accepted when proceeding.
 - Create a discovery issue only when the user explicitly wants an unresolved investigation tracked as work.
+- Unless the user explicitly requests a different team, use the Linear team `shorts-fans` for artifacts created by this skill in this repository.
 
 ## What to Discuss
 - Primary user or actor and the target user journey.
