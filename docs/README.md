@@ -8,6 +8,7 @@
 - [TECH_STACK.md](TECH_STACK.md): Frontend / Backend / Infra / Payment / Analytics を含む技術選定
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
+- [ssot/LOCAL_INDEX.md](ssot/LOCAL_INDEX.md): 外部 repo から取り込んだ SSOT のローカル入口
 
 ## 今後追加する文書領域
 

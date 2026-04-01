@@ -1,0 +1,90 @@
+# short-fans SSOT
+
+## 安定した事実
+- project root は `/Users/yonedazen/Projects/short-fans`
+- `short fans` はショート動画を起点にした `fans` 系のプラットフォーム構想
+- raw メモは `/Users/yonedazen/Projects/short-fans/memo/` に集約する
+- 調査メモは `/Users/yonedazen/Projects/short-fans/memo/research/` に集約する
+- ラフなプロダクトメモは `/Users/yonedazen/Projects/short-fans/memo/memo_memo/` に集約する
+- 参照ファイルは `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/refs/` に置く
+- `SSOT` の事業領域は `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/index.md` に置く
+- `SSOT` のプロダクト領域は `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/index.md` に置く
+
+## SSOT 構造
+
+- root index: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/index.md`
+- business: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/index.md`
+- product: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/index.md`
+- business revenue model: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/revenue/revenue-model.md`
+- business market and strategy: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/market-and-strategy.md`
+- business クリエーター流入戦略: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/creator-acquisition-strategy.md`
+- business マーケ: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/marketing.md`
+- business audio index: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/index.md`
+- business audio current state: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/current-state.md`
+- business audio plan: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/plan.md`
+- business audio overview: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/overview.md`
+- business ai seeding strategy: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/ai-seeding-strategy.md`
+- business data strategy: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/data/data-strategy.md`
+- business data products and governance: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/data/data-products-and-governance.md`
+- product core experience: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/core-experience.md`
+- product ui index: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/index.md`
+- product visual direction: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/visual-direction.md`
+- product fan surfaces: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/fan-surfaces.md`
+- product content model: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/content/content-model.md`
+- product fan journey: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/fan-journey.md`
+- product billing and access: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/monetization/billing-and-access.md`
+- product short main linkage: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/content/short-main-linkage.md`
+- product identity and mode model: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/account/identity-and-mode-model.md`
+- product account permissions: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/account/account-permissions.md`
+- product consumer state and profile: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/consumer-state-and-profile.md`
+- product fan profile and engagement: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/fan-profile-and-engagement.md`
+- product moderation and review: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/moderation/moderation-and-review.md`
+- product creator onboarding surface: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-onboarding-surface.md`
+- product creator workflow: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-workflow.md`
+- product capture and audio model: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/capture-and-audio-model.md`
+- product creator analytics minimum: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-analytics-minimum.md`
+- product mvp boundaries: `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/scope/mvp-boundaries.md`
+
+## 参照ファイル
+- `/Users/yonedazen/Projects/short-fans/memo/2026-03-30-init.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-onlyfans-revenue.md`
+- `/Users/yonedazen/Projects/short-fans/memo/memo_memo/2026-03-31-product-rough-memo.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-onlyfans-revenue-explainer.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-ai-face-replacement-market.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-short-video-creator-workflow.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-trending-audio-portability-and-solutions.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-business-landscape.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-english-market-launch-stack.md`
+- `/Users/yonedazen/Projects/short-fans/memo/research/2026-03-31-creator-supply-and-acquisition.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/refs/reference_content.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/index.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/index.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/revenue/revenue-model.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/market-and-strategy.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/creator-acquisition-strategy.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/marketing.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/index.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/current-state.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/plan.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/audio/overview.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/strategy/ai-seeding-strategy.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/data/data-strategy.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/business/data/data-products-and-governance.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/core-experience.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/index.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/visual-direction.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/ui/fan-surfaces.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/content/content-model.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/fan-journey.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/monetization/billing-and-access.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/content/short-main-linkage.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/account/identity-and-mode-model.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/account/account-permissions.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/consumer-state-and-profile.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/fan/fan-profile-and-engagement.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/moderation/moderation-and-review.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-onboarding-surface.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-workflow.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/capture-and-audio-model.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/creator/creator-analytics-minimum.md`
+- `/Users/yonedazen/Projects/short-fans/_project/short-fans/ssot/product/scope/mvp-boundaries.md`
