@@ -2,6 +2,8 @@
 
 このディレクトリには、プロダクト定義、契約、実装ルールを整理する文書を置きます。
 
+プロダクト仕様と事業仕様の canonical は `docs/ssot/` 配下とし、`docs/*.md` はその前提と矛盾しない実装ルール・技術前提・構成方針を扱います。
+
 ## 現在ある文書
 
 - [BACKEND_STRUCTURE.md](BACKEND_STRUCTURE.md): backend のディレクトリ構成方針、依存方向、SQL と transport の配置ルール

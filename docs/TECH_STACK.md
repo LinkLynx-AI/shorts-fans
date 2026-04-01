@@ -5,7 +5,7 @@
 この文書は、このリポジトリで採用する技術スタックを明文化するための文書です。
 ここに記載されたものを、現時点での実装前提として扱います。
 
-## 確定している技術選定
+## 現時点の実装前提
 
 ### Frontend
 
@@ -41,11 +41,13 @@
 
 ### Payment
 
-- `CCBill`
+- `Payment provider` は未確定
+- first-pass candidate は `CCBill / Segpay / Verotel`
 
 ### Moderation
 
-- 自動判定 + 人手審査
+- `MVP` は `manual-heavy` を前提にした人手審査中心
+- 自動判定は後で拡張
 
 ### Analytics
 
@@ -65,6 +67,6 @@
 - Transcode: `MediaConvert`
 - Delivery: `CloudFront`
 - IaC: `Terraform`
-- Payment: `CCBill`
-- Moderation: `自動判定 + 人手審査`
+- Payment: `未確定 (first-pass candidate: CCBill / Segpay / Verotel)`
+- Moderation: `MVP は人手審査中心、後で自動判定を拡張`
 - Analytics: `まずは PostgreSQL + S3 集計、後で拡張`
