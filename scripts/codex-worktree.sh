@@ -193,7 +193,12 @@ if [[ "$inherit_gh_token" == "1" ]]; then
   if [[ -n "$resolved_gh_token" ]]; then
     export GH_TOKEN="$resolved_gh_token"
     export GITHUB_TOKEN="${GITHUB_TOKEN:-$resolved_gh_token}"
-    codex_args+=(-c 'shell_environment_policy.inherit=["GH_TOKEN","GITHUB_TOKEN"]')
+    # Current Codex expects `inherit` as a string policy; `include_only`
+    # keeps the effective shell exposure limited to GitHub auth env vars.
+    codex_args+=(
+      -c 'shell_environment_policy.inherit=all'
+      -c 'shell_environment_policy.include_only=["GH_TOKEN","GITHUB_TOKEN"]'
+    )
   fi
 fi
 
