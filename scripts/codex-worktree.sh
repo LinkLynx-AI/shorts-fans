@@ -118,6 +118,27 @@ resolve_gh_token() {
   return 0
 }
 
+resolve_shell_environment_policy_inherit_override() {
+  local selective_inherit_override='shell_environment_policy.inherit=["GH_TOKEN","GITHUB_TOKEN"]'
+  local inherit_all_override='shell_environment_policy.inherit=all'
+
+  if codex -c "$selective_inherit_override" features list >/dev/null 2>&1; then
+    printf '%s\n' "$selective_inherit_override"
+    return 0
+  fi
+
+  # Newer Codex releases only accept enum values like core/all/none here.
+  # Fall back to "all" so GH auth still reaches the Codex session.
+  if codex -c "$inherit_all_override" features list >/dev/null 2>&1; then
+    warn "current codex does not support selectively allowlisting GH_TOKEN/GITHUB_TOKEN; falling back to shell_environment_policy.inherit=all."
+    printf '%s\n' "$inherit_all_override"
+    return 0
+  fi
+
+  warn "could not determine shell_environment_policy compatibility; continuing without an explicit shell environment inherit override."
+  return 0
+}
+
 require_command git
 require_command codex
 
@@ -193,7 +214,11 @@ if [[ "$inherit_gh_token" == "1" ]]; then
   if [[ -n "$resolved_gh_token" ]]; then
     export GH_TOKEN="$resolved_gh_token"
     export GITHUB_TOKEN="${GITHUB_TOKEN:-$resolved_gh_token}"
-    codex_args+=(-c 'shell_environment_policy.inherit=["GH_TOKEN","GITHUB_TOKEN"]')
+    shell_environment_policy_override="$(resolve_shell_environment_policy_inherit_override)"
+
+    if [[ -n "$shell_environment_policy_override" ]]; then
+      codex_args+=(-c "$shell_environment_policy_override")
+    fi
   fi
 fi
 
