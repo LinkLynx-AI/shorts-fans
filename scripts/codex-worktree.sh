@@ -20,6 +20,7 @@ Environment:
   CODEX_INHERIT_GH_TOKEN
                        If set to 1, export GH auth into the Codex session.
                        Resolves from GH_TOKEN, then GITHUB_TOKEN, then `gh auth token`.
+                       If resolution fails, prints a warning and continues without token inheritance.
                        (default: 1)
   CODEX_EXTRA_WRITABLE_DIRS
                        Colon-separated extra writable directories.
@@ -42,6 +43,10 @@ require_command() {
     echo "error: '$command_name' is required but was not found." >&2
     exit 1
   fi
+}
+
+warn() {
+  echo "warning: $*" >&2
 }
 
 slugify() {
@@ -85,6 +90,8 @@ resolve_default_base_ref() {
 }
 
 resolve_gh_token() {
+  local resolved_token=""
+
   if [[ -n "${GH_TOKEN:-}" ]]; then
     printf '%s\n' "$GH_TOKEN"
     return 0
@@ -96,10 +103,19 @@ resolve_gh_token() {
   fi
 
   if ! command -v gh >/dev/null 2>&1; then
-    return 1
+    warn "gh is not available; continuing without GH token inheritance."
+    return 0
   fi
 
-  gh auth token 2>/dev/null || true
+  resolved_token="$(gh auth token 2>/dev/null || true)"
+
+  if [[ -n "$resolved_token" ]]; then
+    printf '%s\n' "$resolved_token"
+    return 0
+  fi
+
+  warn "could not resolve GitHub auth token; continuing without GH token inheritance."
+  return 0
 }
 
 require_command git
