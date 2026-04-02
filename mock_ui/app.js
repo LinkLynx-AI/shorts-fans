@@ -151,6 +151,7 @@ const state = {
   currentShortId: "rooftop",
   fanTab: "pinned",
   feedTab: "recommended",
+  followingQuery: "",
   followingCreatorIds: new Set(["aoi", "mina", "sora"]),
   hasPurchaseSetup: false,
   history: [],
@@ -304,6 +305,12 @@ document.addEventListener("input", (event) => {
     return;
   }
 
+  if (target.matches("[data-role='following-search-input']")) {
+    state.followingQuery = target.value;
+    updateFollowingResults();
+    return;
+  }
+
   if (target.matches("[data-role='accept-age']")) {
     state.acceptAge = target.checked;
     updatePaywallState();
@@ -363,10 +370,13 @@ function creatorCard(creatorId) {
   `;
 }
 
-function feedCreatorMeta(shortId) {
+function feedCreatorMeta(shortId, { clickableCaption = true } = {}) {
   const short = shorts[shortId];
   const creator = creators[short.creatorId];
   const following = state.followingCreatorIds.has(creator.id);
+  const captionMarkup = clickableCaption
+    ? `<button class="caption-button" data-action="open-short" data-short-id="${short.id}" type="button">${short.caption}</button>`
+    : `<p class="caption-button">${short.caption}</p>`;
 
   return `
     <div class="creator-card">
@@ -379,7 +389,7 @@ function feedCreatorMeta(shortId) {
           ${following ? "Following" : "Follow"}
         </button>
       </div>
-      <button class="caption-button" data-action="open-short" data-short-id="${short.id}" type="button">${short.caption}</button>
+      ${captionMarkup}
     </div>
   `;
 }
@@ -390,7 +400,7 @@ function creatorRows(creatorIds, trailingLabel = "削除") {
       const creator = creators[creatorId];
 
       return `
-        <div class="follow-row">
+        <div class="follow-row" data-following-item data-search-text="${`${creator.name} ${creator.handle}`.toLowerCase()}">
           <button class="follow-row-main" data-action="open-creator" data-creator-id="${creator.id}" type="button">
             <span class="follow-meta">
               <span class="mini-avatar"></span>
@@ -687,9 +697,16 @@ function followingScreen() {
 
         <h2 class="library-heading">following</h2>
 
+        <div class="library-search-wrap">
+          <div class="search-input-wrap">
+            <span class="search-input-icon" aria-hidden="true"></span>
+            <input class="search-input" data-role="following-search-input" placeholder="検索" type="search" value="${state.followingQuery}" />
+          </div>
+        </div>
+
         <div class="profile-grid-head">
           <p class="eyebrow">all creators</p>
-          <span>${creatorIds.length} creators</span>
+          <span data-role="following-count-label">${creatorIds.length} creators</span>
         </div>
 
         <div class="follow-list">${creatorRows(creatorIds)}</div>
@@ -766,7 +783,6 @@ function feedScreen() {
   return `
     <section class="screen screen-feed" data-theme="${short.theme}">
       <div class="screen-content">
-        <button class="preview-hit" data-action="open-short" data-short-id="${short.id}" type="button" aria-label="Open short detail"></button>
         <div class="topbar">
           <div class="segmented">
             <button class="${state.feedTab === "recommended" ? "is-active" : ""}" data-action="set-tab" data-tab="recommended" type="button">おすすめ</button>
@@ -779,7 +795,7 @@ function feedScreen() {
         ${unlockButton(short)}
 
         <div class="creator-block">
-          ${feedCreatorMeta(short.id)}
+          ${feedCreatorMeta(short.id, { clickableCaption: false })}
         </div>
       </div>
       ${renderOverlay()}
@@ -1017,6 +1033,7 @@ function render() {
   root.innerHTML = `${screenMarkup()}${tabBarMarkup()}`;
   updateSearchResults();
   updateLibraryResults();
+  updateFollowingResults();
   updatePaywallState();
 }
 
@@ -1034,6 +1051,7 @@ function restore(snapshotState) {
   state.overlay = null;
   state.overlayShortId = null;
   state.fanTab = snapshotState.fanTab || "pinned";
+  state.followingQuery = snapshotState.followingQuery || "";
   state.searchQuery = snapshotState.searchQuery;
   state.rootTab = snapshotState.rootTab;
   state.screen = snapshotState.screen;
@@ -1116,12 +1134,10 @@ function shortScreen() {
   const short = currentShort();
 
   return `
-    <section class="screen screen-short" data-theme="${currentTheme()}">
+    <section class="screen screen-feed screen-short" data-theme="${currentTheme()}">
       <div class="screen-content">
         <div class="topbar">
-          <div class="topbar-group">
-            ${createBackAction()}
-          </div>
+          ${createBackAction()}
         </div>
 
         ${pinAction(short.id)}
@@ -1129,10 +1145,7 @@ function shortScreen() {
         ${unlockButton(short)}
 
         <div class="creator-block">
-          <div class="creator-card">
-            ${creatorCard(short.creatorId)}
-            <p class="caption-button">${short.caption}</p>
-          </div>
+          ${feedCreatorMeta(short.id, { clickableCaption: false })}
         </div>
       </div>
       ${renderOverlay()}
@@ -1146,6 +1159,7 @@ function snapshot() {
     currentShortId: state.currentShortId,
     fanTab: state.fanTab,
     feedTab: state.feedTab,
+    followingQuery: state.followingQuery,
     libraryQuery: state.libraryQuery,
     rootTab: state.rootTab,
     searchQuery: state.searchQuery,
@@ -1301,5 +1315,30 @@ function updateLibraryResults() {
 
   if (countLabel) {
     countLabel.textContent = query === "" ? `${visibleCount} items` : `${visibleCount} matches`;
+  }
+}
+
+function updateFollowingResults() {
+  const query = state.followingQuery.trim().toLowerCase();
+  const items = root.querySelectorAll("[data-following-item]");
+  const countLabel = root.querySelector("[data-role='following-count-label']");
+  let visibleCount = 0;
+
+  if (!items.length) {
+    return;
+  }
+
+  items.forEach((item) => {
+    const haystack = item.dataset.searchText || "";
+    const matches = query === "" || haystack.includes(query);
+    item.hidden = !matches;
+
+    if (matches) {
+      visibleCount += 1;
+    }
+  });
+
+  if (countLabel) {
+    countLabel.textContent = query === "" ? `${visibleCount} creators` : `${visibleCount} matches`;
   }
 }

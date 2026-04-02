@@ -218,6 +218,10 @@ button {
   justify-content: center;
 }
 
+.screen-short .topbar {
+  justify-content: flex-start;
+}
+
 .screen-feed .segmented {
   gap: 18px;
   padding: 0;
@@ -268,18 +272,6 @@ button {
 
 .topbar-button {
   min-width: 42px;
-}
-
-.preview-hit {
-  position: absolute;
-  inset: 0;
-  background: transparent;
-  z-index: 1;
-}
-
-.screen-short .preview-hit,
-.screen-main .preview-hit {
-  display: none;
 }
 
 .pin-rail {
@@ -409,6 +401,11 @@ button {
   max-width: none;
 }
 
+.screen-short .creator-card {
+  width: min(88%, 344px);
+  max-width: min(88%, 344px);
+}
+
 .screen-feed .feed-creator-row {
   display: flex;
   align-items: center;
@@ -427,6 +424,11 @@ button {
 
 .screen-feed .creator-name {
   color: #fff;
+}
+
+.screen-short .back-button,
+.screen-main .back-button {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .screen-feed .feed-follow-button {
