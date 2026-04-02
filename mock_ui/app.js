@@ -275,6 +275,12 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "remove-follow" && creatorId) {
+    state.followingCreatorIds.delete(creatorId);
+    render();
+    return;
+  }
+
   if (action === "toggle-pin" && shortId) {
     toggleSet(state.pinnedShortIds, shortId);
     render();
@@ -378,22 +384,28 @@ function feedCreatorMeta(shortId) {
   `;
 }
 
-function creatorRows(creatorIds, trailingLabel = "view") {
+function creatorRows(creatorIds, trailingLabel = "削除") {
   return creatorIds
     .map((creatorId) => {
       const creator = creators[creatorId];
 
       return `
-        <button class="follow-row" data-action="open-creator" data-creator-id="${creator.id}" type="button">
-          <span class="follow-meta">
-            <span class="mini-avatar"></span>
-            <span>
-              <p class="follow-name">${creator.name}</p>
-              <p class="follow-handle">${creator.handle}</p>
+        <div class="follow-row">
+          <button class="follow-row-main" data-action="open-creator" data-creator-id="${creator.id}" type="button">
+            <span class="follow-meta">
+              <span class="mini-avatar"></span>
+              <span>
+                <p class="follow-name">${creator.name}</p>
+                <p class="follow-handle">${creator.handle}</p>
+              </span>
             </span>
-          </span>
-          ${trailingLabel ? `<span class="section-copy">${trailingLabel}</span>` : ""}
-        </button>
+          </button>
+          ${
+            trailingLabel
+              ? `<button class="follow-row-action" data-action="remove-follow" data-creator-id="${creator.id}" type="button">${trailingLabel}</button>`
+              : ""
+          }
+        </div>
       `;
     })
     .join("");
