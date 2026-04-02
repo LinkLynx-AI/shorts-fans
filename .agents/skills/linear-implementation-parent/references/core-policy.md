@@ -27,7 +27,8 @@
 
 ## Required Memory Files
 - Maintain `Prompt.md`, `Plan.md`, `Implement.md`, and `Documentation.md` for long runs.
-- Use repository convention paths such as `docs/agent_runs/<LINEAR-IDENTIFIER>/` or `.codex/runs/<LINEAR-IDENTIFIER>/`.
+- Store them under the worktree-local ignored path `./.local/codex-memo/<LINEAR-IDENTIFIER>/`.
+- Do not store run memory under tracked repository paths such as `docs/agent_runs/` or tracked config paths such as `.codex/`.
 
 ## PR Convention
 - Branch format: `codex/<ISSUE-KEY>-<slug>` when a dedicated issue branch is required.
