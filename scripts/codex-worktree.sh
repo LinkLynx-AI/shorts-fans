@@ -16,7 +16,7 @@ Environment:
   CODEX_WORKTREE_ROOT  Destination root for created worktrees
                        (default: $HOME/.codex/worktrees)
   CODEX_SANDBOX_MODE   Sandbox mode passed to codex
-                       (default: workspace-write)
+                       (default: danger-full-access)
   CODEX_INHERIT_GH_TOKEN
                        If set to 1, export GH auth into the Codex session.
                        Resolves from GH_TOKEN, then GITHUB_TOKEN, then `gh auth token`.
@@ -32,7 +32,7 @@ Examples:
   scripts/codex-worktree.sh feat/frontend-shell -- exec
   scripts/codex-worktree.sh feat/gh-pr
   CODEX_EXTRA_WRITABLE_DIRS=".agents:.codex" scripts/codex-worktree.sh feat/skill-edit
-  CODEX_SANDBOX_MODE=danger-full-access scripts/codex-worktree.sh feat/skill-edit
+  CODEX_SANDBOX_MODE=workspace-write scripts/codex-worktree.sh feat/frontend-shell
 EOF
 }
 
@@ -199,7 +199,7 @@ echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
 echo "base: ${base_ref}"
 
-sandbox_mode="${CODEX_SANDBOX_MODE:-workspace-write}"
+sandbox_mode="${CODEX_SANDBOX_MODE:-danger-full-access}"
 inherit_gh_token="${CODEX_INHERIT_GH_TOKEN:-1}"
 
 codex_args=(
