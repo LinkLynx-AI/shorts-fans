@@ -17,6 +17,10 @@ Environment:
                        (default: $HOME/.codex/worktrees)
   CODEX_SANDBOX_MODE   Sandbox mode passed to codex
                        (default: workspace-write)
+  CODEX_INHERIT_GH_TOKEN
+                       If set to 1, export GH auth into the Codex session.
+                       Resolves from GH_TOKEN, then GITHUB_TOKEN, then `gh auth token`.
+                       (default: 1)
   CODEX_EXTRA_WRITABLE_DIRS
                        Colon-separated extra writable directories.
                        Relative paths are resolved from the created worktree root.
@@ -25,6 +29,7 @@ Environment:
 Examples:
   scripts/codex-worktree.sh feat/frontend-shell
   scripts/codex-worktree.sh feat/frontend-shell -- exec
+  scripts/codex-worktree.sh feat/gh-pr
   CODEX_EXTRA_WRITABLE_DIRS=".agents:.codex" scripts/codex-worktree.sh feat/skill-edit
   CODEX_SANDBOX_MODE=danger-full-access scripts/codex-worktree.sh feat/skill-edit
 EOF
@@ -77,6 +82,24 @@ resolve_default_base_ref() {
   fi
 
   git -C "$repo_root" rev-parse --short HEAD
+}
+
+resolve_gh_token() {
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    printf '%s\n' "$GH_TOKEN"
+    return 0
+  fi
+
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    printf '%s\n' "$GITHUB_TOKEN"
+    return 0
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    return 1
+  fi
+
+  gh auth token 2>/dev/null || true
 }
 
 require_command git
@@ -140,12 +163,23 @@ echo "branch: ${branch_name}"
 echo "base: ${base_ref}"
 
 sandbox_mode="${CODEX_SANDBOX_MODE:-workspace-write}"
+inherit_gh_token="${CODEX_INHERIT_GH_TOKEN:-1}"
 
 codex_args=(
   --ask-for-approval never
   --sandbox "$sandbox_mode"
   --cd "$target_worktree_path"
 )
+
+if [[ "$inherit_gh_token" == "1" ]]; then
+  resolved_gh_token="$(resolve_gh_token)"
+
+  if [[ -n "$resolved_gh_token" ]]; then
+    export GH_TOKEN="$resolved_gh_token"
+    export GITHUB_TOKEN="${GITHUB_TOKEN:-$resolved_gh_token}"
+    codex_args+=(-c 'shell_environment_policy.inherit=["GH_TOKEN","GITHUB_TOKEN"]')
+  fi
+fi
 
 if [[ -n "${CODEX_EXTRA_WRITABLE_DIRS:-}" ]]; then
   old_ifs="$IFS"
