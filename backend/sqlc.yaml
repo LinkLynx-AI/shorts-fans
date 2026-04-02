@@ -4,7 +4,10 @@ sql:
     schema:
       - "db/migrations/000001_bootstrap.up.sql"
       - "db/migrations/000002_mvp_core_entities.up.sql"
-    queries: "db/queries"
+      - "db/migrations/000003_unify_creator_profiles.up.sql"
+    queries:
+      - "db/queries/*.sql"
+      - "db/queries/*/*.sql"
     gen:
       go:
         package: "sqlc"
