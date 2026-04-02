@@ -53,6 +53,15 @@ make backend-migrate-down
 make backend-generate
 ```
 
+人間向けの YAML スキーマを生成します。
+
+```bash
+make backend-schema
+./scripts/generate-db-schema.sh
+```
+
+このコマンドは `POSTGRES_DSN` が指す PostgreSQL サーバー上に一時 DB を作成し、そこへ migration を適用して `db/schema.generated.yaml` を生成します。実行ユーザーには一時 DB を作成・削除できる権限が必要です。
+
 新しい migration を追加するときは、`backend/db/migrations/` に連番で `*.up.sql` と `*.down.sql` を対で作ります。
 例:
 
@@ -66,6 +75,7 @@ backend/db/migrations/000003_some_change.down.sql
 - `up` は forward-only で読めるように書き、`down` はその migration だけを 1 step 戻せる内容にする
 - 既存 migration は原則書き換えず、新しい番号の migration を積む
 - schema を変えたら `make backend-generate` も実行して、`sqlc` 生成が壊れていないことを確認する
+- schema を変えたら `make backend-schema` で `db/schema.generated.yaml` も更新する
 - DB で管理すべき不変条件は `FK`、`UNIQUE`、`CHECK`、必要なら trigger / view で表現する
 
 新しい migration を作った後の確認手順は次を基準にします。
@@ -105,6 +115,7 @@ make backend-migrate-up
 6. backend の最低限検証を流す
 
 ```bash
+make backend-schema
 make backend-test
 make backend-vet
 make backend-generate
@@ -116,6 +127,7 @@ make backend-generate
 cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate up
 cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate down
 cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate version
+cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/schema
 ```
 
 ## Quality
@@ -144,7 +156,9 @@ make backend-vet
 - `cmd/api`: API サーバーの entrypoint
 - `cmd/worker`: worker 骨格の entrypoint
 - `cmd/migrate`: migration 実行 entrypoint
+- `cmd/schema`: migration から人間向け YAML スキーマを生成する entrypoint
 - `internal/config`: 環境変数読込と validation
+- `internal/dbschema`: 一時 DB を使った schema introspection と YAML 出力
 - `internal/httpserver`: Gin router と graceful shutdown
 - `internal/postgres`: `pgxpool` 初期化と readiness
 - `internal/redis`: Redis client 初期化と readiness
