@@ -10,15 +10,23 @@ Usage:
 Behavior:
   - Creates a git worktree under $HOME/.codex/worktrees by default.
   - The worktree directory name is derived from the branch name.
-  - Launches codex with --ask-for-approval never and --cd <worktree-path>.
+  - Launches codex with --ask-for-approval never, --sandbox <mode>, and --cd <worktree-path>.
 
 Environment:
   CODEX_WORKTREE_ROOT  Destination root for created worktrees
                        (default: $HOME/.codex/worktrees)
+  CODEX_SANDBOX_MODE   Sandbox mode passed to codex
+                       (default: workspace-write)
+  CODEX_EXTRA_WRITABLE_DIRS
+                       Colon-separated extra writable directories.
+                       Relative paths are resolved from the created worktree root.
+                       Example: .agents:.codex
 
 Examples:
   scripts/codex-worktree.sh feat/frontend-shell
   scripts/codex-worktree.sh feat/frontend-shell -- exec
+  CODEX_EXTRA_WRITABLE_DIRS=".agents:.codex" scripts/codex-worktree.sh feat/skill-edit
+  CODEX_SANDBOX_MODE=danger-full-access scripts/codex-worktree.sh feat/skill-edit
 EOF
 }
 
@@ -131,4 +139,29 @@ echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
 echo "base: ${base_ref}"
 
-exec codex --ask-for-approval never --cd "$target_worktree_path" "$@"
+sandbox_mode="${CODEX_SANDBOX_MODE:-workspace-write}"
+
+codex_args=(
+  --ask-for-approval never
+  --sandbox "$sandbox_mode"
+  --cd "$target_worktree_path"
+)
+
+if [[ -n "${CODEX_EXTRA_WRITABLE_DIRS:-}" ]]; then
+  old_ifs="$IFS"
+  IFS=':'
+  read -r -a extra_writable_dirs <<< "${CODEX_EXTRA_WRITABLE_DIRS}"
+  IFS="$old_ifs"
+
+  for extra_dir in "${extra_writable_dirs[@]}"; do
+    [[ -z "$extra_dir" ]] && continue
+
+    if [[ "$extra_dir" = /* ]]; then
+      codex_args+=(--add-dir "$extra_dir")
+    else
+      codex_args+=(--add-dir "${target_worktree_path}/${extra_dir}")
+    fi
+  done
+fi
+
+exec codex "${codex_args[@]}" "$@"
