@@ -1,0 +1,2 @@
+# Codex per-PR scratch memory should stay outside tracked diffs.
+/.local/

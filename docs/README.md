@@ -16,7 +16,7 @@
 ## 補助ディレクトリ
 
 - `contracts/`: SSOT を置き換えずに、実装者向けの契約や境界責務をまとめる
-- `agent_runs/`: issue ごとの agent 実行ログと検証メモをまとめる
+- `.local/`: Codex の PR 単位一時メモを置く gitignored ディレクトリ。`./.local/codex-memo/` を使い、PR には含めない
 
 ## 今後追加する文書領域
 
