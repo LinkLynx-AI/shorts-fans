@@ -10,15 +10,29 @@ Usage:
 Behavior:
   - Creates a git worktree under $HOME/.codex/worktrees by default.
   - The worktree directory name is derived from the branch name.
-  - Launches codex with --ask-for-approval never and --cd <worktree-path>.
+  - Launches codex with --ask-for-approval never, --sandbox <mode>, and --cd <worktree-path>.
 
 Environment:
   CODEX_WORKTREE_ROOT  Destination root for created worktrees
                        (default: $HOME/.codex/worktrees)
+  CODEX_SANDBOX_MODE   Sandbox mode passed to codex
+                       (default: workspace-write)
+  CODEX_INHERIT_GH_TOKEN
+                       If set to 1, export GH auth into the Codex session.
+                       Resolves from GH_TOKEN, then GITHUB_TOKEN, then `gh auth token`.
+                       If resolution fails, prints a warning and continues without token inheritance.
+                       (default: 1)
+  CODEX_EXTRA_WRITABLE_DIRS
+                       Colon-separated extra writable directories.
+                       Relative paths are resolved from the created worktree root.
+                       Example: .agents:.codex
 
 Examples:
   scripts/codex-worktree.sh feat/frontend-shell
   scripts/codex-worktree.sh feat/frontend-shell -- exec
+  scripts/codex-worktree.sh feat/gh-pr
+  CODEX_EXTRA_WRITABLE_DIRS=".agents:.codex" scripts/codex-worktree.sh feat/skill-edit
+  CODEX_SANDBOX_MODE=danger-full-access scripts/codex-worktree.sh feat/skill-edit
 EOF
 }
 
@@ -29,6 +43,10 @@ require_command() {
     echo "error: '$command_name' is required but was not found." >&2
     exit 1
   fi
+}
+
+warn() {
+  echo "warning: $*" >&2
 }
 
 slugify() {
@@ -69,6 +87,35 @@ resolve_default_base_ref() {
   fi
 
   git -C "$repo_root" rev-parse --short HEAD
+}
+
+resolve_gh_token() {
+  local resolved_token=""
+
+  if [[ -n "${GH_TOKEN:-}" ]]; then
+    printf '%s\n' "$GH_TOKEN"
+    return 0
+  fi
+
+  if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    printf '%s\n' "$GITHUB_TOKEN"
+    return 0
+  fi
+
+  if ! command -v gh >/dev/null 2>&1; then
+    warn "gh is not available; continuing without GH token inheritance."
+    return 0
+  fi
+
+  resolved_token="$(gh auth token 2>/dev/null || true)"
+
+  if [[ -n "$resolved_token" ]]; then
+    printf '%s\n' "$resolved_token"
+    return 0
+  fi
+
+  warn "could not resolve GitHub auth token; continuing without GH token inheritance."
+  return 0
 }
 
 require_command git
@@ -131,4 +178,40 @@ echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
 echo "base: ${base_ref}"
 
-exec codex --ask-for-approval never --cd "$target_worktree_path" "$@"
+sandbox_mode="${CODEX_SANDBOX_MODE:-workspace-write}"
+inherit_gh_token="${CODEX_INHERIT_GH_TOKEN:-1}"
+
+codex_args=(
+  --ask-for-approval never
+  --sandbox "$sandbox_mode"
+  --cd "$target_worktree_path"
+)
+
+if [[ "$inherit_gh_token" == "1" ]]; then
+  resolved_gh_token="$(resolve_gh_token)"
+
+  if [[ -n "$resolved_gh_token" ]]; then
+    export GH_TOKEN="$resolved_gh_token"
+    export GITHUB_TOKEN="${GITHUB_TOKEN:-$resolved_gh_token}"
+    codex_args+=(-c 'shell_environment_policy.inherit=["GH_TOKEN","GITHUB_TOKEN"]')
+  fi
+fi
+
+if [[ -n "${CODEX_EXTRA_WRITABLE_DIRS:-}" ]]; then
+  old_ifs="$IFS"
+  IFS=':'
+  read -r -a extra_writable_dirs <<< "${CODEX_EXTRA_WRITABLE_DIRS}"
+  IFS="$old_ifs"
+
+  for extra_dir in "${extra_writable_dirs[@]}"; do
+    [[ -z "$extra_dir" ]] && continue
+
+    if [[ "$extra_dir" = /* ]]; then
+      codex_args+=(--add-dir "$extra_dir")
+    else
+      codex_args+=(--add-dir "${target_worktree_path}/${extra_dir}")
+    fi
+  done
+fi
+
+exec codex "${codex_args[@]}" "$@"
