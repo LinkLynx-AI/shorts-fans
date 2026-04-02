@@ -30,7 +30,7 @@
 - 重要なのは `ノーカット` であることより、`連続して見えること` である
 - 同じ画角、同じ導線を保った `複数 short -> 1 main` は、MVP でも自然な運用になりうる
 - 投稿 UI と審査 UI の両方で、`submission package` 単位の方が creator にとって理解しやすい
-- `creator profile draft` を approval 前に持てると、approved 後の立ち上がりは速くなる可能性が高い
+- `profile basics draft` を approval 前に持てると、approved 後の立ち上がりは速くなる可能性が高い
 - `rejected` を全部 support 送りにせず、fixable なものだけ self-serve resubmit にすると onboarding が詰まりにくい
 - `main` まで必要な product では、`music camera` より `continuity / linkage` の方が価値が高い
 

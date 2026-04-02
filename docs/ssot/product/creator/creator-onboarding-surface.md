@@ -8,8 +8,8 @@
 ## 現時点の推奨
 
 - `MVP` では `approved 前は read-only onboarding surface` を基本に置く
-- ただし、`creator profile draft` だけは private に許可する
-- `creator profile draft` の範囲は `display name / avatar / bio` に固定する
+- ただし、`profile basics draft` だけは private に許可する
+- `profile basics draft` の範囲は `display name / avatar / bio` に固定する
 - `approved 前` の creator preview は `static mock` を基本に置く
 - つまり、creator capability を持たない user や onboarding 審査中の user には、`full creator dashboard / upload / submission package editor` は解放しない
 
@@ -44,7 +44,7 @@
 - ここで半端な dashboard shell を出すと、`押せない UI` や `空の table` が増え、未承認 state の価値より frustration が大きくなりやすい
 - `static mock` なら、`approval 後に何が解放されるか` を見せつつ、今は onboarding が主目的だと明確にできる
 
-### 5. creator profile draft だけ先に作れると friction を下げられるため
+### 5. profile basics だけ先に作れると friction を下げられるため
 
 - `display name / avatar / bio` のような low-risk 情報は、approval 前でも下書きできる
 - これにより onboarding 完了後の初期設定負荷を下げられる
@@ -74,7 +74,7 @@
   - creator onboarding の入力中
   - submitted 後の審査待ち
 - 見せるもの
-  - private な `creator profile draft`
+  - private な `profile basics draft`
   - onboarding checklist
   - required docs / status
   - review status
@@ -111,9 +111,9 @@
 
 - creator onboarding は `access unlock flow`
 - creator dashboard は `approved 後の workspace`
-- approval 前に見せる creator UI は `read-only onboarding surface + private creator profile draft` に限定する
+- approval 前に見せる creator UI は `read-only onboarding surface + private profile basics draft` に限定する
 
-## creator profile draft の範囲
+## profile basics draft の範囲
 
 - allow
   - `display name`
@@ -138,7 +138,7 @@
   - `analytics`
 - ただしこれらは `使える UI` ではなく、`approval 後にこういう workspace が解放される` と説明するための固定表示に留める
 - `disabled button` や `empty state table` のような、触れそうに見える疑似 UI は極力避ける
-- 例外として、`display name / avatar / bio` は user 自身の `creator profile draft` を反映した `light profile preview` として見せてもよい
+- 例外として、`display name / avatar / bio` は user 自身の draft を反映した `light profile preview` として見せてもよい
 - つまり、`creator dashboard preview` は static、`profile basics preview` だけ軽く personalize する
 
 ## rejected 時の resubmit flow
@@ -204,7 +204,7 @@
 
 - MVP では `tool を先に触らせる` より `審査条件を理解させる` 方が離脱や混乱を減らしやすい
 - creator 候補 user に対しては、dynamic な dashboard より `static mock + 明確な checklist` の方が十分価値がある
-- `creator profile draft` は low-risk な供給 friction 低減策として機能する可能性が高い
+- `profile basics draft` は low-risk な供給 friction 低減策として機能する可能性が高い
 - `rejected` を全部 manual support に寄せるより、fixable なものだけ self-serve resubmit にした方が onboarding ops を軽くしやすい
 - 初期は `cooldown` より `少数回まで即時にやり直せる` 方が supply friction を下げやすい
 - supply を増やしたくなった後で、必要なら `pre-approval draft` を解放してもよい

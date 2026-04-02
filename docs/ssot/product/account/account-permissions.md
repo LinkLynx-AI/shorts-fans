@@ -60,7 +60,7 @@
 ### pre-approval creator surface
 
 - `Become Creator`
-- private `creator profile draft`
+- private `profile basics draft`
 - `static mock` の creator preview
 - onboarding checklist
 - creator approval status
