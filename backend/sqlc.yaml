@@ -3,6 +3,7 @@ sql:
   - engine: "postgresql"
     schema:
       - "db/migrations/000001_bootstrap.up.sql"
+      - "db/migrations/000002_mvp_core_entities.up.sql"
     queries: "db/queries"
     gen:
       go:

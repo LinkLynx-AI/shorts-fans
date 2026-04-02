@@ -53,6 +53,71 @@ make backend-migrate-down
 make backend-generate
 ```
 
+新しい migration を追加するときは、`backend/db/migrations/` に連番で `*.up.sql` と `*.down.sql` を対で作ります。
+例:
+
+```text
+backend/db/migrations/000003_some_change.up.sql
+backend/db/migrations/000003_some_change.down.sql
+```
+
+基本ルールは次のとおりです。
+
+- `up` は forward-only で読めるように書き、`down` はその migration だけを 1 step 戻せる内容にする
+- 既存 migration は原則書き換えず、新しい番号の migration を積む
+- schema を変えたら `make backend-generate` も実行して、`sqlc` 生成が壊れていないことを確認する
+- DB で管理すべき不変条件は `FK`、`UNIQUE`、`CHECK`、必要なら trigger / view で表現する
+
+新しい migration を作った後の確認手順は次を基準にします。
+
+1. ローカル依存を起動する
+
+```bash
+make backend-dev-up
+```
+
+2. 現在の migration version を確認する
+
+```bash
+cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate version
+```
+
+3. migration を適用する
+
+```bash
+make backend-migrate-up
+```
+
+4. 必要なら 1 step 戻す
+
+```bash
+make backend-migrate-down
+```
+
+5. 変更が大きいときは `up -> down -> up` まで確認する
+
+```bash
+make backend-migrate-up
+make backend-migrate-down
+make backend-migrate-up
+```
+
+6. backend の最低限検証を流す
+
+```bash
+make backend-test
+make backend-vet
+make backend-generate
+```
+
+直接 `cmd/migrate` を使う場合は `POSTGRES_DSN` を渡して実行します。
+
+```bash
+cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate up
+cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate down
+cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable' go run ./cmd/migrate version
+```
+
 ## Quality
 
 ```bash
