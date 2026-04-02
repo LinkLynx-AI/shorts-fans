@@ -115,9 +115,9 @@
 ### public profile 境界
 
 - `creator profile` は `creator capability` を持つ同じ `user` に属します。
-- `creator profile` は public surface です。
+- `creator profile` は private draft と public surface の両状態を持ちえます。
 - upload、review、analytics を含む creator private workspace は `creator profile` と分離します。
-- creator approval 前は private な `profile basics draft` のみを持てます。public creator profile は持ちません。
+- creator approval 前は private な `creator profile draft` のみを持てます。public creator profile は持ちません。
 
 ### content ownership
 
@@ -245,7 +245,7 @@
 ### Creator precondition
 
 - `creator approved` は、`short` と `main` の publish / unlock の前提です。
-- approval 前は onboarding draft data のみ持てます。
+- approval 前は private な `creator profile` draft data のみ持てます。
 - approval 前の `user` は public creator profile、publish 用 content upload、active な creator workspace を持てません。
 
 ### Short public precondition

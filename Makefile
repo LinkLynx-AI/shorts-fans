@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-migrate-up backend-migrate-down backend-generate backend-test backend-vet backend-fmt
+.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-vet backend-fmt
 
 BACKEND_DIR := backend
 BACKEND_APP_ENV ?= development
@@ -21,6 +21,7 @@ help:
 		'  make backend-dev-up' \
 		'  make backend-run' \
 		'  make backend-worker' \
+		'  make backend-schema' \
 		'' \
 		'Examples:' \
 		'  make codex branch=feat/frontend-shell' \
@@ -78,6 +79,11 @@ backend-migrate-down:
 
 backend-generate:
 	cd $(BACKEND_DIR) && go run github.com/sqlc-dev/sqlc/cmd/sqlc@$(SQLC_VERSION) generate
+
+backend-schema:
+	APP_ENV='$(BACKEND_APP_ENV)' \
+	POSTGRES_DSN='$(BACKEND_POSTGRES_DSN)' \
+	./scripts/generate-db-schema.sh
 
 backend-test:
 	cd $(BACKEND_DIR) && go test ./...
