@@ -4,170 +4,213 @@ export type FeedTab = "following" | "recommended";
 export type FanCollectionTab = "library" | "pinned";
 export type ShortId = string;
 
-export type ShortPreviewMeta = {
+export type ShortMediaAsset = {
+  durationSeconds: number | null;
+  id: string;
+  kind: "video";
+  posterUrl: string | null;
+  url: string;
+};
+
+export type ShortSummary = {
   caption: string;
+  canonicalMainId: string;
   creatorId: string;
-  duration: string;
   id: ShortId;
-  price: string;
-  progress: string;
-  searchLabel: string;
-  theme: {
-    background: {
-      accent: string;
-      end: string;
-      mid: string;
-      start: string;
-    };
-    tile: {
-      bottom: string;
-      mid: string;
-      top: string;
-    };
-  };
+  media: ShortMediaAsset;
+  previewDurationSeconds: number;
   title: string;
+};
+
+export type ShortPreviewMeta = ShortSummary;
+
+type ShortTheme = {
+  background: {
+    accent: string;
+    end: string;
+    mid: string;
+    start: string;
+  };
+  tile: {
+    bottom: string;
+    mid: string;
+    top: string;
+  };
 };
 
 const shorts = [
   {
     caption: "雨上がりの balcony preview。続きは main で。",
+    canonicalMainId: "main_sora_after_rain",
     creatorId: "sora",
-    duration: "9分",
     id: "afterrain",
-    price: "¥2,100",
-    progress: "5:12 left",
-    searchLabel: "after rain",
-    theme: {
-      background: {
-        accent: "#6cbfe3",
-        end: "#07131d",
-        mid: "#264f70",
-        start: "#cff6ff",
-      },
-      tile: {
-        bottom: "#0f2234",
-        mid: "#79c8ef",
-        top: "#fff4dc",
-      },
+    media: {
+      durationSeconds: 17,
+      id: "asset_short_sora_afterrain",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
+      url: "https://cdn.example.com/shorts/sora-after-rain.mp4",
     },
+    previewDurationSeconds: 17,
     title: "after rain preview",
   },
   {
     caption: "blue tone の balcony preview。",
+    canonicalMainId: "main_aoi_blue_balcony",
     creatorId: "aoi",
-    duration: "10分",
     id: "balcony",
-    price: "¥2,200",
-    progress: "4:48 left",
-    searchLabel: "blue lace set",
-    theme: {
-      background: {
-        accent: "#7bcbe6",
-        end: "#07131d",
-        mid: "#2d5474",
-        start: "#d9f3ff",
-      },
-      tile: {
-        bottom: "#081521",
-        mid: "#63d0d3",
-        top: "#edfaff",
-      },
+    media: {
+      durationSeconds: 15,
+      id: "asset_short_aoi_balcony",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/aoi-balcony-poster.jpg",
+      url: "https://cdn.example.com/shorts/aoi-balcony.mp4",
     },
+    previewDurationSeconds: 15,
     title: "balcony cut preview",
   },
   {
     caption: "hotel mirror の preview。",
+    canonicalMainId: "main_mina_hotel_mirror",
     creatorId: "mina",
-    duration: "11分",
     id: "mirror",
-    price: "¥2,400",
-    progress: "6:26 left",
-    searchLabel: "hotel mirror",
-    theme: {
-      background: {
-        accent: "#81c7f1",
-        end: "#08131d",
-        mid: "#315f8d",
-        start: "#d4f3ff",
-      },
-      tile: {
-        bottom: "#081521",
-        mid: "#629bde",
-        top: "#edf7ff",
-      },
+    media: {
+      durationSeconds: 18,
+      id: "asset_short_mina_mirror",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/mina-mirror-poster.jpg",
+      url: "https://cdn.example.com/shorts/mina-mirror.mp4",
     },
+    previewDurationSeconds: 18,
     title: "hotel mirror preview",
   },
   {
     caption: "poolside の short cut。",
+    canonicalMainId: "main_sora_poolside_cut",
     creatorId: "sora",
-    duration: "8分",
     id: "poolcut",
-    price: "¥1,900",
-    progress: "3:55 left",
-    searchLabel: "poolside cut",
-    theme: {
-      background: {
-        accent: "#70b0d1",
-        end: "#07131d",
-        mid: "#233e57",
-        start: "#dff9ff",
-      },
-      tile: {
-        bottom: "#081521",
-        mid: "#738aa6",
-        top: "#f2feff",
-      },
+    media: {
+      durationSeconds: 14,
+      id: "asset_short_sora_poolcut",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/sora-poolcut-poster.jpg",
+      url: "https://cdn.example.com/shorts/sora-poolcut.mp4",
     },
+    previewDurationSeconds: 14,
     title: "poolside cut preview",
   },
   {
     caption: "quiet rooftop preview.",
+    canonicalMainId: "main_mina_quiet_rooftop",
     creatorId: "mina",
-    duration: "8分",
     id: "rooftop",
-    price: "¥1,800",
-    progress: "8:14 left",
-    searchLabel: "quiet rooftop",
-    theme: {
-      background: {
-        accent: "#68c0eb",
-        end: "#07131d",
-        mid: "#2a648f",
-        start: "#94e0ff",
-      },
-      tile: {
-        bottom: "#0f2234",
-        mid: "#4cc0eb",
-        top: "#d8f3ff",
-      },
+    media: {
+      durationSeconds: 16,
+      id: "asset_short_mina_rooftop",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+      url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
     },
+    previewDurationSeconds: 16,
     title: "quiet rooftop preview",
   },
   {
     caption: "soft light の preview。",
+    canonicalMainId: "main_aoi_blue_balcony",
     creatorId: "aoi",
-    duration: "12分",
     id: "softlight",
-    price: "¥2,600",
-    progress: "3:42 left",
-    searchLabel: "soft light",
-    theme: {
-      background: {
-        accent: "#59a9d4",
-        end: "#06111a",
-        mid: "#1b4264",
-        start: "#a7e8ff",
-      },
-      tile: {
-        bottom: "#091827",
-        mid: "#4f97c6",
-        top: "#93e4ff",
-      },
+    media: {
+      durationSeconds: 18,
+      id: "asset_short_aoi_softlight",
+      kind: "video",
+      posterUrl: "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+      url: "https://cdn.example.com/shorts/aoi-softlight.mp4",
     },
+    previewDurationSeconds: 18,
     title: "soft light preview",
   },
-] as const satisfies readonly ShortPreviewMeta[];
+] as const satisfies readonly ShortSummary[];
+
+const shortThemes: Record<string, ShortTheme> = {
+  afterrain: {
+    background: {
+      accent: "#6cbfe3",
+      end: "#07131d",
+      mid: "#264f70",
+      start: "#cff6ff",
+    },
+    tile: {
+      bottom: "#0f2234",
+      mid: "#79c8ef",
+      top: "#fff4dc",
+    },
+  },
+  balcony: {
+    background: {
+      accent: "#7bcbe6",
+      end: "#07131d",
+      mid: "#2d5474",
+      start: "#d9f3ff",
+    },
+    tile: {
+      bottom: "#081521",
+      mid: "#63d0d3",
+      top: "#edfaff",
+    },
+  },
+  mirror: {
+    background: {
+      accent: "#81c7f1",
+      end: "#08131d",
+      mid: "#315f8d",
+      start: "#d4f3ff",
+    },
+    tile: {
+      bottom: "#081521",
+      mid: "#629bde",
+      top: "#edf7ff",
+    },
+  },
+  poolcut: {
+    background: {
+      accent: "#70b0d1",
+      end: "#07131d",
+      mid: "#233e57",
+      start: "#dff9ff",
+    },
+    tile: {
+      bottom: "#081521",
+      mid: "#738aa6",
+      top: "#f2feff",
+    },
+  },
+  rooftop: {
+    background: {
+      accent: "#68c0eb",
+      end: "#07131d",
+      mid: "#2a648f",
+      start: "#94e0ff",
+    },
+    tile: {
+      bottom: "#0f2234",
+      mid: "#4cc0eb",
+      top: "#d8f3ff",
+    },
+  },
+  softlight: {
+    background: {
+      accent: "#59a9d4",
+      end: "#06111a",
+      mid: "#1b4264",
+      start: "#a7e8ff",
+    },
+    tile: {
+      bottom: "#091827",
+      mid: "#4f97c6",
+      top: "#93e4ff",
+    },
+  },
+};
 
 const feedShortByTab = {
   following: "softlight",
@@ -241,14 +284,21 @@ export function getLibraryShorts(): readonly ShortPreviewMeta[] {
 /**
  * short 背景用の CSS variable style を返す。
  */
-export function getShortThemeStyle(short: ShortPreviewMeta): CSSProperties {
+export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId): CSSProperties {
+  const shortId = typeof short === "string" ? short : short.id;
+  const theme = shortThemes[shortId];
+
+  if (!theme) {
+    throw new Error(`Unknown short theme: ${shortId}`);
+  }
+
   return {
-    "--short-bg-accent": short.theme.background.accent,
-    "--short-bg-end": short.theme.background.end,
-    "--short-bg-mid": short.theme.background.mid,
-    "--short-bg-start": short.theme.background.start,
-    "--short-tile-bottom": short.theme.tile.bottom,
-    "--short-tile-mid": short.theme.tile.mid,
-    "--short-tile-top": short.theme.tile.top,
+    "--short-bg-accent": theme.background.accent,
+    "--short-bg-end": theme.background.end,
+    "--short-bg-mid": theme.background.mid,
+    "--short-bg-start": theme.background.start,
+    "--short-tile-bottom": theme.tile.bottom,
+    "--short-tile-mid": theme.tile.mid,
+    "--short-tile-top": theme.tile.top,
   } as CSSProperties;
 }

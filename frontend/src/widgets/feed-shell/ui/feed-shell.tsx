@@ -1,21 +1,15 @@
-import { getCreatorById } from "@/entities/creator";
-import type { FeedTab, ShortPreviewMeta } from "@/entities/short";
-import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
+import type { FeedTab } from "@/entities/short";
+import { getFeedSurfaceByTab, ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 type FeedShellProps = {
   activeTab: FeedTab;
-  short: ShortPreviewMeta;
 };
 
 /**
  * fan feed の route shell を表示する。
  */
-export function FeedShell({ activeTab, short }: FeedShellProps) {
-  const creator = getCreatorById(short.creatorId);
+export function FeedShell({ activeTab }: FeedShellProps) {
+  const surface = getFeedSurfaceByTab(activeTab);
 
-  if (!creator) {
-    throw new Error(`Unknown creator for short: ${short.id}`);
-  }
-
-  return <ImmersiveShortSurface activeTab={activeTab} creator={creator} mode="feed" short={short} />;
+  return <ImmersiveShortSurface activeTab={activeTab} mode="feed" surface={surface} />;
 }

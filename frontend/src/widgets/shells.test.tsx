@@ -1,6 +1,5 @@
 import { render, screen } from "@testing-library/react";
 
-import { getFeedShortForTab, getShortById } from "@/entities/short";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
 import { FeedShell } from "@/widgets/feed-shell";
@@ -8,8 +7,7 @@ import { SearchShell } from "@/widgets/search-shell";
 
 describe("widgets", () => {
   it("renders the feed shell", () => {
-    const short = getFeedShortForTab("recommended");
-    render(<FeedShell activeTab="recommended" short={short} />);
+    render(<FeedShell activeTab="recommended" />);
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
@@ -51,12 +49,6 @@ describe("widgets", () => {
   });
 
   it("renders the immersive detail shell", () => {
-    const short = getShortById("softlight");
-
-    if (!short) {
-      throw new Error("fixture missing");
-    }
-
     render(
       <DetailShell backHref="/" style={{ "--short-bg-start": "#a7e8ff" } as React.CSSProperties} variant="immersive">
         <div>hero slot</div>

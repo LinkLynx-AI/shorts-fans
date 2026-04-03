@@ -1,26 +1,23 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import type { CreatorSummary } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { UnlockCta } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
-import { isCreatorFollowed, isShortPinned } from "../model/mock-engagement";
+import type { DetailShortSurface, FeedShortSurface } from "../model/mock-short-surface";
 
 export type ImmersiveShortSurfaceProps =
   | {
       activeTab: FeedTab;
-      creator: CreatorSummary;
       mode: "feed";
-      short: ShortPreviewMeta;
+      surface: FeedShortSurface;
     }
   | {
       backHref: string;
-      creator: CreatorSummary;
       mode: "detail";
-      short: ShortPreviewMeta;
+      surface: DetailShortSurface;
     };
 
 function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
@@ -98,8 +95,8 @@ function PinRail({ pinned }: PinRailProps) {
 }
 
 type CreatorBlockProps = {
-  creator: CreatorSummary;
-  followed: boolean;
+  creator: FeedShortSurface["creator"];
+  followed?: boolean;
   short: ShortPreviewMeta;
 };
 
@@ -112,7 +109,7 @@ function FeedCreatorAvatar() {
   );
 }
 
-function CreatorBlock({ creator, followed, short }: CreatorBlockProps) {
+function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
       <div className="w-[min(88%,344px)] max-w-[344px]">
@@ -144,9 +141,10 @@ function CreatorBlock({ creator, followed, short }: CreatorBlockProps) {
  * `feed` と `short detail` で共有する immersive short surface を表示する。
  */
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
-  const { creator, mode, short } = props;
-  const followed = isCreatorFollowed(creator.id);
-  const pinned = isShortPinned(short.id);
+  const { mode, surface } = props;
+  const { creator, short, unlockCta, viewer } = surface;
+  const followed = mode === "detail" ? viewer.isFollowingCreator : undefined;
+  const pinned = viewer.isPinned;
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
@@ -159,9 +157,9 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <PinRail pinned={pinned} />
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
           <UnlockCta
+            cta={unlockCta}
             className="w-full"
             {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
-            short={short}
           />
         </div>
         <CreatorBlock creator={creator} followed={followed} short={short} />

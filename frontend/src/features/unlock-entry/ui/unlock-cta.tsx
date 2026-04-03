@@ -1,58 +1,58 @@
 import Link from "next/link";
 
-import type { ShortPreviewMeta } from "@/entities/short";
 import { cn } from "@/shared/lib";
 
+import {
+  getUnlockCtaLabel,
+  getUnlockCtaMeta,
+  type UnlockCtaState,
+} from "../model/unlock-cta";
+
 export type UnlockCtaProps = {
+  cta: UnlockCtaState;
   className?: string;
   href?: string;
-  short: ShortPreviewMeta;
-  state?: "locked" | "unlocked";
 };
-
-function getUnlockMeta(short: ShortPreviewMeta, state: UnlockCtaProps["state"]) {
-  if (state === "unlocked") {
-    return short.progress;
-  }
-
-  return `${short.price} | ${short.duration.replace("分", "m")}`;
-}
 
 /**
  * short から main unlock へつなぐ CTA を表示する。
  */
 export function UnlockCta({
+  cta,
   className,
   href,
-  short,
-  state = "locked",
 }: UnlockCtaProps) {
+  const label = getUnlockCtaLabel(cta);
+  const meta = getUnlockCtaMeta(cta);
+  const isUnavailable = cta.state === "unavailable";
+
   const content = (
     <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-      <span className="truncate text-[15px] font-semibold tracking-[-0.01em]">
-        {state === "unlocked" ? "Continue main" : "Unlock"}
-      </span>
-      <span
-        className={cn(
-          "inline-flex min-h-[34px] shrink-0 items-center rounded-full px-3.5 text-xs font-semibold tracking-[-0.01em]",
-          state === "unlocked"
-            ? "bg-accent-strong/12 text-accent-strong"
-            : "bg-[linear-gradient(135deg,var(--accent)_0%,var(--accent-strong)_100%)] text-white shadow-[0_8px_20px_rgba(16,130,200,0.2)]",
-        )}
-      >
-        {getUnlockMeta(short, state)}
-      </span>
+      <span className="truncate text-[15px] font-semibold tracking-[-0.01em]">{label}</span>
+      {meta ? (
+        <span
+          className={cn(
+            "inline-flex min-h-[34px] shrink-0 items-center rounded-full px-3.5 text-xs font-semibold tracking-[-0.01em]",
+            cta.state === "continue_main"
+              ? "bg-accent-strong/12 text-accent-strong"
+              : "bg-[linear-gradient(135deg,var(--accent)_0%,var(--accent-strong)_100%)] text-white shadow-[0_8px_20px_rgba(16,130,200,0.2)]",
+          )}
+        >
+          {meta}
+        </span>
+      ) : null}
     </span>
   );
 
   const classes = cn(
     "flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#bae7ff]/90 bg-[linear-gradient(90deg,rgba(240,251,255,0.97),rgba(213,243,255,0.93))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl",
-    state === "unlocked" &&
+    cta.state === "continue_main" &&
       "border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))]",
+    isUnavailable && "border-[#d9e8f1] text-foreground/54 shadow-none",
     className,
   );
 
-  if (!href) {
+  if (!href || isUnavailable) {
     return <div className={classes}>{content}</div>;
   }
 

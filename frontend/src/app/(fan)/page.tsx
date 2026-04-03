@@ -1,4 +1,4 @@
-import { getFeedShortForTab, type FeedTab } from "@/entities/short";
+import type { FeedTab } from "@/entities/short";
 import { FeedShell } from "@/widgets/feed-shell";
 
 function normalizeFeedTab(tab: string | string[] | undefined): FeedTab {
@@ -12,7 +12,6 @@ export default async function RootPage({
 }) {
   const { tab } = await searchParams;
   const activeTab = normalizeFeedTab(tab);
-  const short = getFeedShortForTab(activeTab);
 
-  return <FeedShell activeTab={activeTab} short={short} />;
+  return <FeedShell activeTab={activeTab} />;
 }

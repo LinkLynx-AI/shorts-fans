@@ -1,6 +1,6 @@
-import { getCreatorById } from "@/entities/creator";
-import { getFeedShortForTab, getShortById } from "@/entities/short";
-import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
+import { notFound } from "next/navigation";
+
+import { getFeedSurfaceByTab, getShortSurfaceById, ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 export default async function ShortDetailPage({
   params,
@@ -8,12 +8,11 @@ export default async function ShortDetailPage({
   params: Promise<{ shortId: string }>;
 }) {
   const { shortId } = await params;
-  const short = getShortById(shortId) ?? getFeedShortForTab("recommended");
-  const creator = getCreatorById(short.creatorId);
+  const surface = getShortSurfaceById(shortId);
 
-  if (!creator) {
-    throw new Error(`Unknown creator for short: ${short.id}`);
+  if (!surface) {
+    notFound();
   }
 
-  return <ImmersiveShortSurface backHref="/" creator={creator} mode="detail" short={short} />;
+  return <ImmersiveShortSurface backHref="/" mode="detail" surface={surface} />;
 }
