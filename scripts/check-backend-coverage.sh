@@ -8,12 +8,8 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 backend_dir="${BACKEND_DIR:-backend}"
 coverage_min="${BACKEND_COVERAGE_MIN:-}"
 coverage_profile="${BACKEND_COVERAGE_PROFILE:-}"
-coverage_exclude_regex="${BACKEND_COVERAGE_EXCLUDE_REGEX-__DEFAULT__}"
+coverage_exclude_regex='(/cmd/|/internal/postgres/sqlc$|/internal/dbschema$)'
 cleanup_profile=0
-
-if [[ "${coverage_exclude_regex}" == "__DEFAULT__" ]]; then
-	coverage_exclude_regex='(/cmd/|/internal/postgres/sqlc$|/internal/dbschema$)'
-fi
 
 if [[ "${backend_dir}" != /* ]]; then
 	backend_dir="${repo_root}/${backend_dir}"
@@ -35,15 +31,9 @@ fi
 cd "${backend_dir}"
 
 packages=()
-if [[ -n "${coverage_exclude_regex}" ]]; then
-	while IFS= read -r package; do
-		packages+=("${package}")
-	done < <(go list ./... | grep -Ev "${coverage_exclude_regex}" || true)
-else
-	while IFS= read -r package; do
-		packages+=("${package}")
-	done < <(go list ./...)
-fi
+while IFS= read -r package; do
+	packages+=("${package}")
+done < <(go list ./... | grep -Ev "${coverage_exclude_regex}" || true)
 
 if [[ "${#packages[@]}" -eq 0 ]]; then
 	printf 'no backend packages matched coverage target\n' >&2

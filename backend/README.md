@@ -147,12 +147,6 @@ make backend-coverage-check BACKEND_COVERAGE_MIN=30
 
 coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc`、開発ツール用の `internal/dbschema` を除外します。entrypoint 配線や生成物、runtime request path 外の schema export ツールではなく、runtime の手書きロジックをしきい値の対象にするためです。
 
-除外条件を変えたいときは `BACKEND_COVERAGE_EXCLUDE_REGEX` を渡します。空文字を渡すと、backend 配下の全 package を対象にできます。
-
-```bash
-make backend-coverage-check BACKEND_COVERAGE_EXCLUDE_REGEX=''
-```
-
 `BACKEND_COVERAGE_PROFILE` を指定すると、`go tool cover -html` などで再利用できる coverage profile を保存できます。
 
 ## Environment
