@@ -12,90 +12,6 @@
               "pinnedShorts": 2,
               "library": 2
             }
-          },
-          "preview": {
-            "pinnedShorts": [
-              {
-                "short": {
-                  "id": "short_sora_afterrain",
-                  "canonicalMainId": "main_sora_after_rain",
-                  "creatorId": "creator_sora_vale",
-                  "title": "after rain preview",
-                  "caption": "雨上がりの balcony preview。続きは main で。",
-                  "media": {
-                    "id": "asset_short_sora_afterrain",
-                    "kind": "video",
-                    "url": "https://cdn.example.com/shorts/sora-after-rain.mp4",
-                    "posterUrl": "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
-                    "width": 1080,
-                    "height": 1920,
-                    "durationSeconds": 17
-                  },
-                  "previewDurationSeconds": 17
-                },
-                "creator": {
-                  "id": "creator_sora_vale",
-                  "displayName": "Sora Vale",
-                  "handle": "@soravale",
-                  "avatar": {
-                    "id": "asset_creator_sora_avatar",
-                    "kind": "image",
-                    "url": "https://cdn.example.com/creator/sora/avatar.jpg",
-                    "posterUrl": null,
-                    "width": 512,
-                    "height": 512,
-                    "durationSeconds": null
-                  },
-                  "bio": "after rain と balcony mood の short をまとめています。"
-                }
-              }
-            ],
-            "library": [
-              {
-                "main": {
-                  "id": "main_mina_quiet_rooftop",
-                  "title": "quiet rooftop main",
-                  "durationSeconds": 480
-                },
-                "creator": {
-                  "id": "creator_mina_rei",
-                  "displayName": "Mina Rei",
-                  "handle": "@minarei",
-                  "avatar": {
-                    "id": "asset_creator_mina_avatar",
-                    "kind": "image",
-                    "url": "https://cdn.example.com/creator/mina/avatar.jpg",
-                    "posterUrl": null,
-                    "width": 512,
-                    "height": 512,
-                    "durationSeconds": null
-                  },
-                  "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
-                },
-                "entryShort": {
-                  "id": "short_mina_rooftop",
-                  "canonicalMainId": "main_mina_quiet_rooftop",
-                  "creatorId": "creator_mina_rei",
-                  "title": "quiet rooftop preview",
-                  "caption": "quiet rooftop preview。",
-                  "media": {
-                    "id": "asset_short_mina_rooftop",
-                    "kind": "video",
-                    "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
-                    "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
-                    "width": 1080,
-                    "height": 1920,
-                    "durationSeconds": 16
-                  },
-                  "previewDurationSeconds": 16
-                },
-                "access": {
-                  "mainId": "main_mina_quiet_rooftop",
-                  "status": "purchased",
-                  "reason": "purchased_access"
-                }
-              }
-            ]
           }
         },
         "meta": {
@@ -117,10 +33,6 @@
               "pinnedShorts": 0,
               "library": 0
             }
-          },
-          "preview": {
-            "pinnedShorts": [],
-            "library": []
           }
         },
         "meta": {

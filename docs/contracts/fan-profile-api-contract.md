@@ -70,13 +70,13 @@
 - `data.fanProfile.counts.following`: `number`
 - `data.fanProfile.counts.pinnedShorts`: `number`
 - `data.fanProfile.counts.library`: `number`
-- `data.preview.pinnedShorts`: `PinnedShortItem[]`
-- `data.preview.library`: `LibraryItem[]`
 
 #### Overview Rules
 
-- preview arrays は各 dedicated endpoint と同じ並び順の先頭 `3` 件まで返します。
+- `GET /api/fan/profile` は overview metadata だけを返し、pinned shorts と library の item 本体は返しません。
 - overview では following の count は返しますが、creator list 自体は `/following` に分けます。
+- frontend は profile 初回表示時に `GET /api/fan/profile` と、初期 tab に対応する paginated endpoint を別で呼びます。
+- `pinned-shorts` と `library` は cursor pagination を前提にし、以後の追加取得は scroll で行います。
 
 ### `GET /api/fan/profile/following`
 
