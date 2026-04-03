@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
 
 export type FeedTab = "following" | "recommended";
-export type FanCollectionTab = "library" | "pinned";
 export type ShortId = string;
 
 export type ShortMediaAsset = {
@@ -217,9 +216,6 @@ const feedShortByTab = {
   recommended: "rooftop",
 } as const satisfies Record<FeedTab, ShortId>;
 
-const pinnedShortIds = ["afterrain", "balcony", "rooftop"] as const;
-const libraryShortIds = ["softlight", "balcony", "mirror"] as const;
-
 /**
  * mock short 一覧を取得する。
  */
@@ -259,26 +255,6 @@ export function getFeedShortForTab(tab: FeedTab): ShortPreviewMeta {
  */
 export function getShortsByCreatorId(creatorId: string): readonly ShortPreviewMeta[] {
   return shorts.filter((short) => short.creatorId === creatorId);
-}
-
-/**
- * pinned short 一覧を取得する。
- */
-export function getPinnedShorts(): readonly ShortPreviewMeta[] {
-  return pinnedShortIds.flatMap((id) => {
-    const short = getShortById(id);
-    return short ? [short] : [];
-  });
-}
-
-/**
- * library short 一覧を取得する。
- */
-export function getLibraryShorts(): readonly ShortPreviewMeta[] {
-  return libraryShortIds.flatMap((id) => {
-    const short = getShortById(id);
-    return short ? [short] : [];
-  });
 }
 
 /**

@@ -1,9 +1,5 @@
-import type { FanCollectionTab } from "@/entities/short";
+import { getFanHubState, normalizeFanHubTab } from "@/entities/fan-profile";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
-
-function normalizeFanTab(tab: string | string[] | undefined): FanCollectionTab {
-  return tab === "library" ? "library" : "pinned";
-}
 
 export default async function FanPage({
   searchParams,
@@ -12,5 +8,5 @@ export default async function FanPage({
 }) {
   const { tab } = await searchParams;
 
-  return <FanHubShell activeTab={normalizeFanTab(tab)} />;
+  return <FanHubShell state={getFanHubState(normalizeFanHubTab(tab))} />;
 }
