@@ -15,7 +15,7 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
     expect(screen.queryByRole("link", { name: /Back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
-    expect(screen.getByText("Following")).toBeInTheDocument();
+    expect(screen.getByText("Follow")).toBeInTheDocument();
   });
 
   it("renders detail mode with back navigation and the same creator block", () => {
@@ -29,5 +29,6 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.queryByRole("link", { name: /おすすめ/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByText("Unlock")).toBeInTheDocument();
+    expect(screen.getByText("Following")).toBeInTheDocument();
   });
 });

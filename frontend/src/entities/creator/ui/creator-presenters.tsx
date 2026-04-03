@@ -1,9 +1,9 @@
 import Link from "next/link";
 
-import type { CreatorStat, CreatorSummary } from "../model/creator";
+import type { CreatorProfileStats, CreatorSummary } from "../model/creator";
 import { getCreatorInitials } from "../model/creator";
 import { cn } from "@/shared/lib";
-import { Avatar, AvatarFallback } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
 
 type CreatorAvatarProps = {
   className?: string;
@@ -18,21 +18,24 @@ type CreatorIdentityProps = {
 
 type CreatorStatListProps = {
   className?: string;
-  stats: readonly CreatorStat[];
+  stats: CreatorProfileStats;
 };
 
+function formatCompactCount(value: number): string {
+  return new Intl.NumberFormat("en", {
+    maximumFractionDigits: 0,
+    notation: "compact",
+  }).format(value);
+}
+
 /**
- * creator 用の gradient avatar を表示する。
+ * creator 用の avatar asset を表示する。
  */
 export function CreatorAvatar({ className, creator }: CreatorAvatarProps) {
   return (
-    <Avatar
-      className={cn("size-12 border-white/68", className)}
-      style={{
-        background: `linear-gradient(180deg, ${creator.avatar.from} 0%, ${creator.avatar.accent} 44%, ${creator.avatar.to} 100%)`,
-      }}
-    >
-      <AvatarFallback>{getCreatorInitials(creator.name)}</AvatarFallback>
+    <Avatar className={cn("size-12 border-white/68", className)}>
+      <AvatarImage alt={creator.displayName} src={creator.avatar.url} />
+      <AvatarFallback>{getCreatorInitials(creator.displayName)}</AvatarFallback>
     </Avatar>
   );
 }
@@ -43,7 +46,7 @@ export function CreatorAvatar({ className, creator }: CreatorAvatarProps) {
 export function CreatorIdentity({ className, creator, href }: CreatorIdentityProps) {
   const content = (
     <div className={cn("min-w-0", className)}>
-      <p className="truncate text-sm font-semibold text-current">{creator.name}</p>
+      <p className="truncate text-sm font-semibold text-current">{creator.displayName}</p>
       <p className="truncate text-[13px] text-current/72">{creator.handle}</p>
     </div>
   );
@@ -63,9 +66,15 @@ export function CreatorIdentity({ className, creator, href }: CreatorIdentityPro
  * creator profile 用の stat list を表示する。
  */
 export function CreatorStatList({ className, stats }: CreatorStatListProps) {
+  const items = [
+    { label: "shorts", value: stats.shortCount.toString() },
+    { label: "fans", value: formatCompactCount(stats.fanCount) },
+    { label: "views", value: formatCompactCount(stats.viewCount) },
+  ] as const;
+
   return (
     <div className={cn("grid grid-cols-3 gap-3 text-center", className)}>
-      {stats.map((stat) => (
+      {items.map((stat) => (
         <div key={stat.label} className="min-w-0">
           <strong className="block font-display text-lg font-semibold tracking-[-0.04em] text-foreground">
             {stat.value}

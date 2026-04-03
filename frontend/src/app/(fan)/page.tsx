@@ -1,5 +1,5 @@
 import type { FeedTab } from "@/entities/short";
-import { FeedShell } from "@/widgets/feed-shell";
+import { FeedShell, getMockFeedShellState } from "@/widgets/feed-shell";
 
 function normalizeFeedTab(tab: string | string[] | undefined): FeedTab {
   return tab === "following" ? "following" : "recommended";
@@ -12,6 +12,7 @@ export default async function RootPage({
 }) {
   const { tab } = await searchParams;
   const activeTab = normalizeFeedTab(tab);
+  const state = getMockFeedShellState(activeTab);
 
-  return <FeedShell activeTab={activeTab} />;
+  return <FeedShell state={state} />;
 }

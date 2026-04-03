@@ -96,15 +96,16 @@ function PinRail({ pinned }: PinRailProps) {
 
 type CreatorBlockProps = {
   creator: FeedShortSurface["creator"];
-  followed?: boolean;
+  followed?: boolean | undefined;
   short: ShortPreviewMeta;
 };
 
-function FeedCreatorAvatar() {
+function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   return (
     <span
       aria-hidden="true"
-      className="h-[38px] w-[38px] shrink-0 rounded-full bg-[linear-gradient(180deg,#a7e8ff_0%,#5ba9d4_56%,#17374f_100%)] shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      className="h-[38px] w-[38px] shrink-0 rounded-full bg-cover bg-center shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      style={{ backgroundImage: `url(${creator.avatar.url})` }}
     />
   );
 }
@@ -118,8 +119,8 @@ function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
             className="inline-flex min-w-0 items-center gap-2 text-left text-white transition hover:opacity-90"
             href={`/creators/${creator.id}`}
           >
-            <FeedCreatorAvatar />
-            <span className="truncate text-[15px] font-bold text-white">{creator.name}</span>
+            <FeedCreatorAvatar creator={creator} />
+            <span className="truncate text-[15px] font-bold text-white">{creator.displayName}</span>
           </Link>
           <button
             className={cn(
@@ -143,7 +144,7 @@ function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { mode, surface } = props;
   const { creator, short, unlockCta, viewer } = surface;
-  const followed = mode === "detail" ? viewer.isFollowingCreator : undefined;
+  const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
 
   return (

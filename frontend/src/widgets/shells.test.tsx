@@ -2,17 +2,31 @@ import { render, screen } from "@testing-library/react";
 
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
-import { FeedShell } from "@/widgets/feed-shell";
+import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
 import { SearchShell } from "@/widgets/search-shell";
 
 describe("widgets", () => {
   it("renders the feed shell", () => {
-    render(<FeedShell activeTab="recommended" />);
+    render(<FeedShell state={getMockFeedShellState("recommended")} />);
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
     expect(screen.getByText("Mina Rei")).toBeInTheDocument();
     expect(screen.getByText("quiet rooftop preview.")).toBeInTheDocument();
+  });
+
+  it("renders following empty state", () => {
+    render(<FeedShell state={getFollowingFeedShellState("empty")} />);
+
+    expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("フォロー中の creator はまだいません")).toBeInTheDocument();
+  });
+
+  it("renders following auth-required state", () => {
+    render(<FeedShell state={getFollowingFeedShellState("auth_required")} />);
+
+    expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
   });
 
   it("renders the search structure and keeps query text", () => {

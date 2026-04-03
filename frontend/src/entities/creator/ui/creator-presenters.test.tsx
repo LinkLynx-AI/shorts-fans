@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
 
-import { CreatorAvatar, CreatorIdentity, CreatorStatList, getCreatorById } from "@/entities/creator";
+import { CreatorAvatar, CreatorIdentity, CreatorStatList, getCreatorById, getCreatorProfileStatsById } from "@/entities/creator";
 
 describe("creator presenters", () => {
   const creator = getCreatorById("mina");
+  const stats = getCreatorProfileStatsById("mina");
 
   it("renders avatar, identity, and stats", () => {
-    if (!creator) {
+    if (!creator || !stats) {
       throw new Error("fixture missing");
     }
 
@@ -14,7 +15,7 @@ describe("creator presenters", () => {
       <div>
         <CreatorAvatar creator={creator} />
         <CreatorIdentity creator={creator} />
-        <CreatorStatList stats={creator.stats} />
+        <CreatorStatList stats={stats} />
       </div>,
     );
 

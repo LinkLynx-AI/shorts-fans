@@ -2,11 +2,12 @@ export {
   getCreatorById,
   getCreatorIds,
   getCreatorInitials,
+  getCreatorProfileStatsById,
   listCreators,
 } from "./model/creator";
 export type {
   CreatorId,
-  CreatorStat,
+  CreatorProfileStats,
   CreatorSummary,
 } from "./model/creator";
 export {
