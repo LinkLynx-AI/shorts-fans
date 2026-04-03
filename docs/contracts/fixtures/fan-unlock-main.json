@@ -1,5 +1,5 @@
 {
-  "GET /api/v1/fan/shorts/{shortId}/unlock": {
+  "GET /api/fan/shorts/{shortId}/unlock": {
     "setup_required": {
       "status": 200,
       "body": {
@@ -309,7 +309,7 @@
       }
     }
   },
-  "GET /api/v1/fan/mains/{mainId}/playback": {
+  "GET /api/fan/mains/{mainId}/playback": {
     "playback_purchased": {
       "status": 200,
       "body": {

@@ -18,14 +18,14 @@
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/fan/feed` | `tab=recommended` は optional、`tab=following` は required | short feed |
-| `GET` | `/api/v1/fan/shorts/{shortId}` | optional | short detail |
-| `GET` | `/api/v1/fan/creators/search` | optional | creator search only |
-| `GET` | `/api/v1/fan/creators/{creatorId}` | optional | public creator profile |
+| `GET` | `/api/fan/feed` | `tab=recommended` は optional、`tab=following` は required | short feed |
+| `GET` | `/api/fan/shorts/{shortId}` | optional | short detail |
+| `GET` | `/api/fan/creators/search` | optional | creator search only |
+| `GET` | `/api/fan/creators/{creatorId}` | optional | public creator profile |
 
 ## Request Contract
 
-### `GET /api/v1/fan/feed`
+### `GET /api/fan/feed`
 
 #### Query
 
@@ -60,7 +60,7 @@
 | `following` empty | `200` |
 | `following` unauthenticated | `401` + `auth_required` |
 
-### `GET /api/v1/fan/shorts/{shortId}`
+### `GET /api/fan/shorts/{shortId}`
 
 #### Path
 
@@ -82,7 +82,7 @@
 | `owner` | `200` |
 | `not_found` | `404` + `not_found` |
 
-### `GET /api/v1/fan/creators/search`
+### `GET /api/fan/creators/search`
 
 #### Query
 
@@ -115,7 +115,7 @@
 | normal | `200` |
 | empty | `200` |
 
-### `GET /api/v1/fan/creators/{creatorId}`
+### `GET /api/fan/creators/{creatorId}`
 
 #### Path
 
@@ -156,10 +156,10 @@
 
 | endpoint | public | purchased | owner | empty | not_found |
 | --- | --- | --- | --- | --- | --- |
-| `GET /api/v1/fan/feed` | yes | yes | no | yes | no |
-| `GET /api/v1/fan/shorts/{shortId}` | yes | yes | yes | no | yes |
-| `GET /api/v1/fan/creators/search` | yes | no | no | yes | no |
-| `GET /api/v1/fan/creators/{creatorId}` | yes | no | no | yes | yes |
+| `GET /api/fan/feed` | yes | yes | no | yes | no |
+| `GET /api/fan/shorts/{shortId}` | yes | yes | yes | no | yes |
+| `GET /api/fan/creators/search` | yes | no | no | yes | no |
+| `GET /api/fan/creators/{creatorId}` | yes | no | no | yes | yes |
 
 ## Out-of-scope Guardrails
 

@@ -1,5 +1,5 @@
 {
-  "GET /api/v1/fan/feed": {
+  "GET /api/fan/feed": {
     "recommended_public": {
       "status": 200,
       "body": {
@@ -166,7 +166,7 @@
       }
     }
   },
-  "GET /api/v1/fan/shorts/{shortId}": {
+  "GET /api/fan/shorts/{shortId}": {
     "short_detail_public": {
       "status": 200,
       "body": {
@@ -350,7 +350,7 @@
       }
     }
   },
-  "GET /api/v1/fan/creators/search": {
+  "GET /api/fan/creators/search": {
     "search_recent": {
       "status": 200,
       "body": {
@@ -439,7 +439,7 @@
       }
     }
   },
-  "GET /api/v1/fan/creators/{creatorId}": {
+  "GET /api/fan/creators/{creatorId}": {
     "creator_profile_normal": {
       "status": 200,
       "body": {

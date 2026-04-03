@@ -18,12 +18,12 @@
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/fan/shorts/{shortId}/unlock` | required | mini paywall / direct unlock 判定用 |
-| `GET` | `/api/v1/fan/mains/{mainId}/playback` | required | main player 開始用 |
+| `GET` | `/api/fan/shorts/{shortId}/unlock` | required | mini paywall / direct unlock 判定用 |
+| `GET` | `/api/fan/mains/{mainId}/playback` | required | main player 開始用 |
 
 ## Request Contract
 
-### `GET /api/v1/fan/shorts/{shortId}/unlock`
+### `GET /api/fan/shorts/{shortId}/unlock`
 
 #### Path
 
@@ -65,7 +65,7 @@
 | `locked` | `403` + `main_locked` |
 | `not_found` | `404` + `not_found` |
 
-### `GET /api/v1/fan/mains/{mainId}/playback`
+### `GET /api/fan/mains/{mainId}/playback`
 
 #### Path
 
@@ -103,8 +103,8 @@
 
 | endpoint | locked | purchased | owner | not_found |
 | --- | --- | --- | --- | --- |
-| `GET /api/v1/fan/shorts/{shortId}/unlock` | yes | yes | yes | yes |
-| `GET /api/v1/fan/mains/{mainId}/playback` | yes | yes | yes | yes |
+| `GET /api/fan/shorts/{shortId}/unlock` | yes | yes | yes | yes |
+| `GET /api/fan/mains/{mainId}/playback` | yes | yes | yes | yes |
 
 ## Out-of-scope Guardrails
 

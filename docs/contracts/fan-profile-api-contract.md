@@ -18,12 +18,12 @@
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/v1/fan/profile` | required | private hub overview |
-| `GET` | `/api/v1/fan/profile/continue-watching` | required | partially watched main の再開一覧 |
-| `GET` | `/api/v1/fan/profile/following` | required | following creator 一覧 |
-| `GET` | `/api/v1/fan/profile/pinned-shorts` | required | pinned short 一覧 |
-| `GET` | `/api/v1/fan/profile/library` | required | unlocked main 一覧 |
-| `GET` | `/api/v1/fan/profile/settings` | required | minimum read-only settings sections |
+| `GET` | `/api/fan/profile` | required | private hub overview |
+| `GET` | `/api/fan/profile/continue-watching` | required | partially watched main の再開一覧 |
+| `GET` | `/api/fan/profile/following` | required | following creator 一覧 |
+| `GET` | `/api/fan/profile/pinned-shorts` | required | pinned short 一覧 |
+| `GET` | `/api/fan/profile/library` | required | unlocked main 一覧 |
+| `GET` | `/api/fan/profile/settings` | required | minimum read-only settings sections |
 
 ## Surface-specific Payloads
 
@@ -64,7 +64,7 @@
 
 ## Request Contract
 
-### `GET /api/v1/fan/profile`
+### `GET /api/fan/profile`
 
 #### Response
 
@@ -83,7 +83,7 @@
 - preview arrays は各 dedicated endpoint と同じ並び順の先頭 `3` 件まで返します。
 - overview では following の count は返しますが、creator list 自体は `/following` に分けます。
 
-### `GET /api/v1/fan/profile/continue-watching`
+### `GET /api/fan/profile/continue-watching`
 
 #### Query
 
@@ -97,7 +97,7 @@
 - partially watched で `remainingSeconds > 0` の item だけ返します。
 - `meta.page`: `CursorPageInfo`
 
-### `GET /api/v1/fan/profile/following`
+### `GET /api/fan/profile/following`
 
 #### Query
 
@@ -110,7 +110,7 @@
 - `data.items`: `FollowingItem[]`
 - `meta.page`: `CursorPageInfo`
 
-### `GET /api/v1/fan/profile/pinned-shorts`
+### `GET /api/fan/profile/pinned-shorts`
 
 #### Query
 
@@ -123,7 +123,7 @@
 - `data.items`: `PinnedShortItem[]`
 - `meta.page`: `CursorPageInfo`
 
-### `GET /api/v1/fan/profile/library`
+### `GET /api/fan/profile/library`
 
 #### Query
 
@@ -136,7 +136,7 @@
 - `data.items`: `LibraryItem[]`
 - `meta.page`: `CursorPageInfo`
 
-### `GET /api/v1/fan/profile/settings`
+### `GET /api/fan/profile/settings`
 
 #### Response
 
@@ -149,12 +149,12 @@
 
 | endpoint | populated | empty | not_found | unauthenticated |
 | --- | --- | --- | --- | --- |
-| `GET /api/v1/fan/profile` | `200` | `200` | `404` | `401` |
-| `GET /api/v1/fan/profile/continue-watching` | `200` | `200` | no | `401` |
-| `GET /api/v1/fan/profile/following` | `200` | `200` | no | `401` |
-| `GET /api/v1/fan/profile/pinned-shorts` | `200` | `200` | no | `401` |
-| `GET /api/v1/fan/profile/library` | `200` | `200` | no | `401` |
-| `GET /api/v1/fan/profile/settings` | `200` | no | no | `401` |
+| `GET /api/fan/profile` | `200` | `200` | `404` | `401` |
+| `GET /api/fan/profile/continue-watching` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/following` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/pinned-shorts` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/library` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/settings` | `200` | no | no | `401` |
 
 ## Out-of-scope Guardrails
 

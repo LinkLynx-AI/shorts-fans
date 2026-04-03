@@ -1,5 +1,5 @@
 {
-  "GET /api/v1/fan/profile": {
+  "GET /api/fan/profile": {
     "overview_populated": {
       "status": 200,
       "body": {
@@ -198,7 +198,7 @@
       }
     }
   },
-  "GET /api/v1/fan/profile/continue-watching": {
+  "GET /api/fan/profile/continue-watching": {
     "continue_watching_populated": {
       "status": 200,
       "body": {
@@ -279,7 +279,7 @@
       }
     }
   },
-  "GET /api/v1/fan/profile/following": {
+  "GET /api/fan/profile/following": {
     "following_populated": {
       "status": 200,
       "body": {
@@ -354,7 +354,7 @@
       }
     }
   },
-  "GET /api/v1/fan/profile/pinned-shorts": {
+  "GET /api/fan/profile/pinned-shorts": {
     "pinned_populated": {
       "status": 200,
       "body": {
@@ -423,7 +423,7 @@
       }
     }
   },
-  "GET /api/v1/fan/profile/library": {
+  "GET /api/fan/profile/library": {
     "library_populated": {
       "status": 200,
       "body": {
@@ -504,7 +504,7 @@
       }
     }
   },
-  "GET /api/v1/fan/profile/settings": {
+  "GET /api/fan/profile/settings": {
     "settings_default": {
       "status": 200,
       "body": {

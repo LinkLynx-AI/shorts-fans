@@ -21,20 +21,20 @@
    - common DTOs
    - common state vocabulary
 2. `SHO-17`
-   - `GET /api/v1/fan/feed`
-   - `GET /api/v1/fan/shorts/{shortId}`
-   - `GET /api/v1/fan/creators/search`
-   - `GET /api/v1/fan/creators/{creatorId}`
+   - `GET /api/fan/feed`
+   - `GET /api/fan/shorts/{shortId}`
+   - `GET /api/fan/creators/search`
+   - `GET /api/fan/creators/{creatorId}`
 3. `SHO-18`
-   - `GET /api/v1/fan/shorts/{shortId}/unlock`
-   - `GET /api/v1/fan/mains/{mainId}/playback`
+   - `GET /api/fan/shorts/{shortId}/unlock`
+   - `GET /api/fan/mains/{mainId}/playback`
 4. `SHO-19`
-   - `GET /api/v1/fan/profile`
-   - `GET /api/v1/fan/profile/continue-watching`
-   - `GET /api/v1/fan/profile/following`
-   - `GET /api/v1/fan/profile/pinned-shorts`
-   - `GET /api/v1/fan/profile/library`
-   - `GET /api/v1/fan/profile/settings`
+   - `GET /api/fan/profile`
+   - `GET /api/fan/profile/continue-watching`
+   - `GET /api/fan/profile/following`
+   - `GET /api/fan/profile/pinned-shorts`
+   - `GET /api/fan/profile/library`
+   - `GET /api/fan/profile/settings`
 
 ## Frontend Connection Order
 
