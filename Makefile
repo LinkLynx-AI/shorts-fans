@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-vet backend-fmt
+.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt
 
 BACKEND_DIR := backend
 BACKEND_APP_ENV ?= development
@@ -11,6 +11,8 @@ BACKEND_POSTGRES_DSN ?= postgres://shorts_fans:shorts_fans@localhost:5432/shorts
 BACKEND_REDIS_ADDR ?= localhost:6379
 BACKEND_AWS_REGION ?=
 BACKEND_SQS_QUEUE_URL ?=
+BACKEND_COVERAGE_MIN ?=
+BACKEND_COVERAGE_PROFILE ?=
 SQLC_VERSION := v1.27.0
 
 help:
@@ -22,11 +24,13 @@ help:
 		'  make backend-run' \
 		'  make backend-worker' \
 		'  make backend-schema' \
+		'  make backend-coverage-check [BACKEND_COVERAGE_MIN=<min-percent>]' \
 		'' \
 		'Examples:' \
 		'  make codex branch=feat/frontend-shell' \
 		'  make codex branch=feat/frontend-shell ARGS="exec"' \
-		'  make backend-run'
+		'  make backend-run' \
+		'  make backend-coverage-check BACKEND_COVERAGE_MIN=30'
 
 codex: codex-worktree
 
@@ -87,6 +91,12 @@ backend-schema:
 
 backend-test:
 	cd $(BACKEND_DIR) && go test ./...
+
+backend-coverage-check:
+	BACKEND_DIR='$(BACKEND_DIR)' \
+	BACKEND_COVERAGE_MIN='$(BACKEND_COVERAGE_MIN)' \
+	BACKEND_COVERAGE_PROFILE='$(BACKEND_COVERAGE_PROFILE)' \
+	./scripts/check-backend-coverage.sh
 
 backend-vet:
 	cd $(BACKEND_DIR) && go vet ./...
