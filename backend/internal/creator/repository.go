@@ -14,11 +14,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ErrCapabilityNotFound indicates that the requested creator capability does not exist.
-var ErrCapabilityNotFound = errors.New("creator capability not found")
+// ErrCapabilityNotFound は対象の creator capability が存在しないことを表します。
+var ErrCapabilityNotFound = errors.New("creator capability が見つかりません")
 
-// ErrProfileNotFound indicates that the requested creator profile does not exist.
-var ErrProfileNotFound = errors.New("creator profile not found")
+// ErrProfileNotFound は対象の creator profile が存在しないことを表します。
+var ErrProfileNotFound = errors.New("creator profile が見つかりません")
 
 type queries interface {
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
@@ -31,12 +31,12 @@ type queries interface {
 	PublishCreatorProfile(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
 
-// Repository wraps creator-related persistence operations.
+// Repository は creator 関連の永続化操作を包みます。
 type Repository struct {
 	queries queries
 }
 
-// Capability is the domain-facing creator capability record.
+// Capability は domain 向けの creator capability レコードです。
 type Capability struct {
 	UserID                   uuid.UUID
 	State                    string
@@ -54,7 +54,7 @@ type Capability struct {
 	UpdatedAt                time.Time
 }
 
-// CreateCapabilityInput is the input for CreateCapability.
+// CreateCapabilityInput は CreateCapability の入力です。
 type CreateCapabilityInput struct {
 	UserID                   uuid.UUID
 	State                    string
@@ -70,7 +70,7 @@ type CreateCapabilityInput struct {
 	SuspendedAt              *time.Time
 }
 
-// UpdateCapabilityInput is the input for UpdateCapability.
+// UpdateCapabilityInput は UpdateCapability の入力です。
 type UpdateCapabilityInput struct {
 	UserID                   uuid.UUID
 	State                    string
@@ -86,7 +86,7 @@ type UpdateCapabilityInput struct {
 	SuspendedAt              *time.Time
 }
 
-// Profile is the domain-facing creator profile record.
+// Profile は domain 向けの creator profile レコードです。
 type Profile struct {
 	UserID      uuid.UUID
 	DisplayName *string
@@ -97,7 +97,7 @@ type Profile struct {
 	UpdatedAt   time.Time
 }
 
-// CreateProfileInput is the input for CreateProfile.
+// CreateProfileInput は CreateProfile の入力です。
 type CreateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
@@ -106,7 +106,7 @@ type CreateProfileInput struct {
 	PublishedAt *time.Time
 }
 
-// UpdateProfileInput is the input for UpdateProfile.
+// UpdateProfileInput は UpdateProfile の入力です。
 type UpdateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
@@ -114,7 +114,7 @@ type UpdateProfileInput struct {
 	Bio         string
 }
 
-// NewRepository constructs a creator repository backed by pgxpool.
+// NewRepository は pgxpool ベースの creator repository を構築します。
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return newRepository(sqlc.New(pool))
 }
@@ -123,7 +123,7 @@ func newRepository(q queries) *Repository {
 	return &Repository{queries: q}
 }
 
-// CreateCapability creates a creator capability row.
+// CreateCapability は creator capability を作成します。
 func (r *Repository) CreateCapability(ctx context.Context, input CreateCapabilityInput) (Capability, error) {
 	row, err := r.queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
 		UserID:                   postgres.UUIDToPG(input.UserID),
@@ -140,37 +140,37 @@ func (r *Repository) CreateCapability(ctx context.Context, input CreateCapabilit
 		SuspendedAt:              postgres.TimeToPG(input.SuspendedAt),
 	})
 	if err != nil {
-		return Capability{}, fmt.Errorf("create creator capability: %w", err)
+		return Capability{}, fmt.Errorf("creator capability 作成: %w", err)
 	}
 
 	capability, err := mapCapability(row)
 	if err != nil {
-		return Capability{}, fmt.Errorf("create creator capability: %w", err)
+		return Capability{}, fmt.Errorf("creator capability 作成結果の変換: %w", err)
 	}
 
 	return capability, nil
 }
 
-// GetCapability returns a creator capability by user ID.
+// GetCapability は user ID から creator capability を取得します。
 func (r *Repository) GetCapability(ctx context.Context, userID uuid.UUID) (Capability, error) {
 	row, err := r.queries.GetCreatorCapabilityByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Capability{}, fmt.Errorf("get creator capability %s: %w", userID, ErrCapabilityNotFound)
+			return Capability{}, fmt.Errorf("creator capability 取得 user=%s: %w", userID, ErrCapabilityNotFound)
 		}
 
-		return Capability{}, fmt.Errorf("get creator capability %s: %w", userID, err)
+		return Capability{}, fmt.Errorf("creator capability 取得 user=%s: %w", userID, err)
 	}
 
 	capability, err := mapCapability(row)
 	if err != nil {
-		return Capability{}, fmt.Errorf("get creator capability %s: %w", userID, err)
+		return Capability{}, fmt.Errorf("creator capability 取得結果の変換 user=%s: %w", userID, err)
 	}
 
 	return capability, nil
 }
 
-// UpdateCapability updates a creator capability row.
+// UpdateCapability は creator capability を更新します。
 func (r *Repository) UpdateCapability(ctx context.Context, input UpdateCapabilityInput) (Capability, error) {
 	row, err := r.queries.UpdateCreatorCapabilityState(ctx, sqlc.UpdateCreatorCapabilityStateParams{
 		State:                    input.State,
@@ -188,21 +188,21 @@ func (r *Repository) UpdateCapability(ctx context.Context, input UpdateCapabilit
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Capability{}, fmt.Errorf("update creator capability %s: %w", input.UserID, ErrCapabilityNotFound)
+			return Capability{}, fmt.Errorf("creator capability 更新 user=%s: %w", input.UserID, ErrCapabilityNotFound)
 		}
 
-		return Capability{}, fmt.Errorf("update creator capability %s: %w", input.UserID, err)
+		return Capability{}, fmt.Errorf("creator capability 更新 user=%s: %w", input.UserID, err)
 	}
 
 	capability, err := mapCapability(row)
 	if err != nil {
-		return Capability{}, fmt.Errorf("update creator capability %s: %w", input.UserID, err)
+		return Capability{}, fmt.Errorf("creator capability 更新結果の変換 user=%s: %w", input.UserID, err)
 	}
 
 	return capability, nil
 }
 
-// CreateProfile creates a creator profile row.
+// CreateProfile は creator profile を作成します。
 func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput) (Profile, error) {
 	row, err := r.queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      postgres.UUIDToPG(input.UserID),
@@ -212,56 +212,56 @@ func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput
 		PublishedAt: postgres.TimeToPG(input.PublishedAt),
 	})
 	if err != nil {
-		return Profile{}, fmt.Errorf("create creator profile: %w", err)
+		return Profile{}, fmt.Errorf("creator profile 作成: %w", err)
 	}
 
 	profile, err := mapProfile(row)
 	if err != nil {
-		return Profile{}, fmt.Errorf("create creator profile: %w", err)
+		return Profile{}, fmt.Errorf("creator profile 作成結果の変換: %w", err)
 	}
 
 	return profile, nil
 }
 
-// GetProfile returns a creator profile by user ID.
+// GetProfile は user ID から creator profile を取得します。
 func (r *Repository) GetProfile(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	row, err := r.queries.GetCreatorProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, fmt.Errorf("get creator profile %s: %w", userID, ErrProfileNotFound)
+			return Profile{}, fmt.Errorf("creator profile 取得 user=%s: %w", userID, ErrProfileNotFound)
 		}
 
-		return Profile{}, fmt.Errorf("get creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("creator profile 取得 user=%s: %w", userID, err)
 	}
 
 	profile, err := mapProfile(row)
 	if err != nil {
-		return Profile{}, fmt.Errorf("get creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("creator profile 取得結果の変換 user=%s: %w", userID, err)
 	}
 
 	return profile, nil
 }
 
-// GetPublicProfile returns a public creator profile by user ID.
+// GetPublicProfile は user ID から公開中の creator profile を取得します。
 func (r *Repository) GetPublicProfile(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	row, err := r.queries.GetPublicCreatorProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, fmt.Errorf("get public creator profile %s: %w", userID, ErrProfileNotFound)
+			return Profile{}, fmt.Errorf("公開 creator profile 取得 user=%s: %w", userID, ErrProfileNotFound)
 		}
 
-		return Profile{}, fmt.Errorf("get public creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("公開 creator profile 取得 user=%s: %w", userID, err)
 	}
 
 	profile, err := mapPublicProfile(row)
 	if err != nil {
-		return Profile{}, fmt.Errorf("get public creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("公開 creator profile 取得結果の変換 user=%s: %w", userID, err)
 	}
 
 	return profile, nil
 }
 
-// UpdateProfile updates a creator profile row.
+// UpdateProfile は creator profile を更新します。
 func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput) (Profile, error) {
 	row, err := r.queries.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(input.DisplayName),
@@ -271,34 +271,34 @@ func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, fmt.Errorf("update creator profile %s: %w", input.UserID, ErrProfileNotFound)
+			return Profile{}, fmt.Errorf("creator profile 更新 user=%s: %w", input.UserID, ErrProfileNotFound)
 		}
 
-		return Profile{}, fmt.Errorf("update creator profile %s: %w", input.UserID, err)
+		return Profile{}, fmt.Errorf("creator profile 更新 user=%s: %w", input.UserID, err)
 	}
 
 	profile, err := mapProfile(row)
 	if err != nil {
-		return Profile{}, fmt.Errorf("update creator profile %s: %w", input.UserID, err)
+		return Profile{}, fmt.Errorf("creator profile 更新結果の変換 user=%s: %w", input.UserID, err)
 	}
 
 	return profile, nil
 }
 
-// PublishProfile marks a creator profile as public.
+// PublishProfile は creator profile を公開状態にします。
 func (r *Repository) PublishProfile(ctx context.Context, userID uuid.UUID) (Profile, error) {
 	row, err := r.queries.PublishCreatorProfile(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Profile{}, fmt.Errorf("publish creator profile %s: %w", userID, ErrProfileNotFound)
+			return Profile{}, fmt.Errorf("creator profile 公開 user=%s: %w", userID, ErrProfileNotFound)
 		}
 
-		return Profile{}, fmt.Errorf("publish creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("creator profile 公開 user=%s: %w", userID, err)
 	}
 
 	profile, err := mapProfile(row)
 	if err != nil {
-		return Profile{}, fmt.Errorf("publish creator profile %s: %w", userID, err)
+		return Profile{}, fmt.Errorf("creator profile 公開結果の変換 user=%s: %w", userID, err)
 	}
 
 	return profile, nil
@@ -307,15 +307,15 @@ func (r *Repository) PublishProfile(ctx context.Context, userID uuid.UUID) (Prof
 func mapCapability(row sqlc.AppCreatorCapability) (Capability, error) {
 	userID, err := postgres.UUIDFromPG(row.UserID)
 	if err != nil {
-		return Capability{}, fmt.Errorf("map creator capability user id: %w", err)
+		return Capability{}, fmt.Errorf("creator capability の user id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Capability{}, fmt.Errorf("map creator capability created at: %w", err)
+		return Capability{}, fmt.Errorf("creator capability の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Capability{}, fmt.Errorf("map creator capability updated at: %w", err)
+		return Capability{}, fmt.Errorf("creator capability の updated_at 変換: %w", err)
 	}
 
 	return Capability{
@@ -339,15 +339,15 @@ func mapCapability(row sqlc.AppCreatorCapability) (Capability, error) {
 func mapProfile(row sqlc.AppCreatorProfile) (Profile, error) {
 	userID, err := postgres.UUIDFromPG(row.UserID)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map creator profile user id: %w", err)
+		return Profile{}, fmt.Errorf("creator profile の user id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map creator profile created at: %w", err)
+		return Profile{}, fmt.Errorf("creator profile の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map creator profile updated at: %w", err)
+		return Profile{}, fmt.Errorf("creator profile の updated_at 変換: %w", err)
 	}
 
 	return Profile{
@@ -364,15 +364,15 @@ func mapProfile(row sqlc.AppCreatorProfile) (Profile, error) {
 func mapPublicProfile(row sqlc.AppPublicCreatorProfile) (Profile, error) {
 	userID, err := postgres.UUIDFromPG(row.UserID)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map public creator profile user id: %w", err)
+		return Profile{}, fmt.Errorf("公開 creator profile の user id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map public creator profile created at: %w", err)
+		return Profile{}, fmt.Errorf("公開 creator profile の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Profile{}, fmt.Errorf("map public creator profile updated at: %w", err)
+		return Profile{}, fmt.Errorf("公開 creator profile の updated_at 変換: %w", err)
 	}
 
 	return Profile{

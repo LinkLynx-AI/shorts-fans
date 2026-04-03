@@ -8,23 +8,23 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// TxBeginner starts a pgx transaction.
+// TxBeginner は pgx transaction を開始します。
 type TxBeginner interface {
 	Begin(ctx context.Context) (pgx.Tx, error)
 }
 
-// RunInTx executes fn inside a transaction and commits on success.
+// RunInTx は transaction 内で fn を実行し、成功時に commit します。
 func RunInTx(ctx context.Context, beginner TxBeginner, fn func(pgx.Tx) error) (err error) {
 	if beginner == nil {
-		return fmt.Errorf("tx beginner is nil")
+		return fmt.Errorf("tx beginner が nil です")
 	}
 	if fn == nil {
-		return fmt.Errorf("tx function is nil")
+		return fmt.Errorf("tx function が nil です")
 	}
 
 	tx, err := beginner.Begin(ctx)
 	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
+		return fmt.Errorf("transaction 開始: %w", err)
 	}
 
 	committed := false
@@ -39,11 +39,11 @@ func RunInTx(ctx context.Context, beginner TxBeginner, fn func(pgx.Tx) error) (e
 		}
 
 		if err == nil {
-			err = fmt.Errorf("rollback tx: %w", rollbackErr)
+			err = fmt.Errorf("transaction rollback: %w", rollbackErr)
 			return
 		}
 
-		err = fmt.Errorf("%w: rollback tx: %v", err, rollbackErr)
+		err = fmt.Errorf("%w: transaction rollback: %v", err, rollbackErr)
 	}()
 
 	if err := fn(tx); err != nil {
@@ -51,7 +51,7 @@ func RunInTx(ctx context.Context, beginner TxBeginner, fn func(pgx.Tx) error) (e
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit tx: %w", err)
+		return fmt.Errorf("transaction commit: %w", err)
 	}
 
 	committed = true

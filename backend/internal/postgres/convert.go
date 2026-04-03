@@ -8,16 +8,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// UUIDFromPG converts a non-null pgtype.UUID into uuid.UUID.
+// UUIDFromPG は null でない pgtype.UUID を uuid.UUID に変換します。
 func UUIDFromPG(value pgtype.UUID) (uuid.UUID, error) {
 	if !value.Valid {
-		return uuid.Nil, fmt.Errorf("uuid is null")
+		return uuid.Nil, fmt.Errorf("uuid が null です")
 	}
 
 	return uuid.UUID(value.Bytes), nil
 }
 
-// UUIDToPG converts uuid.UUID into pgtype.UUID.
+// UUIDToPG は uuid.UUID を pgtype.UUID に変換します。
 func UUIDToPG(value uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{
 		Bytes: [16]byte(value),
@@ -25,16 +25,16 @@ func UUIDToPG(value uuid.UUID) pgtype.UUID {
 	}
 }
 
-// RequiredTimeFromPG converts a non-null pgtype.Timestamptz into time.Time.
+// RequiredTimeFromPG は null でない pgtype.Timestamptz を time.Time に変換します。
 func RequiredTimeFromPG(value pgtype.Timestamptz) (time.Time, error) {
 	if !value.Valid {
-		return time.Time{}, fmt.Errorf("timestamp is null")
+		return time.Time{}, fmt.Errorf("timestamp が null です")
 	}
 
 	return value.Time, nil
 }
 
-// OptionalTimeFromPG converts a nullable pgtype.Timestamptz into *time.Time.
+// OptionalTimeFromPG は nullable な pgtype.Timestamptz を *time.Time に変換します。
 func OptionalTimeFromPG(value pgtype.Timestamptz) *time.Time {
 	if !value.Valid {
 		return nil
@@ -44,7 +44,7 @@ func OptionalTimeFromPG(value pgtype.Timestamptz) *time.Time {
 	return &result
 }
 
-// TimeToPG converts *time.Time into pgtype.Timestamptz.
+// TimeToPG は *time.Time を pgtype.Timestamptz に変換します。
 func TimeToPG(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
 		return pgtype.Timestamptz{}
@@ -56,7 +56,7 @@ func TimeToPG(value *time.Time) pgtype.Timestamptz {
 	}
 }
 
-// OptionalTextFromPG converts a nullable pgtype.Text into *string.
+// OptionalTextFromPG は nullable な pgtype.Text を *string に変換します。
 func OptionalTextFromPG(value pgtype.Text) *string {
 	if !value.Valid {
 		return nil
@@ -66,7 +66,7 @@ func OptionalTextFromPG(value pgtype.Text) *string {
 	return &result
 }
 
-// TextToPG converts *string into pgtype.Text.
+// TextToPG は *string を pgtype.Text に変換します。
 func TextToPG(value *string) pgtype.Text {
 	if value == nil {
 		return pgtype.Text{}
@@ -78,7 +78,7 @@ func TextToPG(value *string) pgtype.Text {
 	}
 }
 
-// OptionalInt64FromPG converts a nullable pgtype.Int8 into *int64.
+// OptionalInt64FromPG は nullable な pgtype.Int8 を *int64 に変換します。
 func OptionalInt64FromPG(value pgtype.Int8) *int64 {
 	if !value.Valid {
 		return nil
@@ -88,7 +88,7 @@ func OptionalInt64FromPG(value pgtype.Int8) *int64 {
 	return &result
 }
 
-// Int64ToPG converts *int64 into pgtype.Int8.
+// Int64ToPG は *int64 を pgtype.Int8 に変換します。
 func Int64ToPG(value *int64) pgtype.Int8 {
 	if value == nil {
 		return pgtype.Int8{}

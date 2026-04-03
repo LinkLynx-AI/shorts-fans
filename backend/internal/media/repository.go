@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ErrAssetNotFound indicates that the requested media asset does not exist.
-var ErrAssetNotFound = errors.New("media asset not found")
+// ErrAssetNotFound は対象の media asset が存在しないことを表します。
+var ErrAssetNotFound = errors.New("media asset が見つかりません")
 
 type queries interface {
 	CreateMediaAsset(ctx context.Context, arg sqlc.CreateMediaAssetParams) (sqlc.AppMediaAsset, error)
@@ -24,12 +24,12 @@ type queries interface {
 	UpdateMediaAssetProcessingState(ctx context.Context, arg sqlc.UpdateMediaAssetProcessingStateParams) (sqlc.AppMediaAsset, error)
 }
 
-// Repository wraps media-related persistence operations.
+// Repository は media 関連の永続化操作を包みます。
 type Repository struct {
 	queries queries
 }
 
-// Asset is the domain-facing media asset record.
+// Asset は domain 向けの media asset レコードです。
 type Asset struct {
 	ID                uuid.UUID
 	CreatorUserID     uuid.UUID
@@ -45,7 +45,7 @@ type Asset struct {
 	UpdatedAt         time.Time
 }
 
-// CreateAssetInput is the input for CreateAsset.
+// CreateAssetInput は CreateAsset の入力です。
 type CreateAssetInput struct {
 	CreatorUserID     uuid.UUID
 	ProcessingState   string
@@ -58,7 +58,7 @@ type CreateAssetInput struct {
 	ExternalUploadRef *string
 }
 
-// UpdateAssetProcessingStateInput is the input for UpdateAssetProcessingState.
+// UpdateAssetProcessingStateInput は UpdateAssetProcessingState の入力です。
 type UpdateAssetProcessingStateInput struct {
 	ID                uuid.UUID
 	ProcessingState   string
@@ -67,7 +67,7 @@ type UpdateAssetProcessingStateInput struct {
 	ExternalUploadRef *string
 }
 
-// NewRepository constructs a media repository backed by pgxpool.
+// NewRepository は pgxpool ベースの media repository を構築します。
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return newRepository(sqlc.New(pool))
 }
@@ -76,7 +76,7 @@ func newRepository(q queries) *Repository {
 	return &Repository{queries: q}
 }
 
-// CreateAsset creates a media asset row.
+// CreateAsset は media asset を作成します。
 func (r *Repository) CreateAsset(ctx context.Context, input CreateAssetInput) (Asset, error) {
 	row, err := r.queries.CreateMediaAsset(ctx, sqlc.CreateMediaAssetParams{
 		CreatorUserID:     postgres.UUIDToPG(input.CreatorUserID),
@@ -90,48 +90,48 @@ func (r *Repository) CreateAsset(ctx context.Context, input CreateAssetInput) (A
 		ExternalUploadRef: postgres.TextToPG(input.ExternalUploadRef),
 	})
 	if err != nil {
-		return Asset{}, fmt.Errorf("create media asset: %w", err)
+		return Asset{}, fmt.Errorf("media asset 作成: %w", err)
 	}
 
 	asset, err := mapAsset(row)
 	if err != nil {
-		return Asset{}, fmt.Errorf("create media asset: %w", err)
+		return Asset{}, fmt.Errorf("media asset 作成結果の変換: %w", err)
 	}
 
 	return asset, nil
 }
 
-// GetAsset returns a media asset by ID.
+// GetAsset は ID から media asset を取得します。
 func (r *Repository) GetAsset(ctx context.Context, id uuid.UUID) (Asset, error) {
 	row, err := r.queries.GetMediaAssetByID(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Asset{}, fmt.Errorf("get media asset %s: %w", id, ErrAssetNotFound)
+			return Asset{}, fmt.Errorf("media asset 取得 id=%s: %w", id, ErrAssetNotFound)
 		}
 
-		return Asset{}, fmt.Errorf("get media asset %s: %w", id, err)
+		return Asset{}, fmt.Errorf("media asset 取得 id=%s: %w", id, err)
 	}
 
 	asset, err := mapAsset(row)
 	if err != nil {
-		return Asset{}, fmt.Errorf("get media asset %s: %w", id, err)
+		return Asset{}, fmt.Errorf("media asset 取得結果の変換 id=%s: %w", id, err)
 	}
 
 	return asset, nil
 }
 
-// ListAssetsByCreator returns media assets owned by the creator.
+// ListAssetsByCreator は creator が所有する media asset 一覧を返します。
 func (r *Repository) ListAssetsByCreator(ctx context.Context, creatorUserID uuid.UUID) ([]Asset, error) {
 	rows, err := r.queries.ListMediaAssetsByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
 	if err != nil {
-		return nil, fmt.Errorf("list media assets for creator %s: %w", creatorUserID, err)
+		return nil, fmt.Errorf("media asset 一覧取得 creator=%s: %w", creatorUserID, err)
 	}
 
 	assets := make([]Asset, 0, len(rows))
 	for _, row := range rows {
 		asset, err := mapAsset(row)
 		if err != nil {
-			return nil, fmt.Errorf("list media assets for creator %s: %w", creatorUserID, err)
+			return nil, fmt.Errorf("media asset 一覧取得結果の変換 creator=%s: %w", creatorUserID, err)
 		}
 
 		assets = append(assets, asset)
@@ -140,7 +140,7 @@ func (r *Repository) ListAssetsByCreator(ctx context.Context, creatorUserID uuid
 	return assets, nil
 }
 
-// UpdateAssetProcessingState updates the media processing fields.
+// UpdateAssetProcessingState は media asset の processing 状態を更新します。
 func (r *Repository) UpdateAssetProcessingState(ctx context.Context, input UpdateAssetProcessingStateInput) (Asset, error) {
 	row, err := r.queries.UpdateMediaAssetProcessingState(ctx, sqlc.UpdateMediaAssetProcessingStateParams{
 		ProcessingState:   input.ProcessingState,
@@ -151,15 +151,15 @@ func (r *Repository) UpdateAssetProcessingState(ctx context.Context, input Updat
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Asset{}, fmt.Errorf("update media asset %s: %w", input.ID, ErrAssetNotFound)
+			return Asset{}, fmt.Errorf("media asset 更新 id=%s: %w", input.ID, ErrAssetNotFound)
 		}
 
-		return Asset{}, fmt.Errorf("update media asset %s: %w", input.ID, err)
+		return Asset{}, fmt.Errorf("media asset 更新 id=%s: %w", input.ID, err)
 	}
 
 	asset, err := mapAsset(row)
 	if err != nil {
-		return Asset{}, fmt.Errorf("update media asset %s: %w", input.ID, err)
+		return Asset{}, fmt.Errorf("media asset 更新結果の変換 id=%s: %w", input.ID, err)
 	}
 
 	return asset, nil
@@ -168,19 +168,19 @@ func (r *Repository) UpdateAssetProcessingState(ctx context.Context, input Updat
 func mapAsset(row sqlc.AppMediaAsset) (Asset, error) {
 	id, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return Asset{}, fmt.Errorf("map media asset id: %w", err)
+		return Asset{}, fmt.Errorf("media asset の id 変換: %w", err)
 	}
 	creatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
 	if err != nil {
-		return Asset{}, fmt.Errorf("map media asset creator user id: %w", err)
+		return Asset{}, fmt.Errorf("media asset の creator user id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Asset{}, fmt.Errorf("map media asset created at: %w", err)
+		return Asset{}, fmt.Errorf("media asset の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Asset{}, fmt.Errorf("map media asset updated at: %w", err)
+		return Asset{}, fmt.Errorf("media asset の updated_at 変換: %w", err)
 	}
 
 	return Asset{

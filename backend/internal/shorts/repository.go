@@ -14,17 +14,17 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// ErrMainNotFound indicates that the requested main does not exist.
-var ErrMainNotFound = errors.New("main not found")
+// ErrMainNotFound は対象の main が存在しないことを表します。
+var ErrMainNotFound = errors.New("main が見つかりません")
 
-// ErrUnlockableMainNotFound indicates that the requested unlockable main does not exist.
-var ErrUnlockableMainNotFound = errors.New("unlockable main not found")
+// ErrUnlockableMainNotFound は対象の unlockable main が存在しないことを表します。
+var ErrUnlockableMainNotFound = errors.New("unlockable main が見つかりません")
 
-// ErrShortNotFound indicates that the requested short does not exist.
-var ErrShortNotFound = errors.New("short not found")
+// ErrShortNotFound は対象の short が存在しないことを表します。
+var ErrShortNotFound = errors.New("short が見つかりません")
 
-// ErrLinkedShortsRequired indicates that at least one linked short must be created with the main.
-var ErrLinkedShortsRequired = errors.New("linked shorts are required")
+// ErrLinkedShortsRequired は linked short が 1 件以上必要なことを表します。
+var ErrLinkedShortsRequired = errors.New("linked short が 1 件以上必要です")
 
 type queries interface {
 	CreateMain(ctx context.Context, arg sqlc.CreateMainParams) (sqlc.AppMain, error)
@@ -43,14 +43,14 @@ type queries interface {
 	GetCanonicalMainIDByShortID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 }
 
-// Repository wraps main/short persistence operations.
+// Repository は main / short 関連の永続化操作を包みます。
 type Repository struct {
 	beginner   postgres.TxBeginner
 	queries    queries
 	newQueries func(sqlc.DBTX) queries
 }
 
-// Main is the domain-facing main record.
+// Main は domain 向けの main レコードです。
 type Main struct {
 	ID                  uuid.UUID
 	CreatorUserID       uuid.UUID
@@ -67,7 +67,7 @@ type Main struct {
 	UpdatedAt           time.Time
 }
 
-// Short is the domain-facing short record.
+// Short は domain 向けの short レコードです。
 type Short struct {
 	ID                   uuid.UUID
 	CreatorUserID        uuid.UUID
@@ -82,7 +82,7 @@ type Short struct {
 	UpdatedAt            time.Time
 }
 
-// CreateMainInput is the input for CreateMain.
+// CreateMainInput は CreateMain の入力です。
 type CreateMainInput struct {
 	CreatorUserID       uuid.UUID
 	MediaAssetID        uuid.UUID
@@ -96,7 +96,7 @@ type CreateMainInput struct {
 	ApprovedForUnlockAt *time.Time
 }
 
-// UpdateMainInput is the input for UpdateMain.
+// UpdateMainInput は UpdateMain の入力です。
 type UpdateMainInput struct {
 	ID                  uuid.UUID
 	State               string
@@ -109,7 +109,7 @@ type UpdateMainInput struct {
 	ApprovedForUnlockAt *time.Time
 }
 
-// CreateShortInput is the input for CreateShort.
+// CreateShortInput は CreateShort の入力です。
 type CreateShortInput struct {
 	CreatorUserID        uuid.UUID
 	CanonicalMainID      uuid.UUID
@@ -121,7 +121,7 @@ type CreateShortInput struct {
 	PublishedAt          *time.Time
 }
 
-// CreateLinkedShortInput is the input for creating a short linked to a newly-created main.
+// CreateLinkedShortInput は新規 main に紐づく short 作成入力です。
 type CreateLinkedShortInput struct {
 	MediaAssetID         uuid.UUID
 	State                string
@@ -131,7 +131,7 @@ type CreateLinkedShortInput struct {
 	PublishedAt          *time.Time
 }
 
-// UpdateShortInput is the input for UpdateShort.
+// UpdateShortInput は UpdateShort の入力です。
 type UpdateShortInput struct {
 	ID                   uuid.UUID
 	State                string
@@ -141,19 +141,19 @@ type UpdateShortInput struct {
 	PublishedAt          *time.Time
 }
 
-// CreateMainWithShortsInput is the input for CreateMainWithShorts.
+// CreateMainWithShortsInput は CreateMainWithShorts の入力です。
 type CreateMainWithShortsInput struct {
 	Main   CreateMainInput
 	Shorts []CreateLinkedShortInput
 }
 
-// MainWithShorts is the result of CreateMainWithShorts.
+// MainWithShorts は CreateMainWithShorts の結果です。
 type MainWithShorts struct {
 	Main   Main
 	Shorts []Short
 }
 
-// NewRepository constructs a shorts repository backed by pgxpool.
+// NewRepository は pgxpool ベースの shorts repository を構築します。
 func NewRepository(pool *pgxpool.Pool) *Repository {
 	return newRepository(
 		pool,
@@ -170,71 +170,71 @@ func newRepository(beginner postgres.TxBeginner, q queries, newQueries func(sqlc
 	}
 }
 
-// CreateMain creates a main row.
+// CreateMain は main を作成します。
 func (r *Repository) CreateMain(ctx context.Context, input CreateMainInput) (Main, error) {
 	row, err := r.queries.CreateMain(ctx, buildCreateMainParams(input))
 	if err != nil {
-		return Main{}, fmt.Errorf("create main: %w", err)
+		return Main{}, fmt.Errorf("main 作成: %w", err)
 	}
 
 	main, err := mapMain(row)
 	if err != nil {
-		return Main{}, fmt.Errorf("create main: %w", err)
+		return Main{}, fmt.Errorf("main 作成結果の変換: %w", err)
 	}
 
 	return main, nil
 }
 
-// GetMain returns a main by ID.
+// GetMain は ID から main を取得します。
 func (r *Repository) GetMain(ctx context.Context, id uuid.UUID) (Main, error) {
 	row, err := r.queries.GetMainByID(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Main{}, fmt.Errorf("get main %s: %w", id, ErrMainNotFound)
+			return Main{}, fmt.Errorf("main 取得 id=%s: %w", id, ErrMainNotFound)
 		}
 
-		return Main{}, fmt.Errorf("get main %s: %w", id, err)
+		return Main{}, fmt.Errorf("main 取得 id=%s: %w", id, err)
 	}
 
 	main, err := mapMain(row)
 	if err != nil {
-		return Main{}, fmt.Errorf("get main %s: %w", id, err)
+		return Main{}, fmt.Errorf("main 取得結果の変換 id=%s: %w", id, err)
 	}
 
 	return main, nil
 }
 
-// GetUnlockableMain returns an unlockable main by ID.
+// GetUnlockableMain は ID から unlock 可能な main を取得します。
 func (r *Repository) GetUnlockableMain(ctx context.Context, id uuid.UUID) (Main, error) {
 	row, err := r.queries.GetUnlockableMainByID(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Main{}, fmt.Errorf("get unlockable main %s: %w", id, ErrUnlockableMainNotFound)
+			return Main{}, fmt.Errorf("unlockable main 取得 id=%s: %w", id, ErrUnlockableMainNotFound)
 		}
 
-		return Main{}, fmt.Errorf("get unlockable main %s: %w", id, err)
+		return Main{}, fmt.Errorf("unlockable main 取得 id=%s: %w", id, err)
 	}
 
 	main, err := mapUnlockableMain(row)
 	if err != nil {
-		return Main{}, fmt.Errorf("get unlockable main %s: %w", id, err)
+		return Main{}, fmt.Errorf("unlockable main 取得結果の変換 id=%s: %w", id, err)
 	}
 
 	return main, nil
 }
 
-// ListMainsByCreator returns mains owned by the creator.
+// ListMainsByCreator は creator が所有する main 一覧を返します。
 func (r *Repository) ListMainsByCreator(ctx context.Context, creatorUserID uuid.UUID) ([]Main, error) {
 	rows, err := r.queries.ListMainsByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
 	if err != nil {
-		return nil, fmt.Errorf("list mains for creator %s: %w", creatorUserID, err)
+		return nil, fmt.Errorf("main 一覧取得 creator=%s: %w", creatorUserID, err)
 	}
 
 	mains := make([]Main, 0, len(rows))
 	for _, row := range rows {
 		main, err := mapMain(row)
 		if err != nil {
-			return nil, fmt.Errorf("list mains for creator %s: %w", creatorUserID, err)
+			return nil, fmt.Errorf("main 一覧取得結果の変換 creator=%s: %w", creatorUserID, err)
 		}
 
 		mains = append(mains, main)
@@ -243,7 +243,7 @@ func (r *Repository) ListMainsByCreator(ctx context.Context, creatorUserID uuid.
 	return mains, nil
 }
 
-// UpdateMain updates main state fields.
+// UpdateMain は main の状態関連フィールドを更新します。
 func (r *Repository) UpdateMain(ctx context.Context, input UpdateMainInput) (Main, error) {
 	row, err := r.queries.UpdateMainState(ctx, sqlc.UpdateMainStateParams{
 		State:               input.State,
@@ -258,85 +258,85 @@ func (r *Repository) UpdateMain(ctx context.Context, input UpdateMainInput) (Mai
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Main{}, fmt.Errorf("update main %s: %w", input.ID, ErrMainNotFound)
+			return Main{}, fmt.Errorf("main 更新 id=%s: %w", input.ID, ErrMainNotFound)
 		}
 
-		return Main{}, fmt.Errorf("update main %s: %w", input.ID, err)
+		return Main{}, fmt.Errorf("main 更新 id=%s: %w", input.ID, err)
 	}
 
 	main, err := mapMain(row)
 	if err != nil {
-		return Main{}, fmt.Errorf("update main %s: %w", input.ID, err)
+		return Main{}, fmt.Errorf("main 更新結果の変換 id=%s: %w", input.ID, err)
 	}
 
 	return main, nil
 }
 
-// CreateShort creates a short row.
+// CreateShort は short を作成します。
 func (r *Repository) CreateShort(ctx context.Context, input CreateShortInput) (Short, error) {
 	row, err := r.queries.CreateShort(ctx, buildCreateShortParams(input))
 	if err != nil {
-		return Short{}, fmt.Errorf("create short: %w", err)
+		return Short{}, fmt.Errorf("short 作成: %w", err)
 	}
 
 	short, err := mapShort(row)
 	if err != nil {
-		return Short{}, fmt.Errorf("create short: %w", err)
+		return Short{}, fmt.Errorf("short 作成結果の変換: %w", err)
 	}
 
 	return short, nil
 }
 
-// GetShort returns a short by ID.
+// GetShort は ID から short を取得します。
 func (r *Repository) GetShort(ctx context.Context, id uuid.UUID) (Short, error) {
 	row, err := r.queries.GetShortByID(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Short{}, fmt.Errorf("get short %s: %w", id, ErrShortNotFound)
+			return Short{}, fmt.Errorf("short 取得 id=%s: %w", id, ErrShortNotFound)
 		}
 
-		return Short{}, fmt.Errorf("get short %s: %w", id, err)
+		return Short{}, fmt.Errorf("short 取得 id=%s: %w", id, err)
 	}
 
 	short, err := mapShort(row)
 	if err != nil {
-		return Short{}, fmt.Errorf("get short %s: %w", id, err)
+		return Short{}, fmt.Errorf("short 取得結果の変換 id=%s: %w", id, err)
 	}
 
 	return short, nil
 }
 
-// GetPublicShort returns a public short by ID.
+// GetPublicShort は ID から公開 short を取得します。
 func (r *Repository) GetPublicShort(ctx context.Context, id uuid.UUID) (Short, error) {
 	row, err := r.queries.GetPublicShortByID(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Short{}, fmt.Errorf("get public short %s: %w", id, ErrShortNotFound)
+			return Short{}, fmt.Errorf("公開 short 取得 id=%s: %w", id, ErrShortNotFound)
 		}
 
-		return Short{}, fmt.Errorf("get public short %s: %w", id, err)
+		return Short{}, fmt.Errorf("公開 short 取得 id=%s: %w", id, err)
 	}
 
 	short, err := mapPublicShort(row)
 	if err != nil {
-		return Short{}, fmt.Errorf("get public short %s: %w", id, err)
+		return Short{}, fmt.Errorf("公開 short 取得結果の変換 id=%s: %w", id, err)
 	}
 
 	return short, nil
 }
 
-// ListShortsByCreator returns shorts owned by the creator.
+// ListShortsByCreator は creator が所有する short 一覧を返します。
 func (r *Repository) ListShortsByCreator(ctx context.Context, creatorUserID uuid.UUID) ([]Short, error) {
 	rows, err := r.queries.ListShortsByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
 	if err != nil {
-		return nil, fmt.Errorf("list shorts for creator %s: %w", creatorUserID, err)
+		return nil, fmt.Errorf("short 一覧取得 creator=%s: %w", creatorUserID, err)
 	}
 
 	shorts := make([]Short, 0, len(rows))
 	for _, row := range rows {
 		short, err := mapShort(row)
 		if err != nil {
-			return nil, fmt.Errorf("list shorts for creator %s: %w", creatorUserID, err)
+			return nil, fmt.Errorf("short 一覧取得結果の変換 creator=%s: %w", creatorUserID, err)
 		}
 
 		shorts = append(shorts, short)
@@ -345,18 +345,18 @@ func (r *Repository) ListShortsByCreator(ctx context.Context, creatorUserID uuid
 	return shorts, nil
 }
 
-// ListPublicShortsByCreator returns public shorts owned by the creator.
+// ListPublicShortsByCreator は creator の公開 short 一覧を返します。
 func (r *Repository) ListPublicShortsByCreator(ctx context.Context, creatorUserID uuid.UUID) ([]Short, error) {
 	rows, err := r.queries.ListPublicShortsByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
 	if err != nil {
-		return nil, fmt.Errorf("list public shorts for creator %s: %w", creatorUserID, err)
+		return nil, fmt.Errorf("公開 short 一覧取得 creator=%s: %w", creatorUserID, err)
 	}
 
 	shorts := make([]Short, 0, len(rows))
 	for _, row := range rows {
 		short, err := mapPublicShort(row)
 		if err != nil {
-			return nil, fmt.Errorf("list public shorts for creator %s: %w", creatorUserID, err)
+			return nil, fmt.Errorf("公開 short 一覧取得結果の変換 creator=%s: %w", creatorUserID, err)
 		}
 
 		shorts = append(shorts, short)
@@ -365,18 +365,18 @@ func (r *Repository) ListPublicShortsByCreator(ctx context.Context, creatorUserI
 	return shorts, nil
 }
 
-// ListShortsByCanonicalMain returns all shorts linked to a main.
+// ListShortsByCanonicalMain は canonical main に紐づく short 一覧を返します。
 func (r *Repository) ListShortsByCanonicalMain(ctx context.Context, mainID uuid.UUID) ([]Short, error) {
 	rows, err := r.queries.ListShortsByCanonicalMainID(ctx, postgres.UUIDToPG(mainID))
 	if err != nil {
-		return nil, fmt.Errorf("list shorts by canonical main %s: %w", mainID, err)
+		return nil, fmt.Errorf("canonical main 配下の short 一覧取得 main=%s: %w", mainID, err)
 	}
 
 	shorts := make([]Short, 0, len(rows))
 	for _, row := range rows {
 		short, err := mapShort(row)
 		if err != nil {
-			return nil, fmt.Errorf("list shorts by canonical main %s: %w", mainID, err)
+			return nil, fmt.Errorf("canonical main 配下の short 一覧取得結果の変換 main=%s: %w", mainID, err)
 		}
 
 		shorts = append(shorts, short)
@@ -385,26 +385,26 @@ func (r *Repository) ListShortsByCanonicalMain(ctx context.Context, mainID uuid.
 	return shorts, nil
 }
 
-// GetCanonicalMainIDByShort returns the canonical main ID for a short.
+// GetCanonicalMainIDByShort は short に対応する canonical main ID を返します。
 func (r *Repository) GetCanonicalMainIDByShort(ctx context.Context, shortID uuid.UUID) (uuid.UUID, error) {
 	row, err := r.queries.GetCanonicalMainIDByShortID(ctx, postgres.UUIDToPG(shortID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return uuid.Nil, fmt.Errorf("get canonical main id for short %s: %w", shortID, ErrShortNotFound)
+			return uuid.Nil, fmt.Errorf("short の canonical main 取得 short=%s: %w", shortID, ErrShortNotFound)
 		}
 
-		return uuid.Nil, fmt.Errorf("get canonical main id for short %s: %w", shortID, err)
+		return uuid.Nil, fmt.Errorf("short の canonical main 取得 short=%s: %w", shortID, err)
 	}
 
 	mainID, err := postgres.UUIDFromPG(row)
 	if err != nil {
-		return uuid.Nil, fmt.Errorf("get canonical main id for short %s: %w", shortID, err)
+		return uuid.Nil, fmt.Errorf("short の canonical main 取得結果の変換 short=%s: %w", shortID, err)
 	}
 
 	return mainID, nil
 }
 
-// UpdateShort updates short state fields.
+// UpdateShort は short の状態関連フィールドを更新します。
 func (r *Repository) UpdateShort(ctx context.Context, input UpdateShortInput) (Short, error) {
 	row, err := r.queries.UpdateShortState(ctx, sqlc.UpdateShortStateParams{
 		State:                input.State,
@@ -416,43 +416,43 @@ func (r *Repository) UpdateShort(ctx context.Context, input UpdateShortInput) (S
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Short{}, fmt.Errorf("update short %s: %w", input.ID, ErrShortNotFound)
+			return Short{}, fmt.Errorf("short 更新 id=%s: %w", input.ID, ErrShortNotFound)
 		}
 
-		return Short{}, fmt.Errorf("update short %s: %w", input.ID, err)
+		return Short{}, fmt.Errorf("short 更新 id=%s: %w", input.ID, err)
 	}
 
 	short, err := mapShort(row)
 	if err != nil {
-		return Short{}, fmt.Errorf("update short %s: %w", input.ID, err)
+		return Short{}, fmt.Errorf("short 更新結果の変換 id=%s: %w", input.ID, err)
 	}
 
 	return short, nil
 }
 
-// PublishShort marks a short as published.
+// PublishShort は short を公開状態にします。
 func (r *Repository) PublishShort(ctx context.Context, id uuid.UUID) (Short, error) {
 	row, err := r.queries.PublishShort(ctx, postgres.UUIDToPG(id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Short{}, fmt.Errorf("publish short %s: %w", id, ErrShortNotFound)
+			return Short{}, fmt.Errorf("short 公開 id=%s: %w", id, ErrShortNotFound)
 		}
 
-		return Short{}, fmt.Errorf("publish short %s: %w", id, err)
+		return Short{}, fmt.Errorf("short 公開 id=%s: %w", id, err)
 	}
 
 	short, err := mapShort(row)
 	if err != nil {
-		return Short{}, fmt.Errorf("publish short %s: %w", id, err)
+		return Short{}, fmt.Errorf("short 公開結果の変換 id=%s: %w", id, err)
 	}
 
 	return short, nil
 }
 
-// CreateMainWithShorts creates a main and one or more linked shorts in a single transaction.
+// CreateMainWithShorts は main と 1 件以上の linked short を同一 transaction で作成します。
 func (r *Repository) CreateMainWithShorts(ctx context.Context, input CreateMainWithShortsInput) (MainWithShorts, error) {
 	if len(input.Shorts) == 0 {
-		return MainWithShorts{}, fmt.Errorf("create main with shorts: %w", ErrLinkedShortsRequired)
+		return MainWithShorts{}, fmt.Errorf("main と short の一括作成: %w", ErrLinkedShortsRequired)
 	}
 
 	var result MainWithShorts
@@ -461,12 +461,12 @@ func (r *Repository) CreateMainWithShorts(ctx context.Context, input CreateMainW
 
 		mainRow, err := q.CreateMain(ctx, buildCreateMainParams(input.Main))
 		if err != nil {
-			return fmt.Errorf("create main: %w", err)
+			return fmt.Errorf("main 作成: %w", err)
 		}
 
 		main, err := mapMain(mainRow)
 		if err != nil {
-			return fmt.Errorf("map main: %w", err)
+			return fmt.Errorf("main 作成結果の変換: %w", err)
 		}
 
 		shorts := make([]Short, 0, len(input.Shorts))
@@ -482,12 +482,12 @@ func (r *Repository) CreateMainWithShorts(ctx context.Context, input CreateMainW
 				PublishedAt:          postgres.TimeToPG(shortInput.PublishedAt),
 			})
 			if err != nil {
-				return fmt.Errorf("create linked short %d: %w", index, err)
+				return fmt.Errorf("linked short 作成 index=%d: %w", index, err)
 			}
 
 			short, err := mapShort(shortRow)
 			if err != nil {
-				return fmt.Errorf("map linked short %d: %w", index, err)
+				return fmt.Errorf("linked short 作成結果の変換 index=%d: %w", index, err)
 			}
 
 			shorts = append(shorts, short)
@@ -500,7 +500,7 @@ func (r *Repository) CreateMainWithShorts(ctx context.Context, input CreateMainW
 		return nil
 	})
 	if err != nil {
-		return MainWithShorts{}, fmt.Errorf("create main with shorts: %w", err)
+		return MainWithShorts{}, fmt.Errorf("main と short の一括作成: %w", err)
 	}
 
 	return result, nil
@@ -537,23 +537,23 @@ func buildCreateShortParams(input CreateShortInput) sqlc.CreateShortParams {
 func mapMain(row sqlc.AppMain) (Main, error) {
 	id, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map main id: %w", err)
+		return Main{}, fmt.Errorf("main の id 変換: %w", err)
 	}
 	creatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map main creator user id: %w", err)
+		return Main{}, fmt.Errorf("main の creator user id 変換: %w", err)
 	}
 	mediaAssetID, err := postgres.UUIDFromPG(row.MediaAssetID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map main media asset id: %w", err)
+		return Main{}, fmt.Errorf("main の media asset id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Main{}, fmt.Errorf("map main created at: %w", err)
+		return Main{}, fmt.Errorf("main の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Main{}, fmt.Errorf("map main updated at: %w", err)
+		return Main{}, fmt.Errorf("main の updated_at 変換: %w", err)
 	}
 
 	return Main{
@@ -576,23 +576,23 @@ func mapMain(row sqlc.AppMain) (Main, error) {
 func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 	id, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map unlockable main id: %w", err)
+		return Main{}, fmt.Errorf("unlockable main の id 変換: %w", err)
 	}
 	creatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map unlockable main creator user id: %w", err)
+		return Main{}, fmt.Errorf("unlockable main の creator user id 変換: %w", err)
 	}
 	mediaAssetID, err := postgres.UUIDFromPG(row.MediaAssetID)
 	if err != nil {
-		return Main{}, fmt.Errorf("map unlockable main media asset id: %w", err)
+		return Main{}, fmt.Errorf("unlockable main の media asset id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Main{}, fmt.Errorf("map unlockable main created at: %w", err)
+		return Main{}, fmt.Errorf("unlockable main の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Main{}, fmt.Errorf("map unlockable main updated at: %w", err)
+		return Main{}, fmt.Errorf("unlockable main の updated_at 変換: %w", err)
 	}
 
 	return Main{
@@ -615,27 +615,27 @@ func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 func mapShort(row sqlc.AppShort) (Short, error) {
 	id, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short id: %w", err)
+		return Short{}, fmt.Errorf("short の id 変換: %w", err)
 	}
 	creatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short creator user id: %w", err)
+		return Short{}, fmt.Errorf("short の creator user id 変換: %w", err)
 	}
 	canonicalMainID, err := postgres.UUIDFromPG(row.CanonicalMainID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short canonical main id: %w", err)
+		return Short{}, fmt.Errorf("short の canonical main id 変換: %w", err)
 	}
 	mediaAssetID, err := postgres.UUIDFromPG(row.MediaAssetID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short media asset id: %w", err)
+		return Short{}, fmt.Errorf("short の media asset id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short created at: %w", err)
+		return Short{}, fmt.Errorf("short の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Short{}, fmt.Errorf("map short updated at: %w", err)
+		return Short{}, fmt.Errorf("short の updated_at 変換: %w", err)
 	}
 
 	return Short{
@@ -656,27 +656,27 @@ func mapShort(row sqlc.AppShort) (Short, error) {
 func mapPublicShort(row sqlc.AppPublicShort) (Short, error) {
 	id, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short id: %w", err)
+		return Short{}, fmt.Errorf("公開 short の id 変換: %w", err)
 	}
 	creatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short creator user id: %w", err)
+		return Short{}, fmt.Errorf("公開 short の creator user id 変換: %w", err)
 	}
 	canonicalMainID, err := postgres.UUIDFromPG(row.CanonicalMainID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short canonical main id: %w", err)
+		return Short{}, fmt.Errorf("公開 short の canonical main id 変換: %w", err)
 	}
 	mediaAssetID, err := postgres.UUIDFromPG(row.MediaAssetID)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short media asset id: %w", err)
+		return Short{}, fmt.Errorf("公開 short の media asset id 変換: %w", err)
 	}
 	createdAt, err := postgres.RequiredTimeFromPG(row.CreatedAt)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short created at: %w", err)
+		return Short{}, fmt.Errorf("公開 short の created_at 変換: %w", err)
 	}
 	updatedAt, err := postgres.RequiredTimeFromPG(row.UpdatedAt)
 	if err != nil {
-		return Short{}, fmt.Errorf("map public short updated at: %w", err)
+		return Short{}, fmt.Errorf("公開 short の updated_at 変換: %w", err)
 	}
 
 	return Short{
