@@ -1,3 +1,4 @@
+import { getCreatorById } from "@/entities/creator";
 import type { FeedTab, ShortId } from "@/entities/short";
 
 export type CreatorProfileRouteOrigin =
@@ -120,7 +121,7 @@ export function buildCreatorShortDetailHref(
 export function resolveShortDetailBackHref(
   routeState: CreatorShortDetailRouteState,
 ): string {
-  if (routeState.from !== "creator" || !routeState.creatorId) {
+  if (routeState.from !== "creator" || !routeState.creatorId || !getCreatorById(routeState.creatorId)) {
     return "/";
   }
 
@@ -128,20 +129,24 @@ export function resolveShortDetailBackHref(
     return `/creators/${routeState.creatorId}`;
   }
 
-  return buildCreatorProfileHref(routeState.creatorId, {
-    ...(routeState.profileFrom === "short"
-      ? {
+  if (routeState.profileFrom === "short") {
+    return routeState.profileShortId
+      ? buildCreatorProfileHref(routeState.creatorId, {
           from: "short",
-          shortId: routeState.profileShortId ?? "",
-        }
-      : routeState.profileFrom === "feed"
-        ? {
-            from: "feed",
-            tab: routeState.profileTab,
-          }
-        : {
-            from: "search",
-            q: routeState.profileQ,
-          }),
-  } as CreatorProfileRouteOrigin);
+          shortId: routeState.profileShortId,
+        })
+      : `/creators/${routeState.creatorId}`;
+  }
+
+  if (routeState.profileFrom === "feed") {
+    return buildCreatorProfileHref(routeState.creatorId, {
+      from: "feed",
+      tab: routeState.profileTab,
+    });
+  }
+
+  return buildCreatorProfileHref(routeState.creatorId, {
+    from: "search",
+    q: routeState.profileQ,
+  });
 }

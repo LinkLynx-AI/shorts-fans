@@ -1,2 +1,2 @@
 export { cn } from "./cn";
-export { getSingleQueryParam } from "./route-params";
+export { getEnumQueryParam, getSingleQueryParam } from "./route-params";

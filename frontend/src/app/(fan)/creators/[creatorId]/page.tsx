@@ -1,18 +1,11 @@
 import { notFound } from "next/navigation";
 import { z } from "zod";
 
-import { getSingleQueryParam } from "@/shared/lib";
+import { getEnumQueryParam, getSingleQueryParam } from "@/shared/lib";
 import { CreatorProfileShell, getCreatorProfileShellState } from "@/widgets/creator-profile-shell";
 
 const paramsSchema = z.object({
   creatorId: z.string().min(1),
-});
-
-const searchParamsSchema = z.object({
-  from: z.enum(["feed", "search", "short"]).optional(),
-  q: z.string().optional(),
-  shortId: z.string().optional(),
-  tab: z.enum(["following", "recommended"]).optional(),
 });
 
 export default async function CreatorProfilePage({
@@ -30,12 +23,12 @@ export default async function CreatorProfilePage({
   const rawParams = await params;
   const rawSearchParams = await searchParams;
   const { creatorId } = paramsSchema.parse(rawParams);
-  const routeState = searchParamsSchema.parse({
-    from: getSingleQueryParam(rawSearchParams.from),
+  const routeState = {
+    from: getEnumQueryParam(rawSearchParams.from, ["feed", "search", "short"]),
     q: getSingleQueryParam(rawSearchParams.q),
     shortId: getSingleQueryParam(rawSearchParams.shortId),
-    tab: getSingleQueryParam(rawSearchParams.tab),
-  });
+    tab: getEnumQueryParam(rawSearchParams.tab, ["following", "recommended"]),
+  };
   const state = getCreatorProfileShellState(creatorId);
 
   if (!state) {

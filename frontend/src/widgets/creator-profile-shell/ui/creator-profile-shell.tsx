@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 
 import { CreatorAvatar, CreatorStatList } from "@/entities/creator";
@@ -19,13 +22,10 @@ type CreatorProfileShellProps = {
 
 function ShortsGridTab() {
   return (
-    <div aria-label="Shorts" className="mt-[18px] flex justify-center border-t border-border/60" role="tablist">
-      <button
-        aria-label="Shorts grid"
-        aria-selected="true"
-        className="inline-flex min-h-[42px] w-[72px] items-center justify-center border-t-2 border-t-foreground bg-transparent pt-[10px] text-foreground"
-        role="tab"
-        type="button"
+    <div className="mt-[18px] flex justify-center border-t border-border/60">
+      <div
+        aria-hidden="true"
+        className="inline-flex min-h-[42px] w-[72px] items-center justify-center border-t-2 border-t-foreground pt-[10px] text-foreground"
       >
         <svg aria-hidden="true" className="size-[18px] fill-current" viewBox="0 0 18 18">
           <rect height="4" rx="1" width="4" x="2" y="2" />
@@ -38,7 +38,7 @@ function ShortsGridTab() {
           <rect height="4" rx="1" width="4" x="7" y="12" />
           <rect height="4" rx="1" width="4" x="12" y="12" />
         </svg>
-      </button>
+      </div>
     </div>
   );
 }
@@ -53,6 +53,7 @@ export function CreatorProfileShell({
   const { creator, shorts, stats, viewer } = state;
   const backHref = resolveCreatorProfileBackHref(routeState);
   const displayHandle = creator.handle.replace(/^@/, "");
+  const [isFollowing, setIsFollowing] = useState(viewer.isFollowing);
 
   return (
     <DetailShell
@@ -84,14 +85,19 @@ export function CreatorProfileShell({
 
         <div className="mt-[14px]">
           <Button
+            aria-pressed={isFollowing}
             className={
-              viewer.isFollowing
+              isFollowing
                 ? "min-h-9 w-full rounded-[10px] border-transparent bg-[#edf2f7] text-[13px] font-bold text-foreground shadow-none backdrop-blur-none"
                 : "min-h-9 w-full rounded-[10px] bg-accent-strong text-[13px] font-bold text-white shadow-none"
             }
-            variant={viewer.isFollowing ? "secondary" : "default"}
+            onClick={() => {
+              setIsFollowing((currentValue) => !currentValue);
+            }}
+            type="button"
+            variant={isFollowing ? "secondary" : "default"}
           >
-            {viewer.isFollowing ? "Following" : "Follow"}
+            {isFollowing ? "Following" : "Follow"}
           </Button>
         </div>
 
@@ -107,6 +113,7 @@ export function CreatorProfileShell({
               <Link
                 key={short.id}
                 aria-label={`${creator.displayName} ${short.title}`}
+                className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
                 href={buildCreatorShortDetailHref(short.id, creator.id, routeState)}
               >
                 <ShortPoster short={short} variant="profile" />

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 
 import { CreatorProfileShell, getCreatorProfileShellState } from "@/widgets/creator-profile-shell";
 
@@ -14,12 +14,17 @@ describe("CreatorProfileShell", () => {
 
     expect(screen.getByText("minarei")).toBeInTheDocument();
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Following" })).toBeInTheDocument();
+    const followButton = screen.getByRole("button", { name: "Following" });
+    expect(followButton).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: /quiet rooftop preview/i })).toHaveAttribute(
       "href",
       "/shorts/rooftop?creatorId=mina&from=creator&profileFrom=search&profileQ=mina",
     );
     expect(screen.queryByText("Unlock")).not.toBeInTheDocument();
+
+    fireEvent.click(followButton);
+
+    expect(screen.getByRole("button", { name: "Follow" })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("renders the empty creator profile state", () => {

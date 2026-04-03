@@ -14,7 +14,7 @@ describe("CreatorSearchPanel", () => {
   it("renders the initial query and recent creators", () => {
     render(<CreatorSearchPanel initialQuery="mina" />);
 
-    expect(screen.getByDisplayValue("mina")).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "クリエイターを検索" })).toHaveValue("mina");
     expect(screen.queryByText("最近")).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
       "href",
@@ -34,12 +34,17 @@ describe("CreatorSearchPanel", () => {
 
     expect(screen.queryByText("最近")).not.toBeInTheDocument();
     expect(screen.queryByText("Sora Vale")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute("href", "/creators/mina?from=search");
 
     act(() => {
       vi.advanceTimersByTime(250);
     });
 
     expect(screen.getByText("Sora Vale")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sora Vale/i })).toHaveAttribute(
+      "href",
+      "/creators/sora?from=search&q=sora",
+    );
     expect(screen.queryByText("Aoi N")).not.toBeInTheDocument();
   });
 });

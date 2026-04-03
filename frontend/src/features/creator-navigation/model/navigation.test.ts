@@ -39,5 +39,20 @@ describe("creator navigation", () => {
         profileTab: "recommended",
       }),
     ).toBe("/creators/mina?from=feed&tab=recommended");
+
+    expect(
+      resolveShortDetailBackHref({
+        creatorId: "mina",
+        from: "creator",
+        profileFrom: "short",
+      }),
+    ).toBe("/creators/mina");
+
+    expect(
+      resolveShortDetailBackHref({
+        creatorId: "../../fan",
+        from: "creator",
+      }),
+    ).toBe("/");
   });
 });

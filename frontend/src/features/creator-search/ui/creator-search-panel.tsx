@@ -33,6 +33,7 @@ export function CreatorSearchPanel({ initialQuery }: CreatorSearchPanelProps) {
           strokeWidth={2}
         />
         <input
+          aria-label="クリエイターを検索"
           className="h-[46px] w-full rounded-[18px] border border-[rgba(186,231,255,0.9)] bg-white/94 pl-11 pr-4 text-sm text-foreground outline-none shadow-[0_12px_32px_rgba(26,69,98,0.12)] placeholder:text-muted focus-visible:ring-4 focus-visible:ring-ring/70"
           onChange={(event) => {
             setQuery(event.currentTarget.value);
@@ -49,10 +50,10 @@ export function CreatorSearchPanel({ initialQuery }: CreatorSearchPanelProps) {
         {creators.map((creator) => (
           <Link
             key={creator.id}
-            className="flex items-center gap-3 rounded-[18px] bg-white/80 px-3 py-3 text-foreground transition hover:bg-white/90"
+            className="flex items-center gap-3 rounded-[18px] bg-white/80 px-3 py-3 text-foreground transition hover:bg-white/90 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
             href={buildCreatorProfileHref(creator.id, {
               from: "search",
-              q: query,
+              q: resolvedQuery,
             })}
           >
             <span className="flex min-w-0 items-center gap-3">

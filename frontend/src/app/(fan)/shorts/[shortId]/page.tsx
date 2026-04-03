@@ -2,20 +2,11 @@ import { notFound } from "next/navigation";
 import { z } from "zod";
 
 import { resolveShortDetailBackHref } from "@/features/creator-navigation";
-import { getSingleQueryParam } from "@/shared/lib";
+import { getEnumQueryParam, getSingleQueryParam } from "@/shared/lib";
 import { getShortSurfaceById, ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 const paramsSchema = z.object({
   shortId: z.string().min(1),
-});
-
-const searchParamsSchema = z.object({
-  creatorId: z.string().optional(),
-  from: z.enum(["creator"]).optional(),
-  profileFrom: z.enum(["feed", "search", "short"]).optional(),
-  profileQ: z.string().optional(),
-  profileShortId: z.string().optional(),
-  profileTab: z.enum(["following", "recommended"]).optional(),
 });
 
 export default async function ShortDetailPage({
@@ -35,14 +26,14 @@ export default async function ShortDetailPage({
   const rawParams = await params;
   const rawSearchParams = await searchParams;
   const { shortId } = paramsSchema.parse(rawParams);
-  const routeState = searchParamsSchema.parse({
+  const routeState = {
     creatorId: getSingleQueryParam(rawSearchParams.creatorId),
-    from: getSingleQueryParam(rawSearchParams.from),
-    profileFrom: getSingleQueryParam(rawSearchParams.profileFrom),
+    from: getEnumQueryParam(rawSearchParams.from, ["creator"]),
+    profileFrom: getEnumQueryParam(rawSearchParams.profileFrom, ["feed", "search", "short"]),
     profileQ: getSingleQueryParam(rawSearchParams.profileQ),
     profileShortId: getSingleQueryParam(rawSearchParams.profileShortId),
-    profileTab: getSingleQueryParam(rawSearchParams.profileTab),
-  });
+    profileTab: getEnumQueryParam(rawSearchParams.profileTab, ["following", "recommended"]),
+  };
   const surface = getShortSurfaceById(shortId);
 
   if (!surface) {

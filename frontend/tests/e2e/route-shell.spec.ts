@@ -11,7 +11,7 @@ test("fan shell routes render and navigation works", async ({ page }) => {
   await page.getByRole("link", { name: "検索" }).click();
   await expect(page).toHaveURL(/\/search$/);
   await page.getByRole("searchbox").fill("mina");
-  await expect(page.getByRole("link", { name: /Mina Rei/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute("href", "/creators/mina?from=search&q=mina");
   await page.getByRole("link", { name: /Mina Rei/i }).click();
   await expect(page).toHaveURL(/\/creators\/mina\?from=search&q=mina$/);
   await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
@@ -39,6 +39,16 @@ test("fan shell routes render and navigation works", async ({ page }) => {
 
   await page.goto("/creators/sora");
   await expect(page.getByText("まだ公開中の short はありません。")).toBeVisible();
+
+  await page.goto("/creators/mina?from=twitter&tab=other");
+  await expect(page).toHaveURL(/\/creators\/mina\?from=twitter&tab=other$/);
+  await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
+  await expect(page.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
+
+  await page.goto("/shorts/rooftop?from=share&profileFrom=other");
+  await expect(page).toHaveURL(/\/shorts\/rooftop\?from=share&profileFrom=other$/);
+  await expect(page.getByText("quiet rooftop preview.")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
 });
 
 test("undefined routes fall back to the shared not-found page", async ({ page }) => {
