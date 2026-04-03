@@ -1,19 +1,19 @@
-import { House, Search, UserRound } from "lucide-react";
+import { CircleUserRound, Search, SquarePlay } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 export type FanNavigationKey = "fan" | "feed" | "search";
 
 export type FanNavigationItem = {
+  ariaLabel: string;
   href: string;
   icon: LucideIcon;
   key: FanNavigationKey;
-  label: string;
 };
 
 const navigationItems = [
-  { href: "/", icon: House, key: "feed", label: "Feed" },
-  { href: "/search", icon: Search, key: "search", label: "Search" },
-  { href: "/fan", icon: UserRound, key: "fan", label: "My" },
+  { ariaLabel: "フィード", href: "/", icon: SquarePlay, key: "feed" },
+  { ariaLabel: "検索", href: "/search", icon: Search, key: "search" },
+  { ariaLabel: "マイ", href: "/fan", icon: CircleUserRound, key: "fan" },
 ] as const satisfies readonly FanNavigationItem[];
 
 /**

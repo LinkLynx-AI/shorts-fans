@@ -8,11 +8,11 @@ test("fan shell routes render and navigation works", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Unlock/i })).toBeVisible();
   await expect(page.getByText("Mina Rei")).toBeVisible();
 
-  await page.getByRole("link", { name: /Search/i }).click();
+  await page.getByRole("link", { name: "検索" }).click();
   await expect(page).toHaveURL(/\/search$/);
   await expect(page.getByRole("heading", { name: "Creator search structure" })).toBeVisible();
 
-  await page.getByRole("link", { name: /My/i }).click();
+  await page.getByRole("link", { name: "マイ" }).click();
   await expect(page).toHaveURL(/\/fan$/);
   await expect(page.getByRole("heading", { name: "Fan hub structure" })).toBeVisible();
 

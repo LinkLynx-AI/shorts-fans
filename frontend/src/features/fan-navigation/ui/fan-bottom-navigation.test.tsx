@@ -20,7 +20,7 @@ describe("fan navigation", () => {
 
     render(<FanBottomNavigation />);
 
-    expect(screen.getByRole("link", { name: /search/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /feed/i })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "検索" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "フィード" })).toHaveAttribute("href", "/");
   });
 });

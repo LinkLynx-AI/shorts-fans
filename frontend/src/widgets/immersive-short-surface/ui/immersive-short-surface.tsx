@@ -68,7 +68,7 @@ function PinRail({ pinned }: PinRailProps) {
   const label = pinned ? "Pinned short" : "Pin short";
 
   return (
-    <div className="absolute bottom-[228px] right-4 z-20 flex flex-col items-center gap-2.5">
+    <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "204px" }}>
       <button
         aria-label={label}
         aria-pressed={pinned}
@@ -114,7 +114,7 @@ function FeedCreatorAvatar() {
 
 function CreatorBlock({ creator, followed, short }: CreatorBlockProps) {
   return (
-    <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-[92px]">
+    <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
       <div className="w-[min(88%,344px)] max-w-[344px]">
         <div className="flex w-fit max-w-full items-center gap-2.5">
           <Link
@@ -157,11 +157,13 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <ShortSurfaceHeader {...props} />
         <PinRail pinned={pinned} />
-        <UnlockCta
-          className="absolute inset-x-4 bottom-[176px] z-20"
-          {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
-          short={short}
-        />
+        <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
+          <UnlockCta
+            className="w-full"
+            {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
+            short={short}
+          />
+        </div>
         <CreatorBlock creator={creator} followed={followed} short={short} />
       </div>
     </section>
