@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-[408px] flex-col overflow-hidden bg-white shadow-[var(--device-shadow)] md:my-6 md:min-h-[min(880px,calc(100svh-3rem))] md:rounded-[36px]">
+    <main className="mx-auto flex min-h-svh w-full max-w-[408px] flex-col overflow-hidden bg-white">
       <div className="flex-1 bg-[linear-gradient(180deg,#94e0ff_0%,#2a648f_56%,#07131d_100%)] px-4 pb-[76px] pt-6">
         <div className="mx-auto h-8 w-44 animate-pulse rounded-full bg-white/22" />
         <div className="mx-auto mt-10 h-[420px] w-full max-w-[274px] animate-pulse rounded-[34px] border border-white/24 bg-white/18" />
