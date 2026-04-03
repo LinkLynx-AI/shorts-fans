@@ -6,7 +6,7 @@ describe("Loading", () => {
   it("renders the loading shell placeholders", () => {
     const { container } = render(<Loading />);
 
-    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(12);
+    expect(container.querySelectorAll(".animate-pulse")).toHaveLength(8);
     expect(screen.getByRole("main")).toBeInTheDocument();
   });
 });

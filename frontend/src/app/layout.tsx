@@ -27,7 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ja" data-scroll-behavior="smooth">
-      <body>{children}</body>
+      <body className="bg-background">{children}</body>
     </html>
   );
 }
