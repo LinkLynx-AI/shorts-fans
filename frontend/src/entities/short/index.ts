@@ -12,7 +12,9 @@ export type {
   FanCollectionTab,
   FeedTab,
   ShortId,
+  ShortMediaAsset,
   ShortPreviewMeta,
+  ShortSummary,
 } from "./model/short";
 export {
   ShortMetaPill,

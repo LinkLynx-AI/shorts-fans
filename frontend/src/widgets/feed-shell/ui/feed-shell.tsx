@@ -1,78 +1,84 @@
-import { ShortPoster, getShortThemeStyle } from "@/entities/short";
-import type { FeedTab, ShortPreviewMeta } from "@/entities/short";
-import { UnlockCta } from "@/features/unlock-entry";
-import { SegmentedControl, SurfacePanel } from "@/shared/ui";
-import { RouteStructurePanel } from "@/widgets/route-structure-panel";
+import Link from "next/link";
+
+import { cn } from "@/shared/lib";
+import { SurfacePanel } from "@/shared/ui";
+import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
+
+import type { FeedShellState } from "../model/mock-feed-shell";
 
 type FeedShellProps = {
-  activeTab: FeedTab;
-  short: ShortPreviewMeta;
+  state: FeedShellState;
 };
+
+function FeedTabsNavigation({ activeTab }: { activeTab: "following" | "recommended" }) {
+  return (
+    <nav aria-label="Feed sections" className="inline-flex gap-[18px]">
+      {[
+        { active: activeTab === "recommended", href: "/?tab=recommended", key: "recommended", label: "おすすめ" },
+        { active: activeTab === "following", href: "/?tab=following", key: "following", label: "フォロー中" },
+      ].map((item) => (
+        <Link
+          key={item.key}
+          aria-current={item.active ? "page" : undefined}
+          className={cn(
+            "relative pb-1.5 text-[15px] font-bold tracking-[0] text-white/62 transition hover:text-white/84",
+            item.active && "text-white after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-white",
+          )}
+          href={item.href}
+        >
+          {item.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function FeedFallbackState({
+  description,
+  title,
+}: {
+  description: string;
+  title: string;
+}) {
+  return (
+    <section className="absolute inset-0 overflow-hidden bg-[linear-gradient(180deg,#94e0ff_0%,#68c0eb_22%,#2a648f_56%,#07131d_100%)] text-white">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
+      <div className="relative flex h-full flex-col">
+        <div className="flex justify-center px-4 pt-6">
+          <FeedTabsNavigation activeTab="following" />
+        </div>
+        <div className="flex flex-1 items-center px-4 pb-24">
+          <SurfacePanel className="w-full px-5 py-5 text-foreground">
+            <h2 className="font-display text-xl font-semibold tracking-[-0.04em]">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+          </SurfacePanel>
+        </div>
+      </div>
+    </section>
+  );
+}
 
 /**
  * fan feed の route shell を表示する。
  */
-export function FeedShell({ activeTab, short }: FeedShellProps) {
+export function FeedShell({ state }: FeedShellProps) {
+  if (state.kind === "ready") {
+    return <ImmersiveShortSurface activeTab={state.tab} mode="feed" surface={state.surface} />;
+  }
+
+  if (state.kind === "empty") {
+    return (
+      <FeedFallbackState
+        description="following feed は 200 empty を返せる前提なので、ここで空状態を受けられるようにしています。実際の copy と CTA は後続 task で詰めます。"
+        title="フォロー中の creator はまだいません"
+      />
+    );
+  }
+
   return (
-    <section className="relative min-h-full overflow-y-auto px-4 pb-28 pt-6 text-white" style={getShortThemeStyle(short)}>
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-mid)_54%,var(--short-bg-end)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
-
-      <div className="relative space-y-5">
-        <SegmentedControl
-          ariaLabel="Feed sections"
-          className="mx-auto"
-          items={[
-            {
-              active: activeTab === "recommended",
-              href: "/?tab=recommended",
-              key: "recommended",
-              label: "おすすめ",
-            },
-            {
-              active: activeTab === "following",
-              href: "/?tab=following",
-              key: "following",
-              label: "フォロー中",
-            },
-          ]}
-          variant="underline"
-        />
-
-        <h1 className="font-display text-[30px] font-semibold tracking-[-0.05em] text-white">Feed shell</h1>
-
-        <ShortPoster className="mx-auto w-full max-w-[274px]" meta="short viewport" short={short} title="surface placeholder" variant="hero" />
-
-        <SurfacePanel className="space-y-3 px-4 py-4 text-foreground">
-          <p className="font-display text-[11px] font-semibold uppercase tracking-[0.22em] text-accent">Shared anchors</p>
-          <UnlockCta href={`/shorts/${short.id}`} short={short} />
-          <p className="text-sm leading-6 text-muted">
-            `short viewport`、`creator block`、`unlock CTA` の配置だけを固定しています。表示内容の実装は `SHO-5` で埋めます。
-          </p>
-        </SurfacePanel>
-
-        <RouteStructurePanel
-          description="fan mode default の route と common shell をここで固定し、feed 本文は後続 issue で実装します。"
-          items={[
-            {
-              description: "short の縦型 viewport をここに差し込む",
-              key: "viewport",
-              label: "Short viewport slot",
-            },
-            {
-              description: "creator 名、caption、profile 遷移をここに配置する",
-              key: "creator-block",
-              label: "Creator block slot",
-            },
-            {
-              description: "おすすめ / フォロー中の tab 切替だけ先に確定する",
-              key: "tabs",
-              label: "Top tab structure",
-            },
-          ]}
-          title="Feed route blueprint"
-        />
-      </div>
-    </section>
+    <FeedFallbackState
+      description="following feed は未認証時に auth_required を返すため、認証必須状態を shell で受けられるようにしています。ログイン導線は後続 task で接続します。"
+      title="フォロー中を見るにはログインが必要です"
+    />
   );
 }

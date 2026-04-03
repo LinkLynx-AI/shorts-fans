@@ -1,19 +1,32 @@
 import { render, screen } from "@testing-library/react";
 
-import { getFeedShortForTab, getShortById } from "@/entities/short";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
-import { FeedShell } from "@/widgets/feed-shell";
+import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
 import { SearchShell } from "@/widgets/search-shell";
 
 describe("widgets", () => {
   it("renders the feed shell", () => {
-    const short = getFeedShortForTab("recommended");
-    render(<FeedShell activeTab="recommended" short={short} />);
+    render(<FeedShell state={getMockFeedShellState("recommended")} />);
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { name: "Feed shell" })).toBeInTheDocument();
-    expect(screen.getByText("Feed route blueprint")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
+    expect(screen.getByText("Mina Rei")).toBeInTheDocument();
+    expect(screen.getByText("quiet rooftop preview.")).toBeInTheDocument();
+  });
+
+  it("renders following empty state", () => {
+    render(<FeedShell state={getFollowingFeedShellState("empty")} />);
+
+    expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("フォロー中の creator はまだいません")).toBeInTheDocument();
+  });
+
+  it("renders following auth-required state", () => {
+    render(<FeedShell state={getFollowingFeedShellState("auth_required")} />);
+
+    expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
   });
 
   it("renders the search structure and keeps query text", () => {
@@ -50,12 +63,6 @@ describe("widgets", () => {
   });
 
   it("renders the immersive detail shell", () => {
-    const short = getShortById("softlight");
-
-    if (!short) {
-      throw new Error("fixture missing");
-    }
-
     render(
       <DetailShell backHref="/" style={{ "--short-bg-start": "#a7e8ff" } as React.CSSProperties} variant="immersive">
         <div>hero slot</div>
