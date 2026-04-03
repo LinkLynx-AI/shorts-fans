@@ -1,0 +1,98 @@
+name: Backend CI
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+    paths:
+      - "backend/**"
+      - "Makefile"
+      - "scripts/check-backend-coverage.sh"
+      - ".github/workflows/backend-ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "Makefile"
+      - "scripts/check-backend-coverage.sh"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Backend Quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Check gofmt
+        shell: bash
+        working-directory: backend
+        run: |
+          mapfile -t files < <(find . -name '*.go' -not -path './vendor/*')
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            exit 0
+          fi
+
+          unformatted="$(gofmt -l "${files[@]}")"
+          if [[ -n "${unformatted}" ]]; then
+            echo 'The following Go files are not formatted with gofmt:'
+            printf '%s\n' "${unformatted}"
+            exit 1
+          fi
+
+      - name: Run tests
+        run: make backend-test
+
+      - name: Run vet
+        run: make backend-vet
+
+      - name: Build packages
+        working-directory: backend
+        run: go build ./...
+
+  coverage:
+    name: Backend Coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Check coverage threshold
+        run: make backend-coverage-check BACKEND_COVERAGE_MIN=20 BACKEND_COVERAGE_PROFILE=.artifacts/backend-coverage.out
+
+      - name: Upload coverage profile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-profile
+          path: .artifacts/backend-coverage.out
+          if-no-files-found: ignore
