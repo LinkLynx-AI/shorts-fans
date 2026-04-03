@@ -13,6 +13,7 @@ BACKEND_AWS_REGION ?=
 BACKEND_SQS_QUEUE_URL ?=
 BACKEND_COVERAGE_MIN ?=
 BACKEND_COVERAGE_PROFILE ?=
+BACKEND_COVERAGE_EXCLUDE_REGEX ?=
 SQLC_VERSION := v1.27.0
 
 help:
@@ -30,7 +31,8 @@ help:
 		'  make codex branch=feat/frontend-shell' \
 		'  make codex branch=feat/frontend-shell ARGS="exec"' \
 		'  make backend-run' \
-		'  make backend-coverage-check BACKEND_COVERAGE_MIN=30'
+		'  make backend-coverage-check BACKEND_COVERAGE_MIN=30' \
+		'  make backend-coverage-check BACKEND_COVERAGE_EXCLUDE_REGEX=""'
 
 codex: codex-worktree
 
@@ -96,6 +98,7 @@ backend-coverage-check:
 	BACKEND_DIR='$(BACKEND_DIR)' \
 	BACKEND_COVERAGE_MIN='$(BACKEND_COVERAGE_MIN)' \
 	BACKEND_COVERAGE_PROFILE='$(BACKEND_COVERAGE_PROFILE)' \
+	BACKEND_COVERAGE_EXCLUDE_REGEX='$(BACKEND_COVERAGE_EXCLUDE_REGEX)' \
 	./scripts/check-backend-coverage.sh
 
 backend-vet:
