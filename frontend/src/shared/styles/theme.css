@@ -1,30 +1,49 @@
 :root {
-  --background: #f5ecdf;
-  --surface: rgba(255, 255, 255, 0.72);
-  --surface-strong: #fff8f0;
-  --foreground: #211613;
-  --muted: #6a5a51;
-  --border: rgba(94, 56, 27, 0.14);
-  --accent: #d15c18;
-  --accent-strong: #8f2e13;
-  --ring: rgba(209, 92, 24, 0.42);
-}
-
-@theme inline {
-  --font-sans:
+  --background: #effcff;
+  --background-muted: #d7e8f3;
+  --surface: rgba(255, 255, 255, 0.74);
+  --surface-strong: rgba(255, 255, 255, 0.92);
+  --foreground: #061521;
+  --muted: #4c6171;
+  --muted-strong: #273847;
+  --border: rgba(167, 220, 249, 0.72);
+  --accent: #1082c8;
+  --accent-strong: #0a5b8c;
+  --ring: rgba(16, 130, 200, 0.36);
+  --tabbar-surface: rgba(255, 255, 255, 0.96);
+  --device-shadow: 0 28px 100px rgba(36, 94, 132, 0.16);
+  --font-body:
+    "Avenir Next",
     "Hiragino Sans",
     "Hiragino Kaku Gothic ProN",
     "Yu Gothic",
     "YuGothic",
     "Noto Sans JP",
     sans-serif;
+  --font-accent:
+    "Space Grotesk",
+    "Avenir Next",
+    "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN",
+    "Yu Gothic",
+    "YuGothic",
+    "Noto Sans JP",
+    sans-serif;
+}
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-display: var(--font-accent);
   --color-background: var(--background);
+  --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-muted-strong: var(--muted-strong);
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
   --color-ring: var(--ring);
+  --color-tabbar-surface: var(--tabbar-surface);
 }

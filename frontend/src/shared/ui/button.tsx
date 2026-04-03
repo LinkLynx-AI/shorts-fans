@@ -14,13 +14,18 @@ const buttonVariants = cva(
     variants: {
       size: {
         default: "h-11 px-5",
+        icon: "size-10 p-0",
         lg: "h-12 px-6 text-base",
-        sm: "h-9 px-4 text-xs",
+        sm: "h-9 px-4 text-[11px] uppercase tracking-[0.14em]",
       },
       variant: {
-        default: "bg-accent text-white shadow-[0_14px_30px_rgba(209,92,24,0.32)] hover:bg-accent-strong",
-        ghost: "bg-transparent text-foreground hover:bg-white/60",
-        secondary: "bg-white/72 text-foreground shadow-[inset_0_0_0_1px_rgba(94,56,27,0.12)] hover:bg-white",
+        chrome:
+          "border border-white/72 bg-white/76 text-accent-strong shadow-[0_10px_24px_rgba(36,94,132,0.1)] backdrop-blur-md hover:bg-white/90",
+        default:
+          "bg-[linear-gradient(135deg,var(--accent)_0%,var(--accent-strong)_100%)] text-white shadow-[0_18px_44px_rgba(16,130,200,0.28)] hover:brightness-105",
+        ghost: "bg-transparent text-foreground hover:bg-white/12",
+        secondary:
+          "bg-white/82 text-foreground shadow-[inset_0_0_0_1px_rgba(167,220,249,0.52),0_12px_28px_rgba(36,94,132,0.12)] backdrop-blur-md hover:bg-white",
       },
     },
   },

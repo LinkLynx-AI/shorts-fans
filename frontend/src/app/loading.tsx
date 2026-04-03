@@ -1,30 +1,21 @@
 export default function Loading() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-6 py-8 sm:px-10">
-      <div className="h-12 w-52 animate-pulse rounded-full bg-white/50" />
-      <div className="grid gap-5 lg:grid-cols-[1.4fr_0.9fr]">
-        <section className="rounded-[2rem] border border-white/70 bg-white/60 p-8 shadow-[0_24px_80px_rgba(87,38,8,0.12)] backdrop-blur">
-          <div className="h-4 w-24 animate-pulse rounded-full bg-accent/20" />
-          <div className="mt-6 h-10 w-2/3 animate-pulse rounded-full bg-stone-300/50" />
-          <div className="mt-4 h-4 w-full animate-pulse rounded-full bg-stone-300/50" />
-          <div className="mt-3 h-4 w-5/6 animate-pulse rounded-full bg-stone-300/50" />
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div
-                key={index}
-                className="h-24 animate-pulse rounded-[1.5rem] bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(255,237,213,0.75))]"
-              />
-            ))}
+    <main className="mx-auto flex min-h-screen w-full max-w-[408px] flex-col overflow-hidden bg-white shadow-[var(--device-shadow)] md:my-6 md:min-h-[min(880px,calc(100svh-3rem))] md:rounded-[36px]">
+      <div className="flex-1 bg-[linear-gradient(180deg,#94e0ff_0%,#2a648f_56%,#07131d_100%)] px-4 pb-[76px] pt-6">
+        <div className="mx-auto h-8 w-44 animate-pulse rounded-full bg-white/22" />
+        <div className="mx-auto mt-10 h-[420px] w-full max-w-[274px] animate-pulse rounded-[34px] border border-white/24 bg-white/18" />
+        <div className="mt-8 h-12 animate-pulse rounded-full bg-white/82" />
+        <div className="mt-5 space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="size-12 animate-pulse rounded-[20px] bg-white/28" />
+            <div className="space-y-2">
+              <div className="h-4 w-28 animate-pulse rounded-full bg-white/22" />
+              <div className="h-3 w-20 animate-pulse rounded-full bg-white/18" />
+            </div>
           </div>
-        </section>
-        <aside className="rounded-[2rem] border border-white/70 bg-[#1f1713] p-6 shadow-[0_24px_80px_rgba(87,38,8,0.16)]">
-          <div className="h-4 w-28 animate-pulse rounded-full bg-white/15" />
-          <div className="mt-5 grid gap-3">
-            {Array.from({ length: 3 }).map((_, index) => (
-              <div key={index} className="h-16 animate-pulse rounded-[1.25rem] bg-white/10" />
-            ))}
-          </div>
-        </aside>
+          <div className="h-4 w-60 animate-pulse rounded-full bg-white/18" />
+          <div className="h-4 w-48 animate-pulse rounded-full bg-white/18" />
+        </div>
       </div>
     </main>
   );

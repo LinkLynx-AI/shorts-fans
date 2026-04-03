@@ -15,8 +15,8 @@
   body {
     min-height: 100svh;
     background:
-      radial-gradient(circle at top, rgb(240 122 42 / 0.24), transparent 34%),
-      linear-gradient(180deg, #f7f0e7 0%, #f2e4d4 44%, #e8d9cb 100%);
+      radial-gradient(circle at top, rgb(132 216 255 / 0.48), transparent 36%),
+      linear-gradient(180deg, #effcff 0%, #e3f2fd 42%, #d7e8f3 100%);
     color: var(--foreground);
     font-family: var(--font-sans);
     text-rendering: optimizeLegibility;
@@ -37,6 +37,6 @@
   }
 
   ::selection {
-    background: rgb(204 95 24 / 0.26);
+    background: rgb(16 130 200 / 0.22);
   }
 }
