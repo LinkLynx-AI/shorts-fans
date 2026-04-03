@@ -25,12 +25,12 @@ import (
 
 const integrationPostgresDSNEnv = "POSTGRES_DSN"
 
-func TestMigrationsRoundTripLatestRevision(t *testing.T) {
+func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(3) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 3)
 
@@ -104,6 +104,103 @@ func TestMigrationsRoundTripLatestRevision(t *testing.T) {
 	}
 	if profile.PublishedAt.Valid {
 		t.Fatalf("GetCreatorProfileByUserID() published_at valid got %t want false", profile.PublishedAt.Valid)
+	}
+}
+
+func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 4)
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+
+	creator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+	_, err = queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creator.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+
+	processingAsset, err := queries.CreateMediaAsset(ctx, sqlc.CreateMediaAssetParams{
+		CreatorUserID:   creator.ID,
+		ProcessingState: "processing",
+		StorageProvider: "s3",
+		StorageBucket:   "test-bucket",
+		StorageKey:      "processing-asset",
+		MimeType:        "video/mp4",
+	})
+	if err != nil {
+		t.Fatalf("CreateMediaAsset(processing) error = %v, want nil", err)
+	}
+	if processingAsset.ProcessingState != "processing" {
+		t.Fatalf("CreateMediaAsset(processing) state got %q want %q", processingAsset.ProcessingState, "processing")
+	}
+	if processingAsset.PlaybackUrl.Valid {
+		t.Fatalf("CreateMediaAsset(processing) playback_url valid got %t want false", processingAsset.PlaybackUrl.Valid)
+	}
+
+	readyAsset, err := queries.UpdateMediaAssetProcessingState(ctx, sqlc.UpdateMediaAssetProcessingStateParams{
+		ID:              processingAsset.ID,
+		ProcessingState: "ready",
+		PlaybackUrl:     pgText("https://cdn.example.com/processing-asset.m3u8"),
+		DurationMs:      pgInt64(1000),
+	})
+	if err != nil {
+		t.Fatalf("UpdateMediaAssetProcessingState(ready before down) error = %v, want nil", err)
+	}
+	if readyAsset.ProcessingState != "ready" {
+		t.Fatalf("UpdateMediaAssetProcessingState(ready before down) state got %q want %q", readyAsset.ProcessingState, "ready")
+	}
+
+	if err := migrator.Steps(-1); err != nil {
+		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 3)
+
+	_, err = queries.CreateMediaAsset(ctx, sqlc.CreateMediaAssetParams{
+		CreatorUserID:   creator.ID,
+		ProcessingState: "processing",
+		StorageProvider: "s3",
+		StorageBucket:   "test-bucket",
+		StorageKey:      "processing-asset-v3",
+		MimeType:        "video/mp4",
+	})
+	if err == nil {
+		t.Fatal("CreateMediaAsset(processing) at version 3 error = nil, want constraint error")
+	}
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 4)
+
+	processingAssetAgain, err := queries.CreateMediaAsset(ctx, sqlc.CreateMediaAssetParams{
+		CreatorUserID:   creator.ID,
+		ProcessingState: "processing",
+		StorageProvider: "s3",
+		StorageBucket:   "test-bucket",
+		StorageKey:      "processing-asset-v4",
+		MimeType:        "video/mp4",
+	})
+	if err != nil {
+		t.Fatalf("CreateMediaAsset(processing) after re-up error = %v, want nil", err)
+	}
+	if processingAssetAgain.ProcessingState != "processing" {
+		t.Fatalf("CreateMediaAsset(processing) after re-up state got %q want %q", processingAssetAgain.ProcessingState, "processing")
 	}
 }
 
