@@ -55,7 +55,7 @@
 
 | field | type | notes |
 | --- | --- | --- |
-| `key` | `"account" \| "payment" \| "safety" \| "mode_switch"` | settings section identifier |
+| `key` | `"account" \| "payment" \| "safety"` | settings section identifier |
 | `label` | `string` | section label |
 | `available` | `boolean` | 現時点で選択可能か |
 
@@ -66,7 +66,6 @@
 #### Response
 
 - `data.fanProfile.title`: `string`
-- `data.fanProfile.currentMode`: `"fan" \| "creator"`
 - `data.fanProfile.counts.following`: `number`
 - `data.fanProfile.counts.pinnedShorts`: `number`
 - `data.fanProfile.counts.library`: `number`
@@ -121,10 +120,12 @@
 
 #### Response
 
-- `data.currentMode`: `"fan" \| "creator"`
-- `data.creatorModeAvailable`: `boolean`
 - `data.sections`: `SettingsSection[]`
 - `meta.page = null`
+
+#### Boundary Rule
+
+- mode switch 可否や現在の active mode は app shell の global self state が持ち、この endpoint では返しません。
 
 ## HTTP States
 

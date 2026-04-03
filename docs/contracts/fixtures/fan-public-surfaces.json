@@ -49,10 +49,7 @@
                 "resumePositionSeconds": null
               }
             }
-          ],
-          "viewer": {
-            "activeMode": null
-          }
+          ]
         },
         "meta": {
           "requestId": "req_feed_recommended_public_001",
@@ -113,10 +110,7 @@
                 "resumePositionSeconds": 198
               }
             }
-          ],
-          "viewer": {
-            "activeMode": "fan"
-          }
+          ]
         },
         "meta": {
           "requestId": "req_feed_recommended_purchased_001",
@@ -133,10 +127,7 @@
       "body": {
         "data": {
           "tab": "following",
-          "items": [],
-          "viewer": {
-            "activeMode": "fan"
-          }
+          "items": []
         },
         "meta": {
           "requestId": "req_feed_following_empty_001",

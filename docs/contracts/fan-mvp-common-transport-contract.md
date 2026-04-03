@@ -18,6 +18,13 @@
 - mutation API
 - DB schema や storage 都合の field
 - ranking、recommendation、payment provider 固有の metadata
+- 認証 viewer 自身の profile / session / active mode のような app shell global state
+
+## Viewer State Boundary
+
+- fan MVP surface contract では、resource と viewer の関係からしか分からない state だけを返します。
+- `isPinned`、`isFollowingCreator`、`unlockCta` のような relation state は surface payload に含めます。
+- authenticated viewer 自身の identity、active mode、creator mode 可否などは app bootstrap 時に別で確保し、surface payload に重ねて返しません。
 
 ## Canonical Sources
 

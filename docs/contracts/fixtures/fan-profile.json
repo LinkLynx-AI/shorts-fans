@@ -6,7 +6,6 @@
         "data": {
           "fanProfile": {
             "title": "My archive",
-            "currentMode": "fan",
             "counts": {
               "following": 3,
               "pinnedShorts": 2,
@@ -27,7 +26,6 @@
         "data": {
           "fanProfile": {
             "title": "My archive",
-            "currentMode": "fan",
             "counts": {
               "following": 0,
               "pinnedShorts": 0,
@@ -285,8 +283,6 @@
       "status": 200,
       "body": {
         "data": {
-          "currentMode": "fan",
-          "creatorModeAvailable": true,
           "sections": [
             {
               "key": "account",
@@ -301,11 +297,6 @@
             {
               "key": "safety",
               "label": "Safety",
-              "available": true
-            },
-            {
-              "key": "mode_switch",
-              "label": "Creator mode",
               "available": true
             }
           ]

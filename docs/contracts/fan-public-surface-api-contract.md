@@ -38,7 +38,6 @@
 
 - `data.tab`: request と同じ tab
 - `data.items`: `FeedItem[]`
-- `data.viewer.activeMode`: `"fan" \| "creator" \| null`
 - `meta.page`: `CursorPageInfo`
 
 ### `FeedItem`

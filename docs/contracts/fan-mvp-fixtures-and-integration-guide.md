@@ -46,6 +46,7 @@
 
 - `SHO-7` の初回表示では `GET /api/fan/profile` で counts を取得し、default tab の `GET /api/fan/profile/pinned-shorts` を別で呼びます。
 - `GET /api/fan/profile/library` は tab を開いた時点で初回 fetch し、以後は cursor を使って scroll 追加取得します。
+- auth viewer の self / session / active mode は app bootstrap 時の global state を正とし、surface payload からは参照しません。
 
 ## Scenario Rules
 
