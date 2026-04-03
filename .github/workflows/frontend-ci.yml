@@ -29,6 +29,36 @@ env:
   NEXT_PUBLIC_API_BASE_URL: https://api.example.com
 
 jobs:
+  fsd:
+    name: Frontend FSD
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.6.0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run FSD check
+        run: pnpm fsd:check
+
   quality:
     name: Frontend Quality
     runs-on: ubuntu-latest
@@ -56,8 +86,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Run lint
-        run: pnpm lint
+      - name: Run ESLint
+        run: pnpm lint:eslint
 
       - name: Run typecheck
         run: pnpm typecheck

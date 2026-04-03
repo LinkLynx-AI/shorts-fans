@@ -16,6 +16,8 @@ pnpm dev
 
 - `pnpm dev`: 開発サーバーを起動
 - `pnpm lint`: ESLint を実行
+- `pnpm lint:eslint`: ESLint だけを実行
+- `pnpm fsd:check`: FSD checker を実行
 - `pnpm typecheck`: TypeScript の型検査を実行
 - `pnpm test:unit`: Vitest の unit / component test を実行
 - `pnpm test:coverage:check`: Vitest の coverage 計測を実行
