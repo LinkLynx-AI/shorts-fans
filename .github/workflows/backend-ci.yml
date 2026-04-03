@@ -87,7 +87,7 @@ jobs:
           cache-dependency-path: backend/go.sum
 
       - name: Check coverage threshold
-        run: make backend-coverage-check BACKEND_COVERAGE_MIN=20 BACKEND_COVERAGE_PROFILE=.artifacts/backend-coverage.out
+        run: make backend-coverage-check BACKEND_COVERAGE_MIN=80 BACKEND_COVERAGE_PROFILE=.artifacts/backend-coverage.out
 
       - name: Upload coverage profile
         if: always()
