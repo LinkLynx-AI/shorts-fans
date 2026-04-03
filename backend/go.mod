@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.39.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-migrate/migrate/v4 v4.18.2
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/redis/go-redis/v9 v9.7.1
 	gopkg.in/yaml.v3 v3.0.1
