@@ -3,7 +3,7 @@
 ## 位置づけ
 
 - この文書は `SHO-19 fan profile private hub の API 契約とモックデータを定義する` の成果物です。
-- `Continue Watching / Following / Pinned Shorts / Library / Settings` を private consumer hub として読む contract を固定します。
+- `Following / Pinned Shorts / Library / Settings` を private consumer hub として読む contract を固定します。
 - DTO と response envelope は `docs/contracts/fan-mvp-common-transport-contract.md` を参照します。
 
 ## Canonical Sources
@@ -19,7 +19,6 @@
 | method | path | auth | notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/fan/profile` | required | private hub overview |
-| `GET` | `/api/fan/profile/continue-watching` | required | partially watched main の再開一覧 |
 | `GET` | `/api/fan/profile/following` | required | following creator 一覧 |
 | `GET` | `/api/fan/profile/pinned-shorts` | required | pinned short 一覧 |
 | `GET` | `/api/fan/profile/library` | required | unlocked main 一覧 |
@@ -42,10 +41,8 @@
 | `main.title` | `string` | main title |
 | `main.durationSeconds` | `number` | main length |
 | `creator` | `CreatorSummary` | owner |
-| `entryShort` | `ShortSummary` | 再開 context として使う linked short |
+| `entryShort` | `ShortSummary` | main へ戻るときの entry context として使う linked short |
 | `access` | `MainAccessState` | `purchased` または `owner` |
-| `resumePositionSeconds` | `number \| null` | 未再生なら `null` |
-| `remainingSeconds` | `number \| null` | continue watching 表示用 |
 
 ### `FollowingItem`
 
@@ -70,11 +67,9 @@
 
 - `data.fanProfile.title`: `string`
 - `data.fanProfile.currentMode`: `"fan" \| "creator"`
-- `data.fanProfile.counts.continueWatching`: `number`
 - `data.fanProfile.counts.following`: `number`
 - `data.fanProfile.counts.pinnedShorts`: `number`
 - `data.fanProfile.counts.library`: `number`
-- `data.preview.continueWatching`: `LibraryItem[]`
 - `data.preview.pinnedShorts`: `PinnedShortItem[]`
 - `data.preview.library`: `LibraryItem[]`
 
@@ -82,20 +77,6 @@
 
 - preview arrays は各 dedicated endpoint と同じ並び順の先頭 `3` 件まで返します。
 - overview では following の count は返しますが、creator list 自体は `/following` に分けます。
-
-### `GET /api/fan/profile/continue-watching`
-
-#### Query
-
-| field | type | required |
-| --- | --- | --- |
-| `cursor` | `string` | no |
-
-#### Response
-
-- `data.items`: `LibraryItem[]`
-- partially watched で `remainingSeconds > 0` の item だけ返します。
-- `meta.page`: `CursorPageInfo`
 
 ### `GET /api/fan/profile/following`
 
@@ -150,7 +131,6 @@
 | endpoint | populated | empty | not_found | unauthenticated |
 | --- | --- | --- | --- | --- |
 | `GET /api/fan/profile` | `200` | `200` | `404` | `401` |
-| `GET /api/fan/profile/continue-watching` | `200` | `200` | no | `401` |
 | `GET /api/fan/profile/following` | `200` | `200` | no | `401` |
 | `GET /api/fan/profile/pinned-shorts` | `200` | `200` | no | `401` |
 | `GET /api/fan/profile/library` | `200` | `200` | no | `401` |

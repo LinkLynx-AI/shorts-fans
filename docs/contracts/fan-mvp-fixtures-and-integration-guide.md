@@ -30,7 +30,6 @@
    - `GET /api/fan/mains/{mainId}/playback`
 4. `SHO-19`
    - `GET /api/fan/profile`
-   - `GET /api/fan/profile/continue-watching`
    - `GET /api/fan/profile/following`
    - `GET /api/fan/profile/pinned-shorts`
    - `GET /api/fan/profile/library`
@@ -43,7 +42,7 @@
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_purchased`, `short_detail_public`, `short_detail_purchased`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_normal`, `creator_profile_empty`, `creator_profile_not_found` |
 | `SHO-8` | `mini paywall / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchased`, `owner`, `locked`, `not_found`, `playback_purchased`, `playback_owner` |
-| `SHO-7` | `fan profile private hub` | `fan-profile-api-contract.md` | `overview_populated`, `overview_empty`, `continue_watching_populated`, `following_populated`, `pinned_populated`, `library_populated`, `settings_default` |
+| `SHO-7` | `fan profile private hub` | `fan-profile-api-contract.md` | `overview_populated`, `overview_empty`, `following_populated`, `pinned_populated`, `library_populated`, `settings_default` |
 
 ## Scenario Rules
 

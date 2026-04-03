@@ -8,61 +8,12 @@
             "title": "My archive",
             "currentMode": "fan",
             "counts": {
-              "continueWatching": 1,
               "following": 3,
               "pinnedShorts": 2,
               "library": 2
             }
           },
           "preview": {
-            "continueWatching": [
-              {
-                "main": {
-                  "id": "main_aoi_blue_balcony",
-                  "title": "blue balcony main",
-                  "durationSeconds": 720
-                },
-                "creator": {
-                  "id": "creator_aoi_n",
-                  "displayName": "Aoi N",
-                  "handle": "@aoina",
-                  "avatar": {
-                    "id": "asset_creator_aoi_avatar",
-                    "kind": "image",
-                    "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
-                    "posterUrl": null,
-                    "width": 512,
-                    "height": 512,
-                    "durationSeconds": null
-                  },
-                  "bio": "soft light と close framing の short を中心に更新中。"
-                },
-                "entryShort": {
-                  "id": "short_aoi_softlight",
-                  "canonicalMainId": "main_aoi_blue_balcony",
-                  "creatorId": "creator_aoi_n",
-                  "title": "soft light preview",
-                  "caption": "soft light の preview。",
-                  "media": {
-                    "id": "asset_short_aoi_softlight",
-                    "kind": "video",
-                    "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
-                    "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-                    "width": 1080,
-                    "height": 1920,
-                    "durationSeconds": 18
-                  },
-                  "previewDurationSeconds": 18
-                },
-                "access": {
-                  "mainId": "main_aoi_blue_balcony",
-                  "status": "purchased",
-                  "reason": "purchased_access"
-                },
-                "resumePositionSeconds": 408,
-                "remainingSeconds": 312
-              }
-            ],
             "pinnedShorts": [
               {
                 "short": {
@@ -142,9 +93,7 @@
                   "mainId": "main_mina_quiet_rooftop",
                   "status": "purchased",
                   "reason": "purchased_access"
-                },
-                "resumePositionSeconds": null,
-                "remainingSeconds": null
+                }
               }
             ]
           }
@@ -164,14 +113,12 @@
             "title": "My archive",
             "currentMode": "fan",
             "counts": {
-              "continueWatching": 0,
               "following": 0,
               "pinnedShorts": 0,
               "library": 0
             }
           },
           "preview": {
-            "continueWatching": [],
             "pinnedShorts": [],
             "library": []
           }
@@ -195,87 +142,6 @@
           "code": "not_found",
           "message": "fan profile was not found"
         }
-      }
-    }
-  },
-  "GET /api/fan/profile/continue-watching": {
-    "continue_watching_populated": {
-      "status": 200,
-      "body": {
-        "data": {
-          "items": [
-            {
-              "main": {
-                "id": "main_aoi_blue_balcony",
-                "title": "blue balcony main",
-                "durationSeconds": 720
-              },
-              "creator": {
-                "id": "creator_aoi_n",
-                "displayName": "Aoi N",
-                "handle": "@aoina",
-                "avatar": {
-                  "id": "asset_creator_aoi_avatar",
-                  "kind": "image",
-                  "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
-                  "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
-                  "durationSeconds": null
-                },
-                "bio": "soft light と close framing の short を中心に更新中。"
-              },
-              "entryShort": {
-                "id": "short_aoi_softlight",
-                "canonicalMainId": "main_aoi_blue_balcony",
-                "creatorId": "creator_aoi_n",
-                "title": "soft light preview",
-                "caption": "soft light の preview。",
-                "media": {
-                  "id": "asset_short_aoi_softlight",
-                  "kind": "video",
-                  "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
-                  "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-                  "width": 1080,
-                  "height": 1920,
-                  "durationSeconds": 18
-                },
-                "previewDurationSeconds": 18
-              },
-              "access": {
-                "mainId": "main_aoi_blue_balcony",
-                "status": "purchased",
-                "reason": "purchased_access"
-              },
-              "resumePositionSeconds": 408,
-              "remainingSeconds": 312
-            }
-          ]
-        },
-        "meta": {
-          "requestId": "req_continue_watching_populated_001",
-          "page": {
-            "nextCursor": null,
-            "hasNext": false
-          }
-        },
-        "error": null
-      }
-    },
-    "continue_watching_empty": {
-      "status": 200,
-      "body": {
-        "data": {
-          "items": []
-        },
-        "meta": {
-          "requestId": "req_continue_watching_empty_001",
-          "page": {
-            "nextCursor": null,
-            "hasNext": false
-          }
-        },
-        "error": null
       }
     }
   },
@@ -471,9 +337,7 @@
                 "mainId": "main_mina_quiet_rooftop",
                 "status": "purchased",
                 "reason": "purchased_access"
-              },
-              "resumePositionSeconds": null,
-              "remainingSeconds": null
+              }
             }
           ]
         },
