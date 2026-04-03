@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { getFeedSurfaceByTab, getShortSurfaceById, ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
+import { getShortSurfaceById, ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 export default async function ShortDetailPage({
   params,
