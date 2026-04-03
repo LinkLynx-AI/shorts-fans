@@ -135,8 +135,17 @@ cd backend && POSTGRES_DSN='postgres://shorts_fans:shorts_fans@localhost:5432/sh
 ```bash
 make backend-fmt
 make backend-test
+make backend-coverage-check
 make backend-vet
 ```
+
+任意のしきい値で判定したいときは `BACKEND_COVERAGE_MIN` を渡します。
+
+```bash
+make backend-coverage-check BACKEND_COVERAGE_MIN=30
+```
+
+`BACKEND_COVERAGE_PROFILE` を指定すると、`go tool cover -html` などで再利用できる coverage profile を保存できます。
 
 ## Environment
 
