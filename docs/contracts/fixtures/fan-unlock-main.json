@@ -1,0 +1,442 @@
+{
+  "GET /api/fan/shorts/{shortId}/unlock": {
+    "setup_required": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_mina_rooftop",
+            "canonicalMainId": "main_mina_quiet_rooftop",
+            "creatorId": "creator_mina_rei",
+            "title": "quiet rooftop preview",
+            "caption": "quiet rooftop preview。",
+            "media": {
+              "id": "asset_short_mina_rooftop",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+              "durationSeconds": 16
+            },
+            "previewDurationSeconds": 16
+          },
+          "creator": {
+            "id": "creator_mina_rei",
+            "displayName": "Mina Rei",
+            "handle": "@minarei",
+            "avatar": {
+              "id": "asset_creator_mina_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/mina/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
+          },
+          "main": {
+            "id": "main_mina_quiet_rooftop",
+            "title": "quiet rooftop main",
+            "durationSeconds": 480,
+            "priceJpy": 1800
+          },
+          "purchase": {
+            "mainId": "main_mina_quiet_rooftop",
+            "status": "not_purchased"
+          },
+          "access": {
+            "mainId": "main_mina_quiet_rooftop",
+            "status": "locked",
+            "reason": "purchase_required"
+          },
+          "unlockCta": {
+            "state": "setup_required",
+            "priceJpy": 1800,
+            "mainDurationSeconds": 480,
+            "resumePositionSeconds": null
+          },
+          "setup": {
+            "required": true,
+            "requiresAgeConfirmation": true,
+            "requiresTermsAcceptance": true
+          }
+        },
+        "meta": {
+          "requestId": "req_unlock_setup_required_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "unlock_available": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_sora_afterrain",
+            "canonicalMainId": "main_sora_after_rain",
+            "creatorId": "creator_sora_vale",
+            "title": "after rain preview",
+            "caption": "雨上がりの balcony preview。続きは main で。",
+            "media": {
+              "id": "asset_short_sora_afterrain",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/sora-after-rain.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
+              "durationSeconds": 17
+            },
+            "previewDurationSeconds": 17
+          },
+          "creator": {
+            "id": "creator_sora_vale",
+            "displayName": "Sora Vale",
+            "handle": "@soravale",
+            "avatar": {
+              "id": "asset_creator_sora_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/sora/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "after rain と balcony mood の short をまとめています。"
+          },
+          "main": {
+            "id": "main_sora_after_rain",
+            "title": "after rain main",
+            "durationSeconds": 540,
+            "priceJpy": 2100
+          },
+          "purchase": {
+            "mainId": "main_sora_after_rain",
+            "status": "not_purchased"
+          },
+          "access": {
+            "mainId": "main_sora_after_rain",
+            "status": "locked",
+            "reason": "purchase_required"
+          },
+          "unlockCta": {
+            "state": "unlock_available",
+            "priceJpy": 2100,
+            "mainDurationSeconds": 540,
+            "resumePositionSeconds": null
+          },
+          "setup": {
+            "required": false,
+            "requiresAgeConfirmation": false,
+            "requiresTermsAcceptance": false
+          }
+        },
+        "meta": {
+          "requestId": "req_unlock_available_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "purchased": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_aoi_softlight",
+            "canonicalMainId": "main_aoi_blue_balcony",
+            "creatorId": "creator_aoi_n",
+            "title": "soft light preview",
+            "caption": "soft light の preview。",
+            "media": {
+              "id": "asset_short_aoi_softlight",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+              "durationSeconds": 18
+            },
+            "previewDurationSeconds": 18
+          },
+          "creator": {
+            "id": "creator_aoi_n",
+            "displayName": "Aoi N",
+            "handle": "@aoina",
+            "avatar": {
+              "id": "asset_creator_aoi_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "soft light と close framing の short を中心に更新中。"
+          },
+          "main": {
+            "id": "main_aoi_blue_balcony",
+            "title": "blue balcony main",
+            "durationSeconds": 720,
+            "priceJpy": 2200
+          },
+          "purchase": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "purchased"
+          },
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "purchased",
+            "reason": "purchased_access"
+          },
+          "unlockCta": {
+            "state": "continue_main",
+            "priceJpy": null,
+            "mainDurationSeconds": null,
+            "resumePositionSeconds": 198
+          },
+          "setup": {
+            "required": false,
+            "requiresAgeConfirmation": false,
+            "requiresTermsAcceptance": false
+          }
+        },
+        "meta": {
+          "requestId": "req_unlock_purchased_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "owner": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_aoi_balcony_cut",
+            "canonicalMainId": "main_aoi_blue_balcony",
+            "creatorId": "creator_aoi_n",
+            "title": "balcony cut preview",
+            "caption": "blue tone の balcony preview。",
+            "media": {
+              "id": "asset_short_aoi_balcony_cut",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/aoi-balcony.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/aoi-balcony-poster.jpg",
+              "durationSeconds": 15
+            },
+            "previewDurationSeconds": 15
+          },
+          "creator": {
+            "id": "creator_aoi_n",
+            "displayName": "Aoi N",
+            "handle": "@aoina",
+            "avatar": {
+              "id": "asset_creator_aoi_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "soft light と close framing の short を中心に更新中。"
+          },
+          "main": {
+            "id": "main_aoi_blue_balcony",
+            "title": "blue balcony main",
+            "durationSeconds": 720,
+            "priceJpy": 2200
+          },
+          "purchase": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "not_purchased"
+          },
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "owner",
+            "reason": "owner_preview"
+          },
+          "unlockCta": {
+            "state": "owner_preview",
+            "priceJpy": null,
+            "mainDurationSeconds": null,
+            "resumePositionSeconds": null
+          },
+          "setup": {
+            "required": false,
+            "requiresAgeConfirmation": false,
+            "requiresTermsAcceptance": false
+          }
+        },
+        "meta": {
+          "requestId": "req_unlock_owner_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "locked": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_unlock_locked_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main is not available for playback"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_unlock_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "short was not found"
+        }
+      }
+    }
+  },
+  "GET /api/fan/mains/{mainId}/playback": {
+    "playback_purchased": {
+      "status": 200,
+      "body": {
+        "data": {
+          "main": {
+            "id": "main_aoi_blue_balcony",
+            "title": "blue balcony main",
+            "media": {
+              "id": "asset_main_aoi_blue_balcony",
+              "kind": "video",
+              "url": "https://cdn.example.com/mains/aoi-blue-balcony.mp4",
+              "posterUrl": "https://cdn.example.com/mains/aoi-blue-balcony-poster.jpg",
+              "durationSeconds": 720
+            },
+            "durationSeconds": 720
+          },
+          "creator": {
+            "id": "creator_aoi_n",
+            "displayName": "Aoi N",
+            "handle": "@aoina",
+            "avatar": {
+              "id": "asset_creator_aoi_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "soft light と close framing の short を中心に更新中。"
+          },
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "purchased",
+            "reason": "purchased_access"
+          },
+          "resumePositionSeconds": 198,
+          "entryShort": {
+            "id": "short_aoi_softlight",
+            "canonicalMainId": "main_aoi_blue_balcony",
+            "creatorId": "creator_aoi_n",
+            "title": "soft light preview",
+            "caption": "soft light の preview。",
+            "media": {
+              "id": "asset_short_aoi_softlight",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+              "durationSeconds": 18
+            },
+            "previewDurationSeconds": 18
+          }
+        },
+        "meta": {
+          "requestId": "req_playback_purchased_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "playback_owner": {
+      "status": 200,
+      "body": {
+        "data": {
+          "main": {
+            "id": "main_aoi_blue_balcony",
+            "title": "blue balcony main",
+            "media": {
+              "id": "asset_main_aoi_blue_balcony",
+              "kind": "video",
+              "url": "https://cdn.example.com/mains/aoi-blue-balcony.mp4",
+              "posterUrl": "https://cdn.example.com/mains/aoi-blue-balcony-poster.jpg",
+              "durationSeconds": 720
+            },
+            "durationSeconds": 720
+          },
+          "creator": {
+            "id": "creator_aoi_n",
+            "displayName": "Aoi N",
+            "handle": "@aoina",
+            "avatar": {
+              "id": "asset_creator_aoi_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "soft light と close framing の short を中心に更新中。"
+          },
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "owner",
+            "reason": "owner_preview"
+          },
+          "resumePositionSeconds": null,
+          "entryShort": {
+            "id": "short_aoi_balcony_cut",
+            "canonicalMainId": "main_aoi_blue_balcony",
+            "creatorId": "creator_aoi_n",
+            "title": "balcony cut preview",
+            "caption": "blue tone の balcony preview。",
+            "media": {
+              "id": "asset_short_aoi_balcony_cut",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/aoi-balcony.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/aoi-balcony-poster.jpg",
+              "durationSeconds": 15
+            },
+            "previewDurationSeconds": 15
+          }
+        },
+        "meta": {
+          "requestId": "req_playback_owner_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "locked": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_playback_locked_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main is not available for playback"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_playback_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "main was not found"
+        }
+      }
+    }
+  }
+}
