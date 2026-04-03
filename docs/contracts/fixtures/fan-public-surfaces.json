@@ -18,8 +18,6 @@
                   "kind": "video",
                   "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
                   "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
-                  "width": 1080,
-                  "height": 1920,
                   "durationSeconds": 16
                 },
                 "previewDurationSeconds": 16
@@ -33,8 +31,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -79,8 +75,6 @@
                   "kind": "video",
                   "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
                   "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-                  "width": 1080,
-                  "height": 1920,
                   "durationSeconds": 18
                 },
                 "previewDurationSeconds": 18
@@ -94,8 +88,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "soft light と close framing の short を中心に更新中。"
@@ -171,8 +163,6 @@
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
                 "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
-                "width": 1080,
-                "height": 1920,
                 "durationSeconds": 16
               },
               "previewDurationSeconds": 16
@@ -186,8 +176,6 @@
                 "kind": "image",
                 "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                 "posterUrl": null,
-                "width": 512,
-                "height": 512,
                 "durationSeconds": null
               },
               "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -227,8 +215,6 @@
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
                 "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-                "width": 1080,
-                "height": 1920,
                 "durationSeconds": 18
               },
               "previewDurationSeconds": 18
@@ -242,8 +228,6 @@
                 "kind": "image",
                 "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
                 "posterUrl": null,
-                "width": 512,
-                "height": 512,
                 "durationSeconds": null
               },
               "bio": "soft light と close framing の short を中心に更新中。"
@@ -283,8 +267,6 @@
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/aoi-balcony.mp4",
                 "posterUrl": "https://cdn.example.com/shorts/aoi-balcony-poster.jpg",
-                "width": 1080,
-                "height": 1920,
                 "durationSeconds": 15
               },
               "previewDurationSeconds": 15
@@ -298,8 +280,6 @@
                 "kind": "image",
                 "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
                 "posterUrl": null,
-                "width": 512,
-                "height": 512,
                 "durationSeconds": null
               },
               "bio": "soft light と close framing の short を中心に更新中。"
@@ -355,8 +335,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "soft light と close framing の short を中心に更新中。"
@@ -372,8 +350,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -407,8 +383,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -442,8 +416,6 @@
                 "kind": "image",
                 "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                 "posterUrl": null,
-                "width": 512,
-                "height": 512,
                 "durationSeconds": null
               },
               "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -469,8 +441,6 @@
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
                 "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
-                "width": 1080,
-                "height": 1920,
                 "durationSeconds": 16
               },
               "previewDurationSeconds": 16
@@ -486,8 +456,6 @@
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-hotel-mirror.mp4",
                 "posterUrl": "https://cdn.example.com/shorts/mina-hotel-mirror-poster.jpg",
-                "width": 1080,
-                "height": 1920,
                 "durationSeconds": 14
               },
               "previewDurationSeconds": 14
@@ -518,8 +486,6 @@
                 "kind": "image",
                 "url": "https://cdn.example.com/creator/sora/avatar.jpg",
                 "posterUrl": null,
-                "width": 512,
-                "height": 512,
                 "durationSeconds": null
               },
               "bio": "after rain と balcony mood の short をまとめています。"

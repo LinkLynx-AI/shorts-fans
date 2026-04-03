@@ -104,9 +104,9 @@
 | `kind` | `"image" \| "video"` | MVP では avatar は `image`、short / main は `video` |
 | `url` | `string` | public または signed URL。client は opaque に扱う |
 | `posterUrl` | `string \| null` | `video` の preview poster。`image` では `null` |
-| `width` | `number` | pixel width |
-| `height` | `number` | pixel height |
 | `durationSeconds` | `number \| null` | `video` だけ値を持つ |
+
+- fan-facing surface は SSOT 上 `縦型固定` なので、layout 計算用の `width / height` は transport contract に含めません。
 
 ### `CreatorSummary`
 

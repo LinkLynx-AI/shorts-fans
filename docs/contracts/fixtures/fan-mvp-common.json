@@ -37,8 +37,6 @@
       "kind": "image",
       "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
       "posterUrl": null,
-      "width": 512,
-      "height": 512,
       "durationSeconds": null
     },
     "mediaAssetVideo": {
@@ -46,8 +44,6 @@
       "kind": "video",
       "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
       "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-      "width": 1080,
-      "height": 1920,
       "durationSeconds": 18
     },
     "creatorSummary": {
@@ -59,8 +55,6 @@
         "kind": "image",
         "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
         "posterUrl": null,
-        "width": 512,
-        "height": 512,
         "durationSeconds": null
       },
       "bio": "soft light と close framing の short を中心に更新中。"
@@ -76,8 +70,6 @@
         "kind": "video",
         "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
         "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-        "width": 1080,
-        "height": 1920,
         "durationSeconds": 18
       },
       "previewDurationSeconds": 18
@@ -94,8 +86,6 @@
           "kind": "video",
           "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
           "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
-          "width": 1080,
-          "height": 1920,
           "durationSeconds": 18
         },
         "previewDurationSeconds": 18
@@ -109,8 +99,6 @@
           "kind": "image",
           "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
           "posterUrl": null,
-          "width": 512,
-          "height": 512,
           "durationSeconds": null
         },
         "bio": "soft light と close framing の short を中心に更新中。"

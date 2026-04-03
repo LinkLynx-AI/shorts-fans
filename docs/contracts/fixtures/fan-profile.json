@@ -71,8 +71,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "soft light と close framing の short を中心に更新中。"
@@ -91,8 +89,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -148,8 +144,6 @@
                   "kind": "video",
                   "url": "https://cdn.example.com/shorts/sora-after-rain.mp4",
                   "posterUrl": "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
-                  "width": 1080,
-                  "height": 1920,
                   "durationSeconds": 17
                 },
                 "previewDurationSeconds": 17
@@ -163,8 +157,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/sora/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "after rain と balcony mood の short をまとめています。"
@@ -220,8 +212,6 @@
                   "kind": "image",
                   "url": "https://cdn.example.com/creator/mina/avatar.jpg",
                   "posterUrl": null,
-                  "width": 512,
-                  "height": 512,
                   "durationSeconds": null
                 },
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
@@ -237,8 +227,6 @@
                   "kind": "video",
                   "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
                   "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
-                  "width": 1080,
-                  "height": 1920,
                   "durationSeconds": 16
                 },
                 "previewDurationSeconds": 16
