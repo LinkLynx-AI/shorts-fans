@@ -3,3 +3,157 @@
 //   sqlc v1.27.0
 
 package sqlc
+
+import (
+	"github.com/jackc/pgx/v5/pgtype"
+)
+
+type AppCreatorCapability struct {
+	UserID                   pgtype.UUID
+	State                    string
+	RejectionReasonCode      pgtype.Text
+	IsResubmitEligible       bool
+	IsSupportReviewRequired  bool
+	SelfServeResubmitCount   int32
+	KycProviderCaseRef       pgtype.Text
+	PayoutProviderAccountRef pgtype.Text
+	SubmittedAt              pgtype.Timestamptz
+	ApprovedAt               pgtype.Timestamptz
+	RejectedAt               pgtype.Timestamptz
+	SuspendedAt              pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+}
+
+type AppCreatorFollow struct {
+	UserID        pgtype.UUID
+	CreatorUserID pgtype.UUID
+	FollowedAt    pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+type AppCreatorProfile struct {
+	UserID      pgtype.UUID
+	DisplayName pgtype.Text
+	AvatarUrl   pgtype.Text
+	Bio         string
+	PublishedAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type AppMain struct {
+	ID                  pgtype.UUID
+	CreatorUserID       pgtype.UUID
+	MediaAssetID        pgtype.UUID
+	State               string
+	ReviewReasonCode    pgtype.Text
+	PostReportState     pgtype.Text
+	PriceMinor          pgtype.Int8
+	CurrencyCode        pgtype.Text
+	OwnershipConfirmed  bool
+	ConsentConfirmed    bool
+	ApprovedForUnlockAt pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
+type AppMainPlaybackProgress struct {
+	UserID         pgtype.UUID
+	MainID         pgtype.UUID
+	LastPositionMs int64
+	LastPlayedAt   pgtype.Timestamptz
+	CompletedAt    pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
+}
+
+type AppMainUnlock struct {
+	UserID                     pgtype.UUID
+	MainID                     pgtype.UUID
+	PaymentProviderPurchaseRef pgtype.Text
+	PurchasedAt                pgtype.Timestamptz
+	CreatedAt                  pgtype.Timestamptz
+}
+
+type AppMediaAsset struct {
+	ID                pgtype.UUID
+	CreatorUserID     pgtype.UUID
+	ProcessingState   string
+	StorageProvider   string
+	StorageBucket     string
+	StorageKey        string
+	PlaybackUrl       pgtype.Text
+	MimeType          string
+	DurationMs        pgtype.Int8
+	ExternalUploadRef pgtype.Text
+	CreatedAt         pgtype.Timestamptz
+	UpdatedAt         pgtype.Timestamptz
+}
+
+type AppPinnedShort struct {
+	UserID    pgtype.UUID
+	ShortID   pgtype.UUID
+	PinnedAt  pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
+type AppPublicCreatorProfile struct {
+	UserID      pgtype.UUID
+	DisplayName pgtype.Text
+	AvatarUrl   pgtype.Text
+	Bio         string
+	PublishedAt pgtype.Timestamptz
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type AppPublicShort struct {
+	ID                   pgtype.UUID
+	CreatorUserID        pgtype.UUID
+	CanonicalMainID      pgtype.UUID
+	MediaAssetID         pgtype.UUID
+	State                string
+	ReviewReasonCode     pgtype.Text
+	PostReportState      pgtype.Text
+	ApprovedForPublishAt pgtype.Timestamptz
+	PublishedAt          pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type AppShort struct {
+	ID                   pgtype.UUID
+	CreatorUserID        pgtype.UUID
+	CanonicalMainID      pgtype.UUID
+	MediaAssetID         pgtype.UUID
+	State                string
+	ReviewReasonCode     pgtype.Text
+	PostReportState      pgtype.Text
+	ApprovedForPublishAt pgtype.Timestamptz
+	PublishedAt          pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type AppUnlockableMain struct {
+	ID                  pgtype.UUID
+	CreatorUserID       pgtype.UUID
+	MediaAssetID        pgtype.UUID
+	State               string
+	ReviewReasonCode    pgtype.Text
+	PostReportState     pgtype.Text
+	PriceMinor          pgtype.Int8
+	CurrencyCode        pgtype.Text
+	OwnershipConfirmed  bool
+	ConsentConfirmed    bool
+	ApprovedForUnlockAt pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
+type AppUser struct {
+	ID        pgtype.UUID
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
