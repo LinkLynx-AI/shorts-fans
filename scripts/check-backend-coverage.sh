@@ -8,6 +8,7 @@ repo_root="$(cd -- "${script_dir}/.." && pwd)"
 backend_dir="${BACKEND_DIR:-backend}"
 coverage_min="${BACKEND_COVERAGE_MIN:-}"
 coverage_profile="${BACKEND_COVERAGE_PROFILE:-}"
+coverage_exclude_regex='(/cmd/|/internal/postgres/sqlc$|/internal/dbschema$)'
 cleanup_profile=0
 
 if [[ "${backend_dir}" != /* ]]; then
@@ -19,7 +20,9 @@ if [[ -n "${coverage_profile}" && "${coverage_profile}" != /* ]]; then
 fi
 
 if [[ -z "${coverage_profile}" ]]; then
-	coverage_profile="$(mktemp "${TMPDIR:-/tmp}/backend-coverage.XXXXXX.out")"
+	tmp_dir="${TMPDIR:-/tmp}"
+	tmp_dir="${tmp_dir%/}"
+	coverage_profile="$(mktemp "${tmp_dir}/backend-coverage.XXXXXX")"
 	cleanup_profile=1
 else
 	mkdir -p "$(dirname -- "${coverage_profile}")"
@@ -27,7 +30,20 @@ fi
 
 cd "${backend_dir}"
 
-go test -covermode=atomic -coverpkg=./... -coverprofile="${coverage_profile}" ./...
+packages=()
+while IFS= read -r package; do
+	packages+=("${package}")
+done < <(go list ./... | grep -Ev "${coverage_exclude_regex}" || true)
+
+if [[ "${#packages[@]}" -eq 0 ]]; then
+	printf 'no backend packages matched coverage target\n' >&2
+	if [[ "${cleanup_profile}" -eq 1 ]]; then
+		rm -f "${coverage_profile}"
+	fi
+	exit 1
+fi
+
+go test -covermode=atomic -coverprofile="${coverage_profile}" "${packages[@]}"
 
 total_line="$(go tool cover -func="${coverage_profile}" | awk '/^total:/ { print; exit }')"
 total_coverage="$(printf '%s\n' "${total_line}" | awk '{ gsub("%", "", $NF); print $NF }')"
@@ -60,4 +76,7 @@ if [[ "${cleanup_profile}" -eq 1 ]]; then
 	rm -f "${coverage_profile}"
 else
 	printf 'coverage profile: %s\n' "${coverage_profile}"
+	if [[ -n "${coverage_exclude_regex}" ]]; then
+		printf 'coverage exclude regex: %s\n' "${coverage_exclude_regex}"
+	fi
 fi

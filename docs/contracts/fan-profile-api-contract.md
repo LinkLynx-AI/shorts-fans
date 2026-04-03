@@ -1,0 +1,149 @@
+# Fan Profile API Contract
+
+## 位置づけ
+
+- この文書は `SHO-19 fan profile private hub の API 契約とモックデータを定義する` の成果物です。
+- `Following / Pinned Shorts / Library / Settings` を private consumer hub として読む contract を固定します。
+- DTO と response envelope は `docs/contracts/fan-mvp-common-transport-contract.md` を参照します。
+
+## Canonical Sources
+
+- `docs/contracts/fan-mvp-common-transport-contract.md`
+- `docs/ssot/product/fan/consumer-state-and-profile.md`
+- `docs/ssot/product/fan/fan-profile-and-engagement.md`
+- `docs/ssot/product/ui/fan-surfaces.md`
+- `docs/ssot/product/account/account-permissions.md`
+
+## Endpoint Summary
+
+| method | path | auth | notes |
+| --- | --- | --- | --- |
+| `GET` | `/api/fan/profile` | required | private hub overview |
+| `GET` | `/api/fan/profile/following` | required | following creator 一覧 |
+| `GET` | `/api/fan/profile/pinned-shorts` | required | pinned short 一覧 |
+| `GET` | `/api/fan/profile/library` | required | unlocked main 一覧 |
+| `GET` | `/api/fan/profile/settings` | required | minimum read-only settings sections |
+
+## Surface-specific Payloads
+
+### `PinnedShortItem`
+
+| field | type | notes |
+| --- | --- | --- |
+| `short` | `ShortSummary` | pinned short |
+| `creator` | `CreatorSummary` | short owner |
+
+### `LibraryItem`
+
+| field | type | notes |
+| --- | --- | --- |
+| `main.id` | `string` | canonical main identifier |
+| `main.title` | `string` | main title |
+| `main.durationSeconds` | `number` | main length |
+| `creator` | `CreatorSummary` | owner |
+| `entryShort` | `ShortSummary` | main へ戻るときの entry context として使う linked short |
+| `access` | `MainAccessState` | `purchased` または `owner` |
+
+### `FollowingItem`
+
+| field | type | notes |
+| --- | --- | --- |
+| `creator` | `CreatorSummary` | followed creator |
+| `viewer.isFollowing` | `true` | private hub 上では true 固定 |
+
+### `SettingsSection`
+
+| field | type | notes |
+| --- | --- | --- |
+| `key` | `"account" \| "payment" \| "safety"` | settings section identifier |
+| `label` | `string` | section label |
+| `available` | `boolean` | 現時点で選択可能か |
+
+## Request Contract
+
+### `GET /api/fan/profile`
+
+#### Response
+
+- `data.fanProfile.title`: `string`
+- `data.fanProfile.counts.following`: `number`
+- `data.fanProfile.counts.pinnedShorts`: `number`
+- `data.fanProfile.counts.library`: `number`
+
+#### Overview Rules
+
+- `GET /api/fan/profile` は overview metadata だけを返し、pinned shorts と library の item 本体は返しません。
+- overview では following の count は返しますが、creator list 自体は `/following` に分けます。
+- frontend は profile 初回表示時に `GET /api/fan/profile` と、初期 tab に対応する paginated endpoint を別で呼びます。
+- `pinned-shorts` と `library` は cursor pagination を前提にし、以後の追加取得は scroll で行います。
+
+### `GET /api/fan/profile/following`
+
+#### Query
+
+| field | type | required |
+| --- | --- | --- |
+| `cursor` | `string` | no |
+
+#### Response
+
+- `data.items`: `FollowingItem[]`
+- `meta.page`: `CursorPageInfo`
+
+### `GET /api/fan/profile/pinned-shorts`
+
+#### Query
+
+| field | type | required |
+| --- | --- | --- |
+| `cursor` | `string` | no |
+
+#### Response
+
+- `data.items`: `PinnedShortItem[]`
+- `meta.page`: `CursorPageInfo`
+
+### `GET /api/fan/profile/library`
+
+#### Query
+
+| field | type | required |
+| --- | --- | --- |
+| `cursor` | `string` | no |
+
+#### Response
+
+- `data.items`: `LibraryItem[]`
+- `meta.page`: `CursorPageInfo`
+
+### `GET /api/fan/profile/settings`
+
+#### Response
+
+- `data.sections`: `SettingsSection[]`
+- `meta.page = null`
+
+#### Boundary Rule
+
+- mode switch 可否や現在の active mode は app shell の global self state が持ち、この endpoint では返しません。
+
+## HTTP States
+
+| endpoint | populated | empty | not_found | unauthenticated |
+| --- | --- | --- | --- | --- |
+| `GET /api/fan/profile` | `200` | `200` | `404` | `401` |
+| `GET /api/fan/profile/following` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/pinned-shorts` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/library` | `200` | `200` | no | `401` |
+| `GET /api/fan/profile/settings` | `200` | no | no | `401` |
+
+## Out-of-scope Guardrails
+
+- public fan profile は返さない
+- `like / comment / public activity` は返さない
+- full watch history は返さない
+- creator dashboard や creator private analytics は返さない
+
+## Fixture Reference
+
+- representative fixture は [fan-profile.json](fixtures/fan-profile.json) を参照します。

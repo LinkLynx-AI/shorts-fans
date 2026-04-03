@@ -11,11 +11,17 @@
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 - [contracts/mvp-core-domain-contract.md](contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
+- [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
+- [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
+- [contracts/fan-unlock-main-api-contract.md](contracts/fan-unlock-main-api-contract.md): `unlock / main player` の read 契約
+- [contracts/fan-profile-api-contract.md](contracts/fan-profile-api-contract.md): `fan profile private hub` の read 契約
+- [contracts/fan-mvp-fixtures-and-integration-guide.md](contracts/fan-mvp-fixtures-and-integration-guide.md): fixture と backend / frontend 接続順の参照ガイド
 - [ssot/LOCAL_INDEX.md](ssot/LOCAL_INDEX.md): 外部 repo から取り込んだ SSOT のローカル入口
 
 ## 補助ディレクトリ
 
 - `contracts/`: SSOT を置き換えずに、実装者向けの契約や境界責務をまとめる
+- `contracts/fixtures/`: fan MVP surface 契約の representative JSON fixture を置く
 - `.local/`: Codex の PR 単位一時メモを置く gitignored ディレクトリ。`./.local/codex-memo/` を使い、PR には含めない
 
 ## 今後追加する文書領域

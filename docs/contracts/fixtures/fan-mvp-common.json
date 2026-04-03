@@ -1,0 +1,137 @@
+{
+  "surfaceStateVocabulary": [
+    "public",
+    "locked",
+    "purchased",
+    "owner",
+    "empty",
+    "not_found"
+  ],
+  "successEnvelope": {
+    "data": {
+      "id": "short_aoi_softlight"
+    },
+    "meta": {
+      "requestId": "req_feed_recommended_001",
+      "page": {
+        "nextCursor": "feed:recommended:cursor:001",
+        "hasNext": true
+      }
+    },
+    "error": null
+  },
+  "errorEnvelope": {
+    "data": null,
+    "meta": {
+      "requestId": "req_short_not_found_001",
+      "page": null
+    },
+    "error": {
+      "code": "not_found",
+      "message": "short was not found"
+    }
+  },
+  "dtoExamples": {
+    "mediaAssetImage": {
+      "id": "asset_creator_aoi_avatar",
+      "kind": "image",
+      "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+      "posterUrl": null,
+      "durationSeconds": null
+    },
+    "mediaAssetVideo": {
+      "id": "asset_short_aoi_softlight",
+      "kind": "video",
+      "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+      "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+      "durationSeconds": 18
+    },
+    "creatorSummary": {
+      "id": "creator_aoi_n",
+      "displayName": "Aoi N",
+      "handle": "@aoina",
+      "avatar": {
+        "id": "asset_creator_aoi_avatar",
+        "kind": "image",
+        "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+        "posterUrl": null,
+        "durationSeconds": null
+      },
+      "bio": "soft light と close framing の short を中心に更新中。"
+    },
+    "shortSummary": {
+      "id": "short_aoi_softlight",
+      "canonicalMainId": "main_aoi_blue_balcony",
+      "creatorId": "creator_aoi_n",
+      "title": "soft light preview",
+      "caption": "soft light の preview。",
+      "media": {
+        "id": "asset_short_aoi_softlight",
+        "kind": "video",
+        "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+        "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+        "durationSeconds": 18
+      },
+      "previewDurationSeconds": 18
+    },
+    "shortDetail": {
+      "short": {
+        "id": "short_aoi_softlight",
+        "canonicalMainId": "main_aoi_blue_balcony",
+        "creatorId": "creator_aoi_n",
+        "title": "soft light preview",
+        "caption": "soft light の preview。",
+        "media": {
+          "id": "asset_short_aoi_softlight",
+          "kind": "video",
+          "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+          "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+          "durationSeconds": 18
+        },
+        "previewDurationSeconds": 18
+      },
+      "creator": {
+        "id": "creator_aoi_n",
+        "displayName": "Aoi N",
+        "handle": "@aoina",
+        "avatar": {
+          "id": "asset_creator_aoi_avatar",
+          "kind": "image",
+          "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+          "posterUrl": null,
+          "durationSeconds": null
+        },
+        "bio": "soft light と close framing の short を中心に更新中。"
+      },
+      "viewer": {
+        "isPinned": true,
+        "isFollowingCreator": true
+      },
+      "unlockCta": {
+        "state": "unlock_available",
+        "priceJpy": 2200,
+        "mainDurationSeconds": 720,
+        "resumePositionSeconds": null
+      }
+    },
+    "purchaseState": {
+      "mainId": "main_aoi_blue_balcony",
+      "status": "not_purchased"
+    },
+    "mainAccessState": {
+      "mainId": "main_aoi_blue_balcony",
+      "status": "locked",
+      "reason": "purchase_required"
+    },
+    "unlockCtaState": {
+      "state": "unlock_available",
+      "priceJpy": 2200,
+      "mainDurationSeconds": 720,
+      "resumePositionSeconds": null
+    },
+    "cursorPageInfo": {
+      "nextCursor": "feed:recommended:cursor:001",
+      "hasNext": true
+    }
+  }
+}

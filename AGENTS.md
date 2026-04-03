@@ -30,6 +30,11 @@
 - [docs/GO.md](docs/GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [docs/TYPESCRIPT.md](docs/TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 - [docs/contracts/mvp-core-domain-contract.md](docs/contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
+- [docs/contracts/fan-mvp-common-transport-contract.md](docs/contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
+- [docs/contracts/fan-public-surface-api-contract.md](docs/contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
+- [docs/contracts/fan-unlock-main-api-contract.md](docs/contracts/fan-unlock-main-api-contract.md): `unlock / main player` の read 契約
+- [docs/contracts/fan-profile-api-contract.md](docs/contracts/fan-profile-api-contract.md): `fan profile private hub` の read 契約
+- [docs/contracts/fan-mvp-fixtures-and-integration-guide.md](docs/contracts/fan-mvp-fixtures-and-integration-guide.md): fixture と backend / frontend 接続順の参照ガイド
 - [docs/ssot/LOCAL_INDEX.md](docs/ssot/LOCAL_INDEX.md): 外部 repo から取り込んだ SSOT のローカル入口
 
 ## ドキュメント運用ルール
