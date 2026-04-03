@@ -51,7 +51,6 @@
             }
           ],
           "viewer": {
-            "isAuthenticated": false,
             "activeMode": null
           }
         },
@@ -116,7 +115,6 @@
             }
           ],
           "viewer": {
-            "isAuthenticated": true,
             "activeMode": "fan"
           }
         },
@@ -137,7 +135,6 @@
           "tab": "following",
           "items": [],
           "viewer": {
-            "isAuthenticated": true,
             "activeMode": "fan"
           }
         },
