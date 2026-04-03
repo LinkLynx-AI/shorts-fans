@@ -12,8 +12,9 @@ describe("widgets", () => {
     render(<FeedShell activeTab="recommended" short={short} />);
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { name: "Feed shell" })).toBeInTheDocument();
-    expect(screen.getByText("Feed route blueprint")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
+    expect(screen.getByText("Mina Rei")).toBeInTheDocument();
+    expect(screen.getByText("quiet rooftop preview.")).toBeInTheDocument();
   });
 
   it("renders the search structure and keeps query text", () => {

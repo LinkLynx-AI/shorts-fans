@@ -14,6 +14,7 @@ export type ShortPreviewMeta = {
   searchLabel: string;
   theme: {
     background: {
+      accent: string;
       end: string;
       mid: string;
       start: string;
@@ -38,6 +39,7 @@ const shorts = [
     searchLabel: "after rain",
     theme: {
       background: {
+        accent: "#6cbfe3",
         end: "#07131d",
         mid: "#264f70",
         start: "#cff6ff",
@@ -60,6 +62,7 @@ const shorts = [
     searchLabel: "blue lace set",
     theme: {
       background: {
+        accent: "#7bcbe6",
         end: "#07131d",
         mid: "#2d5474",
         start: "#d9f3ff",
@@ -82,6 +85,7 @@ const shorts = [
     searchLabel: "hotel mirror",
     theme: {
       background: {
+        accent: "#81c7f1",
         end: "#08131d",
         mid: "#315f8d",
         start: "#d4f3ff",
@@ -104,6 +108,7 @@ const shorts = [
     searchLabel: "poolside cut",
     theme: {
       background: {
+        accent: "#70b0d1",
         end: "#07131d",
         mid: "#233e57",
         start: "#dff9ff",
@@ -126,6 +131,7 @@ const shorts = [
     searchLabel: "quiet rooftop",
     theme: {
       background: {
+        accent: "#68c0eb",
         end: "#07131d",
         mid: "#2a648f",
         start: "#94e0ff",
@@ -148,6 +154,7 @@ const shorts = [
     searchLabel: "soft light",
     theme: {
       background: {
+        accent: "#59a9d4",
         end: "#06111a",
         mid: "#1b4264",
         start: "#a7e8ff",
@@ -236,6 +243,7 @@ export function getLibraryShorts(): readonly ShortPreviewMeta[] {
  */
 export function getShortThemeStyle(short: ShortPreviewMeta): CSSProperties {
   return {
+    "--short-bg-accent": short.theme.background.accent,
     "--short-bg-end": short.theme.background.end,
     "--short-bg-mid": short.theme.background.mid,
     "--short-bg-start": short.theme.background.start,
