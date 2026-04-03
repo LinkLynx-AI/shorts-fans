@@ -34,9 +34,11 @@ function FeedTabsNavigation({ activeTab }: { activeTab: "following" | "recommend
 }
 
 function FeedFallbackState({
+  activeTab,
   description,
   title,
 }: {
+  activeTab: "following" | "recommended";
   description: string;
   title: string;
 }) {
@@ -45,7 +47,7 @@ function FeedFallbackState({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
       <div className="relative flex h-full flex-col">
         <div className="flex justify-center px-4 pt-6">
-          <FeedTabsNavigation activeTab="following" />
+          <FeedTabsNavigation activeTab={activeTab} />
         </div>
         <div className="flex flex-1 items-center px-4 pb-24">
           <SurfacePanel className="w-full px-5 py-5 text-foreground">
@@ -63,12 +65,30 @@ function FeedFallbackState({
  */
 export function FeedShell({ state }: FeedShellProps) {
   if (state.kind === "ready") {
-    return <ImmersiveShortSurface activeTab={state.tab} mode="feed" surface={state.surface} />;
+    return (
+      <ImmersiveShortSurface
+        activeTab={state.tab}
+        mode="feed"
+        surface={state.surface}
+        {...(state.detailHref ? { detailHref: state.detailHref } : {})}
+      />
+    );
   }
 
   if (state.kind === "empty") {
+    if (state.tab === "recommended") {
+      return (
+        <FeedFallbackState
+          activeTab="recommended"
+          description="recommended feed が 200 empty を返したときの受け皿です。実際の copy と CTA は後続 task で詰めます。"
+          title="公開中の short はまだありません"
+        />
+      );
+    }
+
     return (
       <FeedFallbackState
+        activeTab="following"
         description="following feed は 200 empty を返せる前提なので、ここで空状態を受けられるようにしています。実際の copy と CTA は後続 task で詰めます。"
         title="フォロー中の creator はまだいません"
       />
@@ -77,6 +97,7 @@ export function FeedShell({ state }: FeedShellProps) {
 
   return (
     <FeedFallbackState
+      activeTab="following"
       description="following feed は未認証時に auth_required を返すため、認証必須状態を shell で受けられるようにしています。ログイン導線は後続 task で接続します。"
       title="フォロー中を見るにはログインが必要です"
     />

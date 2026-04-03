@@ -33,4 +33,11 @@ describe("short model", () => {
       "--short-tile-top": "#d8f3ff",
     });
   });
+
+  it("falls back to a deterministic theme for unknown short IDs", () => {
+    const style = getShortThemeStyle("unknown-short-id") as Record<string, string | undefined>;
+
+    expect(style["--short-bg-start"]).toBeTypeOf("string");
+    expect(style["--short-tile-bottom"]).toBeTypeOf("string");
+  });
 });

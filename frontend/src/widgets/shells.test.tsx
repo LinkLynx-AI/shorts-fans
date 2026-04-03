@@ -2,7 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
-import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
+import { FeedShell, getEmptyFeedShellState, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
 import { SearchShell } from "@/widgets/search-shell";
 
 describe("widgets", () => {
@@ -27,6 +27,13 @@ describe("widgets", () => {
 
     expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
+  });
+
+  it("renders recommended empty state", () => {
+    render(<FeedShell state={getEmptyFeedShellState("recommended")} />);
+
+    expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("公開中の short はまだありません")).toBeInTheDocument();
   });
 
   it("renders the search structure and keeps query text", () => {

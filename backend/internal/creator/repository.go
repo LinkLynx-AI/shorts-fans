@@ -90,6 +90,7 @@ type UpdateCapabilityInput struct {
 type Profile struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 	PublishedAt *time.Time
@@ -101,6 +102,7 @@ type Profile struct {
 type CreateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 	PublishedAt *time.Time
@@ -110,6 +112,7 @@ type CreateProfileInput struct {
 type UpdateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 }
@@ -207,6 +210,7 @@ func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput
 	row, err := r.queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      postgres.UUIDToPG(input.UserID),
 		DisplayName: postgres.TextToPG(input.DisplayName),
+		Handle:      postgres.TextToPG(input.Handle),
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		PublishedAt: postgres.TimeToPG(input.PublishedAt),
@@ -265,6 +269,7 @@ func (r *Repository) GetPublicProfile(ctx context.Context, userID uuid.UUID) (Pr
 func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput) (Profile, error) {
 	row, err := r.queries.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(input.DisplayName),
+		Handle:      postgres.TextToPG(input.Handle),
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		UserID:      postgres.UUIDToPG(input.UserID),
@@ -353,6 +358,7 @@ func mapProfile(row sqlc.AppCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
+		Handle:      postgres.OptionalTextFromPG(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),
@@ -378,6 +384,7 @@ func mapPublicProfile(row sqlc.AppPublicCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
+		Handle:      postgres.OptionalTextFromPG(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),

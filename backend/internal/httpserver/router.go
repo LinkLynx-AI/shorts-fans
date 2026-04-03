@@ -29,6 +29,11 @@ type Config struct {
 	ShutdownTimeout time.Duration
 }
 
+// FanServices は fan read surface 用の domain service を束ねます。
+type FanServices struct {
+	Feed FanFeedService
+}
+
 // Server は Gin の起動と graceful shutdown を管理します。
 type Server struct {
 	config     Config
@@ -37,7 +42,7 @@ type Server struct {
 }
 
 // NewHandler は API サーバー用の Gin router を構築します。
-func NewHandler(dependencies []Dependency) *gin.Engine {
+func NewHandler(dependencies []Dependency, fanServices FanServices) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
@@ -70,12 +75,13 @@ func NewHandler(dependencies []Dependency) *gin.Engine {
 
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
+	registerFanRoutes(router, fanServices)
 
 	return router
 }
 
 // New は実行設定と依存先から Server を構築します。
-func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
+func New(cfg Config, logger *slog.Logger, dependencies []Dependency, fanServices FanServices) *Server {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 10 * time.Second
 	}
@@ -83,7 +89,7 @@ func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
 		logger = slog.Default()
 	}
 
-	handler := NewHandler(dependencies)
+	handler := NewHandler(dependencies, fanServices)
 
 	return &Server{
 		config: cfg,

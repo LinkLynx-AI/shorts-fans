@@ -38,6 +38,48 @@ type ShortTheme = {
   };
 };
 
+const fallbackShortThemes = [
+  {
+    background: {
+      accent: "#6aaac7",
+      end: "#08131d",
+      mid: "#254863",
+      start: "#d7f6ff",
+    },
+    tile: {
+      bottom: "#0b1c2a",
+      mid: "#5db6da",
+      top: "#eefaff",
+    },
+  },
+  {
+    background: {
+      accent: "#73bdd6",
+      end: "#07121c",
+      mid: "#2d5877",
+      start: "#e3f8ff",
+    },
+    tile: {
+      bottom: "#0a1724",
+      mid: "#7fb8d3",
+      top: "#f6fcff",
+    },
+  },
+  {
+    background: {
+      accent: "#5fa8c2",
+      end: "#07131d",
+      mid: "#20465e",
+      start: "#d8f3ff",
+    },
+    tile: {
+      bottom: "#0b1a27",
+      mid: "#66a9c9",
+      top: "#e8fbff",
+    },
+  },
+] as const satisfies readonly ShortTheme[];
+
 const shorts = [
   {
     caption: "雨上がりの balcony preview。続きは main で。",
@@ -286,11 +328,7 @@ export function getLibraryShorts(): readonly ShortPreviewMeta[] {
  */
 export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId): CSSProperties {
   const shortId = typeof short === "string" ? short : short.id;
-  const theme = shortThemes[shortId];
-
-  if (!theme) {
-    throw new Error(`Unknown short theme: ${shortId}`);
-  }
+  const theme = shortThemes[shortId] ?? getFallbackShortTheme(shortId);
 
   return {
     "--short-bg-accent": theme.background.accent,
@@ -301,4 +339,12 @@ export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId
     "--short-tile-mid": theme.tile.mid,
     "--short-tile-top": theme.tile.top,
   } as CSSProperties;
+}
+
+function hashShortId(shortId: string): number {
+  return Array.from(shortId).reduce((accumulator, character) => accumulator + character.charCodeAt(0), 0);
+}
+
+function getFallbackShortTheme(shortId: string): ShortTheme {
+  return fallbackShortThemes[hashShortId(shortId) % fallbackShortThemes.length] ?? fallbackShortThemes[0];
 }

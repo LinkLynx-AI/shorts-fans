@@ -73,6 +73,8 @@ type Short struct {
 	CreatorUserID        uuid.UUID
 	CanonicalMainID      uuid.UUID
 	MediaAssetID         uuid.UUID
+	Title                string
+	Caption              string
 	State                string
 	ReviewReasonCode     *string
 	PostReportState      *string
@@ -114,6 +116,8 @@ type CreateShortInput struct {
 	CreatorUserID        uuid.UUID
 	CanonicalMainID      uuid.UUID
 	MediaAssetID         uuid.UUID
+	Title                string
+	Caption              string
 	State                string
 	ReviewReasonCode     *string
 	PostReportState      *string
@@ -124,6 +128,8 @@ type CreateShortInput struct {
 // CreateLinkedShortInput は新規 main に紐づく short 作成入力です。
 type CreateLinkedShortInput struct {
 	MediaAssetID         uuid.UUID
+	Title                string
+	Caption              string
 	State                string
 	ReviewReasonCode     *string
 	PostReportState      *string
@@ -475,6 +481,8 @@ func (r *Repository) CreateMainWithShorts(ctx context.Context, input CreateMainW
 				CreatorUserID:        postgres.UUIDToPG(input.Main.CreatorUserID),
 				CanonicalMainID:      mainRow.ID,
 				MediaAssetID:         postgres.UUIDToPG(shortInput.MediaAssetID),
+				Title:                shortInput.Title,
+				Caption:              shortInput.Caption,
 				State:                shortInput.State,
 				ReviewReasonCode:     postgres.TextToPG(shortInput.ReviewReasonCode),
 				PostReportState:      postgres.TextToPG(shortInput.PostReportState),
@@ -526,6 +534,8 @@ func buildCreateShortParams(input CreateShortInput) sqlc.CreateShortParams {
 		CreatorUserID:        postgres.UUIDToPG(input.CreatorUserID),
 		CanonicalMainID:      postgres.UUIDToPG(input.CanonicalMainID),
 		MediaAssetID:         postgres.UUIDToPG(input.MediaAssetID),
+		Title:                input.Title,
+		Caption:              input.Caption,
 		State:                input.State,
 		ReviewReasonCode:     postgres.TextToPG(input.ReviewReasonCode),
 		PostReportState:      postgres.TextToPG(input.PostReportState),
@@ -643,6 +653,8 @@ func mapShort(row sqlc.AppShort) (Short, error) {
 		CreatorUserID:        creatorUserID,
 		CanonicalMainID:      canonicalMainID,
 		MediaAssetID:         mediaAssetID,
+		Title:                row.Title,
+		Caption:              row.Caption,
 		State:                row.State,
 		ReviewReasonCode:     postgres.OptionalTextFromPG(row.ReviewReasonCode),
 		PostReportState:      postgres.OptionalTextFromPG(row.PostReportState),
@@ -684,6 +696,8 @@ func mapPublicShort(row sqlc.AppPublicShort) (Short, error) {
 		CreatorUserID:        creatorUserID,
 		CanonicalMainID:      canonicalMainID,
 		MediaAssetID:         mediaAssetID,
+		Title:                row.Title,
+		Caption:              row.Caption,
 		State:                row.State,
 		ReviewReasonCode:     postgres.OptionalTextFromPG(row.ReviewReasonCode),
 		PostReportState:      postgres.OptionalTextFromPG(row.PostReportState),

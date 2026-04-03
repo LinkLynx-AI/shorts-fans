@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
@@ -56,6 +57,9 @@ func main() {
 		[]httpserver.Dependency{
 			{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 			{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
+		},
+		httpserver.FanServices{
+			Feed: feed.NewRecommendedService(feed.NewRepository(pool)),
 		},
 	)
 
