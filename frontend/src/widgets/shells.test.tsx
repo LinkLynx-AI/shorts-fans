@@ -29,15 +29,19 @@ describe("widgets", () => {
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
   });
 
-  it("renders the search structure and keeps query text", () => {
+  it("renders the search UI and keeps query text", () => {
     const { rerender } = render(<SearchShell query="" />);
 
-    expect(screen.getByRole("heading", { name: "Creator search structure" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Aoi N/i })).toBeInTheDocument();
 
     rerender(<SearchShell query="mina" />);
 
     expect(screen.getByDisplayValue("mina")).toBeInTheDocument();
-    expect(screen.getByText('query "mina" を保持できる route だけを先に定義しています。')).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
+      "href",
+      "/creators/mina?from=search&q=mina",
+    );
   });
 
   it("renders fan hub structure and active tab copy", () => {

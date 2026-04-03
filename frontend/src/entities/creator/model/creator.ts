@@ -22,6 +22,8 @@ export type CreatorProfileStats = {
   viewCount: number;
 };
 
+const recentCreatorIds = ["aoi", "mina"] as const satisfies readonly CreatorId[];
+
 function createAvatarDataUrl(from: string, accent: string, to: string): string {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
@@ -75,9 +77,17 @@ const creators = [
 
 const creatorProfileStatsById: Record<string, CreatorProfileStats> = {
   aoi: { fanCount: 19000, shortCount: 11, viewCount: 132000 },
-  mina: { fanCount: 24000, shortCount: 14, viewCount: 184000 },
-  sora: { fanCount: 16000, shortCount: 9, viewCount: 118000 },
+  mina: { fanCount: 24000, shortCount: 2, viewCount: 184000 },
+  sora: { fanCount: 16000, shortCount: 0, viewCount: 118000 },
 };
+
+function normalizeCreatorSearchQuery(query: string): string {
+  return query.trim().toLowerCase();
+}
+
+function getCreatorSearchText(creator: CreatorSummary): string {
+  return `${creator.displayName} ${creator.handle}`.toLowerCase();
+}
 
 /**
  * mock creator 一覧を取得する。
@@ -87,10 +97,34 @@ export function listCreators(): readonly CreatorSummary[] {
 }
 
 /**
+ * creator search 初期表示用の recent creators を取得する。
+ */
+export function getRecentCreators(): readonly CreatorSummary[] {
+  return recentCreatorIds.flatMap((id) => {
+    const creator = getCreatorById(id);
+
+    return creator ? [creator] : [];
+  });
+}
+
+/**
  * creator ID から summary を取得する。
  */
 export function getCreatorById(id: CreatorId): CreatorSummary | undefined {
   return creators.find((creator) => creator.id === id);
+}
+
+/**
+ * display name / handle のみを対象に creator を検索する。
+ */
+export function searchCreators(query: string): readonly CreatorSummary[] {
+  const normalizedQuery = normalizeCreatorSearchQuery(query);
+
+  if (normalizedQuery.length === 0) {
+    return getRecentCreators();
+  }
+
+  return creators.filter((creator) => getCreatorSearchText(creator).includes(normalizedQuery));
 }
 
 /**

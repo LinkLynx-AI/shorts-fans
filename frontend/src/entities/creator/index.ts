@@ -3,7 +3,9 @@ export {
   getCreatorIds,
   getCreatorInitials,
   getCreatorProfileStatsById,
+  getRecentCreators,
   listCreators,
+  searchCreators,
 } from "./model/creator";
 export type {
   CreatorId,

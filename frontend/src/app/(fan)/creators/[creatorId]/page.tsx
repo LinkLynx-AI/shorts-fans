@@ -1,37 +1,46 @@
-import { DetailShell } from "@/widgets/detail-shell";
-import { RouteStructurePanel } from "@/widgets/route-structure-panel";
+import { notFound } from "next/navigation";
+import { z } from "zod";
+
+import { getSingleQueryParam } from "@/shared/lib";
+import { CreatorProfileShell, getCreatorProfileShellState } from "@/widgets/creator-profile-shell";
+
+const paramsSchema = z.object({
+  creatorId: z.string().min(1),
+});
+
+const searchParamsSchema = z.object({
+  from: z.enum(["feed", "search", "short"]).optional(),
+  q: z.string().optional(),
+  shortId: z.string().optional(),
+  tab: z.enum(["following", "recommended"]).optional(),
+});
 
 export default async function CreatorProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ creatorId: string }>;
+  searchParams: Promise<{
+    from?: string | string[];
+    q?: string | string[];
+    shortId?: string | string[];
+    tab?: string | string[];
+  }>;
 }) {
-  const { creatorId } = await params;
+  const rawParams = await params;
+  const rawSearchParams = await searchParams;
+  const { creatorId } = paramsSchema.parse(rawParams);
+  const routeState = searchParamsSchema.parse({
+    from: getSingleQueryParam(rawSearchParams.from),
+    q: getSingleQueryParam(rawSearchParams.q),
+    shortId: getSingleQueryParam(rawSearchParams.shortId),
+    tab: getSingleQueryParam(rawSearchParams.tab),
+  });
+  const state = getCreatorProfileShellState(creatorId);
 
-  return (
-    <DetailShell backHref="/" variant="surface">
-      <h1 className="font-display text-[30px] font-semibold tracking-[-0.05em]">Creator profile structure</h1>
-      <RouteStructurePanel
-        description={`creator route "/creators/${creatorId}" の枠だけを先に定義しています。profile 本文は \`SHO-6\` で実装します。`}
-        items={[
-          {
-            description: "header、stats、follow action をここに配置する",
-            key: "header",
-            label: "Profile header slot",
-          },
-          {
-            description: "short grid と short detail への遷移をここに差し込む",
-            key: "grid",
-            label: "Short grid slot",
-          },
-          {
-            description: "search / feed から流入した際の戻り導線をこの shell で受ける",
-            key: "navigation",
-            label: "Back navigation",
-          },
-        ]}
-        title="Creator route blueprint"
-      />
-    </DetailShell>
-  );
+  if (!state) {
+    notFound();
+  }
+
+  return <CreatorProfileShell routeState={routeState} state={state} />;
 }

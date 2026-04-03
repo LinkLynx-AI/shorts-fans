@@ -2,11 +2,15 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { ArrowLeft } from "lucide-react";
 
+import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
 type DetailShellProps = {
   backHref: string;
+  backButtonClassName?: string;
+  bodyClassName?: string;
   children?: ReactNode;
+  headerContent?: ReactNode;
   style?: CSSProperties;
   variant?: "immersive" | "surface";
 };
@@ -16,7 +20,10 @@ type DetailShellProps = {
  */
 export function DetailShell({
   backHref,
+  backButtonClassName,
+  bodyClassName,
   children,
+  headerContent,
   style,
   variant = "surface",
 }: DetailShellProps) {
@@ -41,12 +48,15 @@ export function DetailShell({
 
   return (
     <section className="min-h-full overflow-y-auto px-4 pb-28 pt-4 text-foreground">
-      <Button asChild size="icon" variant="ghost">
-        <Link aria-label="Back" href={backHref}>
-          <ArrowLeft className="size-5" strokeWidth={2.1} />
-        </Link>
-      </Button>
-      <div className="mt-4">{children}</div>
+      <div className="flex items-center gap-3">
+        <Button asChild className={backButtonClassName} size="icon" variant="ghost">
+          <Link aria-label="Back" href={backHref}>
+            <ArrowLeft className="size-5" strokeWidth={2.1} />
+          </Link>
+        </Button>
+        {headerContent ? <div className="min-w-0 flex-1">{headerContent}</div> : null}
+      </div>
+      <div className={cn(headerContent ? "mt-3" : "mt-4", bodyClassName)}>{children}</div>
     </section>
   );
 }
