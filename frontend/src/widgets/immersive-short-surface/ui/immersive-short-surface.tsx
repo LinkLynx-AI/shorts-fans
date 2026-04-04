@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
+import { buildCreatorProfileHref } from "@/features/creator-navigation";
 import { UnlockCta } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
@@ -97,6 +98,7 @@ function PinRail({ pinned }: PinRailProps) {
 type CreatorBlockProps = {
   creator: FeedShortSurface["creator"];
   followed?: boolean | undefined;
+  profileHref: string;
   short: ShortPreviewMeta;
 };
 
@@ -110,14 +112,14 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   );
 }
 
-function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
+function CreatorBlock({ creator, followed = false, profileHref, short }: CreatorBlockProps) {
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
       <div className="w-[min(88%,344px)] max-w-[344px]">
         <div className="flex w-fit max-w-full items-center gap-2.5">
           <Link
             className="inline-flex min-w-0 items-center gap-2 text-left text-white transition hover:opacity-90"
-            href={`/creators/${creator.id}`}
+            href={profileHref}
           >
             <FeedCreatorAvatar creator={creator} />
             <span className="truncate text-[15px] font-bold text-white">{creator.displayName}</span>
@@ -146,6 +148,16 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { creator, short, unlockCta, viewer } = surface;
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
+  const profileHref =
+    mode === "feed"
+      ? buildCreatorProfileHref(creator.id, {
+          from: "feed",
+          tab: props.activeTab,
+        })
+      : buildCreatorProfileHref(creator.id, {
+          from: "short",
+          shortId: short.id,
+        });
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
@@ -163,7 +175,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
           />
         </div>
-        <CreatorBlock creator={creator} followed={followed} short={short} />
+        <CreatorBlock creator={creator} followed={followed} profileHref={profileHref} short={short} />
       </div>
     </section>
   );

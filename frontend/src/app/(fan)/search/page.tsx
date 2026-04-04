@@ -1,19 +1,21 @@
+import { z } from "zod";
+
+import { getSingleQueryParam } from "@/shared/lib";
 import { SearchShell } from "@/widgets/search-shell";
 
-function normalizeQuery(value: string | string[] | undefined): string {
-  if (Array.isArray(value)) {
-    return value[0] ?? "";
-  }
-
-  return value ?? "";
-}
+const searchParamsSchema = z.object({
+  q: z.string().optional().default(""),
+});
 
 export default async function SearchPage({
   searchParams,
 }: {
   searchParams: Promise<{ q?: string | string[] }>;
 }) {
-  const { q } = await searchParams;
+  const rawSearchParams = await searchParams;
+  const { q } = searchParamsSchema.parse({
+    q: getSingleQueryParam(rawSearchParams.q),
+  });
 
-  return <SearchShell query={normalizeQuery(q)} />;
+  return <SearchShell query={q} />;
 }

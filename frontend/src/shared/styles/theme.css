@@ -13,20 +13,21 @@
   --tabbar-surface: rgba(255, 255, 255, 0.96);
   --device-shadow: 0 28px 100px rgba(36, 94, 132, 0.16);
   --font-body:
-    "Avenir Next",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     "Hiragino Sans",
     "Hiragino Kaku Gothic ProN",
-    "Yu Gothic",
-    "YuGothic",
     "Noto Sans JP",
     sans-serif;
   --font-accent:
-    "Space Grotesk",
-    "Avenir Next",
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
     "Hiragino Sans",
     "Hiragino Kaku Gothic ProN",
-    "Yu Gothic",
-    "YuGothic",
     "Noto Sans JP",
     sans-serif;
 }
