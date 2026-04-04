@@ -7,6 +7,7 @@ source:
         - 000001_bootstrap.up.sql
         - 000002_mvp_core_entities.up.sql
         - 000003_unify_creator_profiles.up.sql
+        - 000004_expand_media_asset_processing_state.up.sql
 schemas:
     - name: app
       tables:
@@ -452,11 +453,11 @@ schemas:
                 - creator_user_id
           check_constraints:
             - name: media_assets_check
-              expression: CHECK (processing_state = 'ready'::text AND playback_url IS NOT NULL AND duration_ms IS NOT NULL OR (processing_state = ANY (ARRAY['uploaded'::text, 'failed'::text])) AND playback_url IS NULL)
+              expression: CHECK (processing_state = 'ready'::text AND playback_url IS NOT NULL AND duration_ms IS NOT NULL OR (processing_state = ANY (ARRAY['uploaded'::text, 'processing'::text, 'failed'::text])) AND playback_url IS NULL)
             - name: media_assets_duration_ms_check
               expression: CHECK (duration_ms IS NULL OR duration_ms > 0)
             - name: media_assets_processing_state_check
-              expression: CHECK (processing_state = ANY (ARRAY['uploaded'::text, 'ready'::text, 'failed'::text]))
+              expression: CHECK (processing_state = ANY (ARRAY['uploaded'::text, 'processing'::text, 'ready'::text, 'failed'::text]))
           indexes:
             - name: idx_media_assets_creator_user_id
               columns:
