@@ -31,7 +31,11 @@ test("fan shell routes render and navigation works", async ({ page }) => {
 
   await page.getByRole("link", { name: "マイ" }).click();
   await expect(page).toHaveURL(/\/fan$/);
-  await expect(page.getByRole("heading", { name: "Fan hub structure" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+
+  await page.getByRole("link", { name: "Following" }).click();
+  await expect(page).toHaveURL(/\/fan\/following$/);
+  await expect(page.getByRole("heading", { name: "following" })).toBeVisible();
 
   await page.goto("/shorts/rooftop");
   await expect(page.getByRole("link", { name: /Back/i })).toBeVisible();

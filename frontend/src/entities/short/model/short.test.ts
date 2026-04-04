@@ -1,7 +1,5 @@
 import {
   getFeedShortForTab,
-  getLibraryShorts,
-  getPinnedShorts,
   getShortById,
   getShortIds,
   getShortThemeStyle,
@@ -16,8 +14,6 @@ describe("short model", () => {
 
   it("returns fixture collections", () => {
     expect(getShortIds()).toContain("afterrain");
-    expect(getPinnedShorts()).toHaveLength(3);
-    expect(getLibraryShorts()).toHaveLength(3);
     expect(getShortsByCreatorId("sora")).toHaveLength(2);
   });
 
