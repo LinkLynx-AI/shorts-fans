@@ -11,6 +11,7 @@ import type { DetailShortSurface, FeedShortSurface } from "../model/mock-short-s
 export type ImmersiveShortSurfaceProps =
   | {
       activeTab: FeedTab;
+      detailHref?: string;
       mode: "feed";
       surface: FeedShortSurface;
     }
@@ -160,7 +161,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             cta={unlockCta}
             className="w-full"
-            {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
+            {...(mode === "feed" && props.detailHref ? { href: props.detailHref } : {})}
           />
         </div>
         <CreatorBlock creator={creator} followed={followed} short={short} />

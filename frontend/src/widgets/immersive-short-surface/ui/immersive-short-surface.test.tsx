@@ -9,7 +9,14 @@ describe("ImmersiveShortSurface", () => {
   const detailSurface = getShortSurfaceById("rooftop");
 
   it("renders feed mode with tab navigation and a detail CTA link", () => {
-    render(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />);
+    render(
+      <ImmersiveShortSurface
+        activeTab="recommended"
+        detailHref="/shorts/rooftop"
+        mode="feed"
+        surface={feedSurface}
+      />,
+    );
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
@@ -30,5 +37,12 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByText("Unlock")).toBeInTheDocument();
     expect(screen.getByText("Following")).toBeInTheDocument();
+  });
+
+  it("renders a non-link CTA when feed detail navigation is unavailable", () => {
+    render(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />);
+
+    expect(screen.queryByRole("link", { name: /Unlock/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Unlock")).toBeInTheDocument();
   });
 });

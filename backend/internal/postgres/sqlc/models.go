@@ -40,6 +40,7 @@ type AppCreatorProfile struct {
 	PublishedAt pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
+	Handle      pgtype.Text
 }
 
 type AppMain struct {
@@ -101,6 +102,7 @@ type AppPinnedShort struct {
 type AppPublicCreatorProfile struct {
 	UserID      pgtype.UUID
 	DisplayName pgtype.Text
+	Handle      pgtype.Text
 	AvatarUrl   pgtype.Text
 	Bio         string
 	PublishedAt pgtype.Timestamptz
@@ -113,6 +115,8 @@ type AppPublicShort struct {
 	CreatorUserID        pgtype.UUID
 	CanonicalMainID      pgtype.UUID
 	MediaAssetID         pgtype.UUID
+	Title                string
+	Caption              string
 	State                string
 	ReviewReasonCode     pgtype.Text
 	PostReportState      pgtype.Text
@@ -134,6 +138,8 @@ type AppShort struct {
 	PublishedAt          pgtype.Timestamptz
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
+	Title                string
+	Caption              string
 }
 
 type AppUnlockableMain struct {
