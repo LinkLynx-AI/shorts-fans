@@ -15,6 +15,7 @@ const createCreatorProfile = `-- name: CreateCreatorProfile :one
 INSERT INTO app.creator_profiles (
     user_id,
     display_name,
+    handle,
     avatar_url,
     bio,
     published_at
@@ -23,14 +24,16 @@ INSERT INTO app.creator_profiles (
     $2,
     $3,
     $4,
-    $5
+    $5,
+    $6
 )
-RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at
+RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 `
 
 type CreateCreatorProfileParams struct {
 	UserID      pgtype.UUID
 	DisplayName pgtype.Text
+	Handle      pgtype.Text
 	AvatarUrl   pgtype.Text
 	Bio         string
 	PublishedAt pgtype.Timestamptz
@@ -40,6 +43,7 @@ func (q *Queries) CreateCreatorProfile(ctx context.Context, arg CreateCreatorPro
 	row := q.db.QueryRow(ctx, createCreatorProfile,
 		arg.UserID,
 		arg.DisplayName,
+		arg.Handle,
 		arg.AvatarUrl,
 		arg.Bio,
 		arg.PublishedAt,
@@ -53,12 +57,13 @@ func (q *Queries) CreateCreatorProfile(ctx context.Context, arg CreateCreatorPro
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Handle,
 	)
 	return i, err
 }
 
 const getCreatorProfileByUserID = `-- name: GetCreatorProfileByUserID :one
-SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at
+SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 FROM app.creator_profiles
 WHERE user_id = $1
 LIMIT 1
@@ -75,12 +80,36 @@ func (q *Queries) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.U
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Handle,
+	)
+	return i, err
+}
+
+const getPublicCreatorProfileByHandle = `-- name: GetPublicCreatorProfileByHandle :one
+SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
+FROM app.public_creator_profiles
+WHERE handle = $1
+LIMIT 1
+`
+
+func (q *Queries) GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (AppPublicCreatorProfile, error) {
+	row := q.db.QueryRow(ctx, getPublicCreatorProfileByHandle, handle)
+	var i AppPublicCreatorProfile
+	err := row.Scan(
+		&i.UserID,
+		&i.DisplayName,
+		&i.AvatarUrl,
+		&i.Bio,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Handle,
 	)
 	return i, err
 }
 
 const getPublicCreatorProfileByUserID = `-- name: GetPublicCreatorProfileByUserID :one
-SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at
+SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 FROM app.public_creator_profiles
 WHERE user_id = $1
 LIMIT 1
@@ -97,8 +126,59 @@ func (q *Queries) GetPublicCreatorProfileByUserID(ctx context.Context, userID pg
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Handle,
 	)
 	return i, err
+}
+
+const listRecentPublicCreatorProfiles = `-- name: ListRecentPublicCreatorProfiles :many
+SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
+FROM app.public_creator_profiles
+WHERE (
+    $1::timestamptz IS NULL
+    OR published_at < $1::timestamptz
+    OR (
+        published_at = $1::timestamptz
+        AND handle > COALESCE($2::text, '')
+    )
+)
+ORDER BY published_at DESC, handle ASC
+LIMIT $3
+`
+
+type ListRecentPublicCreatorProfilesParams struct {
+	CursorPublishedAt pgtype.Timestamptz
+	CursorHandle      pgtype.Text
+	LimitCount        int32
+}
+
+func (q *Queries) ListRecentPublicCreatorProfiles(ctx context.Context, arg ListRecentPublicCreatorProfilesParams) ([]AppPublicCreatorProfile, error) {
+	rows, err := q.db.Query(ctx, listRecentPublicCreatorProfiles, arg.CursorPublishedAt, arg.CursorHandle, arg.LimitCount)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AppPublicCreatorProfile
+	for rows.Next() {
+		var i AppPublicCreatorProfile
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.PublishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Handle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const publishCreatorProfile = `-- name: PublishCreatorProfile :one
@@ -107,7 +187,7 @@ SET
     published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE user_id = $1
-RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at
+RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 `
 
 func (q *Queries) PublishCreatorProfile(ctx context.Context, userID pgtype.UUID) (AppCreatorProfile, error) {
@@ -121,23 +201,91 @@ func (q *Queries) PublishCreatorProfile(ctx context.Context, userID pgtype.UUID)
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Handle,
 	)
 	return i, err
+}
+
+const searchPublicCreatorProfiles = `-- name: SearchPublicCreatorProfiles :many
+SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
+FROM app.public_creator_profiles
+WHERE (
+    display_name ILIKE '%' || $1 || '%'
+    OR (
+        $2 <> ''
+        AND handle LIKE $2 || '%'
+    )
+)
+AND (
+    $3::timestamptz IS NULL
+    OR published_at < $3::timestamptz
+    OR (
+        published_at = $3::timestamptz
+        AND handle > COALESCE($4::text, '')
+    )
+)
+ORDER BY published_at DESC, handle ASC
+LIMIT $5
+`
+
+type SearchPublicCreatorProfilesParams struct {
+	DisplayNameQuery  pgtype.Text
+	HandlePrefixQuery interface{}
+	CursorPublishedAt pgtype.Timestamptz
+	CursorHandle      pgtype.Text
+	LimitCount        int32
+}
+
+func (q *Queries) SearchPublicCreatorProfiles(ctx context.Context, arg SearchPublicCreatorProfilesParams) ([]AppPublicCreatorProfile, error) {
+	rows, err := q.db.Query(ctx, searchPublicCreatorProfiles,
+		arg.DisplayNameQuery,
+		arg.HandlePrefixQuery,
+		arg.CursorPublishedAt,
+		arg.CursorHandle,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AppPublicCreatorProfile
+	for rows.Next() {
+		var i AppPublicCreatorProfile
+		if err := rows.Scan(
+			&i.UserID,
+			&i.DisplayName,
+			&i.AvatarUrl,
+			&i.Bio,
+			&i.PublishedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Handle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateCreatorProfile = `-- name: UpdateCreatorProfile :one
 UPDATE app.creator_profiles
 SET
     display_name = $1,
-    avatar_url = $2,
-    bio = $3,
+    handle = $2,
+    avatar_url = $3,
+    bio = $4,
     updated_at = CURRENT_TIMESTAMP
-WHERE user_id = $4
-RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at
+WHERE user_id = $5
+RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 `
 
 type UpdateCreatorProfileParams struct {
 	DisplayName pgtype.Text
+	Handle      pgtype.Text
 	AvatarUrl   pgtype.Text
 	Bio         string
 	UserID      pgtype.UUID
@@ -146,6 +294,7 @@ type UpdateCreatorProfileParams struct {
 func (q *Queries) UpdateCreatorProfile(ctx context.Context, arg UpdateCreatorProfileParams) (AppCreatorProfile, error) {
 	row := q.db.QueryRow(ctx, updateCreatorProfile,
 		arg.DisplayName,
+		arg.Handle,
 		arg.AvatarUrl,
 		arg.Bio,
 		arg.UserID,
@@ -159,6 +308,7 @@ func (q *Queries) UpdateCreatorProfile(ctx context.Context, arg UpdateCreatorPro
 		&i.PublishedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Handle,
 	)
 	return i, err
 }

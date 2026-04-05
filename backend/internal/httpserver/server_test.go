@@ -12,7 +12,7 @@ import (
 func TestNewAppliesDefaults(t *testing.T) {
 	t.Parallel()
 
-	server := New(Config{Addr: "127.0.0.1:0"}, nil, nil)
+	server := New(Config{Addr: "127.0.0.1:0"}, nil, HandlerConfig{})
 
 	if server.config.ShutdownTimeout != 10*time.Second {
 		t.Fatalf("New() shutdown timeout got %s want %s", server.config.ShutdownTimeout, 10*time.Second)
@@ -32,7 +32,7 @@ func TestRunShutsDownOnContextCancel(t *testing.T) {
 	server := New(Config{
 		Addr:            "127.0.0.1:0",
 		ShutdownTimeout: time.Second,
-	}, logger, nil)
+	}, logger, HandlerConfig{})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)

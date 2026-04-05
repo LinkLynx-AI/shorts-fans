@@ -40,6 +40,18 @@ func (s stubQueries) GetPublicCreatorProfileByUserID(context.Context, pgtype.UUI
 	return sqlc.AppPublicCreatorProfile{}, nil
 }
 
+func (s stubQueries) GetPublicCreatorProfileByHandle(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+	return sqlc.AppPublicCreatorProfile{}, nil
+}
+
+func (s stubQueries) ListRecentPublicCreatorProfiles(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+	return nil, nil
+}
+
+func (s stubQueries) SearchPublicCreatorProfiles(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+	return nil, nil
+}
+
 func (s stubQueries) UpdateCreatorProfile(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
 	return sqlc.AppCreatorProfile{}, nil
 }

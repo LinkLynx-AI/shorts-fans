@@ -8,6 +8,7 @@ source:
         - 000002_mvp_core_entities.up.sql
         - 000003_unify_creator_profiles.up.sql
         - 000004_expand_media_asset_processing_state.up.sql
+        - 000005_add_creator_profile_handle.up.sql
 schemas:
     - name: app
       tables:
@@ -172,6 +173,9 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: handle
+              type: text
+              nullable: true
           primary_key:
             - user_id
           foreign_keys:
@@ -186,8 +190,21 @@ schemas:
           check_constraints:
             - name: creator_profiles_display_name_trimmed_check
               expression: CHECK (display_name IS NULL OR length(btrim(display_name)) > 0)
+            - name: creator_profiles_handle_format_check
+              expression: CHECK (handle IS NULL OR handle ~ '^[a-z0-9._]+$'::text)
+            - name: creator_profiles_handle_lowercase_check
+              expression: CHECK (handle IS NULL OR handle = lower(handle))
+            - name: creator_profiles_handle_trimmed_check
+              expression: CHECK (handle IS NULL OR handle = btrim(handle))
             - name: creator_profiles_public_fields_check
-              expression: CHECK (published_at IS NULL OR display_name IS NOT NULL)
+              expression: CHECK (published_at IS NULL OR display_name IS NOT NULL AND handle IS NOT NULL)
+          indexes:
+            - name: creator_profiles_handle_unique_idx
+              columns:
+                - handle
+              unique: true
+              predicate: (handle IS NOT NULL)
+              definition: CREATE UNIQUE INDEX creator_profiles_handle_unique_idx ON app.creator_profiles USING btree (handle) WHERE (handle IS NOT NULL)
         - name: main_playback_progress
           columns:
             - name: user_id
@@ -645,6 +662,9 @@ schemas:
             - name: updated_at
               type: timestamp with time zone
               nullable: true
+            - name: handle
+              type: text
+              nullable: true
           definition: |-
             SELECT p.user_id,
                 p.display_name,
@@ -652,7 +672,8 @@ schemas:
                 p.bio,
                 p.published_at,
                 p.created_at,
-                p.updated_at
+                p.updated_at,
+                p.handle
                FROM app.creator_profiles p
                  JOIN app.creator_capabilities c ON c.user_id = p.user_id
               WHERE c.state = 'approved'::text AND p.published_at IS NOT NULL;

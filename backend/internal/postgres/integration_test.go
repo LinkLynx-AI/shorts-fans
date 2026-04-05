@@ -111,8 +111,8 @@ func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	if err := migrator.Migrate(4); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(4) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 4)
 
@@ -183,8 +183,8 @@ func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 		t.Fatal("CreateMediaAsset(processing) at version 3 error = nil, want constraint error")
 	}
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
+	if err := migrator.Migrate(4); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(4) second run error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 4)
 
@@ -201,6 +201,118 @@ func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 	}
 	if processingAssetAgain.ProcessingState != "processing" {
 		t.Fatalf("CreateMediaAsset(processing) after re-up state got %q want %q", processingAssetAgain.ProcessingState, "processing")
+	}
+}
+
+func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(3) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 3)
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+
+	creatorA, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorA) error = %v, want nil", err)
+	}
+	creatorB, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorB) error = %v, want nil", err)
+	}
+
+	for _, creatorID := range []pgtype.UUID{creatorA.ID, creatorB.ID} {
+		if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+			UserID:                  creatorID,
+			State:                   "approved",
+			IsResubmitEligible:      false,
+			IsSupportReviewRequired: false,
+			SelfServeResubmitCount:  0,
+			ApprovedAt:              pgTime(now),
+		}); err != nil {
+			t.Fatalf("CreateCreatorCapability(%v) error = %v, want nil", creatorID, err)
+		}
+	}
+
+	if _, err := conn.Exec(
+		ctx,
+		`INSERT INTO app.creator_profiles (user_id, display_name, avatar_url, bio, published_at)
+		VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`,
+		creatorA.ID,
+		"Mina Rei",
+		"https://cdn.example.com/creator/mina-a/avatar.jpg",
+		"bio-a",
+		pgTime(now),
+		creatorB.ID,
+		"Mina Rei",
+		"https://cdn.example.com/creator/mina-b/avatar.jpg",
+		"bio-b",
+		pgTime(now.Add(-time.Hour)),
+	); err != nil {
+		t.Fatalf("INSERT creator_profiles(version3) error = %v, want nil", err)
+	}
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() to latest error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 5)
+
+	profileA, err := queries.GetCreatorProfileByUserID(ctx, creatorA.ID)
+	if err != nil {
+		t.Fatalf("GetCreatorProfileByUserID(creatorA) error = %v, want nil", err)
+	}
+	profileB, err := queries.GetCreatorProfileByUserID(ctx, creatorB.ID)
+	if err != nil {
+		t.Fatalf("GetCreatorProfileByUserID(creatorB) error = %v, want nil", err)
+	}
+	if !profileA.Handle.Valid || !profileB.Handle.Valid {
+		t.Fatalf("backfilled handle valid got [%t %t] want [true true]", profileA.Handle.Valid, profileB.Handle.Valid)
+	}
+	if profileA.Handle.String != "minarei" {
+		t.Fatalf("creatorA handle got %q want %q", profileA.Handle.String, "minarei")
+	}
+	if !strings.HasPrefix(profileB.Handle.String, "minarei_") {
+		t.Fatalf("creatorB handle got %q want prefix %q", profileB.Handle.String, "minarei_")
+	}
+	if profileA.Handle.String == profileB.Handle.String {
+		t.Fatalf("backfilled handles got duplicate %q want unique handles", profileA.Handle.String)
+	}
+
+	gotByHandle, err := queries.GetPublicCreatorProfileByHandle(ctx, pgText(profileA.Handle.String))
+	if err != nil {
+		t.Fatalf("GetPublicCreatorProfileByHandle() error = %v, want nil", err)
+	}
+	if gotByHandle.UserID != creatorA.ID {
+		t.Fatalf("GetPublicCreatorProfileByHandle() user got %v want %v", gotByHandle.UserID, creatorA.ID)
+	}
+
+	recentProfiles, err := queries.ListRecentPublicCreatorProfiles(ctx, sqlc.ListRecentPublicCreatorProfilesParams{
+		LimitCount: 10,
+	})
+	if err != nil {
+		t.Fatalf("ListRecentPublicCreatorProfiles() error = %v, want nil", err)
+	}
+	if len(recentProfiles) != 2 {
+		t.Fatalf("ListRecentPublicCreatorProfiles() len got %d want %d", len(recentProfiles), 2)
+	}
+	if recentProfiles[0].UserID != creatorA.ID || recentProfiles[1].UserID != creatorB.ID {
+		t.Fatalf("ListRecentPublicCreatorProfiles() order got [%v %v] want [%v %v]", recentProfiles[0].UserID, recentProfiles[1].UserID, creatorA.ID, creatorB.ID)
+	}
+
+	filteredProfiles, err := queries.SearchPublicCreatorProfiles(ctx, sqlc.SearchPublicCreatorProfilesParams{
+		DisplayNameQuery:  pgText("mina"),
+		HandlePrefixQuery: "mina",
+		LimitCount:        10,
+	})
+	if err != nil {
+		t.Fatalf("SearchPublicCreatorProfiles() error = %v, want nil", err)
+	}
+	if len(filteredProfiles) != 2 {
+		t.Fatalf("SearchPublicCreatorProfiles() len got %d want %d", len(filteredProfiles), 2)
 	}
 }
 

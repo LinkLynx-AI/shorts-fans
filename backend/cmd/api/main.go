@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
@@ -53,9 +54,12 @@ func main() {
 			ShutdownTimeout: 10 * time.Second,
 		},
 		logger,
-		[]httpserver.Dependency{
-			{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
-			{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
+		httpserver.HandlerConfig{
+			CreatorSearch: creator.NewRepository(pool),
+			Dependencies: []httpserver.Dependency{
+				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
+				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
+			},
 		},
 	)
 
