@@ -29,6 +29,40 @@ resource "aws_s3_bucket_public_access_block" "raw" {
   restrict_public_buckets = true
 }
 
+data "aws_iam_policy_document" "raw_access" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.raw.arn,
+      "${aws_s3_bucket.raw.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "raw" {
+  bucket = aws_s3_bucket.raw.id
+  policy = data.aws_iam_policy_document.raw_access.json
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.raw,
+    aws_s3_bucket_public_access_block.raw,
+  ]
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "raw" {
   bucket = aws_s3_bucket.raw.id
 
@@ -74,31 +108,57 @@ resource "aws_s3_bucket_public_access_block" "short_public" {
   bucket = aws_s3_bucket.short_public.id
 
   block_public_acls       = true
-  block_public_policy     = false
+  block_public_policy     = !var.enable_public_short_delivery
   ignore_public_acls      = true
-  restrict_public_buckets = false
+  restrict_public_buckets = !var.enable_public_short_delivery
 }
 
-data "aws_iam_policy_document" "short_public_read" {
+data "aws_iam_policy_document" "short_public_access" {
+  dynamic "statement" {
+    for_each = var.enable_public_short_delivery ? [1] : []
+
+    content {
+      sid    = "AllowAnonymousReadOfShortObjects"
+      effect = "Allow"
+
+      principals {
+        type        = "*"
+        identifiers = ["*"]
+      }
+
+      actions = ["s3:GetObject"]
+      resources = [
+        "${aws_s3_bucket.short_public.arn}/*",
+      ]
+    }
+  }
+
   statement {
-    sid    = "AllowAnonymousReadOfShortObjects"
-    effect = "Allow"
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
 
     principals {
       type        = "*"
       identifiers = ["*"]
     }
 
-    actions = ["s3:GetObject"]
+    actions = ["s3:*"]
     resources = [
+      aws_s3_bucket.short_public.arn,
       "${aws_s3_bucket.short_public.arn}/*",
     ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
   }
 }
 
 resource "aws_s3_bucket_policy" "short_public" {
   bucket = aws_s3_bucket.short_public.id
-  policy = data.aws_iam_policy_document.short_public_read.json
+  policy = data.aws_iam_policy_document.short_public_access.json
 
   depends_on = [
     aws_s3_bucket_ownership_controls.short_public,
@@ -162,6 +222,40 @@ resource "aws_s3_bucket_public_access_block" "main_private" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "main_private_access" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.main_private.arn,
+      "${aws_s3_bucket.main_private.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "main_private" {
+  bucket = aws_s3_bucket.main_private.id
+  policy = data.aws_iam_policy_document.main_private_access.json
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.main_private,
+    aws_s3_bucket_public_access_block.main_private,
+  ]
 }
 
 resource "aws_s3_bucket_cors_configuration" "main_private" {

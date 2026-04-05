@@ -21,3 +21,9 @@ variable "allowed_app_origins" {
     error_message = "allowed_app_origins must contain at least one origin."
   }
 }
+
+variable "enable_public_short_delivery" {
+  description = "Whether to expose the short delivery bucket for anonymous direct S3 playback in dev."
+  type        = bool
+  default     = true
+}

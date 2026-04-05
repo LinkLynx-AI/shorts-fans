@@ -21,6 +21,7 @@
 - public short delivery bucket
   - dev では direct S3 public object を許可
   - 匿名 `GetObject` だけを bucket policy で許可
+  - account-level S3 Block Public Access が public policy を禁止している場合、この bucket 単体では public 化できません
 - private main delivery bucket
   - paid main 向け
   - direct private S3 + signed URL 前提
@@ -42,6 +43,11 @@
   - 任意
   - default は `http://localhost:3000` と `http://127.0.0.1:3000`
   - short/main の delivery bucket CORS に使います
+- `enable_public_short_delivery`
+  - 任意
+  - default は `true`
+  - `true` のときだけ short bucket に匿名 `GetObject` policy を付けます
+  - account-level S3 Block Public Access で public policy が禁止されている dev アカウントでは `false` にしてください
 
 ## 使い方
 
@@ -83,6 +89,7 @@ terraform destroy -var-file=terraform.tfvars
 - `raw_bucket_name`
 - `short_public_bucket_name`
 - `short_public_base_url`
+  - `enable_public_short_delivery = true` のときだけ public delivery の base URL として使います
 - `main_private_bucket_name`
 - `media_jobs_queue_url`
 - `media_jobs_queue_arn`
@@ -97,8 +104,11 @@ terraform destroy -var-file=terraform.tfvars
 - `CloudFront` をここでは作りません。
   - dev は direct S3 delivery に留めます。
   - workflow 契約でも `CloudFront` は必須ではありません。
+- short の direct public S3 delivery は account-level S3 Block Public Access が public bucket policy を許可していることを前提にします。
+  - 禁止されている場合は `enable_public_short_delivery = false` にして apply し、delivery 経路は後続 task 側で別途用意します。
 - raw/main bucket は public access block を有効化します。
 - short bucket も ACL では public にせず、bucket policy で `GetObject` だけを匿名公開します。
+- すべての bucket policy で HTTPS 以外のアクセスを deny します。
 - すべての bucket で SSE-S3 を使います。
 - queue は SQS managed SSE を有効化します。
 - raw object は lifecycle で自動削除し、不要な蓄積コストを抑えます。
@@ -111,5 +121,8 @@ terraform destroy -var-file=terraform.tfvars
   - この root module は local state 前提です。
 - MediaConvert custom queue、job template、preset、notification 設定は未対応です。
   - cycle1 は default queue 前提に留めます。
+- account-level S3 Block Public Access が public bucket policy を禁止している場合、`short-public` bucket の direct public delivery は成立しません。
+  - その場合でも `enable_public_short_delivery = false` にすれば apply 自体は可能です。
+  - public short の delivery は dev 用 account 設定を見直すか、後続 task で別 delivery layer を使う必要があります。
 - browser から raw bucket へ直接 upload する CORS / presigned upload flow は未定義です。
   - 必要なら後続 task で追加します。
