@@ -56,13 +56,10 @@ export function getUnlockEntryAction(unlock: Pick<UnlockSurfaceModel, "unlockCta
 /**
  * main playback route の href を組み立てる。
  */
-export function getMainPlaybackHref(mainId: string, fromShortId?: string): string {
-  if (!fromShortId) {
-    return `/mains/${mainId}`;
-  }
-
+export function getMainPlaybackHref(mainId: string, fromShortId: string, grantToken: string): string {
   const searchParams = new URLSearchParams({
     fromShortId,
+    grant: grantToken,
   });
 
   return `/mains/${mainId}?${searchParams.toString()}`;

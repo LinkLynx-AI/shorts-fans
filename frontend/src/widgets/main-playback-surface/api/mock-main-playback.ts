@@ -78,29 +78,15 @@ const playbackSurfaceSchema = z.object({
 function buildPlaybackAccess(shortId: string | undefined, mainId: string): {
   access: MainAccessState;
   resumePositionSeconds: number | null;
-} {
+} | undefined {
   if (!shortId) {
-    return {
-      access: {
-        mainId,
-        reason: "purchased_access",
-        status: "purchased",
-      },
-      resumePositionSeconds: null,
-    };
+    return undefined;
   }
 
   const unlock = getUnlockSurfaceByShortId(shortId);
 
   if (!unlock) {
-    return {
-      access: {
-        mainId,
-        reason: "purchased_access",
-        status: "purchased",
-      },
-      resumePositionSeconds: null,
-    };
+    return undefined;
   }
 
   if (unlock.access.status === "owner") {
@@ -131,14 +117,23 @@ export function getMainPlaybackSurfaceById(
   mainId: string,
   fromShortId?: string,
 ): MainPlaybackSurface | undefined {
+  if (!fromShortId) {
+    return undefined;
+  }
+
   const main = getMainById(mainId);
 
   if (!main) {
     return undefined;
   }
 
-  const entryShort =
-    fromShortId && getShortById(fromShortId)?.canonicalMainId === mainId ? getShortById(fromShortId) : null;
+  const candidateEntryShort = getShortById(fromShortId);
+
+  if (!candidateEntryShort || candidateEntryShort.canonicalMainId !== mainId) {
+    return undefined;
+  }
+
+  const entryShort = candidateEntryShort;
   const themeShort = entryShort ?? getShortById(main.leadShortId);
 
   if (!themeShort) {
@@ -152,6 +147,11 @@ export function getMainPlaybackSurfaceById(
   }
 
   const playbackState = buildPlaybackAccess(entryShort?.id, main.id);
+
+  if (!playbackState) {
+    return undefined;
+  }
+
   const pinnedShortIds = new Set(getPinnedShorts().map((short) => short.id));
 
   return playbackSurfaceSchema.parse({

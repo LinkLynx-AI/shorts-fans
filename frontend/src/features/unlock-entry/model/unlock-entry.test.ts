@@ -77,8 +77,8 @@ describe("unlock-entry model", () => {
   });
 
   it("builds playback href with an entry short id", () => {
-    expect(getMainPlaybackHref("main_mina_quiet_rooftop", "rooftop")).toBe(
-      "/mains/main_mina_quiet_rooftop?fromShortId=rooftop",
+    expect(getMainPlaybackHref("main_mina_quiet_rooftop", "rooftop", "grant_123")).toBe(
+      "/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=grant_123",
     );
   });
 });

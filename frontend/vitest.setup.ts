@@ -9,13 +9,20 @@ type MockedLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 };
 
 const mockedUsePathname = vi.fn(() => "/");
+const mockedRouter = {
+  back: vi.fn(),
+  push: vi.fn(),
+};
 
 afterEach(() => {
   cleanup();
+  mockedRouter.back.mockReset();
+  mockedRouter.push.mockReset();
 });
 
 vi.mock("next/navigation", () => ({
   usePathname: mockedUsePathname,
+  useRouter: () => mockedRouter,
 }));
 
 vi.mock("next/link", () => ({

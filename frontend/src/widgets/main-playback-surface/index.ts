@@ -10,3 +10,4 @@ export type {
 } from "./model/main-playback-surface";
 export { MainPlaybackSurface } from "./ui/main-playback-surface";
 export type { MainPlaybackSurfaceProps } from "./ui/main-playback-surface";
+export { MainPlaybackGate } from "./ui/main-playback-gate";

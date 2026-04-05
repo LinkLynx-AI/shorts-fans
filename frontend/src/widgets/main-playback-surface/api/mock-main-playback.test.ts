@@ -18,4 +18,9 @@ describe("mock main playback surface", () => {
     expect(surface?.resumePositionSeconds).toBeNull();
     expect(surface?.themeShort.id).toBe("balcony");
   });
+
+  it("blocks playback when the entry short context is missing or invalid", () => {
+    expect(getMainPlaybackSurfaceById("main_mina_quiet_rooftop")).toBeUndefined();
+    expect(getMainPlaybackSurfaceById("main_mina_quiet_rooftop", "softlight")).toBeUndefined();
+  });
 });

@@ -3,12 +3,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { CreatorAvatar } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import {
   getMainPlaybackHref,
   getUnlockEntryAction,
+  issueMockMainAccessGrant,
   UnlockCta,
   UnlockPaywallDialog,
 } from "@/features/unlock-entry";
@@ -153,11 +155,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [acceptAge, setAcceptAge] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
-  const playbackHref = getMainPlaybackHref(unlock.main.id, short.id);
   const unlockAction = getUnlockEntryAction(unlock);
 
   const handleOpenPaywall = () => {
@@ -170,6 +172,14 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     setAcceptAge(false);
     setAcceptTerms(false);
     setIsPaywallOpen(false);
+  };
+
+  const handleOpenMain = () => {
+    const grantToken = issueMockMainAccessGrant(unlock.main.id);
+    const playbackHref = getMainPlaybackHref(unlock.main.id, short.id, grantToken);
+
+    handleClosePaywall();
+    router.push(playbackHref);
   };
 
   return (
@@ -186,7 +196,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             className="w-full"
             cta={unlock.unlockCta}
             {...(unlockAction === "open_main"
-              ? { href: playbackHref }
+              ? { onClick: handleOpenMain }
               : unlockAction === "open_paywall"
                 ? { onClick: handleOpenPaywall }
                 : {})}
@@ -199,8 +209,8 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           onAcceptAgeChange={setAcceptAge}
           onAcceptTermsChange={setAcceptTerms}
           onClose={handleClosePaywall}
+          onConfirm={handleOpenMain}
           open={isPaywallOpen}
-          playbackHref={playbackHref}
           unlock={unlock}
         />
       </div>

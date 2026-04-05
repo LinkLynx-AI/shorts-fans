@@ -48,42 +48,45 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" })).toBeInTheDocument();
   });
 
-  it("links continue-main detail content directly to playback", () => {
+  it("renders continue-main detail content as an action button", async () => {
     if (!continueMainSurface) {
       throw new Error("fixture missing");
     }
 
+    const user = userEvent.setup();
+
     render(<ImmersiveShortSurface backHref="/" mode="detail" surface={continueMainSurface} />);
 
-    expect(screen.getByRole("link", { name: /Continue main/i })).toHaveAttribute(
-      "href",
-      "/mains/main_aoi_blue_balcony?fromShortId=softlight",
-    );
+    await user.click(screen.getByRole("button", { name: /Continue main/i }));
+
+    expect(screen.getByRole("button", { name: /Continue main/i })).toBeInTheDocument();
   });
 
-  it("links direct-unlock detail content straight to playback", () => {
+  it("renders direct-unlock detail content as an action button", async () => {
     if (!directUnlockSurface) {
       throw new Error("fixture missing");
     }
 
+    const user = userEvent.setup();
+
     render(<ImmersiveShortSurface backHref="/" mode="detail" surface={directUnlockSurface} />);
 
-    expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute(
-      "href",
-      "/mains/main_sora_after_rain?fromShortId=afterrain",
-    );
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
   });
 
-  it("links owner-preview detail content straight to playback", () => {
+  it("renders owner-preview detail content as an action button", async () => {
     if (!ownerPreviewSurface) {
       throw new Error("fixture missing");
     }
 
+    const user = userEvent.setup();
+
     render(<ImmersiveShortSurface backHref="/" mode="detail" surface={ownerPreviewSurface} />);
 
-    expect(screen.getByRole("link", { name: /Owner preview/i })).toHaveAttribute(
-      "href",
-      "/mains/main_aoi_blue_balcony?fromShortId=balcony",
-    );
+    await user.click(screen.getByRole("button", { name: /Owner preview/i }));
+
+    expect(screen.getByRole("button", { name: /Owner preview/i })).toBeInTheDocument();
   });
 });

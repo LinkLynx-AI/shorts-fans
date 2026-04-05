@@ -1,6 +1,4 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import Link from "next/link";
-
 import { cn } from "@/shared/lib";
 
 import { getUnlockCtaMeta } from "../model/unlock-cta";

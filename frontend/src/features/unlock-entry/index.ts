@@ -1,5 +1,9 @@
 export { getUnlockSurfaceByShortId } from "./api/mock-unlock-entry";
 export {
+  hasMockMainAccessGrant,
+  issueMockMainAccessGrant,
+} from "./lib/mock-main-access";
+export {
   getUnlockCtaLabel,
   getUnlockCtaMeta,
 } from "./model/unlock-cta";
