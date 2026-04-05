@@ -93,9 +93,10 @@ func Generate(ctx context.Context, opts Options) (err error) {
 		err = errors.Join(err, cleanupErr)
 	}()
 
-	tempConfig := baseConfig.Copy()
-	tempConfig.Database = tempDatabaseName
-	tempDSN := tempConfig.ConnString()
+	tempDSN, err := dsnWithDatabase(opts.PostgresDSN, tempDatabaseName)
+	if err != nil {
+		return err
+	}
 
 	if err := applyMigrations(tempDSN, migrationDir); err != nil {
 		return err
@@ -267,4 +268,15 @@ func uniqueStrings(values ...string) []string {
 	}
 
 	return result
+}
+
+func dsnWithDatabase(dsn string, databaseName string) (string, error) {
+	parsed, err := url.Parse(dsn)
+	if err != nil {
+		return "", fmt.Errorf("parse postgres dsn: %w", err)
+	}
+
+	parsed.Path = "/" + databaseName
+
+	return parsed.String(), nil
 }

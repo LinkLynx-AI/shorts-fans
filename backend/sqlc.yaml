@@ -5,6 +5,8 @@ sql:
       - "db/migrations/000001_bootstrap.up.sql"
       - "db/migrations/000002_mvp_core_entities.up.sql"
       - "db/migrations/000003_unify_creator_profiles.up.sql"
+      - "db/migrations/000004_expand_media_asset_processing_state.up.sql"
+      - "db/migrations/000005_add_auth_tables.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"
