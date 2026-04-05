@@ -6,7 +6,7 @@ import {
   type ShortId,
   type ShortPreviewMeta,
 } from "@/entities/short";
-import type { UnlockCtaState } from "@/features/unlock-entry";
+import { getUnlockSurfaceByShortId, type UnlockSurfaceModel } from "@/features/unlock-entry";
 
 export type FeedSurfaceViewerState = {
   isPinned: boolean;
@@ -19,7 +19,7 @@ export type DetailSurfaceViewerState = FeedSurfaceViewerState & {
 type ShortSurfaceBase = {
   creator: CreatorSummary;
   short: ShortPreviewMeta;
-  unlockCta: UnlockCtaState;
+  unlock: UnlockSurfaceModel;
 };
 
 export type FeedShortSurface = ShortSurfaceBase & {
@@ -48,45 +48,6 @@ const detailViewerStateByShortId: Record<string, DetailSurfaceViewerState> = {
   softlight: { isFollowingCreator: true, isPinned: false },
 };
 
-const unlockCtaByShortId: Record<string, UnlockCtaState> = {
-  afterrain: {
-    mainDurationSeconds: 540,
-    priceJpy: 2100,
-    resumePositionSeconds: null,
-    state: "unlock_available",
-  },
-  balcony: {
-    mainDurationSeconds: 720,
-    priceJpy: null,
-    resumePositionSeconds: null,
-    state: "owner_preview",
-  },
-  mirror: {
-    mainDurationSeconds: 660,
-    priceJpy: 2400,
-    resumePositionSeconds: null,
-    state: "setup_required",
-  },
-  poolcut: {
-    mainDurationSeconds: 480,
-    priceJpy: 1900,
-    resumePositionSeconds: null,
-    state: "unlock_available",
-  },
-  rooftop: {
-    mainDurationSeconds: 480,
-    priceJpy: 1800,
-    resumePositionSeconds: null,
-    state: "unlock_available",
-  },
-  softlight: {
-    mainDurationSeconds: null,
-    priceJpy: null,
-    resumePositionSeconds: 198,
-    state: "continue_main",
-  },
-};
-
 function buildShortSurfaceBase(shortId: ShortId): ShortSurfaceBase | undefined {
   const short = getShortById(shortId);
 
@@ -100,16 +61,16 @@ function buildShortSurfaceBase(shortId: ShortId): ShortSurfaceBase | undefined {
     throw new Error(`Unknown creator for short surface: ${short.id}`);
   }
 
-  const unlockCta = unlockCtaByShortId[short.id];
+  const unlock = getUnlockSurfaceByShortId(short.id);
 
-  if (!unlockCta) {
-    throw new Error(`Unknown unlock CTA state for short: ${short.id}`);
+  if (!unlock) {
+    throw new Error(`Unknown unlock surface state for short: ${short.id}`);
   }
 
   return {
     creator,
     short,
-    unlockCta,
+    unlock,
   };
 }
 

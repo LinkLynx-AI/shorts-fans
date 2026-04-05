@@ -1,8 +1,17 @@
+"use client";
+
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
+import { CreatorAvatar } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
-import { UnlockCta } from "@/features/unlock-entry";
+import {
+  getMainPlaybackHref,
+  getUnlockEntryAction,
+  UnlockCta,
+  UnlockPaywallDialog,
+} from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -102,10 +111,9 @@ type CreatorBlockProps = {
 
 function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   return (
-    <span
-      aria-hidden="true"
-      className="h-[38px] w-[38px] shrink-0 rounded-full bg-cover bg-center shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
-      style={{ backgroundImage: `url(${creator.avatar.url})` }}
+    <CreatorAvatar
+      className="size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      creator={creator}
     />
   );
 }
@@ -142,10 +150,27 @@ function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
  * `feed` と `short detail` で共有する immersive short surface を表示する。
  */
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
+  const [acceptAge, setAcceptAge] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const { mode, surface } = props;
-  const { creator, short, unlockCta, viewer } = surface;
+  const { creator, short, unlock, viewer } = surface;
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
+  const playbackHref = getMainPlaybackHref(unlock.main.id, short.id);
+  const unlockAction = getUnlockEntryAction(unlock);
+
+  const handleOpenPaywall = () => {
+    setAcceptAge(false);
+    setAcceptTerms(false);
+    setIsPaywallOpen(true);
+  };
+
+  const handleClosePaywall = () => {
+    setAcceptAge(false);
+    setAcceptTerms(false);
+    setIsPaywallOpen(false);
+  };
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
@@ -158,12 +183,26 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <PinRail pinned={pinned} />
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
           <UnlockCta
-            cta={unlockCta}
             className="w-full"
-            {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
+            cta={unlock.unlockCta}
+            {...(unlockAction === "open_main"
+              ? { href: playbackHref }
+              : unlockAction === "open_paywall"
+                ? { onClick: handleOpenPaywall }
+                : {})}
           />
         </div>
         <CreatorBlock creator={creator} followed={followed} short={short} />
+        <UnlockPaywallDialog
+          acceptAge={acceptAge}
+          acceptTerms={acceptTerms}
+          onAcceptAgeChange={setAcceptAge}
+          onAcceptTermsChange={setAcceptTerms}
+          onClose={handleClosePaywall}
+          open={isPaywallOpen}
+          playbackHref={playbackHref}
+          unlock={unlock}
+        />
       </div>
     </section>
   );

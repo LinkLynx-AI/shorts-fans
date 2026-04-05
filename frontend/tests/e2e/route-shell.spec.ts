@@ -1,12 +1,24 @@
 import { expect, test } from "@playwright/test";
 
-test("fan shell routes render and navigation works", async ({ page }) => {
+test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.goto("/");
 
   await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("link", { name: "おすすめ" })).toHaveAttribute("aria-current", "page");
-  await expect(page.getByRole("link", { name: /Unlock/i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Unlock/i })).toBeVisible();
   await expect(page.getByText("Mina Rei")).toBeVisible();
+
+  await page.getByRole("button", { name: /Unlock/i }).click();
+  const paywall = page.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" });
+  await expect(paywall).toBeVisible();
+  await expect(paywall.getByRole("button", { name: "Unlock ¥1,800 | 8分" })).toBeDisabled();
+  await page.getByLabel("18歳以上であり、年齢確認に同意する").check();
+  await page.getByLabel("利用規約とポリシーに同意し、確認面なしで main 再生へ進む").check();
+  await paywall.getByRole("link", { name: "Unlock ¥1,800 | 8分" }).click();
+  await expect(page).toHaveURL(/\/mains\/main_mina_quiet_rooftop\?fromShortId=rooftop$/);
+  await expect(page.getByText("Playing main")).toBeVisible();
+  await page.getByRole("button", { name: "Back" }).click();
+  await expect(page).toHaveURL(/\/$/);
 
   await page.getByRole("link", { name: "検索" }).click();
   await expect(page).toHaveURL(/\/search$/);
@@ -19,6 +31,12 @@ test("fan shell routes render and navigation works", async ({ page }) => {
   await page.goto("/shorts/rooftop");
   await expect(page.getByRole("link", { name: /Back/i })).toBeVisible();
   await expect(page.getByText("quiet rooftop preview.")).toBeVisible();
+
+  await page.goto("/shorts/softlight");
+  await expect(page.getByRole("link", { name: /Continue main/i })).toHaveAttribute(
+    "href",
+    "/mains/main_aoi_blue_balcony?fromShortId=softlight",
+  );
 
   await page.goto("/creators/mina");
   await expect(page.getByRole("heading", { name: "Creator profile structure" })).toBeVisible();

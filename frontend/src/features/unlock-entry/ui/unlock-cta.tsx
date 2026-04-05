@@ -11,7 +11,9 @@ import {
 export type UnlockCtaProps = {
   cta: UnlockCtaState;
   className?: string;
+  disabled?: boolean;
   href?: string;
+  onClick?: () => void;
 };
 
 /**
@@ -20,7 +22,9 @@ export type UnlockCtaProps = {
 export function UnlockCta({
   cta,
   className,
+  disabled = false,
   href,
+  onClick,
 }: UnlockCtaProps) {
   const label = getUnlockCtaLabel(cta);
   const meta = getUnlockCtaMeta(cta);
@@ -51,6 +55,19 @@ export function UnlockCta({
     isUnavailable && "border-[#d9e8f1] text-foreground/54 shadow-none",
     className,
   );
+
+  if (onClick && !isUnavailable) {
+    return (
+      <button
+        className={cn(classes, "transition hover:translate-y-[-1px] disabled:translate-y-0 disabled:opacity-55")}
+        disabled={disabled}
+        onClick={onClick}
+        type="button"
+      >
+        {content}
+      </button>
+    );
+  }
 
   if (!href || isUnavailable) {
     return <div className={classes}>{content}</div>;
