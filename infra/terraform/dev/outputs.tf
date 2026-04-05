@@ -24,8 +24,8 @@ output "short_public_bucket_arn" {
 }
 
 output "short_public_base_url" {
-  description = "Base URL for public short objects."
-  value       = "https://${aws_s3_bucket.short_public.bucket_regional_domain_name}"
+  description = "Base URL for public short objects when enable_public_short_delivery is true."
+  value       = var.enable_public_short_delivery ? "https://${aws_s3_bucket.short_public.bucket_regional_domain_name}" : null
 }
 
 output "main_private_bucket_name" {
