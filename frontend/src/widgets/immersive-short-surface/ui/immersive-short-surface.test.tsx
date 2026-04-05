@@ -9,6 +9,8 @@ describe("ImmersiveShortSurface", () => {
   const feedSurface = getFeedSurfaceByTab("recommended");
   const detailSurface = getShortSurfaceById("rooftop");
   const continueMainSurface = getShortSurfaceById("softlight");
+  const directUnlockSurface = getShortSurfaceById("afterrain");
+  const ownerPreviewSurface = getShortSurfaceById("balcony");
 
   it("opens the mini paywall for setup-required feed content", async () => {
     const user = userEvent.setup();
@@ -56,6 +58,32 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("link", { name: /Continue main/i })).toHaveAttribute(
       "href",
       "/mains/main_aoi_blue_balcony?fromShortId=softlight",
+    );
+  });
+
+  it("links direct-unlock detail content straight to playback", () => {
+    if (!directUnlockSurface) {
+      throw new Error("fixture missing");
+    }
+
+    render(<ImmersiveShortSurface backHref="/" mode="detail" surface={directUnlockSurface} />);
+
+    expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute(
+      "href",
+      "/mains/main_sora_after_rain?fromShortId=afterrain",
+    );
+  });
+
+  it("links owner-preview detail content straight to playback", () => {
+    if (!ownerPreviewSurface) {
+      throw new Error("fixture missing");
+    }
+
+    render(<ImmersiveShortSurface backHref="/" mode="detail" surface={ownerPreviewSurface} />);
+
+    expect(screen.getByRole("link", { name: /Owner preview/i })).toHaveAttribute(
+      "href",
+      "/mains/main_aoi_blue_balcony?fromShortId=balcony",
     );
   });
 });

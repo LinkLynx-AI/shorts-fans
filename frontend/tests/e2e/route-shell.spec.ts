@@ -38,6 +38,18 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
     "/mains/main_aoi_blue_balcony?fromShortId=softlight",
   );
 
+  await page.goto("/shorts/afterrain");
+  await expect(page.getByRole("link", { name: /Unlock/i })).toHaveAttribute(
+    "href",
+    "/mains/main_sora_after_rain?fromShortId=afterrain",
+  );
+
+  await page.goto("/shorts/balcony");
+  await expect(page.getByRole("link", { name: /Owner preview/i })).toHaveAttribute(
+    "href",
+    "/mains/main_aoi_blue_balcony?fromShortId=balcony",
+  );
+
   await page.goto("/creators/mina");
   await expect(page.getByRole("heading", { name: "Creator profile structure" })).toBeVisible();
 });
