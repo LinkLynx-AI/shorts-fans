@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
@@ -12,7 +13,19 @@ import (
 )
 
 type stubQueries struct {
-	getCurrentViewerBySessionTokenHash func(context.Context, string) (sqlc.GetCurrentViewerBySessionTokenHashRow, error)
+	touchAuthSessionLastSeenByTokenHash func(context.Context, sqlc.TouchAuthSessionLastSeenByTokenHashParams) (sqlc.AppAuthSession, error)
+	getCurrentViewerBySessionTokenHash  func(context.Context, string) (sqlc.GetCurrentViewerBySessionTokenHashRow, error)
+}
+
+func (s stubQueries) TouchAuthSessionLastSeenByTokenHash(
+	ctx context.Context,
+	arg sqlc.TouchAuthSessionLastSeenByTokenHashParams,
+) (sqlc.AppAuthSession, error) {
+	if s.touchAuthSessionLastSeenByTokenHash == nil {
+		return sqlc.AppAuthSession{}, nil
+	}
+
+	return s.touchAuthSessionLastSeenByTokenHash(ctx, arg)
 }
 
 func (s stubQueries) GetCurrentViewerBySessionTokenHash(
@@ -83,6 +96,39 @@ func TestGetCurrentViewerBySessionTokenHashRejectsInvalidUUID(t *testing.T) {
 	}
 }
 
+func TestTouchSessionLastSeenByTokenHash(t *testing.T) {
+	t.Parallel()
+
+	expectedID := uuid.New()
+	now := time.Unix(1710000000, 0).UTC()
+	repository := newRepository(stubQueries{
+		touchAuthSessionLastSeenByTokenHash: func(context.Context, sqlc.TouchAuthSessionLastSeenByTokenHashParams) (sqlc.AppAuthSession, error) {
+			return sqlc.AppAuthSession{
+				ID:               pgUUID(expectedID),
+				UserID:           pgUUID(uuid.New()),
+				ActiveMode:       "fan",
+				SessionTokenHash: "session-token-hash",
+				ExpiresAt:        pgTime(now.Add(time.Hour)),
+				LastSeenAt:       pgTime(now),
+				CreatedAt:        pgTime(now),
+				UpdatedAt:        pgTime(now),
+			}, nil
+		},
+	})
+
+	got, err := repository.TouchSessionLastSeenByTokenHash(context.Background(), "session-token-hash", now)
+	if err != nil {
+		t.Fatalf("TouchSessionLastSeenByTokenHash() error = %v, want nil", err)
+	}
+	if got.ID != expectedID {
+		t.Fatalf("TouchSessionLastSeenByTokenHash() id got %s want %s", got.ID, expectedID)
+	}
+}
+
 func pgUUID(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: [16]byte(id), Valid: true}
+}
+
+func pgTime(value time.Time) pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: value, Valid: true}
 }

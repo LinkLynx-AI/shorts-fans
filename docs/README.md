@@ -13,6 +13,7 @@
 - [infra/dev-media-sandbox.md](infra/dev-media-sandbox.md): dev 用 AWS media sandbox の Terraform 構成、guardrail、適用手順
 - [contracts/mvp-core-domain-contract.md](contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
 - [contracts/mvp-media-workflow-contract.md](contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
+- [contracts/fan-auth-api-contract.md](contracts/fan-auth-api-contract.md): fan sign in / sign up / session start / logout の transport 契約
 - [contracts/viewer-bootstrap-api-contract.md](contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約

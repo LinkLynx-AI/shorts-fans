@@ -34,6 +34,8 @@ type CreatorSearchReader interface {
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	CreatorSearch   CreatorSearchReader
+	FanAuth         FanAuthService
+	AuthCookie      AuthCookieConfig
 	ViewerBootstrap ViewerBootstrapReader
 	Dependencies    []Dependency
 }
@@ -90,6 +92,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(config.ViewerBootstrap))
 	}
 
+	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 
 	return router

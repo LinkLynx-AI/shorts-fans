@@ -156,6 +156,39 @@ func (q *Queries) ListAuthSessionsByUserID(ctx context.Context, userID pgtype.UU
 	return items, nil
 }
 
+const revokeActiveAuthSessionByTokenHash = `-- name: RevokeActiveAuthSessionByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    revoked_at = COALESCE($1::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = $2
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+`
+
+type RevokeActiveAuthSessionByTokenHashParams struct {
+	RevokedAt        pgtype.Timestamptz
+	SessionTokenHash string
+}
+
+func (q *Queries) RevokeActiveAuthSessionByTokenHash(ctx context.Context, arg RevokeActiveAuthSessionByTokenHashParams) (AppAuthSession, error) {
+	row := q.db.QueryRow(ctx, revokeActiveAuthSessionByTokenHash, arg.RevokedAt, arg.SessionTokenHash)
+	var i AppAuthSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActiveMode,
+		&i.SessionTokenHash,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const revokeAuthSession = `-- name: RevokeAuthSession :one
 UPDATE app.auth_sessions
 SET
@@ -205,6 +238,39 @@ type TouchAuthSessionParams struct {
 
 func (q *Queries) TouchAuthSession(ctx context.Context, arg TouchAuthSessionParams) (AppAuthSession, error) {
 	row := q.db.QueryRow(ctx, touchAuthSession, arg.ActiveMode, arg.LastSeenAt, arg.ID)
+	var i AppAuthSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActiveMode,
+		&i.SessionTokenHash,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const touchAuthSessionLastSeenByTokenHash = `-- name: TouchAuthSessionLastSeenByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    last_seen_at = COALESCE($1::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = $2
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+`
+
+type TouchAuthSessionLastSeenByTokenHashParams struct {
+	LastSeenAt       pgtype.Timestamptz
+	SessionTokenHash string
+}
+
+func (q *Queries) TouchAuthSessionLastSeenByTokenHash(ctx context.Context, arg TouchAuthSessionLastSeenByTokenHashParams) (AppAuthSession, error) {
+	row := q.db.QueryRow(ctx, touchAuthSessionLastSeenByTokenHash, arg.LastSeenAt, arg.SessionTokenHash)
 	var i AppAuthSession
 	err := row.Scan(
 		&i.ID,

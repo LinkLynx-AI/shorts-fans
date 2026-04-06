@@ -9,6 +9,7 @@
 
 | issue | contract | fixture |
 | --- | --- | --- |
+| `SHO-53` | `docs/contracts/fan-auth-api-contract.md` | `docs/contracts/fixtures/fan-auth.json` |
 | `SHO-39` | `docs/contracts/viewer-bootstrap-api-contract.md` | `docs/contracts/fixtures/viewer-bootstrap.json` |
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
@@ -38,13 +39,20 @@
 
 ## App Bootstrap Connection Order
 
-1. `SHO-39`
+1. `SHO-53`
+   - `POST /api/fan/auth/sign-in/challenges`
+   - `POST /api/fan/auth/sign-in/session`
+   - `POST /api/fan/auth/sign-up/challenges`
+   - `POST /api/fan/auth/sign-up/session`
+   - `DELETE /api/fan/auth/session`
+   - auth mutation 成功後は cookie のみを更新し、viewer state はまだ返さない
+2. `SHO-39`
    - `GET /api/viewer/bootstrap`
    - current viewer の `id / activeMode / canAccessCreatorMode`
    - unauthenticated bootstrap 時は `currentViewer = null`
-2. `SHO-17` 以降の public surface
+3. `SHO-17` 以降の public surface
    - viewer 自身の state ではなく resource relation state だけを参照する
-3. `SHO-19`
+4. `SHO-19`
    - private hub は bootstrap 済みの current viewer を前提に接続する
 
 ## Frontend Connection Order

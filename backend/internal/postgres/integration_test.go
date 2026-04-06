@@ -263,6 +263,17 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 		t.Fatalf("GetActiveAuthSessionByTokenHash() id got %v want %v", gotSession.ID, session.ID)
 	}
 
+	touchedByToken, err := queries.TouchAuthSessionLastSeenByTokenHash(ctx, sqlc.TouchAuthSessionLastSeenByTokenHashParams{
+		LastSeenAt:       pgTime(now.Add(4 * time.Minute)),
+		SessionTokenHash: "session-token-hash",
+	})
+	if err != nil {
+		t.Fatalf("TouchAuthSessionLastSeenByTokenHash() error = %v, want nil", err)
+	}
+	if !touchedByToken.LastSeenAt.Time.Equal(now.Add(4 * time.Minute)) {
+		t.Fatalf("TouchAuthSessionLastSeenByTokenHash() last_seen_at got %s want %s", touchedByToken.LastSeenAt.Time, now.Add(4*time.Minute))
+	}
+
 	currentViewer, err := queries.GetCurrentViewerBySessionTokenHash(ctx, "session-token-hash")
 	if err != nil {
 		t.Fatalf("GetCurrentViewerBySessionTokenHash() before capability error = %v, want nil", err)
@@ -312,12 +323,12 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 		t.Fatal("GetCurrentViewerBySessionTokenHash() can_access_creator_mode = false, want true after capability")
 	}
 
-	_, err = queries.RevokeAuthSession(ctx, sqlc.RevokeAuthSessionParams{
-		ID:        session.ID,
-		RevokedAt: pgTime(now.Add(6 * time.Minute)),
+	_, err = queries.RevokeActiveAuthSessionByTokenHash(ctx, sqlc.RevokeActiveAuthSessionByTokenHashParams{
+		RevokedAt:        pgTime(now.Add(6 * time.Minute)),
+		SessionTokenHash: "session-token-hash",
 	})
 	if err != nil {
-		t.Fatalf("RevokeAuthSession() error = %v, want nil", err)
+		t.Fatalf("RevokeActiveAuthSessionByTokenHash() error = %v, want nil", err)
 	}
 	if _, err := queries.GetActiveAuthSessionByTokenHash(ctx, "session-token-hash"); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("GetActiveAuthSessionByTokenHash() after revoke error got %v want %v", err, pgx.ErrNoRows)

@@ -55,10 +55,30 @@ SET
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: TouchAuthSessionLastSeenByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    last_seen_at = COALESCE(sqlc.narg(last_seen_at)::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = sqlc.arg(session_token_hash)
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING *;
+
 -- name: RevokeAuthSession :one
 UPDATE app.auth_sessions
 SET
     revoked_at = COALESCE(sqlc.narg(revoked_at)::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id)
+RETURNING *;
+
+-- name: RevokeActiveAuthSessionByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    revoked_at = COALESCE(sqlc.narg(revoked_at)::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = sqlc.arg(session_token_hash)
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
 RETURNING *;

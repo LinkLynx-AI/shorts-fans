@@ -1,0 +1,42 @@
+{
+  "signInChallengeSuccess": {
+    "status": 200,
+    "body": {
+      "data": {
+        "challengeToken": "challenge_token_sign_in_001",
+        "expiresAt": "2026-04-06T19:00:00Z"
+      },
+      "meta": {
+        "requestId": "req_fan_auth_sign_in_challenge_001",
+        "page": null
+      },
+      "error": null
+    }
+  },
+  "signUpChallengeConflict": {
+    "status": 409,
+    "body": {
+      "data": null,
+      "meta": {
+        "requestId": "req_fan_auth_sign_up_challenge_001",
+        "page": null
+      },
+      "error": {
+        "code": "email_already_registered",
+        "message": "email is already registered"
+      }
+    }
+  },
+  "signInSessionSuccess": {
+    "status": 204,
+    "headers": {
+      "set-cookie": "shorts_fans_session=raw-session-token; Path=/; HttpOnly; SameSite=Lax"
+    }
+  },
+  "logoutSuccess": {
+    "status": 204,
+    "headers": {
+      "set-cookie": "shorts_fans_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
+    }
+  }
+}
