@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 
+import { getFanHubState } from "@/entities/fan-profile";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
 import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
@@ -29,26 +30,33 @@ describe("widgets", () => {
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
   });
 
-  it("renders the search structure and keeps query text", () => {
+  it("renders the search UI and keeps query text", () => {
     const { rerender } = render(<SearchShell query="" />);
 
-    expect(screen.getByRole("heading", { name: "Creator search structure" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Aoi N/i })).toBeInTheDocument();
 
     rerender(<SearchShell query="mina" />);
 
     expect(screen.getByDisplayValue("mina")).toBeInTheDocument();
-    expect(screen.getByText('query "mina" を保持できる route だけを先に定義しています。')).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
+      "href",
+      "/creators/mina?from=search&q=mina",
+    );
   });
 
-  it("renders fan hub structure and active tab copy", () => {
-    const { rerender } = render(<FanHubShell activeTab="library" />);
+  it("renders fan hub content and active tabs", () => {
+    const { rerender } = render(<FanHubShell state={getFanHubState("library")} />);
 
-    expect(screen.getByRole("heading", { name: "Fan hub structure" })).toBeInTheDocument();
-    expect(screen.getByText("Library panel の中身を後続 task で差し込む")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "My archive" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/fan/following");
+    expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
 
-    rerender(<FanHubShell activeTab="pinned" />);
+    rerender(<FanHubShell state={getFanHubState("pinned")} />);
 
-    expect(screen.getByText("Pinned panel の中身を後続 task で差し込む")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /after rain preview/i })).toHaveAttribute("href", "/shorts/afterrain");
   });
 
   it("renders the surface detail shell", () => {

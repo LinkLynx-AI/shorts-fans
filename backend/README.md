@@ -21,6 +21,12 @@ API サーバーを起動します。
 make backend-run
 ```
 
+ローカル開発用の fixed mock data を投入します。
+
+```bash
+make backend-dev-seed
+```
+
 worker 骨格を起動します。
 
 ```bash
@@ -46,6 +52,14 @@ migration を 1 つ戻します。
 ```bash
 make backend-migrate-down
 ```
+
+dev seed を再投入するときは次を使います。
+
+```bash
+make backend-dev-seed
+```
+
+この seed は `creator-capable user 1人 + fan-only user 1人 + 公開済み short/main + follow/unlock/pin` を固定 UUID で idempotent に投入します。ローカル DB を作り直した直後の復旧や、手元確認の初期データとして使う想定です。
 
 `sqlc` 生成を実行します。
 

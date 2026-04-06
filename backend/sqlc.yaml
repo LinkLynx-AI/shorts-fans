@@ -6,7 +6,9 @@ sql:
       - "db/migrations/000002_mvp_core_entities.up.sql"
       - "db/migrations/000003_unify_creator_profiles.up.sql"
       - "db/migrations/000004_expand_media_asset_processing_state.up.sql"
-      - "db/migrations/000005_add_creator_profile_handle.up.sql"
+      - "db/migrations/000005_add_auth_tables.up.sql"
+      - "db/migrations/000006_require_unique_email_identity.up.sql"
+      - "db/migrations/000007_add_creator_profile_handle.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

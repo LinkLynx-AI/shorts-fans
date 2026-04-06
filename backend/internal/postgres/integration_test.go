@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -21,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const integrationPostgresDSNEnv = "POSTGRES_DSN"
@@ -87,8 +86,8 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("GetCreatorProfileByUserID() after down error got %v want %v", err, pgx.ErrNoRows)
 	}
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
+	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(3) second run error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 3)
 	assertRelationExists(t, ctx, conn, "app.creator_profile_drafts", false)
@@ -106,6 +105,217 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 	if profile.PublishedAt.Valid {
 		t.Fatalf("GetCreatorProfileByUserID() published_at valid got %t want false", profile.PublishedAt.Valid)
 	}
+}
+
+func TestAuthTablesMigrationLatestRevision(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 7)
+
+	queries := sqlc.New(conn)
+	now := time.Now().UTC()
+
+	user, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+
+	identity, err := queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              user.ID,
+		Provider:            "email",
+		ProviderSubject:     "fan@example.com",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthIdentity() error = %v, want nil", err)
+	}
+
+	secondUser, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() second user error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "duplicate@example.com",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "google",
+		ProviderSubject:     "google-subject",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthIdentity() non-email duplicate error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "missing-email@example.com",
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23514", "auth_identities_email_provider_requires_email_check")
+
+	gotIdentity, err := queries.GetAuthIdentityByProviderAndSubject(ctx, sqlc.GetAuthIdentityByProviderAndSubjectParams{
+		Provider:        "email",
+		ProviderSubject: "fan@example.com",
+	})
+	if err != nil {
+		t.Fatalf("GetAuthIdentityByProviderAndSubject() error = %v, want nil", err)
+	}
+	if gotIdentity.ID != identity.ID {
+		t.Fatalf("GetAuthIdentityByProviderAndSubject() id got %v want %v", gotIdentity.ID, identity.ID)
+	}
+
+	updatedIdentity, err := queries.RecordAuthIdentityAuthentication(ctx, sqlc.RecordAuthIdentityAuthenticationParams{
+		ID:                  identity.ID,
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now.Add(time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("RecordAuthIdentityAuthentication() error = %v, want nil", err)
+	}
+	if !updatedIdentity.LastAuthenticatedAt.Time.Equal(now.Add(time.Minute)) {
+		t.Fatalf("RecordAuthIdentityAuthentication() last_authenticated_at got %s want %s", updatedIdentity.LastAuthenticatedAt.Time, now.Add(time.Minute))
+	}
+
+	challenge, err := queries.CreateAuthLoginChallenge(ctx, sqlc.CreateAuthLoginChallengeParams{
+		Provider:           "email",
+		ProviderSubject:    "fan@example.com",
+		EmailNormalized:    pgText("fan@example.com"),
+		ChallengeTokenHash: "challenge-token-hash",
+		Purpose:            "login",
+		ExpiresAt:          pgTime(now.Add(10 * time.Minute)),
+		AttemptCount:       0,
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthLoginChallenge() error = %v, want nil", err)
+	}
+
+	gotChallenge, err := queries.GetLatestPendingAuthLoginChallengeByProviderAndSubject(ctx, sqlc.GetLatestPendingAuthLoginChallengeByProviderAndSubjectParams{
+		Provider:        "email",
+		ProviderSubject: "fan@example.com",
+	})
+	if err != nil {
+		t.Fatalf("GetLatestPendingAuthLoginChallengeByProviderAndSubject() error = %v, want nil", err)
+	}
+	if gotChallenge.ID != challenge.ID {
+		t.Fatalf("GetLatestPendingAuthLoginChallengeByProviderAndSubject() id got %v want %v", gotChallenge.ID, challenge.ID)
+	}
+
+	challenge, err = queries.IncrementAuthLoginChallengeAttemptCount(ctx, challenge.ID)
+	if err != nil {
+		t.Fatalf("IncrementAuthLoginChallengeAttemptCount() error = %v, want nil", err)
+	}
+	if challenge.AttemptCount != 1 {
+		t.Fatalf("IncrementAuthLoginChallengeAttemptCount() attempt_count got %d want 1", challenge.AttemptCount)
+	}
+
+	challenge, err = queries.ConsumeAuthLoginChallenge(ctx, sqlc.ConsumeAuthLoginChallengeParams{
+		ID:         challenge.ID,
+		ConsumedAt: pgTime(now.Add(2 * time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("ConsumeAuthLoginChallenge() error = %v, want nil", err)
+	}
+	if !challenge.ConsumedAt.Valid {
+		t.Fatal("ConsumeAuthLoginChallenge() consumed_at valid = false, want true")
+	}
+	if _, err := queries.ConsumeAuthLoginChallenge(ctx, sqlc.ConsumeAuthLoginChallengeParams{
+		ID:         challenge.ID,
+		ConsumedAt: pgTime(now.Add(3 * time.Minute)),
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("ConsumeAuthLoginChallenge() second call error got %v want %v", err, pgx.ErrNoRows)
+	}
+
+	session, err := queries.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
+		UserID:           user.ID,
+		ActiveMode:       "fan",
+		SessionTokenHash: "session-token-hash",
+		ExpiresAt:        pgTime(now.Add(24 * time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthSession() error = %v, want nil", err)
+	}
+
+	gotSession, err := queries.GetActiveAuthSessionByTokenHash(ctx, "session-token-hash")
+	if err != nil {
+		t.Fatalf("GetActiveAuthSessionByTokenHash() error = %v, want nil", err)
+	}
+	if gotSession.ID != session.ID {
+		t.Fatalf("GetActiveAuthSessionByTokenHash() id got %v want %v", gotSession.ID, session.ID)
+	}
+
+	session, err = queries.TouchAuthSession(ctx, sqlc.TouchAuthSessionParams{
+		ID:         session.ID,
+		ActiveMode: "creator",
+		LastSeenAt: pgTime(now.Add(5 * time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("TouchAuthSession() error = %v, want nil", err)
+	}
+	if session.ActiveMode != "creator" {
+		t.Fatalf("TouchAuthSession() active_mode got %q want %q", session.ActiveMode, "creator")
+	}
+
+	_, err = queries.RevokeAuthSession(ctx, sqlc.RevokeAuthSessionParams{
+		ID:        session.ID,
+		RevokedAt: pgTime(now.Add(6 * time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("RevokeAuthSession() error = %v, want nil", err)
+	}
+	if _, err := queries.GetActiveAuthSessionByTokenHash(ctx, "session-token-hash"); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("GetActiveAuthSessionByTokenHash() after revoke error got %v want %v", err, pgx.ErrNoRows)
+	}
+
+	if err := migrator.Steps(-1); err != nil {
+		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 6)
+	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
+	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
+	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 7)
+	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
+	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
+	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
+
+	thirdUser, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() third user error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              thirdUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "reapplied@example.com",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
 }
 
 func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
@@ -260,7 +470,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() to latest error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 5)
+	assertMigrationVersion(t, migrator, 7)
 
 	profileA, err := queries.GetCreatorProfileByUserID(ctx, creatorA.ID)
 	if err != nil {
@@ -656,11 +866,10 @@ func newIntegrationEnvironment(t *testing.T) (context.Context, *pgx.Conn, *migra
 
 	tempConfig := baseConfig.Copy()
 	tempConfig.Database = tempDatabaseName
-	tempDSN := tempConfig.ConnString()
 
-	migrator := newTestMigrator(t, tempDSN)
+	migrator := newTestMigrator(t, tempConfig)
 
-	conn, err := pgx.Connect(ctx, tempDSN)
+	conn, err := pgx.ConnectConfig(ctx, tempConfig)
 	if err != nil {
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
@@ -694,13 +903,10 @@ func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx
 	return nil, fmt.Errorf("connect admin database: %w", lastErr)
 }
 
-func newTestMigrator(t *testing.T, dsn string) *migrate.Migrate {
+func newTestMigrator(t *testing.T, config *pgx.ConnConfig) *migrate.Migrate {
 	t.Helper()
 
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open() error = %v, want nil", err)
-	}
+	db := stdlib.OpenDB(*config)
 
 	driver, err := pgmigrate.WithInstance(db, &pgmigrate.Config{})
 	if err != nil {
@@ -792,6 +998,25 @@ func assertRelationExists(t *testing.T, ctx context.Context, conn *pgx.Conn, rel
 	}
 	if regclass.Valid != want {
 		t.Fatalf("to_regclass(%q) valid got %t want %t", relationName, regclass.Valid, want)
+	}
+}
+
+func assertPgConstraintError(t *testing.T, err error, wantCode string, wantConstraint string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want pg error code %s constraint %s", wantCode, wantConstraint)
+	}
+
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		t.Fatalf("error type got %T want *pgconn.PgError", err)
+	}
+	if pgErr.Code != wantCode {
+		t.Fatalf("pg error code got %q want %q", pgErr.Code, wantCode)
+	}
+	if pgErr.ConstraintName != wantConstraint {
+		t.Fatalf("pg constraint got %q want %q", pgErr.ConstraintName, wantConstraint)
 	}
 }
 

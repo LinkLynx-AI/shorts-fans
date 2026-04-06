@@ -2,7 +2,7 @@ SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt
+.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-dev-seed backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt
 
 BACKEND_DIR := backend
 BACKEND_APP_ENV ?= development
@@ -21,6 +21,7 @@ help:
 		'  make codex branch=<branch-name> [ARGS="..."]' \
 		'  make codex-worktree branch=<branch-name> [ARGS="..."]' \
 		'  make backend-dev-up' \
+		'  make backend-dev-seed' \
 		'  make backend-run' \
 		'  make backend-worker' \
 		'  make backend-schema' \
@@ -30,6 +31,7 @@ help:
 		'  make codex branch=feat/frontend-shell' \
 		'  make codex branch=feat/frontend-shell ARGS="exec"' \
 		'  make backend-run' \
+		'  make backend-dev-seed' \
 		'  make backend-coverage-check BACKEND_COVERAGE_MIN=30'
 
 codex: codex-worktree
@@ -70,6 +72,12 @@ backend-worker:
 		AWS_REGION='$(BACKEND_AWS_REGION)' \
 		SQS_QUEUE_URL='$(BACKEND_SQS_QUEUE_URL)' \
 		go run ./cmd/worker
+
+backend-dev-seed:
+	cd $(BACKEND_DIR) && \
+		APP_ENV='$(BACKEND_APP_ENV)' \
+		POSTGRES_DSN='$(BACKEND_POSTGRES_DSN)' \
+		go run ./cmd/devseed
 
 backend-migrate-up:
 	cd $(BACKEND_DIR) && \
