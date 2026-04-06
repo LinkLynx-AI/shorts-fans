@@ -42,6 +42,16 @@ func TestValidateAPIRequiresDependencies(t *testing.T) {
 func TestValidateWorker(t *testing.T) {
 	t.Parallel()
 
+	validMediaConfig := Config{
+		AWSRegion:                  "ap-northeast-1",
+		MediaJobsQueueURL:          "https://example.com/queue",
+		MediaRawBucketName:         "raw-bucket",
+		MediaShortPublicBucketName: "short-bucket",
+		MediaShortPublicBaseURL:    "https://example.com/shorts",
+		MediaMainPrivateBucketName: "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}
+
 	tests := []struct {
 		name    string
 		cfg     Config
@@ -53,24 +63,30 @@ func TestValidateWorker(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name: "complete sqs config is allowed",
-			cfg: Config{
-				AWSRegion:   "ap-northeast-1",
-				SQSQueueURL: "https://example.com/queue",
-			},
+			name:    "complete media sandbox config is allowed",
+			cfg:     validMediaConfig,
 			wantErr: false,
 		},
 		{
 			name: "missing region is rejected",
 			cfg: Config{
-				SQSQueueURL: "https://example.com/queue",
+				MediaJobsQueueURL: validMediaConfig.MediaJobsQueueURL,
 			},
 			wantErr: true,
 		},
 		{
 			name: "missing queue url is rejected",
 			cfg: Config{
-				AWSRegion: "ap-northeast-1",
+				AWSRegion: validMediaConfig.AWSRegion,
+			},
+			wantErr: true,
+		},
+		{
+			name: "partial media sandbox config is rejected",
+			cfg: Config{
+				AWSRegion:                  validMediaConfig.AWSRegion,
+				MediaJobsQueueURL:          validMediaConfig.MediaJobsQueueURL,
+				MediaShortPublicBucketName: validMediaConfig.MediaShortPublicBucketName,
 			},
 			wantErr: true,
 		},
@@ -89,5 +105,28 @@ func TestValidateWorker(t *testing.T) {
 				t.Fatalf("ValidateWorker() error = %v, want nil", err)
 			}
 		})
+	}
+}
+
+func TestValidateMediaSmoke(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		AWSRegion:                  "ap-northeast-1",
+		MediaJobsQueueURL:          "https://example.com/queue",
+		MediaRawBucketName:         "raw-bucket",
+		MediaShortPublicBucketName: "short-bucket",
+		MediaShortPublicBaseURL:    "https://example.com/shorts",
+		MediaMainPrivateBucketName: "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}
+
+	if err := cfg.ValidateMediaSmoke(); err != nil {
+		t.Fatalf("ValidateMediaSmoke() unexpected error: %v", err)
+	}
+
+	cfg.MediaMainPrivateBucketName = ""
+	if err := cfg.ValidateMediaSmoke(); err == nil {
+		t.Fatal("ValidateMediaSmoke() error = nil, want error")
 	}
 }
