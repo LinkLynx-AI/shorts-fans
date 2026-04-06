@@ -27,6 +27,7 @@
    - `GET /api/fan/shorts/{shortId}`
    - `GET /api/fan/creators/search`
    - `GET /api/fan/creators/{creatorId}`
+   - `GET /api/fan/creators/{creatorId}/shorts`
 3. `SHO-18`
    - `GET /api/fan/shorts/{shortId}/unlock`
    - `GET /api/fan/mains/{mainId}/playback`
@@ -61,10 +62,12 @@
 | --- | --- | --- | --- |
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_purchased`, `short_detail_public`, `short_detail_purchased`, `short_detail_owner`, `short_detail_not_found` |
-| `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_normal`, `creator_profile_empty`, `creator_profile_not_found` |
+| `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-8` | `mini paywall / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchased`, `owner`, `locked`, `not_found`, `playback_purchased`, `playback_owner` |
 | `SHO-7` | `fan profile private hub` | `fan-profile-api-contract.md` | `overview_populated`, `overview_empty`, `following_populated`, `pinned_populated`, `library_populated`, `settings_default` |
 
+- `SHO-6` の creator profile 初回表示では `GET /api/fan/creators/{creatorId}` と `GET /api/fan/creators/{creatorId}/shorts` を並列取得します。
+- `SHO-6` の short grid 追加取得では `GET /api/fan/creators/{creatorId}/shorts?cursor=...` だけを再度呼びます。
 - `SHO-7` の初回表示では `GET /api/fan/profile` で counts を取得し、default tab の `GET /api/fan/profile/pinned-shorts` を別で呼びます。
 - `GET /api/fan/profile/library` は tab を開いた時点で初回 fetch し、以後は cursor を使って scroll 追加取得します。
 - auth viewer の self / session / active mode は app bootstrap 時の global state を正とし、surface payload からは参照しません。

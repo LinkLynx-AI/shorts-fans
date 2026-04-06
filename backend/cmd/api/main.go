@@ -49,6 +49,7 @@ func main() {
 		}
 	}()
 
+	creatorRepository := creator.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
@@ -60,10 +61,12 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
-			CreatorSearch:   creator.NewRepository(pool),
-			FanAuth:         authLifecycle,
-			AuthCookie:      httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
-			ViewerBootstrap: viewerBootstrapReader,
+			CreatorSearch:        creatorRepository,
+			CreatorProfile:       creatorRepository,
+			CreatorProfileShorts: creatorRepository,
+			FanAuth:              authLifecycle,
+			AuthCookie:           httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
+			ViewerBootstrap:      viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

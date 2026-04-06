@@ -31,13 +31,25 @@ type CreatorSearchReader interface {
 	SearchPublicProfiles(ctx context.Context, query string, cursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error)
 }
 
+// CreatorProfileReader は creator profile header 用の read 操作を表します。
+type CreatorProfileReader interface {
+	GetPublicProfileHeader(ctx context.Context, creatorID string) (creator.PublicProfileHeader, error)
+}
+
+// CreatorProfileShortsReader は creator profile short grid 用の read 操作を表します。
+type CreatorProfileShortsReader interface {
+	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
+}
+
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	CreatorSearch   CreatorSearchReader
-	FanAuth         FanAuthService
-	AuthCookie      AuthCookieConfig
-	ViewerBootstrap ViewerBootstrapReader
-	Dependencies    []Dependency
+	CreatorSearch        CreatorSearchReader
+	CreatorProfile       CreatorProfileReader
+	CreatorProfileShorts CreatorProfileShortsReader
+	FanAuth              FanAuthService
+	AuthCookie           AuthCookieConfig
+	ViewerBootstrap      ViewerBootstrapReader
+	Dependencies         []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -94,6 +106,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
 
 	return router
 }
