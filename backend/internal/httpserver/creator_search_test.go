@@ -19,14 +19,17 @@ type stubCreatorSearchReader struct {
 	search     func(context.Context, string, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error)
 }
 
+// ListRecentPublicProfiles は recent route 用の test stub を委譲実行します。
 func (s stubCreatorSearchReader) ListRecentPublicProfiles(ctx context.Context, cursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
 	return s.listRecent(ctx, cursor, limit)
 }
 
+// SearchPublicProfiles は filtered route 用の test stub を委譲実行します。
 func (s stubCreatorSearchReader) SearchPublicProfiles(ctx context.Context, query string, cursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
 	return s.search(ctx, query, cursor, limit)
 }
 
+// TestCreatorSearchRecentRoute は空 query が recent creators を返すことを検証します。
 func TestCreatorSearchRecentRoute(t *testing.T) {
 	t.Parallel()
 
@@ -76,6 +79,7 @@ func TestCreatorSearchRecentRoute(t *testing.T) {
 	}
 }
 
+// TestCreatorSearchFilteredRoute は non-empty query が filtered search を返すことを検証します。
 func TestCreatorSearchFilteredRoute(t *testing.T) {
 	t.Parallel()
 
@@ -160,6 +164,7 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 	}
 }
 
+// TestCreatorSearchEmptyFilteredRoute は no match 時に recent fallback せず空配列を返すことを検証します。
 func TestCreatorSearchEmptyFilteredRoute(t *testing.T) {
 	t.Parallel()
 
@@ -209,6 +214,7 @@ func TestCreatorSearchEmptyFilteredRoute(t *testing.T) {
 	}
 }
 
+// TestCreatorSearchMalformedCursorFallsBackToFirstPage は壊れた cursor を first page 扱いにすることを検証します。
 func TestCreatorSearchMalformedCursorFallsBackToFirstPage(t *testing.T) {
 	t.Parallel()
 
@@ -241,6 +247,7 @@ func TestCreatorSearchMalformedCursorFallsBackToFirstPage(t *testing.T) {
 	}
 }
 
+// TestCreatorSearchAllowsMissingAvatar は avatar 未設定でも `avatar: null` で返すことを検証します。
 func TestCreatorSearchAllowsMissingAvatar(t *testing.T) {
 	t.Parallel()
 
@@ -287,10 +294,12 @@ func TestCreatorSearchAllowsMissingAvatar(t *testing.T) {
 	}
 }
 
+// stringPtr は test fixture 用に string pointer を返します。
 func stringPtr(value string) *string {
 	return &value
 }
 
+// timePtr は test fixture 用に time pointer を返します。
 func timePtr(value time.Time) *time.Time {
 	return &value
 }

@@ -67,6 +67,7 @@ type mediaAsset struct {
 	URL             string  `json:"url"`
 }
 
+// registerCreatorSearchRoutes は creator search API を router に登録します。
 func registerCreatorSearchRoutes(router gin.IRouter, reader CreatorSearchReader) {
 	if reader == nil {
 		return
@@ -77,6 +78,7 @@ func registerCreatorSearchRoutes(router gin.IRouter, reader CreatorSearchReader)
 	})
 }
 
+// handleCreatorSearch は query の有無に応じて recent 一覧または filtered search を返します。
 func handleCreatorSearch(c *gin.Context, reader CreatorSearchReader) {
 	query := strings.TrimSpace(c.Query("q"))
 	cursor := decodeCreatorSearchCursor(strings.TrimSpace(c.Query("cursor")))
@@ -123,6 +125,7 @@ func handleCreatorSearch(c *gin.Context, reader CreatorSearchReader) {
 	})
 }
 
+// buildCreatorSearchResult は公開 creator profile を transport response に変換します。
 func buildCreatorSearchResult(profile creator.Profile) (creatorSearchResult, error) {
 	if profile.DisplayName == nil || profile.Handle == nil {
 		return creatorSearchResult{}, fmt.Errorf("creator search result に必要な display name または handle がありません")
@@ -150,6 +153,7 @@ func buildCreatorSearchResult(profile creator.Profile) (creatorSearchResult, err
 	}, nil
 }
 
+// decodeCreatorSearchCursor は base64url 文字列から keyset cursor を復元します。
 func decodeCreatorSearchCursor(encoded string) *creator.PublicProfileCursor {
 	if encoded == "" {
 		return nil
@@ -176,6 +180,7 @@ func decodeCreatorSearchCursor(encoded string) *creator.PublicProfileCursor {
 	}
 }
 
+// encodeCreatorSearchCursor は keyset cursor を response 用の base64url 文字列に変換します。
 func encodeCreatorSearchCursor(cursor *creator.PublicProfileCursor) *string {
 	if cursor == nil {
 		return nil
@@ -193,10 +198,12 @@ func encodeCreatorSearchCursor(cursor *creator.PublicProfileCursor) *string {
 	return &encoded
 }
 
+// newRequestID は endpoint scope 付きの request identifier を生成します。
 func newRequestID(prefix string) string {
 	return fmt.Sprintf("req_%s_%s", prefix, strings.ReplaceAll(uuid.NewString(), "-", ""))
 }
 
+// writeInternalServerError は fan read surface 共通の internal error envelope を返します。
 func writeInternalServerError(c *gin.Context, requestScope string) {
 	c.JSON(http.StatusInternalServerError, responseEnvelope[struct{}]{
 		Data: nil,
@@ -211,14 +218,17 @@ func writeInternalServerError(c *gin.Context, requestScope string) {
 	})
 }
 
+// formatHandle は保存済み handle を API 向けの `@` 付き表現に揃えます。
 func formatHandle(handle string) string {
 	return "@" + strings.TrimPrefix(handle, "@")
 }
 
+// creatorPublicID は user ID から stable な creator identifier を生成します。
 func creatorPublicID(userID uuid.UUID) string {
 	return fmt.Sprintf("creator_%s", strings.ReplaceAll(userID.String(), "-", ""))
 }
 
+// creatorAvatarAssetID は user ID から stable な avatar asset identifier を生成します。
 func creatorAvatarAssetID(userID uuid.UUID) string {
 	return fmt.Sprintf("asset_creator_%s_avatar", strings.ReplaceAll(userID.String(), "-", ""))
 }

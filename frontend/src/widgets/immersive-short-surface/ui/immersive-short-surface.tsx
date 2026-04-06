@@ -21,6 +21,9 @@ export type ImmersiveShortSurfaceProps =
       surface: DetailShortSurface;
     };
 
+/**
+ * feed/detail 共通の header 領域を表示する。
+ */
 function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
   if (props.mode === "feed") {
     return (
@@ -62,6 +65,9 @@ type PinRailProps = {
   pinned: boolean;
 };
 
+/**
+ * short の pin 状態を表す操作レールを表示する。
+ */
 function PinRail({ pinned }: PinRailProps) {
   const label = pinned ? "Pinned short" : "Pin short";
 
@@ -101,6 +107,9 @@ type CreatorBlockProps = {
   short: ShortPreviewMeta;
 };
 
+/**
+ * feed surface 用の creator avatar を表示し、avatar 不在時は initials fallback を描画する。
+ */
 function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   if (!creator.avatar) {
     return (
@@ -122,6 +131,9 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   );
 }
 
+/**
+ * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
+ */
 function CreatorBlock({ creator, followed = false, short }: CreatorBlockProps) {
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>

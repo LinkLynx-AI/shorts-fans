@@ -21,6 +21,9 @@ type CreatorStatListProps = {
   stats: CreatorProfileStats;
 };
 
+/**
+ * creator stat 用の数値を compact notation に整形する。
+ */
 function formatCompactCount(value: number): string {
   return new Intl.NumberFormat("en", {
     maximumFractionDigits: 0,
