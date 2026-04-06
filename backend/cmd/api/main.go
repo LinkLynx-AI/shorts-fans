@@ -61,6 +61,7 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
+			AppEnv:               cfg.AppEnv,
 			CreatorSearch:        creatorRepository,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
