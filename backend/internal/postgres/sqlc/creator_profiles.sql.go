@@ -210,10 +210,10 @@ const searchPublicCreatorProfiles = `-- name: SearchPublicCreatorProfiles :many
 SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 FROM app.public_creator_profiles
 WHERE (
-    display_name ILIKE '%' || $1 || '%'
+    display_name ILIKE '%' || $1 || '%' ESCAPE '\'
     OR (
         $2 <> ''
-        AND handle LIKE $2 || '%'
+        AND handle LIKE $2 || '%' ESCAPE '\'
     )
 )
 AND (

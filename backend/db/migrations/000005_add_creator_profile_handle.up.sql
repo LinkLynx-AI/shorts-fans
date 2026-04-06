@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
 ALTER TABLE app.creator_profiles
     ADD COLUMN handle TEXT;
 
@@ -62,6 +64,16 @@ ALTER TABLE app.creator_profiles
 CREATE UNIQUE INDEX creator_profiles_handle_unique_idx
     ON app.creator_profiles (handle)
     WHERE handle IS NOT NULL;
+
+CREATE INDEX creator_profiles_public_published_handle_idx
+    ON app.creator_profiles (published_at DESC, handle ASC)
+    WHERE published_at IS NOT NULL;
+
+CREATE INDEX creator_profiles_public_display_name_trgm_idx
+    ON app.creator_profiles
+    USING gin (display_name gin_trgm_ops)
+    WHERE published_at IS NOT NULL
+        AND display_name IS NOT NULL;
 
 CREATE OR REPLACE VIEW app.public_creator_profiles AS
 SELECT

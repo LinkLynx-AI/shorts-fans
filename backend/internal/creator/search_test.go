@@ -173,3 +173,26 @@ func TestSearchPublicProfiles(t *testing.T) {
 		t.Fatalf("SearchPublicProfiles() nextCursor got %#v want nil", nextCursor)
 	}
 }
+
+func TestSearchPublicProfilesEscapesLikePattern(t *testing.T) {
+	t.Parallel()
+
+	var gotParams sqlc.SearchPublicCreatorProfilesParams
+
+	repo := newRepository(repositoryStubQueries{
+		searchPublic: func(_ context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+			gotParams = arg
+			return nil, nil
+		},
+	})
+
+	if _, _, err := repo.SearchPublicProfiles(context.Background(), ` %a_b\c `, nil, 2); err != nil {
+		t.Fatalf("SearchPublicProfiles() error = %v, want nil", err)
+	}
+	if gotParams.DisplayNameQuery.String != `\%a\_b\\c` {
+		t.Fatalf("SearchPublicProfiles() escaped display query got %q want %q", gotParams.DisplayNameQuery.String, `\%a\_b\\c`)
+	}
+	if gotParams.HandlePrefixQuery != `a\_bc` {
+		t.Fatalf("SearchPublicProfiles() escaped handle prefix got %#v want %q", gotParams.HandlePrefixQuery, `a\_bc`)
+	}
+}

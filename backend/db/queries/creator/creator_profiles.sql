@@ -71,10 +71,10 @@ LIMIT sqlc.arg(limit_count);
 SELECT *
 FROM app.public_creator_profiles
 WHERE (
-    display_name ILIKE '%' || sqlc.arg(display_name_query) || '%'
+    display_name ILIKE '%' || sqlc.arg(display_name_query) || '%' ESCAPE '\'
     OR (
         sqlc.arg(handle_prefix_query) <> ''
-        AND handle LIKE sqlc.arg(handle_prefix_query) || '%'
+        AND handle LIKE sqlc.arg(handle_prefix_query) || '%' ESCAPE '\'
     )
 )
 AND (

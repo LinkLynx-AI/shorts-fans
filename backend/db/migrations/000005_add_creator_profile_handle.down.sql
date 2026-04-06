@@ -1,5 +1,7 @@
 DROP VIEW IF EXISTS app.public_creator_profiles;
 
+DROP INDEX IF EXISTS app.creator_profiles_public_display_name_trgm_idx;
+DROP INDEX IF EXISTS app.creator_profiles_public_published_handle_idx;
 DROP INDEX IF EXISTS app.creator_profiles_handle_unique_idx;
 
 ALTER TABLE app.creator_profiles

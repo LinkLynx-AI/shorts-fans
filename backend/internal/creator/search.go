@@ -60,23 +60,24 @@ func (r *Repository) ListRecentPublicProfiles(ctx context.Context, cursor *Publi
 
 // SearchPublicProfiles は display name / handle のみを対象に公開 creator profile を検索します。
 func (r *Repository) SearchPublicProfiles(ctx context.Context, query string, cursor *PublicProfileCursor, limit int) ([]Profile, *PublicProfileCursor, error) {
+	trimmedQuery := strings.TrimSpace(query)
 	pageParams, pageLimit := buildPublicProfilePageParams(cursor, limit)
 
 	rows, err := r.queries.SearchPublicCreatorProfiles(ctx, sqlc.SearchPublicCreatorProfilesParams{
 		DisplayNameQuery: pgtype.Text{
-			String: strings.TrimSpace(query),
+			String: escapeLikePattern(trimmedQuery),
 			Valid:  true,
 		},
-		HandlePrefixQuery: normalizeSearchHandleQuery(query),
+		HandlePrefixQuery: escapeLikePattern(normalizeSearchHandleQuery(trimmedQuery)),
 		CursorPublishedAt: pageParams.CursorPublishedAt,
 		CursorHandle:      pageParams.CursorHandle,
 		LimitCount:        pageParams.LimitCount,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("公開 creator profile 検索 query=%q: %w", strings.TrimSpace(query), err)
+		return nil, nil, fmt.Errorf("公開 creator profile 検索 query=%q: %w", trimmedQuery, err)
 	}
 
-	return mapPublicProfilePage(rows, pageLimit, fmt.Sprintf("公開 creator profile 検索結果の変換 query=%q", strings.TrimSpace(query)))
+	return mapPublicProfilePage(rows, pageLimit, fmt.Sprintf("公開 creator profile 検索結果の変換 query=%q", trimmedQuery))
 }
 
 func buildPublicProfilePageParams(cursor *PublicProfileCursor, limit int) (sqlc.ListRecentPublicCreatorProfilesParams, int) {
@@ -167,6 +168,18 @@ func normalizeSearchHandleQuery(query string) string {
 		if isAllowedHandleRune(char) {
 			builder.WriteRune(char)
 		}
+	}
+
+	return builder.String()
+}
+
+func escapeLikePattern(value string) string {
+	var builder strings.Builder
+	for _, char := range value {
+		if char == '%' || char == '_' || char == '\\' {
+			builder.WriteRune('\\')
+		}
+		builder.WriteRune(char)
 	}
 
 	return builder.String()

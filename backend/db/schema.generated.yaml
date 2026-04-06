@@ -205,6 +205,17 @@ schemas:
               unique: true
               predicate: (handle IS NOT NULL)
               definition: CREATE UNIQUE INDEX creator_profiles_handle_unique_idx ON app.creator_profiles USING btree (handle) WHERE (handle IS NOT NULL)
+            - name: creator_profiles_public_display_name_trgm_idx
+              columns:
+                - display_name
+              predicate: ((published_at IS NOT NULL) AND (display_name IS NOT NULL))
+              definition: CREATE INDEX creator_profiles_public_display_name_trgm_idx ON app.creator_profiles USING gin (display_name gin_trgm_ops) WHERE ((published_at IS NOT NULL) AND (display_name IS NOT NULL))
+            - name: creator_profiles_public_published_handle_idx
+              columns:
+                - published_at
+                - handle
+              predicate: (published_at IS NOT NULL)
+              definition: CREATE INDEX creator_profiles_public_published_handle_idx ON app.creator_profiles USING btree (published_at DESC, handle) WHERE (published_at IS NOT NULL)
         - name: main_playback_progress
           columns:
             - name: user_id

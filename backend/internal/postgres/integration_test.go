@@ -19,6 +19,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -313,6 +314,107 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	}
 	if len(filteredProfiles) != 2 {
 		t.Fatalf("SearchPublicCreatorProfiles() len got %d want %d", len(filteredProfiles), 2)
+	}
+
+	creatorMissingHandle, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorMissingHandle) error = %v, want nil", err)
+	}
+	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creatorMissingHandle.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	}); err != nil {
+		t.Fatalf("CreateCreatorCapability(creatorMissingHandle) error = %v, want nil", err)
+	}
+	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
+		UserID:      creatorMissingHandle.ID,
+		DisplayName: pgText("No Handle"),
+		Bio:         "draft before handle assignment",
+	}); err != nil {
+		t.Fatalf("CreateCreatorProfile(creatorMissingHandle) error = %v, want nil", err)
+	}
+
+	_, err = queries.PublishCreatorProfile(ctx, creatorMissingHandle.ID)
+	if err == nil {
+		t.Fatal("PublishCreatorProfile(creatorMissingHandle) error = nil, want constraint error")
+	}
+
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		t.Fatalf("PublishCreatorProfile(creatorMissingHandle) error got %T want *pgconn.PgError", err)
+	}
+	if pgErr.ConstraintName != "creator_profiles_public_fields_check" {
+		t.Fatalf("PublishCreatorProfile(creatorMissingHandle) constraint got %q want %q", pgErr.ConstraintName, "creator_profiles_public_fields_check")
+	}
+
+	creatorC, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorC) error = %v, want nil", err)
+	}
+	creatorD, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorD) error = %v, want nil", err)
+	}
+	for _, creatorID := range []pgtype.UUID{creatorC.ID, creatorD.ID} {
+		if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+			UserID:                  creatorID,
+			State:                   "approved",
+			IsResubmitEligible:      false,
+			IsSupportReviewRequired: false,
+			SelfServeResubmitCount:  0,
+			ApprovedAt:              pgTime(now),
+		}); err != nil {
+			t.Fatalf("CreateCreatorCapability(%v) after latest error = %v, want nil", creatorID, err)
+		}
+	}
+	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
+		UserID:      creatorC.ID,
+		DisplayName: pgText("A Under"),
+		Handle:      pgText("a_b"),
+		Bio:         "bio-c",
+		PublishedAt: pgTime(now.Add(-2 * time.Hour)),
+	}); err != nil {
+		t.Fatalf("CreateCreatorProfile(creatorC) error = %v, want nil", err)
+	}
+	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
+		UserID:      creatorD.ID,
+		DisplayName: pgText("AB Plain"),
+		Handle:      pgText("ab"),
+		Bio:         "bio-d",
+		PublishedAt: pgTime(now.Add(-3 * time.Hour)),
+	}); err != nil {
+		t.Fatalf("CreateCreatorProfile(creatorD) error = %v, want nil", err)
+	}
+
+	literalPercentProfiles, err := queries.SearchPublicCreatorProfiles(ctx, sqlc.SearchPublicCreatorProfilesParams{
+		DisplayNameQuery:  pgText(`\%`),
+		HandlePrefixQuery: "",
+		LimitCount:        10,
+	})
+	if err != nil {
+		t.Fatalf("SearchPublicCreatorProfiles(literal percent) error = %v, want nil", err)
+	}
+	if len(literalPercentProfiles) != 0 {
+		t.Fatalf("SearchPublicCreatorProfiles(literal percent) len got %d want %d", len(literalPercentProfiles), 0)
+	}
+
+	literalUnderscoreProfiles, err := queries.SearchPublicCreatorProfiles(ctx, sqlc.SearchPublicCreatorProfilesParams{
+		DisplayNameQuery:  pgText(`a\_`),
+		HandlePrefixQuery: `a\_`,
+		LimitCount:        10,
+	})
+	if err != nil {
+		t.Fatalf("SearchPublicCreatorProfiles(literal underscore) error = %v, want nil", err)
+	}
+	if len(literalUnderscoreProfiles) != 1 {
+		t.Fatalf("SearchPublicCreatorProfiles(literal underscore) len got %d want %d", len(literalUnderscoreProfiles), 1)
+	}
+	if literalUnderscoreProfiles[0].UserID != creatorC.ID {
+		t.Fatalf("SearchPublicCreatorProfiles(literal underscore) user got %v want %v", literalUnderscoreProfiles[0].UserID, creatorC.ID)
 	}
 }
 

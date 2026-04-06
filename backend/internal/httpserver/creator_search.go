@@ -127,20 +127,23 @@ func buildCreatorSearchResult(profile creator.Profile) (creatorSearchResult, err
 	if profile.DisplayName == nil || profile.Handle == nil {
 		return creatorSearchResult{}, fmt.Errorf("creator search result に必要な display name または handle がありません")
 	}
+	if profile.AvatarURL == nil || strings.TrimSpace(*profile.AvatarURL) == "" {
+		return creatorSearchResult{}, fmt.Errorf("creator search result に必要な avatar url がありません")
+	}
 
 	return creatorSearchResult{
 		Creator: creatorSearchSummary{
 			Avatar: mediaAsset{
 				DurationSeconds: nil,
-				ID:              fmt.Sprintf("asset_creator_%s_avatar", *profile.Handle),
+				ID:              creatorAvatarAssetID(profile.UserID),
 				Kind:            "image",
 				PosterURL:       nil,
-				URL:             valueOrEmpty(profile.AvatarURL),
+				URL:             strings.TrimSpace(*profile.AvatarURL),
 			},
 			Bio:         profile.Bio,
 			DisplayName: *profile.DisplayName,
 			Handle:      formatHandle(*profile.Handle),
-			ID:          *profile.Handle,
+			ID:          creatorPublicID(profile.UserID),
 		},
 	}, nil
 }
@@ -210,10 +213,10 @@ func formatHandle(handle string) string {
 	return "@" + strings.TrimPrefix(handle, "@")
 }
 
-func valueOrEmpty(value *string) string {
-	if value == nil {
-		return ""
-	}
+func creatorPublicID(userID uuid.UUID) string {
+	return fmt.Sprintf("creator_%s", strings.ReplaceAll(userID.String(), "-", ""))
+}
 
-	return *value
+func creatorAvatarAssetID(userID uuid.UUID) string {
+	return fmt.Sprintf("asset_creator_%s_avatar", strings.ReplaceAll(userID.String(), "-", ""))
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/google/uuid"
 )
 
 type stubCreatorSearchReader struct {
@@ -30,11 +31,13 @@ func TestCreatorSearchRecentRoute(t *testing.T) {
 	t.Parallel()
 
 	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	router := NewHandler(HandlerConfig{
 		CreatorSearch: stubCreatorSearchReader{
 			listRecent: func(context.Context, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
 				return []creator.Profile{
 					{
+						UserID:      creatorID,
 						DisplayName: stringPtr("Aoi N"),
 						Handle:      stringPtr("aoina"),
 						AvatarURL:   stringPtr("https://cdn.example.com/creator/aoi/avatar.jpg"),
@@ -65,8 +68,11 @@ func TestCreatorSearchRecentRoute(t *testing.T) {
 	if !strings.Contains(body, `"handle":"@aoina"`) {
 		t.Fatalf("GET /api/fan/creators/search body got %q want @aoina", body)
 	}
-	if !strings.Contains(body, `"id":"aoina"`) {
-		t.Fatalf("GET /api/fan/creators/search body got %q want id aoina", body)
+	if !strings.Contains(body, `"id":"creator_11111111111111111111111111111111"`) {
+		t.Fatalf("GET /api/fan/creators/search body got %q want stable creator id", body)
+	}
+	if !strings.Contains(body, `"id":"asset_creator_11111111111111111111111111111111_avatar"`) {
+		t.Fatalf("GET /api/fan/creators/search body got %q want stable avatar id", body)
 	}
 }
 
@@ -74,6 +80,7 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 	t.Parallel()
 
 	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	cursor := &creator.PublicProfileCursor{
 		PublishedAt: now.Add(-time.Hour),
 		Handle:      "minarei",
@@ -96,6 +103,7 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 				}
 				return []creator.Profile{
 					{
+						UserID:      creatorID,
 						DisplayName: stringPtr("Mina Rei"),
 						Handle:      stringPtr("minarei"),
 						AvatarURL:   stringPtr("https://cdn.example.com/creator/mina/avatar.jpg"),
@@ -127,6 +135,15 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 	if response.Data == nil || response.Data.Query != "@mina" {
 		t.Fatalf("response.Data.Query got %#v want %q", response.Data, "@mina")
 	}
+	if len(response.Data.Items) != 1 {
+		t.Fatalf("response.Data.Items len got %d want %d", len(response.Data.Items), 1)
+	}
+	if response.Data.Items[0].Creator.ID != "creator_22222222222222222222222222222222" {
+		t.Fatalf("response.Data.Items[0].Creator.ID got %q want %q", response.Data.Items[0].Creator.ID, "creator_22222222222222222222222222222222")
+	}
+	if response.Data.Items[0].Creator.Avatar.ID != "asset_creator_22222222222222222222222222222222_avatar" {
+		t.Fatalf("response.Data.Items[0].Creator.Avatar.ID got %q want %q", response.Data.Items[0].Creator.Avatar.ID, "asset_creator_22222222222222222222222222222222_avatar")
+	}
 	if response.Meta.Page == nil || !response.Meta.Page.HasNext || response.Meta.Page.NextCursor == nil {
 		t.Fatalf("response.Meta.Page got %#v want next cursor", response.Meta.Page)
 	}
@@ -137,6 +154,127 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 	}
 	if !strings.Contains(string(decoded), `"handle":"minarei"`) {
 		t.Fatalf("decoded next cursor got %q want minarei", string(decoded))
+	}
+}
+
+func TestCreatorSearchEmptyFilteredRoute(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorSearch: stubCreatorSearchReader{
+			listRecent: func(context.Context, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				t.Fatal("ListRecentPublicProfiles() was called for filtered empty result")
+				return nil, nil, nil
+			},
+			search: func(_ context.Context, query string, gotCursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				if query != "missing" {
+					t.Fatalf("SearchPublicProfiles() query got %q want %q", query, "missing")
+				}
+				if gotCursor != nil {
+					t.Fatalf("SearchPublicProfiles() cursor got %#v want nil", gotCursor)
+				}
+				if limit != creatorSearchPageSize {
+					t.Fatalf("SearchPublicProfiles() limit got %d want %d", limit, creatorSearchPageSize)
+				}
+
+				return []creator.Profile{}, nil, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/creators/search?q=missing", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/creators/search?q=missing status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorSearchResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil || response.Data.Query != "missing" {
+		t.Fatalf("response.Data.Query got %#v want %q", response.Data, "missing")
+	}
+	if len(response.Data.Items) != 0 {
+		t.Fatalf("response.Data.Items len got %d want %d", len(response.Data.Items), 0)
+	}
+	if response.Meta.Page == nil || response.Meta.Page.HasNext || response.Meta.Page.NextCursor != nil {
+		t.Fatalf("response.Meta.Page got %#v want empty page info", response.Meta.Page)
+	}
+}
+
+func TestCreatorSearchMalformedCursorFallsBackToFirstPage(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorSearch: stubCreatorSearchReader{
+			listRecent: func(_ context.Context, gotCursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				if gotCursor != nil {
+					t.Fatalf("ListRecentPublicProfiles() cursor got %#v want nil", gotCursor)
+				}
+				if limit != creatorSearchPageSize {
+					t.Fatalf("ListRecentPublicProfiles() limit got %d want %d", limit, creatorSearchPageSize)
+				}
+
+				return []creator.Profile{}, nil, nil
+			},
+			search: func(context.Context, string, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				t.Fatal("SearchPublicProfiles() was called for malformed recent cursor")
+				return nil, nil, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/creators/search?cursor=***", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/creators/search?cursor=*** status got %d want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestCreatorSearchRejectsMissingAvatar(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorSearch: stubCreatorSearchReader{
+			listRecent: func(context.Context, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				return []creator.Profile{
+					{
+						UserID:      uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+						DisplayName: stringPtr("Aoi N"),
+						Handle:      stringPtr("aoina"),
+						Bio:         "missing avatar should not reach transport",
+					},
+				}, nil, nil
+			},
+			search: func(context.Context, string, *creator.PublicProfileCursor, int) ([]creator.Profile, *creator.PublicProfileCursor, error) {
+				t.Fatal("SearchPublicProfiles() was called for missing-avatar recent route")
+				return nil, nil, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/creators/search", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/fan/creators/search status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
 	}
 }
 
