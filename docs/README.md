@@ -11,6 +11,7 @@
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 - [infra/dev-media-sandbox.md](infra/dev-media-sandbox.md): dev 用 AWS media sandbox の Terraform 構成、guardrail、適用手順、backend 接続用 env 対応
+- [infra/dev-media-smoke.md](infra/dev-media-smoke.md): dev media smoke の再現手順、切り分け、manual recovery、quota/cost 注意点
 - [contracts/mvp-core-domain-contract.md](contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
 - [contracts/mvp-media-workflow-contract.md](contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
 - [contracts/viewer-bootstrap-api-contract.md](contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約

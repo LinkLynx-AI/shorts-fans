@@ -39,6 +39,8 @@ dev AWS media sandbox への representative path を確認します。
 make backend-media-smoke
 ```
 
+詳細な前提、Terraform output からの env 設定、失敗時の切り分けは [`../docs/infra/dev-media-smoke.md`](../docs/infra/dev-media-smoke.md) を参照してください。
+
 停止するときは次を使います。
 
 ```bash
