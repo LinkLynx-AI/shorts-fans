@@ -7,6 +7,7 @@ import type { UnlockSurfaceModel } from "../model/unlock-entry";
 export type UnlockPaywallDialogProps = {
   acceptAge: boolean;
   acceptTerms: boolean;
+  isSubmitting?: boolean;
   onAcceptAgeChange: (checked: boolean) => void;
   onAcceptTermsChange: (checked: boolean) => void;
   onClose: () => void;
@@ -30,6 +31,7 @@ function getUnlockButtonLabel(unlock: UnlockSurfaceModel): string {
 export function UnlockPaywallDialog({
   acceptAge,
   acceptTerms,
+  isSubmitting = false,
   onAcceptAgeChange,
   onAcceptTermsChange,
   onClose,
@@ -107,11 +109,15 @@ export function UnlockPaywallDialog({
 
           <div className="mt-4 flex gap-2.5">
             <Dialog.Close asChild>
-              <button className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent/10 px-4 text-[13px] font-bold text-accent-strong" type="button">
+              <button
+                className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent/10 px-4 text-[13px] font-bold text-accent-strong"
+                disabled={isSubmitting}
+                type="button"
+              >
                 閉じる
               </button>
             </Dialog.Close>
-          {confirmEnabled ? (
+          {confirmEnabled && !isSubmitting ? (
             <button
               className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent-strong px-4 text-[13px] font-bold text-white"
               onClick={onConfirm}

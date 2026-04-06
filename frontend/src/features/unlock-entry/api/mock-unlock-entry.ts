@@ -3,8 +3,13 @@ import { z } from "zod";
 import { getCreatorById } from "@/entities/creator";
 import { getMainById } from "@/entities/main";
 import { getShortById } from "@/entities/short";
+import { issueMockSignedToken } from "@/shared/lib/mock-signed-token";
 
-import type { UnlockSurfaceModel } from "../model/unlock-entry";
+import {
+  buildMockMainAccessEntryContext,
+  getMockMainAccessRoutePath,
+  type UnlockSurfaceModel,
+} from "../model/unlock-entry";
 
 const purchaseSchema = z.object({
   mainId: z.string().min(1),
@@ -74,6 +79,10 @@ const mainSummarySchema = z.object({
 const unlockSurfaceSchema = z.object({
   access: accessSchema,
   creator: creatorSchema,
+  mainAccessEntry: z.object({
+    routePath: z.string().min(1),
+    token: z.string().min(1),
+  }),
   main: mainSummarySchema,
   purchase: purchaseSchema,
   setup: setupSchema,
@@ -254,6 +263,10 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
   return unlockSurfaceSchema.parse({
     access: rawState.access,
     creator,
+    mainAccessEntry: {
+      routePath: getMockMainAccessRoutePath(),
+      token: issueMockSignedToken(buildMockMainAccessEntryContext(main.id, short.id)),
+    },
     main: {
       durationSeconds: main.durationSeconds,
       id: main.id,

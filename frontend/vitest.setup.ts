@@ -13,9 +13,18 @@ const mockedRouter = {
   back: vi.fn(),
   push: vi.fn(),
 };
+const mockedFetch = vi.fn(async () =>
+  new Response(JSON.stringify({ href: "/mains/mock?fromShortId=rooftop&grant=test" }), {
+    headers: {
+      "Content-Type": "application/json",
+    },
+    status: 200,
+  }),
+);
 
 afterEach(() => {
   cleanup();
+  mockedFetch.mockClear();
   mockedRouter.back.mockReset();
   mockedRouter.push.mockReset();
 });
@@ -36,3 +45,5 @@ vi.mock("next/link", () => ({
       children,
     ),
 }));
+
+vi.stubGlobal("fetch", mockedFetch);

@@ -1,6 +1,10 @@
 import {
+  buildMockMainAccessEntryContext,
+  buildMockMainPlaybackGrantContext,
   getMainPlaybackHref,
+  getMockMainAccessRoutePath,
   getUnlockEntryAction,
+  parseMockMainPlaybackGrantContext,
   type UnlockSurfaceModel,
 } from "@/features/unlock-entry";
 
@@ -25,6 +29,10 @@ function createUnlockSurfaceModel(
       displayName: "Mina Rei",
       handle: "@minarei",
       id: "mina",
+    },
+    mainAccessEntry: {
+      routePath: "/api/mock-main-access",
+      token: "entry_token",
     },
     main: {
       durationSeconds: 480,
@@ -80,5 +88,30 @@ describe("unlock-entry model", () => {
     expect(getMainPlaybackHref("main_mina_quiet_rooftop", "rooftop", "grant_123")).toBe(
       "/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=grant_123",
     );
+  });
+
+  it("builds entry and playback grant contexts", () => {
+    expect(buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop")).toBe(
+      "main-access-entry::main_mina_quiet_rooftop::rooftop",
+    );
+    expect(
+      buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "rooftop", "purchased"),
+    ).toBe("main-playback-grant::main_mina_quiet_rooftop::rooftop::purchased");
+    expect(parseMockMainPlaybackGrantContext("main-playback-grant::main_mina_quiet_rooftop::rooftop::owner"))
+      .toEqual({
+        fromShortId: "rooftop",
+        grantKind: "owner",
+        mainId: "main_mina_quiet_rooftop",
+      });
+    expect(getMockMainAccessRoutePath()).toBe("/api/mock-main-access");
+    expect(parseMockMainPlaybackGrantContext("main_mina_quiet_rooftop::rooftop")).toBeNull();
+  });
+
+  it("parses invalid playback grant context as null", () => {
+    expect(
+      parseMockMainPlaybackGrantContext(
+        "main-playback-grant::main_mina_quiet_rooftop::rooftop::invalid",
+      ),
+    ).toBeNull();
   });
 });

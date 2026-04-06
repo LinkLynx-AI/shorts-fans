@@ -7,13 +7,7 @@ import { useRouter } from "next/navigation";
 
 import { CreatorAvatar } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
-import {
-  getMainPlaybackHref,
-  getUnlockEntryAction,
-  issueMockMainAccessGrant,
-  UnlockCta,
-  UnlockPaywallDialog,
-} from "@/features/unlock-entry";
+import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -155,6 +149,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [acceptAge, setAcceptAge] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
   const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
@@ -169,17 +164,53 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   const handleClosePaywall = () => {
+    if (isSubmittingMainAccess) {
+      return;
+    }
+
     setAcceptAge(false);
     setAcceptTerms(false);
     setIsPaywallOpen(false);
   };
 
-  const handleOpenMain = () => {
-    const grantToken = issueMockMainAccessGrant(unlock.main.id);
-    const playbackHref = getMainPlaybackHref(unlock.main.id, short.id, grantToken);
+  const handleOpenMain = async () => {
+    if (isSubmittingMainAccess) {
+      return;
+    }
 
-    handleClosePaywall();
-    router.push(playbackHref);
+    setIsSubmittingMainAccess(true);
+
+    try {
+      const response = await fetch(unlock.mainAccessEntry.routePath, {
+        body: JSON.stringify({
+          acceptedAge: acceptAge,
+          acceptedTerms: acceptTerms,
+          entryToken: unlock.mainAccessEntry.token,
+          fromShortId: short.id,
+          mainId: unlock.main.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            fallbackHref?: string;
+            href?: string;
+          }
+        | null;
+
+      if (response.ok && payload?.href) {
+        handleClosePaywall();
+        router.push(payload.href);
+        return;
+      }
+
+      router.push(payload?.fallbackHref ?? `/shorts/${short.id}`);
+    } finally {
+      setIsSubmittingMainAccess(false);
+    }
   };
 
   return (
@@ -206,6 +237,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}
+          isSubmitting={isSubmittingMainAccess}
           onAcceptAgeChange={setAcceptAge}
           onAcceptTermsChange={setAcceptTerms}
           onClose={handleClosePaywall}

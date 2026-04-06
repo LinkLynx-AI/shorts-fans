@@ -3,7 +3,11 @@ import { z } from "zod";
 import { getCreatorById } from "@/entities/creator";
 import { getMainById } from "@/entities/main";
 import { getPinnedShorts, getShortById } from "@/entities/short";
-import { getUnlockSurfaceByShortId, type MainAccessState } from "@/features/unlock-entry";
+import {
+  getUnlockSurfaceByShortId,
+  type MainAccessState,
+  type MainPlaybackGrantKind,
+} from "@/features/unlock-entry";
 
 import type { MainPlaybackSurface } from "../model/main-playback-surface";
 
@@ -75,7 +79,11 @@ const playbackSurfaceSchema = z.object({
   }),
 });
 
-function buildPlaybackAccess(shortId: string | undefined, mainId: string): {
+function buildPlaybackAccess(
+  shortId: string | undefined,
+  mainId: string,
+  grantKind: MainPlaybackGrantKind,
+): {
   access: MainAccessState;
   resumePositionSeconds: number | null;
 } | undefined {
@@ -89,7 +97,7 @@ function buildPlaybackAccess(shortId: string | undefined, mainId: string): {
     return undefined;
   }
 
-  if (unlock.access.status === "owner") {
+  if (grantKind === "owner") {
     return {
       access: {
         mainId,
@@ -101,11 +109,11 @@ function buildPlaybackAccess(shortId: string | undefined, mainId: string): {
   }
 
   return {
-    access: {
-      mainId,
-      reason: "purchased_access",
-      status: "purchased",
-    },
+      access: {
+        mainId,
+        reason: "purchased_access",
+        status: "purchased",
+      },
     resumePositionSeconds: unlock.unlockCta.resumePositionSeconds,
   };
 }
@@ -116,8 +124,9 @@ function buildPlaybackAccess(shortId: string | undefined, mainId: string): {
 export function getMainPlaybackSurfaceById(
   mainId: string,
   fromShortId?: string,
+  grantKind?: MainPlaybackGrantKind,
 ): MainPlaybackSurface | undefined {
-  if (!fromShortId) {
+  if (!fromShortId || !grantKind) {
     return undefined;
   }
 
@@ -146,7 +155,7 @@ export function getMainPlaybackSurfaceById(
     throw new Error(`Unknown creator for main playback: ${themeShort.creatorId}`);
   }
 
-  const playbackState = buildPlaybackAccess(entryShort?.id, main.id);
+  const playbackState = buildPlaybackAccess(entryShort?.id, main.id, grantKind);
 
   if (!playbackState) {
     return undefined;

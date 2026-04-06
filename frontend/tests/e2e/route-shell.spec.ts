@@ -57,6 +57,53 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Creator profile structure" })).toBeVisible();
 });
 
+test("invalid grant response does not leak protected playback data", async ({ request }) => {
+  const response = await request.get("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid");
+  const body = await response.text();
+
+  expect(body).toContain("この main はまだ unlock されていません。");
+  expect(body).not.toContain("quiet rooftop main");
+  expect(body).not.toContain("cdn.example.com/mains/");
+});
+
+test("main access route rejects direct setup bypass requests", async ({ request }) => {
+  const response = await request.post("/api/mock-main-access", {
+    data: {
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: "invalid",
+      fromShortId: "rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    },
+  });
+
+  expect(response.status()).toBe(403);
+  await expect(response.json()).resolves.toEqual({
+    fallbackHref: "/shorts/rooftop",
+  });
+});
+
+test("signed grants cannot be replayed against a different main context", async ({ page, request }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Unlock/i }).click();
+  await page.getByLabel("18歳以上であり、年齢確認に同意する").check();
+  await page.getByLabel("利用規約とポリシーに同意し、確認面なしで main 再生へ進む").check();
+  await page.getByRole("button", { name: "Unlock ¥1,800 | 8分" }).click();
+  await expect(page).toHaveURL(/\/mains\/main_mina_quiet_rooftop\?fromShortId=rooftop&grant=/);
+
+  const mainUrl = new URL(page.url());
+  const grant = mainUrl.searchParams.get("grant");
+
+  expect(grant).toBeTruthy();
+
+  const response = await request.get(`/mains/main_aoi_blue_balcony?fromShortId=softlight&grant=${grant}`);
+  const body = await response.text();
+
+  expect(body).toContain("この main はまだ unlock されていません。");
+  expect(body).not.toContain("quiet rooftop main");
+  expect(body).not.toContain("cdn.example.com/mains/");
+});
+
 test("undefined routes fall back to the shared not-found page", async ({ page }) => {
   await page.goto("/missing-route");
   await expect(page.getByRole("heading", { name: "指定された surface はまだ用意されていません。" })).toBeVisible();

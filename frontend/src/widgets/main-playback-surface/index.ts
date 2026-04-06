@@ -8,6 +8,6 @@ export type {
   MainPlaybackSurface as MainPlaybackSurfaceModel,
   MainPlaybackSurfaceMain,
 } from "./model/main-playback-surface";
+export { MainPlaybackLockedState } from "./ui/main-playback-locked-state";
 export { MainPlaybackSurface } from "./ui/main-playback-surface";
 export type { MainPlaybackSurfaceProps } from "./ui/main-playback-surface";
-export { MainPlaybackGate } from "./ui/main-playback-gate";

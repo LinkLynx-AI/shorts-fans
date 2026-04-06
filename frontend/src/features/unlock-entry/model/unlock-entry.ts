@@ -25,9 +25,17 @@ export type UnlockSetupState = {
   requiresTermsAcceptance: boolean;
 };
 
+export type MainAccessEntry = {
+  routePath: string;
+  token: string;
+};
+
+export type MainPlaybackGrantKind = "owner" | "purchased";
+
 export type UnlockSurfaceModel = {
   access: MainAccessState;
   creator: CreatorSummary;
+  mainAccessEntry: MainAccessEntry;
   main: MainSummary;
   purchase: PurchaseState;
   setup: UnlockSetupState;
@@ -36,6 +44,52 @@ export type UnlockSurfaceModel = {
 };
 
 export type UnlockEntryAction = "open_main" | "open_paywall" | "unavailable";
+
+/**
+ * main access entry token の検証用 context を組み立てる。
+ */
+export function buildMockMainAccessEntryContext(mainId: string, fromShortId: string): string {
+  return `main-access-entry::${mainId}::${fromShortId}`;
+}
+
+/**
+ * main playback grant の検証用 context を組み立てる。
+ */
+export function buildMockMainPlaybackGrantContext(
+  mainId: string,
+  fromShortId: string,
+  grantKind: MainPlaybackGrantKind,
+): string {
+  return `main-playback-grant::${mainId}::${fromShortId}::${grantKind}`;
+}
+
+/**
+ * main playback grant context を解析する。
+ */
+export function parseMockMainPlaybackGrantContext(
+  context: string,
+): {
+  fromShortId: string;
+  grantKind: MainPlaybackGrantKind;
+  mainId: string;
+} | null {
+  const [prefix, mainId, fromShortId, grantKind] = context.split("::");
+
+  if (
+    prefix !== "main-playback-grant" ||
+    !mainId ||
+    !fromShortId ||
+    (grantKind !== "owner" && grantKind !== "purchased")
+  ) {
+    return null;
+  }
+
+  return {
+    fromShortId,
+    grantKind,
+    mainId,
+  };
+}
 
 /**
  * unlock state から次の UI action を決定する。
@@ -63,4 +117,11 @@ export function getMainPlaybackHref(mainId: string, fromShortId: string, grantTo
   });
 
   return `/mains/${mainId}?${searchParams.toString()}`;
+}
+
+/**
+ * server grant 発行 endpoint の href を組み立てる。
+ */
+export function getMockMainAccessRoutePath(): string {
+  return "/api/mock-main-access";
 }
