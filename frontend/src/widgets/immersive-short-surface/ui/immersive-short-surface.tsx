@@ -1,10 +1,14 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+"use client";
 
-import { getCreatorInitials } from "@/entities/creator";
+import Link from "next/link";
+import { useState } from "react";
+import { ArrowLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
+
+import { CreatorAvatar, getCreatorInitials } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { buildCreatorProfileHref } from "@/features/creator-navigation";
-import { UnlockCta } from "@/features/unlock-entry";
+import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -125,10 +129,9 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   }
 
   return (
-    <span
-      aria-hidden="true"
-      className="h-[38px] w-[38px] shrink-0 rounded-full bg-cover bg-center shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
-      style={{ backgroundImage: `url(${creator.avatar.url})` }}
+    <CreatorAvatar
+      className="size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      creator={creator}
     />
   );
 }
@@ -168,10 +171,16 @@ function CreatorBlock({ creator, followed = false, profileHref, short }: Creator
  * `feed` と `short detail` で共有する immersive short surface を表示する。
  */
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
+  const [acceptAge, setAcceptAge] = useState(false);
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
+  const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
+  const router = useRouter();
   const { mode, surface } = props;
-  const { creator, short, unlockCta, viewer } = surface;
+  const { creator, short, unlock, viewer } = surface;
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
+  const unlockAction = getUnlockEntryAction(unlock);
   const profileHref =
     mode === "feed"
       ? buildCreatorProfileHref(creator.id, {
@@ -182,6 +191,71 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           from: "short",
           shortId: short.id,
         });
+
+  /**
+   * setup-required main の paywall dialog を開く前に確認状態を初期化する。
+   */
+  const handleOpenPaywall = () => {
+    setAcceptAge(false);
+    setAcceptTerms(false);
+    setIsPaywallOpen(true);
+  };
+
+  /**
+   * paywall dialog を閉じる。送信中は多重操作を防ぐ。
+   */
+  const handleClosePaywall = () => {
+    if (isSubmittingMainAccess) {
+      return;
+    }
+
+    setAcceptAge(false);
+    setAcceptTerms(false);
+    setIsPaywallOpen(false);
+  };
+
+  /**
+   * main access entry を叩いて main playback へ遷移する。
+   */
+  const handleOpenMain = async () => {
+    if (isSubmittingMainAccess) {
+      return;
+    }
+
+    setIsSubmittingMainAccess(true);
+
+    try {
+      const response = await fetch(unlock.mainAccessEntry.routePath, {
+        body: JSON.stringify({
+          acceptedAge: acceptAge,
+          acceptedTerms: acceptTerms,
+          entryToken: unlock.mainAccessEntry.token,
+          fromShortId: short.id,
+          mainId: unlock.main.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            fallbackHref?: string;
+            href?: string;
+          }
+        | null;
+
+      if (response.ok && payload?.href) {
+        handleClosePaywall();
+        router.push(payload.href);
+        return;
+      }
+
+      router.push(payload?.fallbackHref ?? `/shorts/${short.id}`);
+    } finally {
+      setIsSubmittingMainAccess(false);
+    }
+  };
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
@@ -194,12 +268,27 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <PinRail pinned={pinned} />
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
           <UnlockCta
-            cta={unlockCta}
             className="w-full"
-            {...(mode === "feed" ? { href: `/shorts/${short.id}` } : {})}
+            cta={unlock.unlockCta}
+            {...(unlockAction === "open_main"
+              ? { onClick: handleOpenMain }
+              : unlockAction === "open_paywall"
+                ? { onClick: handleOpenPaywall }
+                : {})}
           />
         </div>
         <CreatorBlock creator={creator} followed={followed} profileHref={profileHref} short={short} />
+        <UnlockPaywallDialog
+          acceptAge={acceptAge}
+          acceptTerms={acceptTerms}
+          isSubmitting={isSubmittingMainAccess}
+          onAcceptAgeChange={setAcceptAge}
+          onAcceptTermsChange={setAcceptTerms}
+          onClose={handleClosePaywall}
+          onConfirm={handleOpenMain}
+          open={isPaywallOpen}
+          unlock={unlock}
+        />
       </div>
     </section>
   );

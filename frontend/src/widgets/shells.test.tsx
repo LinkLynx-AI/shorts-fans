@@ -11,7 +11,7 @@ describe("widgets", () => {
     render(<FeedShell state={getMockFeedShellState("recommended")} />);
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
+    expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
     expect(screen.getByText("Mina Rei")).toBeInTheDocument();
     expect(screen.getByText("quiet rooftop preview.")).toBeInTheDocument();
   });

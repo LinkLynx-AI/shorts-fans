@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 
 import { UnlockCta } from "@/features/unlock-entry";
@@ -17,10 +18,13 @@ describe("UnlockCta", () => {
     );
 
     expect(screen.getByRole("link", { name: /Unlock/i })).toHaveAttribute("href", "/shorts/rooftop");
-    expect(screen.getByText(/1,800 \| 8m/)).toBeInTheDocument();
+    expect(screen.getByText(/1,800 \| 8分/)).toBeInTheDocument();
   });
 
-  it("renders a continue-main CTA without navigation", () => {
+  it("renders an action button when click behavior is provided", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+
     render(
       <UnlockCta
         cta={{
@@ -29,10 +33,13 @@ describe("UnlockCta", () => {
           resumePositionSeconds: 494,
           state: "continue_main",
         }}
+        onClick={onClick}
       />,
     );
 
-    expect(screen.getByText("Continue main")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /Continue main/i }));
+
+    expect(onClick).toHaveBeenCalledTimes(1);
     expect(screen.getByText("8:14")).toBeInTheDocument();
   });
 });
