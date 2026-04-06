@@ -41,8 +41,9 @@ type queries interface {
 
 // Repository は auth 関連の永続化操作を包みます。
 type Repository struct {
-	pool    *pgxpool.Pool
-	queries queries
+	txBeginner postgres.TxBeginner
+	db         sqlc.DBTX
+	queries    queries
 }
 
 // Identity は domain 向けの auth identity レコードです。
@@ -120,10 +121,16 @@ type CreateUserWithEmailIdentityAndSessionInput struct {
 
 // NewRepository は pgxpool ベースの auth repository を構築します。
 func NewRepository(pool *pgxpool.Pool) *Repository {
-	return &Repository{
-		pool:    pool,
-		queries: sqlc.New(pool),
+	repository := &Repository{}
+	if pool == nil {
+		return repository
 	}
+
+	repository.txBeginner = pool
+	repository.db = pool
+	repository.queries = sqlc.New(pool)
+
+	return repository
 }
 
 func newRepository(q queries) *Repository {
@@ -319,12 +326,12 @@ func (r *Repository) CreateSession(ctx context.Context, input CreateSessionInput
 
 // CreateUserWithEmailIdentityAndSession は sign-up 完了時の一括作成を transaction で行います。
 func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, input CreateUserWithEmailIdentityAndSessionInput) (SessionRecord, error) {
-	if r.pool == nil {
+	if r.txBeginner == nil {
 		return SessionRecord{}, fmt.Errorf("auth repository pool が初期化されていません")
 	}
 
 	var sessionRow sqlc.AppAuthSession
-	err := postgres.RunInTx(ctx, r.pool, func(tx pgx.Tx) error {
+	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := sqlc.New(tx)
 
 		user, err := q.CreateUser(ctx)
@@ -450,22 +457,22 @@ func (r *Repository) GetCurrentViewerBySessionTokenHash(ctx context.Context, ses
 }
 
 func (r *Repository) dbQueries() (*sqlc.Queries, error) {
-	if r.pool == nil {
+	if r.db == nil {
 		return nil, fmt.Errorf("auth repository pool が初期化されていません")
 	}
 
-	return sqlc.New(r.pool), nil
+	return sqlc.New(r.db), nil
 }
 
 func (r *Repository) bootstrapQueries() (queries, error) {
 	if r.queries != nil {
 		return r.queries, nil
 	}
-	if r.pool == nil {
+	if r.db == nil {
 		return nil, fmt.Errorf("auth repository queries が初期化されていません")
 	}
 
-	return sqlc.New(r.pool), nil
+	return sqlc.New(r.db), nil
 }
 
 func mapCurrentViewer(row sqlc.GetCurrentViewerBySessionTokenHashRow) (CurrentViewer, error) {
