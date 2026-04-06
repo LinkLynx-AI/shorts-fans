@@ -37,7 +37,7 @@ type Server struct {
 }
 
 // NewHandler は API サーバー用の Gin router を構築します。
-func NewHandler(dependencies []Dependency) *gin.Engine {
+func NewHandler(dependencies []Dependency, viewerBootstrapReader ViewerBootstrapReader) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
@@ -71,11 +71,15 @@ func NewHandler(dependencies []Dependency) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
+	if viewerBootstrapReader != nil {
+		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(viewerBootstrapReader))
+	}
+
 	return router
 }
 
 // New は実行設定と依存先から Server を構築します。
-func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
+func New(cfg Config, logger *slog.Logger, dependencies []Dependency, viewerBootstrapReader ViewerBootstrapReader) *Server {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 10 * time.Second
 	}
@@ -83,7 +87,7 @@ func New(cfg Config, logger *slog.Logger, dependencies []Dependency) *Server {
 		logger = slog.Default()
 	}
 
-	handler := NewHandler(dependencies)
+	handler := NewHandler(dependencies, viewerBootstrapReader)
 
 	return &Server{
 		config: cfg,

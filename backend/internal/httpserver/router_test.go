@@ -20,7 +20,7 @@ func (c staticChecker) CheckReadiness(context.Context) error {
 func TestHealthz(t *testing.T) {
 	t.Parallel()
 
-	router := NewHandler(nil)
+	router := NewHandler(nil, nil)
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	rec := httptest.NewRecorder()
 
@@ -77,7 +77,7 @@ func TestReadyz(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			router := NewHandler(tt.deps)
+			router := NewHandler(tt.deps, nil)
 			req := httptest.NewRequest(http.MethodGet, "/readyz", nil)
 			rec := httptest.NewRecorder()
 

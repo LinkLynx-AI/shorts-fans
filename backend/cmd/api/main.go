@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
@@ -47,6 +48,9 @@ func main() {
 		}
 	}()
 
+	authRepository := auth.NewRepository(pool)
+	viewerBootstrapReader := auth.NewReader(authRepository)
+
 	server := httpserver.New(
 		httpserver.Config{
 			Addr:            cfg.APIAddr,
@@ -57,6 +61,7 @@ func main() {
 			{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 			{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
 		},
+		viewerBootstrapReader,
 	)
 
 	logger.Info("api server starting", "addr", cfg.APIAddr, "app_env", cfg.AppEnv)

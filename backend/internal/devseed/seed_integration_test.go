@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/golang-migrate/migrate/v4"
@@ -53,6 +54,12 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if len(summary.ShortIDs) != len(publicShorts) {
 		t.Fatalf("Run() short id count got %d want %d", len(summary.ShortIDs), len(publicShorts))
+	}
+	if summary.FanSessionToken != fanSessionToken {
+		t.Fatalf("Run() fan session token got %q want %q", summary.FanSessionToken, fanSessionToken)
+	}
+	if summary.CreatorSessionToken != creatorSessionToken {
+		t.Fatalf("Run() creator session token got %q want %q", summary.CreatorSessionToken, creatorSessionToken)
 	}
 
 	queries := sqlc.New(pool)
@@ -109,6 +116,34 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 		t.Fatalf("GetMainUnlockByUserIDAndMainID() payment_provider_purchase_ref got %q want %q", got, mainPurchaseRef)
 	}
 
+	fanViewer, err := queries.GetCurrentViewerBySessionTokenHash(ctx, auth.HashSessionToken(summary.FanSessionToken))
+	if err != nil {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() fan error = %v, want nil", err)
+	}
+	if fanViewer.UserID != uuidToPG(fanUserID) {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() fan user got %v want %v", fanViewer.UserID, uuidToPG(fanUserID))
+	}
+	if fanViewer.ActiveMode != "fan" {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() fan active mode got %q want %q", fanViewer.ActiveMode, "fan")
+	}
+	if fanViewer.CanAccessCreatorMode {
+		t.Fatal("GetCurrentViewerBySessionTokenHash() fan can_access_creator_mode = true, want false")
+	}
+
+	creatorViewer, err := queries.GetCurrentViewerBySessionTokenHash(ctx, auth.HashSessionToken(summary.CreatorSessionToken))
+	if err != nil {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() creator error = %v, want nil", err)
+	}
+	if creatorViewer.UserID != uuidToPG(creatorUserID) {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() creator user got %v want %v", creatorViewer.UserID, uuidToPG(creatorUserID))
+	}
+	if creatorViewer.ActiveMode != "creator" {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() creator active mode got %q want %q", creatorViewer.ActiveMode, "creator")
+	}
+	if !creatorViewer.CanAccessCreatorMode {
+		t.Fatal("GetCurrentViewerBySessionTokenHash() creator can_access_creator_mode = false, want true")
+	}
+
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 2)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_capabilities", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_profiles", 1)
@@ -118,6 +153,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_follows", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.pinned_shorts", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 
 	if _, err := pool.Exec(ctx, "UPDATE app.creator_profiles SET bio = $1 WHERE user_id = $2", "stale bio", creatorUserID); err != nil {
 		t.Fatalf("UPDATE app.creator_profiles stale bio error = %v, want nil", err)
@@ -141,6 +177,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_follows", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.pinned_shorts", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 }
 
 func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {

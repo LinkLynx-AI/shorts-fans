@@ -89,6 +89,36 @@ func (q *Queries) GetActiveAuthSessionByTokenHash(ctx context.Context, sessionTo
 	return i, err
 }
 
+const getCurrentViewerBySessionTokenHash = `-- name: GetCurrentViewerBySessionTokenHash :one
+SELECT
+    s.user_id,
+    s.active_mode,
+    EXISTS (
+        SELECT 1
+        FROM app.creator_capabilities AS c
+        WHERE c.user_id = s.user_id
+            AND c.state = 'approved'
+    ) AS can_access_creator_mode
+FROM app.auth_sessions AS s
+WHERE s.session_token_hash = $1
+    AND s.revoked_at IS NULL
+    AND s.expires_at > CURRENT_TIMESTAMP
+LIMIT 1
+`
+
+type GetCurrentViewerBySessionTokenHashRow struct {
+	UserID               pgtype.UUID
+	ActiveMode           string
+	CanAccessCreatorMode bool
+}
+
+func (q *Queries) GetCurrentViewerBySessionTokenHash(ctx context.Context, sessionTokenHash string) (GetCurrentViewerBySessionTokenHashRow, error) {
+	row := q.db.QueryRow(ctx, getCurrentViewerBySessionTokenHash, sessionTokenHash)
+	var i GetCurrentViewerBySessionTokenHashRow
+	err := row.Scan(&i.UserID, &i.ActiveMode, &i.CanAccessCreatorMode)
+	return i, err
+}
+
 const listAuthSessionsByUserID = `-- name: ListAuthSessionsByUserID :many
 SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
 FROM app.auth_sessions
