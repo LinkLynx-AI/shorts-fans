@@ -263,6 +263,32 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 		t.Fatalf("GetActiveAuthSessionByTokenHash() id got %v want %v", gotSession.ID, session.ID)
 	}
 
+	currentViewer, err := queries.GetCurrentViewerBySessionTokenHash(ctx, "session-token-hash")
+	if err != nil {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() before capability error = %v, want nil", err)
+	}
+	if currentViewer.UserID != user.ID {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() user id got %v want %v", currentViewer.UserID, user.ID)
+	}
+	if currentViewer.ActiveMode != "fan" {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() active mode got %q want %q", currentViewer.ActiveMode, "fan")
+	}
+	if currentViewer.CanAccessCreatorMode {
+		t.Fatal("GetCurrentViewerBySessionTokenHash() can_access_creator_mode = true, want false before capability")
+	}
+
+	_, err = queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  user.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateCreatorCapability() for current viewer bootstrap error = %v, want nil", err)
+	}
+
 	session, err = queries.TouchAuthSession(ctx, sqlc.TouchAuthSessionParams{
 		ID:         session.ID,
 		ActiveMode: "creator",
@@ -273,6 +299,17 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	}
 	if session.ActiveMode != "creator" {
 		t.Fatalf("TouchAuthSession() active_mode got %q want %q", session.ActiveMode, "creator")
+	}
+
+	currentViewer, err = queries.GetCurrentViewerBySessionTokenHash(ctx, "session-token-hash")
+	if err != nil {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() after capability error = %v, want nil", err)
+	}
+	if currentViewer.ActiveMode != "creator" {
+		t.Fatalf("GetCurrentViewerBySessionTokenHash() creator active mode got %q want %q", currentViewer.ActiveMode, "creator")
+	}
+	if !currentViewer.CanAccessCreatorMode {
+		t.Fatal("GetCurrentViewerBySessionTokenHash() can_access_creator_mode = false, want true after capability")
 	}
 
 	_, err = queries.RevokeAuthSession(ctx, sqlc.RevokeAuthSessionParams{

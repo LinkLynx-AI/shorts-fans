@@ -9,6 +9,7 @@
 
 | issue | contract | fixture |
 | --- | --- | --- |
+| `SHO-39` | `docs/contracts/viewer-bootstrap-api-contract.md` | `docs/contracts/fixtures/viewer-bootstrap.json` |
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
 | `SHO-18` | `docs/contracts/fan-unlock-main-api-contract.md` | `docs/contracts/fixtures/fan-unlock-main.json` |
@@ -36,10 +37,22 @@
    - `GET /api/fan/profile/library`
    - `GET /api/fan/profile/settings`
 
+## App Bootstrap Connection Order
+
+1. `SHO-39`
+   - `GET /api/viewer/bootstrap`
+   - current viewer の `id / activeMode / canAccessCreatorMode`
+   - unauthenticated bootstrap 時は `currentViewer = null`
+2. `SHO-17` 以降の public surface
+   - viewer 自身の state ではなく resource relation state だけを参照する
+3. `SHO-19`
+   - private hub は bootstrap 済みの current viewer を前提に接続する
+
 ## Frontend Connection Order
 
 | downstream issue | UI area | primary contract | fixture scenarios |
 | --- | --- | --- | --- |
+| `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_purchased`, `short_detail_public`, `short_detail_purchased`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-8` | `mini paywall / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchased`, `owner`, `locked`, `not_found`, `playback_purchased`, `playback_owner` |

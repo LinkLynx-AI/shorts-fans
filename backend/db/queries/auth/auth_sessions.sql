@@ -24,6 +24,22 @@ WHERE session_token_hash = sqlc.arg(session_token_hash)
     AND expires_at > CURRENT_TIMESTAMP
 LIMIT 1;
 
+-- name: GetCurrentViewerBySessionTokenHash :one
+SELECT
+    s.user_id,
+    s.active_mode,
+    EXISTS (
+        SELECT 1
+        FROM app.creator_capabilities AS c
+        WHERE c.user_id = s.user_id
+            AND c.state = 'approved'
+    ) AS can_access_creator_mode
+FROM app.auth_sessions AS s
+WHERE s.session_token_hash = sqlc.arg(session_token_hash)
+    AND s.revoked_at IS NULL
+    AND s.expires_at > CURRENT_TIMESTAMP
+LIMIT 1;
+
 -- name: ListAuthSessionsByUserID :many
 SELECT *
 FROM app.auth_sessions

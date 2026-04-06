@@ -10,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
@@ -49,6 +50,8 @@ func main() {
 	}()
 
 	creatorRepository := creator.NewRepository(pool)
+	authRepository := auth.NewRepository(pool)
+	viewerBootstrapReader := auth.NewReader(authRepository)
 
 	server := httpserver.New(
 		httpserver.Config{
@@ -60,6 +63,7 @@ func main() {
 			CreatorSearch:       creatorRepository,
 			CreatorProfile:      creatorRepository,
 			CreatorProfileShort: creatorRepository,
+			ViewerBootstrap:     viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

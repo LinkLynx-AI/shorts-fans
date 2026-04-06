@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -21,16 +22,18 @@ var (
 	shortAAssetID = uuid.MustParse("77777777-7777-7777-7777-777777777777")
 	shortBAssetID = uuid.MustParse("88888888-8888-8888-8888-888888888888")
 
-	creatorApprovedAt  = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
-	creatorPublishedAt = time.Date(2026, 1, 2, 9, 30, 0, 0, time.UTC)
-	mainApprovedAt     = time.Date(2026, 1, 2, 10, 0, 0, 0, time.UTC)
-	shortAApprovedAt   = time.Date(2026, 1, 2, 10, 30, 0, 0, time.UTC)
-	shortAPublishedAt  = time.Date(2026, 1, 2, 11, 0, 0, 0, time.UTC)
-	shortBApprovedAt   = time.Date(2026, 1, 2, 11, 30, 0, 0, time.UTC)
-	shortBPublishedAt  = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
-	fanFollowedAt      = time.Date(2026, 1, 2, 12, 30, 0, 0, time.UTC)
-	fanUnlockedAt      = time.Date(2026, 1, 2, 13, 0, 0, 0, time.UTC)
-	fanPinnedShortAt   = time.Date(2026, 1, 2, 13, 30, 0, 0, time.UTC)
+	creatorApprovedAt       = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
+	creatorPublishedAt      = time.Date(2026, 1, 2, 9, 30, 0, 0, time.UTC)
+	mainApprovedAt          = time.Date(2026, 1, 2, 10, 0, 0, 0, time.UTC)
+	shortAApprovedAt        = time.Date(2026, 1, 2, 10, 30, 0, 0, time.UTC)
+	shortAPublishedAt       = time.Date(2026, 1, 2, 11, 0, 0, 0, time.UTC)
+	shortBApprovedAt        = time.Date(2026, 1, 2, 11, 30, 0, 0, time.UTC)
+	shortBPublishedAt       = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	fanFollowedAt           = time.Date(2026, 1, 2, 12, 30, 0, 0, time.UTC)
+	fanUnlockedAt           = time.Date(2026, 1, 2, 13, 0, 0, 0, time.UTC)
+	fanPinnedShortAt        = time.Date(2026, 1, 2, 13, 30, 0, 0, time.UTC)
+	fanSessionExpiresAt     = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	creatorSessionExpiresAt = time.Date(2026, 12, 31, 0, 5, 0, 0, time.UTC)
 )
 
 const (
@@ -42,7 +45,9 @@ const (
 	mainPriceMinor = int64(1200)
 	mainCurrency   = "JPY"
 
-	mainPurchaseRef = "mock-purchase-main-001"
+	mainPurchaseRef     = "mock-purchase-main-001"
+	fanSessionToken     = "dev-fan-session-token"
+	creatorSessionToken = "dev-creator-session-token"
 )
 
 type mediaAssetSeed struct {
@@ -98,10 +103,12 @@ var publicShorts = []shortSeed{
 
 // Summary は dev seed 適用後に利用しやすい主要 ID を返します。
 type Summary struct {
-	CreatorUserID uuid.UUID
-	FanUserID     uuid.UUID
-	MainID        uuid.UUID
-	ShortIDs      []uuid.UUID
+	CreatorUserID       uuid.UUID
+	FanUserID           uuid.UUID
+	MainID              uuid.UUID
+	ShortIDs            []uuid.UUID
+	FanSessionToken     string
+	CreatorSessionToken string
 }
 
 // Run はローカル開発用の固定 mock data を idempotent に投入します。
@@ -145,6 +152,12 @@ func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
 		if err := upsertPinnedShort(ctx, tx); err != nil {
 			return err
 		}
+		if err := upsertAuthSession(ctx, tx, fanUserID, "fan", fanSessionToken, fanSessionExpiresAt); err != nil {
+			return err
+		}
+		if err := upsertAuthSession(ctx, tx, creatorUserID, "creator", creatorSessionToken, creatorSessionExpiresAt); err != nil {
+			return err
+		}
 
 		return nil
 	}); err != nil {
@@ -157,10 +170,12 @@ func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
 	}
 
 	return Summary{
-		CreatorUserID: creatorUserID,
-		FanUserID:     fanUserID,
-		MainID:        mainID,
-		ShortIDs:      shortIDs,
+		CreatorUserID:       creatorUserID,
+		FanUserID:           fanUserID,
+		MainID:              mainID,
+		ShortIDs:            shortIDs,
+		FanSessionToken:     fanSessionToken,
+		CreatorSessionToken: creatorSessionToken,
 	}, nil
 }
 
@@ -445,6 +460,40 @@ func upsertPinnedShort(ctx context.Context, tx pgx.Tx) error {
 			pinned_at = EXCLUDED.pinned_at
 	`, fanUserID, shortAID, fanPinnedShortAt); err != nil {
 		return fmt.Errorf("pinned_shorts upsert user_id=%s short_id=%s: %w", fanUserID, shortAID, err)
+	}
+
+	return nil
+}
+
+func upsertAuthSession(
+	ctx context.Context,
+	tx pgx.Tx,
+	userID uuid.UUID,
+	activeMode string,
+	rawSessionToken string,
+	expiresAt time.Time,
+) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.auth_sessions (
+			user_id,
+			active_mode,
+			session_token_hash,
+			expires_at
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4
+		)
+		ON CONFLICT (session_token_hash) DO UPDATE
+		SET
+			user_id = EXCLUDED.user_id,
+			active_mode = EXCLUDED.active_mode,
+			expires_at = EXCLUDED.expires_at,
+			revoked_at = NULL,
+			updated_at = CURRENT_TIMESTAMP
+	`, userID, activeMode, auth.HashSessionToken(rawSessionToken), expiresAt); err != nil {
+		return fmt.Errorf("auth_sessions upsert user_id=%s active_mode=%s: %w", userID, activeMode, err)
 	}
 
 	return nil

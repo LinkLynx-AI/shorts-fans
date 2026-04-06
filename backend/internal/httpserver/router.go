@@ -46,6 +46,7 @@ type HandlerConfig struct {
 	CreatorSearch       CreatorSearchReader
 	CreatorProfile      CreatorProfileReader
 	CreatorProfileShort CreatorProfileShortsReader
+	ViewerBootstrap     ViewerBootstrapReader
 	Dependencies        []Dependency
 }
 
@@ -96,6 +97,10 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
+
+	if config.ViewerBootstrap != nil {
+		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(config.ViewerBootstrap))
+	}
 
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShort)
