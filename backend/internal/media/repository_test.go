@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type stubQueries struct {
@@ -43,5 +44,17 @@ func TestGetAssetNotFound(t *testing.T) {
 	_, err := repo.GetAsset(context.Background(), uuid.New())
 	if !errors.Is(err, ErrAssetNotFound) {
 		t.Fatalf("GetAsset() error got %v want %v", err, ErrAssetNotFound)
+	}
+}
+
+func TestNewRepositoryInitializesQueries(t *testing.T) {
+	t.Parallel()
+
+	repository := NewRepository(&pgxpool.Pool{})
+	if repository == nil {
+		t.Fatal("NewRepository() repository = nil, want non-nil")
+	}
+	if repository.queries == nil {
+		t.Fatal("NewRepository() queries = nil, want initialized")
 	}
 }

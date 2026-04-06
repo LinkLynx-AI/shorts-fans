@@ -46,6 +46,8 @@ type HandlerConfig struct {
 	CreatorSearch        CreatorSearchReader
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	FanAuth              FanAuthService
+	AuthCookie           AuthCookieConfig
 	ViewerBootstrap      ViewerBootstrapReader
 	Dependencies         []Dependency
 }
@@ -102,6 +104,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(config.ViewerBootstrap))
 	}
 
+	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
 

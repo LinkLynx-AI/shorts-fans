@@ -4,12 +4,22 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
 
 type bootstrapRepositoryStub struct {
-	getCurrentViewer func(context.Context, string) (CurrentViewer, error)
+	touchSessionLastSeen func(context.Context, string, time.Time) (SessionRecord, error)
+	getCurrentViewer     func(context.Context, string) (CurrentViewer, error)
+}
+
+func (s bootstrapRepositoryStub) TouchSessionLastSeenByTokenHash(
+	ctx context.Context,
+	sessionTokenHash string,
+	lastSeenAt time.Time,
+) (SessionRecord, error) {
+	return s.touchSessionLastSeen(ctx, sessionTokenHash, lastSeenAt)
 }
 
 func (s bootstrapRepositoryStub) GetCurrentViewerBySessionTokenHash(
@@ -24,6 +34,10 @@ func TestReadCurrentViewerReturnsEmptyStateForBlankToken(t *testing.T) {
 
 	called := false
 	reader := NewReader(bootstrapRepositoryStub{
+		touchSessionLastSeen: func(context.Context, string, time.Time) (SessionRecord, error) {
+			called = true
+			return SessionRecord{}, nil
+		},
 		getCurrentViewer: func(context.Context, string) (CurrentViewer, error) {
 			called = true
 			return CurrentViewer{}, nil
@@ -46,6 +60,9 @@ func TestReadCurrentViewerReturnsEmptyStateForMissingSession(t *testing.T) {
 	t.Parallel()
 
 	reader := NewReader(bootstrapRepositoryStub{
+		touchSessionLastSeen: func(context.Context, string, time.Time) (SessionRecord, error) {
+			return SessionRecord{}, ErrSessionNotFound
+		},
 		getCurrentViewer: func(context.Context, string) (CurrentViewer, error) {
 			return CurrentViewer{}, ErrCurrentViewerNotFound
 		},
@@ -64,6 +81,9 @@ func TestReadCurrentViewerNormalizesInvalidCreatorMode(t *testing.T) {
 	t.Parallel()
 
 	reader := NewReader(bootstrapRepositoryStub{
+		touchSessionLastSeen: func(context.Context, string, time.Time) (SessionRecord, error) {
+			return SessionRecord{}, nil
+		},
 		getCurrentViewer: func(context.Context, string) (CurrentViewer, error) {
 			return CurrentViewer{
 				ID:                   uuid.MustParse("11111111-1111-1111-1111-111111111111"),
@@ -90,6 +110,9 @@ func TestReadCurrentViewerWrapsRepositoryError(t *testing.T) {
 
 	expectedErr := errors.New("query failed")
 	reader := NewReader(bootstrapRepositoryStub{
+		touchSessionLastSeen: func(context.Context, string, time.Time) (SessionRecord, error) {
+			return SessionRecord{}, nil
+		},
 		getCurrentViewer: func(context.Context, string) (CurrentViewer, error) {
 			return CurrentViewer{}, expectedErr
 		},

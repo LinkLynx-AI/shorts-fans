@@ -84,6 +84,18 @@ func TestNewClientSuccess(t *testing.T) {
 	}
 }
 
+func TestNewClientRejectsInvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(context.Background(), Config{})
+	if err == nil {
+		t.Fatal("NewClient() error = nil, want error")
+	}
+	if client != nil {
+		t.Fatalf("NewClient() client got %#v want nil", client)
+	}
+}
+
 func stringPtr(value string) *string {
 	return &value
 }

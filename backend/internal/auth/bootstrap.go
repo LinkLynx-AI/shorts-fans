@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -32,17 +33,22 @@ type Bootstrap struct {
 }
 
 type bootstrapRepository interface {
+	TouchSessionLastSeenByTokenHash(ctx context.Context, sessionTokenHash string, lastSeenAt time.Time) (SessionRecord, error)
 	GetCurrentViewerBySessionTokenHash(ctx context.Context, sessionTokenHash string) (CurrentViewer, error)
 }
 
 // Reader は session token から current viewer bootstrap を解決します。
 type Reader struct {
 	repository bootstrapRepository
+	now        func() time.Time
 }
 
 // NewReader は bootstrap reader を構築します。
 func NewReader(repository bootstrapRepository) *Reader {
-	return &Reader{repository: repository}
+	return &Reader{
+		repository: repository,
+		now:        time.Now,
+	}
 }
 
 // ReadCurrentViewer は raw session token から current viewer state を返します。
@@ -56,7 +62,16 @@ func (r *Reader) ReadCurrentViewer(ctx context.Context, rawSessionToken string) 
 		return Bootstrap{}, nil
 	}
 
-	viewer, err := r.repository.GetCurrentViewerBySessionTokenHash(ctx, HashSessionToken(trimmedToken))
+	sessionTokenHash := HashSessionToken(trimmedToken)
+	if _, err := r.repository.TouchSessionLastSeenByTokenHash(ctx, sessionTokenHash, r.now().UTC()); err != nil {
+		if errors.Is(err, ErrSessionNotFound) {
+			return Bootstrap{}, nil
+		}
+
+		return Bootstrap{}, fmt.Errorf("current viewer session 更新: %w", err)
+	}
+
+	viewer, err := r.repository.GetCurrentViewerBySessionTokenHash(ctx, sessionTokenHash)
 	if err != nil {
 		if errors.Is(err, ErrCurrentViewerNotFound) {
 			return Bootstrap{}, nil

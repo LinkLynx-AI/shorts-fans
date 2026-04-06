@@ -41,6 +41,65 @@ func TestNewDelivery(t *testing.T) {
 	}
 }
 
+func TestNewDeliveryRejectsInvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		cfg  DeliveryConfig
+	}{
+		{
+			name: "missing short public base url",
+			cfg: DeliveryConfig{
+				MainPrivateBucketName: "main-bucket",
+			},
+		},
+		{
+			name: "invalid short public base url",
+			cfg: DeliveryConfig{
+				ShortPublicBaseURL:    "http://%",
+				MainPrivateBucketName: "main-bucket",
+			},
+		},
+		{
+			name: "missing main private bucket name",
+			cfg: DeliveryConfig{
+				ShortPublicBaseURL: "https://cdn.example.com/media",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			delivery, err := NewDelivery(tt.cfg, &stubMainURLSigner{})
+			if err == nil {
+				t.Fatal("NewDelivery() error = nil, want error")
+			}
+			if delivery != nil {
+				t.Fatalf("NewDelivery() delivery got %#v want nil", delivery)
+			}
+		})
+	}
+}
+
+func TestNewDeliveryRejectsNilSigner(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, nil)
+	if err == nil {
+		t.Fatal("NewDelivery() error = nil, want error")
+	}
+	if delivery != nil {
+		t.Fatalf("NewDelivery() delivery got %#v want nil", delivery)
+	}
+}
+
 func TestShortPublicURL(t *testing.T) {
 	t.Parallel()
 
@@ -58,6 +117,31 @@ func TestShortPublicURL(t *testing.T) {
 	}
 	if got != "https://cdn.example.com/media/probe/short%20smoke.m3u8" {
 		t.Fatalf("ShortPublicURL() got %q want %q", got, "https://cdn.example.com/media/probe/short%20smoke.m3u8")
+	}
+}
+
+func TestShortPublicURLRejectsNilReceiver(t *testing.T) {
+	t.Parallel()
+
+	var delivery *Delivery
+	if _, err := delivery.ShortPublicURL("probe/short.m3u8"); err == nil {
+		t.Fatal("ShortPublicURL() error = nil, want error")
+	}
+}
+
+func TestShortPublicURLRejectsBlankStorageKey(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	if _, err := delivery.ShortPublicURL("   "); err == nil {
+		t.Fatal("ShortPublicURL() error = nil, want error")
 	}
 }
 
