@@ -1,7 +1,5 @@
 export {
   getFeedShortForTab,
-  getLibraryShorts,
-  getPinnedShorts,
   getShortById,
   getShortIds,
   getShortThemeStyle,
@@ -9,7 +7,6 @@ export {
   listShorts,
 } from "./model/short";
 export type {
-  FanCollectionTab,
   FeedTab,
   ShortId,
   ShortMediaAsset,

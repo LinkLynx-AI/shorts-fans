@@ -19,6 +19,7 @@ type CreatorIdentityProps = {
 type CreatorStatListProps = {
   className?: string;
   stats: CreatorProfileStats;
+  variant?: "default" | "creatorProfile";
 };
 
 function formatCompactCount(value: number): string {
@@ -65,7 +66,11 @@ export function CreatorIdentity({ className, creator, href }: CreatorIdentityPro
 /**
  * creator profile 用の stat list を表示する。
  */
-export function CreatorStatList({ className, stats }: CreatorStatListProps) {
+export function CreatorStatList({
+  className,
+  stats,
+  variant = "default",
+}: CreatorStatListProps) {
   const items = [
     { label: "shorts", value: stats.shortCount.toString() },
     { label: "fans", value: formatCompactCount(stats.fanCount) },
@@ -73,13 +78,32 @@ export function CreatorStatList({ className, stats }: CreatorStatListProps) {
   ] as const;
 
   return (
-    <div className={cn("grid grid-cols-3 gap-3 text-center", className)}>
+    <div
+      className={cn(
+        variant === "creatorProfile"
+          ? "grid grid-cols-3 gap-4 text-left"
+          : "grid grid-cols-3 gap-3 text-center",
+        className,
+      )}
+    >
       {items.map((stat) => (
         <div key={stat.label} className="min-w-0">
-          <strong className="block font-display text-lg font-semibold tracking-[-0.04em] text-foreground">
+          <strong
+            className={cn(
+              "block font-display font-semibold tracking-[-0.04em] text-foreground",
+              variant === "creatorProfile" ? "text-[18px]" : "text-lg",
+            )}
+          >
             {stat.value}
           </strong>
-          <span className="mt-1 block text-[11px] uppercase tracking-[0.14em] text-muted">{stat.label}</span>
+          <span
+            className={cn(
+              "mt-1 block text-[11px] text-muted",
+              variant === "creatorProfile" ? "text-[12px] leading-[1.25]" : "uppercase tracking-[0.14em]",
+            )}
+          >
+            {stat.label}
+          </span>
         </div>
       ))}
     </div>

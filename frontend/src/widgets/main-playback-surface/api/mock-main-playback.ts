@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 import { getCreatorById } from "@/entities/creator";
+import { getFanHubState } from "@/entities/fan-profile";
 import { getMainById } from "@/entities/main";
-import { getPinnedShorts, getShortById } from "@/entities/short";
+import { getShortById } from "@/entities/short";
 import {
   getUnlockSurfaceByShortId,
   type MainAccessState,
@@ -109,11 +110,11 @@ function buildPlaybackAccess(
   }
 
   return {
-      access: {
-        mainId,
-        reason: "purchased_access",
-        status: "purchased",
-      },
+    access: {
+      mainId,
+      reason: "purchased_access",
+      status: "purchased",
+    },
     resumePositionSeconds: unlock.unlockCta.resumePositionSeconds,
   };
 }
@@ -161,7 +162,7 @@ export function getMainPlaybackSurfaceById(
     return undefined;
   }
 
-  const pinnedShortIds = new Set(getPinnedShorts().map((short) => short.id));
+  const pinnedShortIds = new Set(getFanHubState("pinned").pinnedItems.map((item) => item.short.id));
 
   return playbackSurfaceSchema.parse({
     access: playbackState.access,
