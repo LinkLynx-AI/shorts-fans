@@ -75,7 +75,7 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "この main はまだ unlock されていません。" })).toBeVisible();
 
   await page.goto("/creators/mina");
-  await expect(page.getByRole("heading", { name: "Creator profile structure" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
 
   await page.goto("/creators/sora");
   await expect(page.getByText("まだ公開中の short はありません。")).toBeVisible();
