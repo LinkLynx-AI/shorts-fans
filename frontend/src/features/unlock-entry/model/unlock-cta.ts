@@ -22,7 +22,7 @@ function formatSecondsAsTimestamp(seconds: number): string {
 
 function formatCompactMinutes(seconds: number): string {
   const roundedMinutes = Math.max(1, Math.round(seconds / 60));
-  return `${roundedMinutes}m`;
+  return `${roundedMinutes}分`;
 }
 
 function formatJpy(priceJpy: number): string {
