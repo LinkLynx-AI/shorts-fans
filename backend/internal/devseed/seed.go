@@ -8,7 +8,6 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 var (
@@ -105,12 +104,12 @@ type Summary struct {
 }
 
 // Run はローカル開発用の固定 mock data を idempotent に投入します。
-func Run(ctx context.Context, pool *pgxpool.Pool) (Summary, error) {
-	if pool == nil {
-		return Summary{}, fmt.Errorf("postgres pool が nil です")
+func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
+	if beginner == nil {
+		return Summary{}, fmt.Errorf("tx beginner が nil です")
 	}
 
-	if err := postgres.RunInTx(ctx, pool, func(tx pgx.Tx) error {
+	if err := postgres.RunInTx(ctx, beginner, func(tx pgx.Tx) error {
 		if err := upsertUser(ctx, tx, creatorUserID); err != nil {
 			return err
 		}
