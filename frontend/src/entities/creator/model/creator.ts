@@ -9,7 +9,7 @@ type CreatorAvatarAsset = {
 };
 
 export type CreatorSummary = {
-  avatar: CreatorAvatarAsset;
+  avatar: CreatorAvatarAsset | null;
   bio: string;
   displayName: string;
   handle: `@${string}`;
@@ -22,8 +22,9 @@ export type CreatorProfileStats = {
   viewCount: number;
 };
 
-const recentCreatorIds = ["aoi", "mina"] as const satisfies readonly CreatorId[];
-
+/**
+ * mock avatar 表示用の data URL を生成する。
+ */
 function createAvatarDataUrl(from: string, accent: string, to: string): string {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
@@ -41,6 +42,14 @@ function createAvatarDataUrl(from: string, accent: string, to: string): string {
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+/**
+ * creator search 初期表示に使う recent creator ID 一覧を保持する。
+ */
+const recentCreatorIds = ["aoi", "mina"] as const satisfies readonly CreatorId[];
+
+/**
+ * mock creator 用の avatar asset を構築する。
+ */
 function createAvatarAsset(creatorId: CreatorId, from: string, accent: string, to: string): CreatorAvatarAsset {
   return {
     durationSeconds: null,
@@ -81,10 +90,16 @@ const creatorProfileStatsById: Record<string, CreatorProfileStats> = {
   sora: { fanCount: 16000, shortCount: 0, viewCount: 118000 },
 };
 
+/**
+ * creator search query を比較用の lowercase 文字列に正規化する。
+ */
 function normalizeCreatorSearchQuery(query: string): string {
   return query.trim().toLowerCase();
 }
 
+/**
+ * creator の検索対象文字列を組み立てる。
+ */
 function getCreatorSearchText(creator: CreatorSummary): string {
   return `${creator.displayName} ${creator.handle}`.toLowerCase();
 }
