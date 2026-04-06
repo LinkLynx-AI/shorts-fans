@@ -1,6 +1,9 @@
 package sqs
 
-import "testing"
+import (
+	"context"
+	"testing"
+)
 
 func TestConfigValidate(t *testing.T) {
 	t.Parallel()
@@ -60,5 +63,43 @@ func TestConfigValidate(t *testing.T) {
 				t.Fatalf("Enabled() got %t want %t", got, tt.wantReady)
 			}
 		})
+	}
+}
+
+func TestNewClientReturnsNilForDisabledConfig(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewClient(context.Background(), Config{})
+	if err != nil {
+		t.Fatalf("NewClient() error = %v, want nil", err)
+	}
+	if client != nil {
+		t.Fatalf("NewClient() client got %#v want nil", client)
+	}
+}
+
+func TestNewAccessCheckerReturnsNilForDisabledConfig(t *testing.T) {
+	t.Parallel()
+
+	checker, err := NewAccessChecker(context.Background(), Config{})
+	if err != nil {
+		t.Fatalf("NewAccessChecker() error = %v, want nil", err)
+	}
+	if checker != nil {
+		t.Fatalf("NewAccessChecker() checker got %#v want nil", checker)
+	}
+}
+
+func TestNewAccessCheckerRejectsInvalidConfig(t *testing.T) {
+	t.Parallel()
+
+	checker, err := NewAccessChecker(context.Background(), Config{
+		QueueURL: "https://example.com/queue",
+	})
+	if err == nil {
+		t.Fatal("NewAccessChecker() error = nil, want error")
+	}
+	if checker != nil {
+		t.Fatalf("NewAccessChecker() checker got %#v want nil", checker)
 	}
 }
