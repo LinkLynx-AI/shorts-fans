@@ -14,17 +14,27 @@ import (
 )
 
 type repositoryStubQueries struct {
-	createCapability  func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
-	getCapability     func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
-	updateCapability  func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
-	createProfile     func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	getProfile        func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
-	getPublicProfile  func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
-	getPublicByHandle func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
-	listRecentPublic  func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
-	searchPublic      func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
-	updateProfile     func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	publishProfile    func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	countFollowers       func(context.Context, pgtype.UUID) (int64, error)
+	createCapability     func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
+	getCapability        func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	updateCapability     func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
+	countPublicShorts    func(context.Context, pgtype.UUID) (int64, error)
+	createProfile        func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	getProfile           func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	getPublicProfile     func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
+	getPublicByHandle    func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
+	listProfileShortGrid func(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
+	listRecentPublic     func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	searchPublic         func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	updateProfile        func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	publishProfile       func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+}
+
+func (s repositoryStubQueries) CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error) {
+	if s.countFollowers == nil {
+		return 0, nil
+	}
+	return s.countFollowers(ctx, creatorUserID)
 }
 
 func (s repositoryStubQueries) CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
@@ -55,6 +65,13 @@ func (s repositoryStubQueries) CreateCreatorProfile(ctx context.Context, arg sql
 	return s.createProfile(ctx, arg)
 }
 
+func (s repositoryStubQueries) CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error) {
+	if s.countPublicShorts == nil {
+		return 0, nil
+	}
+	return s.countPublicShorts(ctx, creatorUserID)
+}
+
 func (s repositoryStubQueries) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 	if s.getProfile == nil {
 		return sqlc.AppCreatorProfile{}, nil
@@ -74,6 +91,13 @@ func (s repositoryStubQueries) GetPublicCreatorProfileByHandle(ctx context.Conte
 		return sqlc.AppPublicCreatorProfile{}, nil
 	}
 	return s.getPublicByHandle(ctx, handle)
+}
+
+func (s repositoryStubQueries) ListCreatorProfileShortGridItems(ctx context.Context, arg sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error) {
+	if s.listProfileShortGrid == nil {
+		return nil, nil
+	}
+	return s.listProfileShortGrid(ctx, arg)
 }
 
 func (s repositoryStubQueries) ListRecentPublicCreatorProfiles(ctx context.Context, arg sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {

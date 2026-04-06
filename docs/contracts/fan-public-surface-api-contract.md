@@ -21,7 +21,8 @@
 | `GET` | `/api/fan/feed` | `tab=recommended` は optional、`tab=following` は required | short feed |
 | `GET` | `/api/fan/shorts/{shortId}` | optional | short detail |
 | `GET` | `/api/fan/creators/search` | optional | creator search only |
-| `GET` | `/api/fan/creators/{creatorId}` | optional | public creator profile |
+| `GET` | `/api/fan/creators/{creatorId}` | optional | public creator profile header |
+| `GET` | `/api/fan/creators/{creatorId}/shorts` | optional | public creator short grid |
 
 ## Request Contract
 
@@ -121,25 +122,58 @@
 | --- | --- | --- |
 | `creatorId` | `string` | yes |
 
-#### Query
-
-| field | type | required | notes |
-| --- | --- | --- | --- |
-| `cursor` | `string` | no | short grid pagination |
-
 #### Response
 
 - `data.profile.creator`: `CreatorSummary`
 - `data.profile.stats.shortCount`: `number`
 - `data.profile.stats.fanCount`: `number`
-- `data.profile.stats.viewCount`: `number`
 - `data.profile.viewer.isFollowing`: `boolean`
-- `data.shorts`: `ShortSummary[]`
-- `meta.page`: `CursorPageInfo`
+- `meta.page = null`
 
 #### Guardrail
 
-- `data.shorts` には `unlockCta`、価格、`mainDurationSeconds` を入れません。
+- creator profile は `main` の direct list surface に昇格させません。
+
+#### HTTP States
+
+| case | status |
+| --- | --- |
+| normal | `200` |
+| `not_found` | `404` + `not_found` |
+
+### `GET /api/fan/creators/{creatorId}/shorts`
+
+#### Path
+
+| field | type | required |
+| --- | --- | --- |
+| `creatorId` | `string` | yes |
+
+#### Query
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `cursor` | `string` | no | short grid keyset pagination |
+
+#### Response
+
+- `data.items`: `CreatorProfileShortGridItem[]`
+- `meta.page`: `CursorPageInfo`
+
+### `CreatorProfileShortGridItem`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | short identifier |
+| `canonicalMainId` | `string` | canonical main target |
+| `creatorId` | `string` | short owner |
+| `media` | `MediaAsset` | `kind = "video"` |
+| `previewDurationSeconds` | `number` | short 自身の長さ |
+
+#### Guardrail
+
+- grid item には `unlockCta`、価格、`mainDurationSeconds` を入れません。
+- grid item には `title`、`caption` を入れません。
 - creator profile は `main` の direct list surface に昇格させません。
 
 #### HTTP States
@@ -157,7 +191,8 @@
 | `GET /api/fan/feed` | yes | yes | no | yes | no |
 | `GET /api/fan/shorts/{shortId}` | yes | yes | yes | no | yes |
 | `GET /api/fan/creators/search` | yes | no | no | yes | no |
-| `GET /api/fan/creators/{creatorId}` | yes | no | no | yes | yes |
+| `GET /api/fan/creators/{creatorId}` | yes | no | no | no | yes |
+| `GET /api/fan/creators/{creatorId}/shorts` | yes | no | no | yes | yes |
 
 ## Out-of-scope Guardrails
 

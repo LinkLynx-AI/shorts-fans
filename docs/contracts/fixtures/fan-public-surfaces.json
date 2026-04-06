@@ -402,7 +402,7 @@
     }
   },
   "GET /api/fan/creators/{creatorId}": {
-    "creator_profile_normal": {
+    "creator_profile_header_normal": {
       "status": 200,
       "body": {
         "data": {
@@ -422,25 +422,50 @@
             },
             "stats": {
               "shortCount": 2,
-              "fanCount": 24000,
-              "viewCount": 184000
+              "fanCount": 24000
             },
             "viewer": {
-              "isFollowing": true
+              "isFollowing": false
             }
-          },
-          "shorts": [
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_profile_header_normal_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "creator_profile_header_not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_profile_header_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator was not found"
+        }
+      }
+    }
+  },
+  "GET /api/fan/creators/{creatorId}/shorts": {
+    "creator_profile_shorts_normal": {
+      "status": 200,
+      "body": {
+        "data": {
+          "items": [
             {
               "id": "short_mina_rooftop",
               "canonicalMainId": "main_mina_quiet_rooftop",
               "creatorId": "creator_mina_rei",
-              "title": "quiet rooftop preview",
-              "caption": "quiet rooftop preview。",
               "media": {
                 "id": "asset_short_mina_rooftop",
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
-                "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+                "posterUrl": null,
                 "durationSeconds": 16
               },
               "previewDurationSeconds": 16
@@ -449,13 +474,11 @@
               "id": "short_mina_hotel_mirror",
               "canonicalMainId": "main_mina_quiet_rooftop",
               "creatorId": "creator_mina_rei",
-              "title": "hotel mirror preview",
-              "caption": "hotel mirror の preview。",
               "media": {
                 "id": "asset_short_mina_hotel_mirror",
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-hotel-mirror.mp4",
-                "posterUrl": "https://cdn.example.com/shorts/mina-hotel-mirror-poster.jpg",
+                "posterUrl": null,
                 "durationSeconds": 14
               },
               "previewDurationSeconds": 14
@@ -463,7 +486,7 @@
           ]
         },
         "meta": {
-          "requestId": "req_creator_profile_normal_001",
+          "requestId": "req_creator_profile_shorts_normal_001",
           "page": {
             "nextCursor": null,
             "hasNext": false
@@ -472,37 +495,44 @@
         "error": null
       }
     },
-    "creator_profile_empty": {
+    "creator_profile_shorts_next_page": {
       "status": 200,
       "body": {
         "data": {
-          "profile": {
-            "creator": {
-              "id": "creator_sora_vale",
-              "displayName": "Sora Vale",
-              "handle": "@soravale",
-              "avatar": {
-                "id": "asset_creator_sora_avatar",
-                "kind": "image",
-                "url": "https://cdn.example.com/creator/sora/avatar.jpg",
+          "items": [
+            {
+              "id": "short_mina_rooftop",
+              "canonicalMainId": "main_mina_quiet_rooftop",
+              "creatorId": "creator_mina_rei",
+              "media": {
+                "id": "asset_short_mina_rooftop",
+                "kind": "video",
+                "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
                 "posterUrl": null,
-                "durationSeconds": null
+                "durationSeconds": 16
               },
-              "bio": "after rain と balcony mood の short をまとめています。"
-            },
-            "stats": {
-              "shortCount": 0,
-              "fanCount": 16000,
-              "viewCount": 118000
-            },
-            "viewer": {
-              "isFollowing": false
+              "previewDurationSeconds": 16
             }
-          },
-          "shorts": []
+          ]
         },
         "meta": {
-          "requestId": "req_creator_profile_empty_001",
+          "requestId": "req_creator_profile_shorts_next_page_001",
+          "page": {
+            "nextCursor": "creator-profile:shorts:cursor:001",
+            "hasNext": true
+          }
+        },
+        "error": null
+      }
+    },
+    "creator_profile_shorts_empty": {
+      "status": 200,
+      "body": {
+        "data": {
+          "items": []
+        },
+        "meta": {
+          "requestId": "req_creator_profile_shorts_empty_001",
           "page": {
             "nextCursor": null,
             "hasNext": false
@@ -511,12 +541,12 @@
         "error": null
       }
     },
-    "creator_profile_not_found": {
+    "creator_profile_shorts_not_found": {
       "status": 404,
       "body": {
         "data": null,
         "meta": {
-          "requestId": "req_creator_profile_not_found_001",
+          "requestId": "req_creator_profile_shorts_not_found_001",
           "page": null
         },
         "error": {

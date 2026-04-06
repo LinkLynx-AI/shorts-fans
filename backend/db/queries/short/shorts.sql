@@ -60,6 +60,35 @@ FROM app.public_shorts
 WHERE creator_user_id = $1
 ORDER BY published_at DESC, created_at DESC, id DESC;
 
+-- name: CountPublicShortsByCreatorUserID :one
+SELECT COUNT(*)::bigint
+FROM app.public_shorts
+WHERE creator_user_id = $1;
+
+-- name: ListCreatorProfileShortGridItems :many
+SELECT
+    s.id,
+    s.creator_user_id,
+    s.canonical_main_id,
+    s.media_asset_id,
+    s.published_at,
+    m.playback_url,
+    m.duration_ms
+FROM app.public_shorts AS s
+JOIN app.media_assets AS m
+    ON m.id = s.media_asset_id
+WHERE s.creator_user_id = sqlc.arg(creator_user_id)
+AND (
+    sqlc.narg(cursor_published_at)::timestamptz IS NULL
+    OR s.published_at < sqlc.narg(cursor_published_at)::timestamptz
+    OR (
+        s.published_at = sqlc.narg(cursor_published_at)::timestamptz
+        AND s.id < COALESCE(sqlc.narg(cursor_short_id)::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
+    )
+)
+ORDER BY s.published_at DESC, s.id DESC
+LIMIT sqlc.arg(limit_count);
+
 -- name: GetPublicShortByID :one
 SELECT *
 FROM app.public_shorts

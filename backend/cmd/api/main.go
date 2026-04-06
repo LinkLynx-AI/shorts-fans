@@ -48,6 +48,8 @@ func main() {
 		}
 	}()
 
+	creatorRepository := creator.NewRepository(pool)
+
 	server := httpserver.New(
 		httpserver.Config{
 			Addr:            cfg.APIAddr,
@@ -55,7 +57,9 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
-			CreatorSearch: creator.NewRepository(pool),
+			CreatorSearch:       creatorRepository,
+			CreatorProfile:      creatorRepository,
+			CreatorProfileShort: creatorRepository,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countPublicShortsByCreatorUserID = `-- name: CountPublicShortsByCreatorUserID :one
+SELECT COUNT(*)::bigint
+FROM app.public_shorts
+WHERE creator_user_id = $1
+`
+
+func (q *Queries) CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countPublicShortsByCreatorUserID, creatorUserID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createShort = `-- name: CreateShort :one
 INSERT INTO app.shorts (
     creator_user_id,
@@ -123,6 +136,81 @@ func (q *Queries) GetShortByID(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listCreatorProfileShortGridItems = `-- name: ListCreatorProfileShortGridItems :many
+SELECT
+    s.id,
+    s.creator_user_id,
+    s.canonical_main_id,
+    s.media_asset_id,
+    s.published_at,
+    m.playback_url,
+    m.duration_ms
+FROM app.public_shorts AS s
+JOIN app.media_assets AS m
+    ON m.id = s.media_asset_id
+WHERE s.creator_user_id = $1
+AND (
+    $2::timestamptz IS NULL
+    OR s.published_at < $2::timestamptz
+    OR (
+        s.published_at = $2::timestamptz
+        AND s.id < COALESCE($3::uuid, 'ffffffff-ffff-ffff-ffff-ffffffffffff'::uuid)
+    )
+)
+ORDER BY s.published_at DESC, s.id DESC
+LIMIT $4
+`
+
+type ListCreatorProfileShortGridItemsParams struct {
+	CreatorUserID     pgtype.UUID
+	CursorPublishedAt pgtype.Timestamptz
+	CursorShortID     pgtype.UUID
+	LimitCount        int32
+}
+
+type ListCreatorProfileShortGridItemsRow struct {
+	ID              pgtype.UUID
+	CreatorUserID   pgtype.UUID
+	CanonicalMainID pgtype.UUID
+	MediaAssetID    pgtype.UUID
+	PublishedAt     pgtype.Timestamptz
+	PlaybackUrl     pgtype.Text
+	DurationMs      pgtype.Int8
+}
+
+func (q *Queries) ListCreatorProfileShortGridItems(ctx context.Context, arg ListCreatorProfileShortGridItemsParams) ([]ListCreatorProfileShortGridItemsRow, error) {
+	rows, err := q.db.Query(ctx, listCreatorProfileShortGridItems,
+		arg.CreatorUserID,
+		arg.CursorPublishedAt,
+		arg.CursorShortID,
+		arg.LimitCount,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreatorProfileShortGridItemsRow
+	for rows.Next() {
+		var i ListCreatorProfileShortGridItemsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatorUserID,
+			&i.CanonicalMainID,
+			&i.MediaAssetID,
+			&i.PublishedAt,
+			&i.PlaybackUrl,
+			&i.DurationMs,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPublicShortsByCreatorUserID = `-- name: ListPublicShortsByCreatorUserID :many
