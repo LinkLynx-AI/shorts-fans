@@ -34,7 +34,7 @@ function formatCompactCount(value: number): string {
 export function CreatorAvatar({ className, creator }: CreatorAvatarProps) {
   return (
     <Avatar className={cn("size-12 border-white/68", className)}>
-      <AvatarImage alt={creator.displayName} src={creator.avatar.url} />
+      {creator.avatar ? <AvatarImage alt={creator.displayName} src={creator.avatar.url} /> : null}
       <AvatarFallback>{getCreatorInitials(creator.displayName)}</AvatarFallback>
     </Avatar>
   );

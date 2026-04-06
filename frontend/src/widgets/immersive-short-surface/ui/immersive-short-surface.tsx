@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
+import { getCreatorInitials } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { UnlockCta } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
@@ -101,6 +102,17 @@ type CreatorBlockProps = {
 };
 
 function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
+  if (!creator.avatar) {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#b2ecff_0%,#65bae0_56%,#1b4362_100%)] text-[11px] font-semibold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      >
+        {getCreatorInitials(creator.displayName)}
+      </span>
+    );
+  }
+
   return (
     <span
       aria-hidden="true"

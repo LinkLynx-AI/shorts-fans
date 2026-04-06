@@ -115,7 +115,7 @@
 | `id` | `string` | creator identifier |
 | `displayName` | `string` | public display name |
 | `handle` | `string` | creator search 用の public identifier。core domain minimum を広げる目的ではなく transport 用にだけ持つ |
-| `avatar` | `MediaAsset` | `kind = "image"` |
+| `avatar` | `MediaAsset \| null` | custom avatar がある場合は `kind = "image"`。ない場合は `null` を返し、client が platform default avatar を描画する |
 | `bio` | `string` | public creator bio |
 
 ### `ShortSummary`

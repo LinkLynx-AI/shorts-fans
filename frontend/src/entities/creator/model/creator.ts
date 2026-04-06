@@ -9,7 +9,7 @@ type CreatorAvatarAsset = {
 };
 
 export type CreatorSummary = {
-  avatar: CreatorAvatarAsset;
+  avatar: CreatorAvatarAsset | null;
   bio: string;
   displayName: string;
   handle: `@${string}`;

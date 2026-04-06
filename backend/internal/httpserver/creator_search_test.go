@@ -141,6 +141,9 @@ func TestCreatorSearchFilteredRoute(t *testing.T) {
 	if response.Data.Items[0].Creator.ID != "creator_22222222222222222222222222222222" {
 		t.Fatalf("response.Data.Items[0].Creator.ID got %q want %q", response.Data.Items[0].Creator.ID, "creator_22222222222222222222222222222222")
 	}
+	if response.Data.Items[0].Creator.Avatar == nil {
+		t.Fatal("response.Data.Items[0].Creator.Avatar = nil, want non-nil")
+	}
 	if response.Data.Items[0].Creator.Avatar.ID != "asset_creator_22222222222222222222222222222222_avatar" {
 		t.Fatalf("response.Data.Items[0].Creator.Avatar.ID got %q want %q", response.Data.Items[0].Creator.Avatar.ID, "asset_creator_22222222222222222222222222222222_avatar")
 	}
@@ -238,7 +241,7 @@ func TestCreatorSearchMalformedCursorFallsBackToFirstPage(t *testing.T) {
 	}
 }
 
-func TestCreatorSearchRejectsMissingAvatar(t *testing.T) {
+func TestCreatorSearchAllowsMissingAvatar(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
@@ -249,7 +252,7 @@ func TestCreatorSearchRejectsMissingAvatar(t *testing.T) {
 						UserID:      uuid.MustParse("33333333-3333-3333-3333-333333333333"),
 						DisplayName: stringPtr("Aoi N"),
 						Handle:      stringPtr("aoina"),
-						Bio:         "missing avatar should not reach transport",
+						Bio:         "missing avatar should return null avatar",
 					},
 				}, nil, nil
 			},
@@ -265,16 +268,22 @@ func TestCreatorSearchRejectsMissingAvatar(t *testing.T) {
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("GET /api/fan/creators/search status got %d want %d", rec.Code, http.StatusInternalServerError)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/creators/search status got %d want %d", rec.Code, http.StatusOK)
 	}
 
-	var response responseEnvelope[struct{}]
+	var response responseEnvelope[creatorSearchResponseData]
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
 	}
-	if response.Error == nil || response.Error.Code != "internal_error" {
-		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+	if response.Data == nil || len(response.Data.Items) != 1 {
+		t.Fatalf("response.Data got %#v want one item", response.Data)
+	}
+	if response.Data.Items[0].Creator.Avatar != nil {
+		t.Fatalf("response.Data.Items[0].Creator.Avatar got %#v want nil", response.Data.Items[0].Creator.Avatar)
 	}
 }
 

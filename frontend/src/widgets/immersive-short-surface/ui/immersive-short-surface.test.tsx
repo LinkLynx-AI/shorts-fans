@@ -31,4 +31,16 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByText("Unlock")).toBeInTheDocument();
     expect(screen.getByText("Following")).toBeInTheDocument();
   });
+
+  it("renders creator initials when the creator has no custom avatar", () => {
+    render(
+      <ImmersiveShortSurface
+        activeTab="recommended"
+        mode="feed"
+        surface={{ ...feedSurface, creator: { ...feedSurface.creator, avatar: null } }}
+      />,
+    );
+
+    expect(screen.getByText("MR")).toBeInTheDocument();
+  });
 });

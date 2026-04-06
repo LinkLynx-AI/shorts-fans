@@ -61,6 +61,7 @@
   - `display name`
   - `avatar`
   - `bio`
+- `avatar` は public surface 上の profile image slot を指します。creator が custom avatar を未設定でも、この slot 自体は維持され、read transport では `null` を返して client が platform default avatar を描画してよいものとします。
 - public handle、URL、その他 discoverability identifier はこの contract の対象外です。
 
 ### short
