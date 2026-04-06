@@ -33,6 +33,12 @@ worker 骨格を起動します。
 make backend-worker
 ```
 
+dev AWS media sandbox への representative path を確認します。
+
+```bash
+make backend-media-smoke
+```
+
 停止するときは次を使います。
 
 ```bash
@@ -172,21 +178,39 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 - `POSTGRES_DSN`
 - `REDIS_ADDR`
 - `AWS_REGION`
-- `SQS_QUEUE_URL`
+- `MEDIA_JOBS_QUEUE_URL`
+- `MEDIA_RAW_BUCKET_NAME`
+- `MEDIA_SHORT_PUBLIC_BUCKET_NAME`
+- `MEDIA_SHORT_PUBLIC_BASE_URL`
+- `MEDIA_MAIN_PRIVATE_BUCKET_NAME`
+- `MEDIACONVERT_SERVICE_ROLE_ARN`
+
+`MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
 `cmd/api` は `POSTGRES_DSN` と `REDIS_ADDR` を必須にします。`cmd/worker` は SQS 設定が未投入でも骨格起動できます。
+
+`cmd/media-smoke` は次を前提にします。
+
+- dev app access policy が local principal に attach 済みであること
+- `MEDIA_SHORT_PUBLIC_BASE_URL` が Terraform output の `short_public_base_url` を指していること
+- `MEDIA_MAIN_PRIVATE_BUCKET_NAME` が Terraform output の `main_private_bucket_name` を指していること
+
+smoke は `short_public` と `main_private` に一時 probe object を置き、`short` は public URL、`main` は signed URL で取得できることを確認した後に cleanup します。
 
 ## Structure
 
 - `cmd/api`: API サーバーの entrypoint
+- `cmd/media-smoke`: dev AWS media sandbox の representative path を検証する entrypoint
 - `cmd/worker`: worker 骨格の entrypoint
 - `cmd/migrate`: migration 実行 entrypoint
 - `cmd/schema`: migration から人間向け YAML スキーマを生成する entrypoint
 - `internal/config`: 環境変数読込と validation
 - `internal/dbschema`: 一時 DB を使った schema introspection と YAML 出力
 - `internal/httpserver`: Gin router と graceful shutdown
+- `internal/mediaconvert`: MediaConvert access check
 - `internal/postgres`: `pgxpool` 初期化と readiness
 - `internal/redis`: Redis client 初期化と readiness
+- `internal/s3`: S3 upload / signed URL helper
 - `internal/sqs`: SQS 設定と client factory の骨格
 - `db/migrations`: `golang-migrate` 用 SQL
 - `db/queries`: `sqlc` 用 query

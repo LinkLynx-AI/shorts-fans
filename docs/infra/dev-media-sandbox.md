@@ -100,6 +100,20 @@ terraform destroy -var-file=terraform.tfvars
 
 特に `SHO-25` では `AWS_REGION` と `media_jobs_queue_url`、bucket 名、MediaConvert role ARN が接続前提になります。
 
+backend から読む env 名は次に揃えます。
+
+| Terraform output | backend env |
+| --- | --- |
+| `aws_region` | `AWS_REGION` |
+| `media_jobs_queue_url` | `MEDIA_JOBS_QUEUE_URL` |
+| `raw_bucket_name` | `MEDIA_RAW_BUCKET_NAME` |
+| `short_public_bucket_name` | `MEDIA_SHORT_PUBLIC_BUCKET_NAME` |
+| `short_public_base_url` | `MEDIA_SHORT_PUBLIC_BASE_URL` |
+| `main_private_bucket_name` | `MEDIA_MAIN_PRIVATE_BUCKET_NAME` |
+| `mediaconvert_service_role_arn` | `MEDIACONVERT_SERVICE_ROLE_ARN` |
+
+`SQS_QUEUE_URL` は旧 skeleton との互換 alias としてのみ残し、新しい backend 実装では `MEDIA_JOBS_QUEUE_URL` を使います。
+
 ## Guardrail
 
 - `short` の public delivery は `CloudFront + private S3 origin` に固定します。
