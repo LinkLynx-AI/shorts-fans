@@ -1,0 +1,51 @@
+{
+  "authenticatedFan": {
+    "data": {
+      "currentViewer": {
+        "id": "user_fan_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_fan_001",
+      "page": null
+    },
+    "error": null
+  },
+  "authenticatedCreator": {
+    "data": {
+      "currentViewer": {
+        "id": "user_creator_001",
+        "activeMode": "creator",
+        "canAccessCreatorMode": true
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_creator_001",
+      "page": null
+    },
+    "error": null
+  },
+  "unauthenticated": {
+    "data": {
+      "currentViewer": null
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_anon_001",
+      "page": null
+    },
+    "error": null
+  },
+  "internalError": {
+    "data": null,
+    "meta": {
+      "requestId": "req_viewer_bootstrap_500_001",
+      "page": null
+    },
+    "error": {
+      "code": "internal_error",
+      "message": "viewer bootstrap could not be loaded"
+    }
+  }
+}

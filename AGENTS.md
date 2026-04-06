@@ -31,6 +31,7 @@
 - [docs/TYPESCRIPT.md](docs/TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 - [docs/contracts/mvp-core-domain-contract.md](docs/contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
 - [docs/contracts/mvp-media-workflow-contract.md](docs/contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
+- [docs/contracts/viewer-bootstrap-api-contract.md](docs/contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [docs/contracts/fan-mvp-common-transport-contract.md](docs/contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [docs/contracts/fan-public-surface-api-contract.md](docs/contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
 - [docs/contracts/fan-unlock-main-api-contract.md](docs/contracts/fan-unlock-main-api-contract.md): `unlock / main player` の read 契約
