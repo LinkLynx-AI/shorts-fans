@@ -11,7 +11,8 @@ import (
 	"github.com/google/uuid"
 )
 
-const defaultProfileShortGridPageSize = 18
+// DefaultPublicProfileShortGridPageSize は creator profile short grid の既定 page size です。
+const DefaultPublicProfileShortGridPageSize = 18
 
 // PublicProfileHeader は creator profile header 用の read model です。
 type PublicProfileHeader struct {
@@ -93,7 +94,7 @@ func (r *Repository) ListPublicProfileShorts(ctx context.Context, creatorID stri
 
 func buildPublicProfileShortPageParams(creatorUserID uuid.UUID, cursor *PublicProfileShortCursor, limit int) (sqlc.ListCreatorProfileShortGridItemsParams, int) {
 	if limit <= 0 {
-		limit = defaultProfileShortGridPageSize
+		limit = DefaultPublicProfileShortGridPageSize
 	}
 
 	params := sqlc.ListCreatorProfileShortGridItemsParams{

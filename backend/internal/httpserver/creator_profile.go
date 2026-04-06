@@ -15,8 +15,6 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 )
 
-const creatorProfileShortGridPageSize = 18
-
 type creatorProfileResponseData struct {
 	Profile creatorProfilePayload `json:"profile"`
 }
@@ -113,7 +111,7 @@ func handleCreatorProfileShorts(c *gin.Context, reader CreatorProfileShortsReade
 	creatorID := strings.TrimSpace(c.Param("creatorId"))
 	cursor := decodeCreatorProfileShortGridCursor(strings.TrimSpace(c.Query("cursor")))
 
-	items, nextCursor, err := reader.ListPublicProfileShorts(c.Request.Context(), creatorID, cursor, creatorProfileShortGridPageSize)
+	items, nextCursor, err := reader.ListPublicProfileShorts(c.Request.Context(), creatorID, cursor, creator.DefaultPublicProfileShortGridPageSize)
 	if err != nil {
 		if errors.Is(err, creator.ErrProfileNotFound) {
 			writeNotFoundError(c, "creator_profile_shorts", "creator was not found")
@@ -212,6 +210,7 @@ func encodeCreatorProfileShortGridCursor(cursor *creator.PublicProfileShortCurso
 		ShortID:     cursor.ShortID.String(),
 	})
 	if err != nil {
+		// Strings-only payload should always marshal; nil omits nextCursor if something unexpected happens.
 		return nil
 	}
 

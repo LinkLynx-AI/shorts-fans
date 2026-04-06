@@ -127,7 +127,7 @@ func TestCreatorProfileShortsRoute(t *testing.T) {
 	}
 
 	router := NewHandler(HandlerConfig{
-		CreatorProfileShort: stubCreatorProfileShortsReader{
+		CreatorProfileShorts: stubCreatorProfileShortsReader{
 			listShorts: func(_ context.Context, gotCreatorID string, gotCursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error) {
 				if gotCreatorID != creator.FormatPublicID(creatorID) {
 					t.Fatalf("ListPublicProfileShorts() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
@@ -135,8 +135,8 @@ func TestCreatorProfileShortsRoute(t *testing.T) {
 				if gotCursor != nil {
 					t.Fatalf("ListPublicProfileShorts() cursor got %#v want nil", gotCursor)
 				}
-				if limit != creatorProfileShortGridPageSize {
-					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creatorProfileShortGridPageSize)
+				if limit != creator.DefaultPublicProfileShortGridPageSize {
+					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creator.DefaultPublicProfileShortGridPageSize)
 				}
 
 				return []creator.PublicProfileShort{
@@ -196,7 +196,7 @@ func TestCreatorProfileShortsEmptyRoute(t *testing.T) {
 	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 
 	router := NewHandler(HandlerConfig{
-		CreatorProfileShort: stubCreatorProfileShortsReader{
+		CreatorProfileShorts: stubCreatorProfileShortsReader{
 			listShorts: func(_ context.Context, gotCreatorID string, gotCursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error) {
 				if gotCreatorID != creator.FormatPublicID(creatorID) {
 					t.Fatalf("ListPublicProfileShorts() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
@@ -204,8 +204,8 @@ func TestCreatorProfileShortsEmptyRoute(t *testing.T) {
 				if gotCursor != nil {
 					t.Fatalf("ListPublicProfileShorts() cursor got %#v want nil", gotCursor)
 				}
-				if limit != creatorProfileShortGridPageSize {
-					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creatorProfileShortGridPageSize)
+				if limit != creator.DefaultPublicProfileShortGridPageSize {
+					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creator.DefaultPublicProfileShortGridPageSize)
 				}
 				return []creator.PublicProfileShort{}, nil, nil
 			},
@@ -243,7 +243,7 @@ func TestCreatorProfileShortsMalformedCursorFallsBackToFirstPage(t *testing.T) {
 	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 
 	router := NewHandler(HandlerConfig{
-		CreatorProfileShort: stubCreatorProfileShortsReader{
+		CreatorProfileShorts: stubCreatorProfileShortsReader{
 			listShorts: func(_ context.Context, gotCreatorID string, gotCursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error) {
 				if gotCreatorID != creator.FormatPublicID(creatorID) {
 					t.Fatalf("ListPublicProfileShorts() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
@@ -251,8 +251,8 @@ func TestCreatorProfileShortsMalformedCursorFallsBackToFirstPage(t *testing.T) {
 				if gotCursor != nil {
 					t.Fatalf("ListPublicProfileShorts() cursor got %#v want nil", gotCursor)
 				}
-				if limit != creatorProfileShortGridPageSize {
-					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creatorProfileShortGridPageSize)
+				if limit != creator.DefaultPublicProfileShortGridPageSize {
+					t.Fatalf("ListPublicProfileShorts() limit got %d want %d", limit, creator.DefaultPublicProfileShortGridPageSize)
 				}
 				return []creator.PublicProfileShort{}, nil, nil
 			},
@@ -273,7 +273,7 @@ func TestCreatorProfileShortsNotFoundRoute(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		CreatorProfileShort: stubCreatorProfileShortsReader{
+		CreatorProfileShorts: stubCreatorProfileShortsReader{
 			listShorts: func(context.Context, string, *creator.PublicProfileShortCursor, int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error) {
 				return nil, nil, creator.ErrProfileNotFound
 			},

@@ -60,10 +60,10 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
-			CreatorSearch:       creatorRepository,
-			CreatorProfile:      creatorRepository,
-			CreatorProfileShort: creatorRepository,
-			ViewerBootstrap:     viewerBootstrapReader,
+			CreatorSearch:        creatorRepository,
+			CreatorProfile:       creatorRepository,
+			CreatorProfileShorts: creatorRepository,
+			ViewerBootstrap:      viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

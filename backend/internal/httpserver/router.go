@@ -43,11 +43,11 @@ type CreatorProfileShortsReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	CreatorSearch       CreatorSearchReader
-	CreatorProfile      CreatorProfileReader
-	CreatorProfileShort CreatorProfileShortsReader
-	ViewerBootstrap     ViewerBootstrapReader
-	Dependencies        []Dependency
+	CreatorSearch        CreatorSearchReader
+	CreatorProfile       CreatorProfileReader
+	CreatorProfileShorts CreatorProfileShortsReader
+	ViewerBootstrap      ViewerBootstrapReader
+	Dependencies         []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -103,7 +103,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShort)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
 
 	return router
 }
