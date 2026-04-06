@@ -33,8 +33,9 @@ type CreatorSearchReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	CreatorSearch CreatorSearchReader
-	Dependencies  []Dependency
+	CreatorSearch   CreatorSearchReader
+	ViewerBootstrap ViewerBootstrapReader
+	Dependencies    []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -84,6 +85,10 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
+
+	if config.ViewerBootstrap != nil {
+		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(config.ViewerBootstrap))
+	}
 
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 

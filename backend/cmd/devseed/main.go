@@ -40,7 +40,9 @@ func main() {
 	logger.Info(
 		"dev seed applied",
 		"creator_user_id", summary.CreatorUserID.String(),
+		"creator_session_token", summary.CreatorSessionToken,
 		"fan_user_id", summary.FanUserID.String(),
+		"fan_session_token", summary.FanSessionToken,
 		"main_id", summary.MainID.String(),
 		"short_ids", uuidStrings(summary.ShortIDs),
 	)
