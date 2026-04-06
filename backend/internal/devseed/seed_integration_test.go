@@ -75,8 +75,19 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	if got := textFromPG(profile.DisplayName); got != creatorDisplayName {
 		t.Fatalf("GetCreatorProfileByUserID() display_name got %q want %q", got, creatorDisplayName)
 	}
+	if got := textFromPG(profile.Handle); got != creatorHandle {
+		t.Fatalf("GetCreatorProfileByUserID() handle got %q want %q", got, creatorHandle)
+	}
 	if profile.Bio != creatorBio {
 		t.Fatalf("GetCreatorProfileByUserID() bio got %q want %q", profile.Bio, creatorBio)
+	}
+
+	publicProfile, err := queries.GetPublicCreatorProfileByHandle(ctx, pgtype.Text{String: creatorHandle, Valid: true})
+	if err != nil {
+		t.Fatalf("GetPublicCreatorProfileByHandle() error = %v, want nil", err)
+	}
+	if publicProfile.UserID != uuidToPG(creatorUserID) {
+		t.Fatalf("GetPublicCreatorProfileByHandle() user_id got %s want %s", publicProfile.UserID, uuidToPG(creatorUserID))
 	}
 
 	main, err := queries.GetUnlockableMainByID(ctx, uuidToPG(mainID))

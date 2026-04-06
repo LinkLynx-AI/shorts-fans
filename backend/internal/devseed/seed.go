@@ -35,6 +35,7 @@ var (
 
 const (
 	creatorDisplayName = "Mika Aoi"
+	creatorHandle      = "mikaaoi"
 	creatorAvatarURL   = "https://cdn.example.com/mock/creator/avatar-mika-aoi.jpg"
 	creatorBio         = "Public shorts から paid main へつながる creator mock profile."
 
@@ -230,6 +231,7 @@ func upsertCreatorProfile(ctx context.Context, tx pgx.Tx) error {
 		INSERT INTO app.creator_profiles (
 			user_id,
 			display_name,
+			handle,
 			avatar_url,
 			bio,
 			published_at
@@ -238,16 +240,18 @@ func upsertCreatorProfile(ctx context.Context, tx pgx.Tx) error {
 			$2,
 			$3,
 			$4,
-			$5
+			$5,
+			$6
 		)
 		ON CONFLICT (user_id) DO UPDATE
 		SET
 			display_name = EXCLUDED.display_name,
+			handle = EXCLUDED.handle,
 			avatar_url = EXCLUDED.avatar_url,
 			bio = EXCLUDED.bio,
 			published_at = EXCLUDED.published_at,
 			updated_at = CURRENT_TIMESTAMP
-	`, creatorUserID, creatorDisplayName, creatorAvatarURL, creatorBio, creatorPublishedAt); err != nil {
+	`, creatorUserID, creatorDisplayName, creatorHandle, creatorAvatarURL, creatorBio, creatorPublishedAt); err != nil {
 		return fmt.Errorf("creator_profiles upsert user_id=%s: %w", creatorUserID, err)
 	}
 
