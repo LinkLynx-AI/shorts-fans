@@ -14,14 +14,17 @@ import (
 )
 
 type repositoryStubQueries struct {
-	createCapability func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
-	getCapability    func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
-	updateCapability func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
-	createProfile    func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	getProfile       func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
-	getPublicProfile func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
-	updateProfile    func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	publishProfile   func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	createCapability  func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
+	getCapability     func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	updateCapability  func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
+	createProfile     func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	getProfile        func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	getPublicProfile  func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
+	getPublicByHandle func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
+	listRecentPublic  func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	searchPublic      func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	updateProfile     func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	publishProfile    func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
 
 func (s repositoryStubQueries) CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
@@ -66,6 +69,27 @@ func (s repositoryStubQueries) GetPublicCreatorProfileByUserID(ctx context.Conte
 	return s.getPublicProfile(ctx, userID)
 }
 
+func (s repositoryStubQueries) GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+	if s.getPublicByHandle == nil {
+		return sqlc.AppPublicCreatorProfile{}, nil
+	}
+	return s.getPublicByHandle(ctx, handle)
+}
+
+func (s repositoryStubQueries) ListRecentPublicCreatorProfiles(ctx context.Context, arg sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+	if s.listRecentPublic == nil {
+		return nil, nil
+	}
+	return s.listRecentPublic(ctx, arg)
+}
+
+func (s repositoryStubQueries) SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+	if s.searchPublic == nil {
+		return nil, nil
+	}
+	return s.searchPublic(ctx, arg)
+}
+
 func (s repositoryStubQueries) UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
 	if s.updateProfile == nil {
 		return sqlc.AppCreatorProfile{}, nil
@@ -86,6 +110,7 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	now := time.Unix(1710000000, 0).UTC()
 	userID := uuid.New()
 	displayName := stringPtr("alice")
+	handle := stringPtr("alice")
 	avatarURL := stringPtr("https://cdn.example.com/avatar.jpg")
 	rejectionReason := stringPtr("needs_review")
 	kycRef := stringPtr("kyc-1")
@@ -97,8 +122,8 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	publishedAt := timePtr(now.Add(5 * time.Hour))
 
 	capabilityRow := testCapabilityRow(userID, now, rejectionReason, kycRef, payoutRef, submittedAt, approvedAt, rejectedAt, suspendedAt)
-	profileRow := testProfileRow(userID, now, displayName, avatarURL, publishedAt)
-	publicProfileRow := testPublicProfileRow(userID, now, displayName, avatarURL, publishedAt)
+	profileRow := testProfileRow(userID, now, displayName, handle, avatarURL, publishedAt)
+	publicProfileRow := testPublicProfileRow(userID, now, displayName, handle, avatarURL, publishedAt)
 
 	var createCapabilityArg sqlc.CreateCreatorCapabilityParams
 	var updateCapabilityArg sqlc.UpdateCreatorCapabilityStateParams
@@ -196,6 +221,7 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	profileInput := CreateProfileInput{
 		UserID:      userID,
 		DisplayName: displayName,
+		Handle:      handle,
 		AvatarURL:   avatarURL,
 		Bio:         "bio",
 		PublishedAt: publishedAt,
@@ -205,11 +231,14 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateProfile() error = %v, want nil", err)
 	}
-	if !reflect.DeepEqual(createdProfile, wantProfile(userID, now, displayName, avatarURL, publishedAt)) {
-		t.Fatalf("CreateProfile() got %#v want %#v", createdProfile, wantProfile(userID, now, displayName, avatarURL, publishedAt))
+	if !reflect.DeepEqual(createdProfile, wantProfile(userID, now, displayName, handle, avatarURL, publishedAt)) {
+		t.Fatalf("CreateProfile() got %#v want %#v", createdProfile, wantProfile(userID, now, displayName, handle, avatarURL, publishedAt))
 	}
 	if createProfileArg.UserID != pgUUID(userID) {
 		t.Fatalf("CreateProfile() user arg got %v want %v", createProfileArg.UserID, pgUUID(userID))
+	}
+	if createProfileArg.Handle != pgText(handle) {
+		t.Fatalf("CreateProfile() handle arg got %v want %v", createProfileArg.Handle, pgText(handle))
 	}
 
 	gotProfile, err := repo.GetProfile(context.Background(), userID)
@@ -231,6 +260,7 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	updatedProfile, err := repo.UpdateProfile(context.Background(), UpdateProfileInput{
 		UserID:      userID,
 		DisplayName: displayName,
+		Handle:      handle,
 		AvatarURL:   avatarURL,
 		Bio:         "bio",
 	})
@@ -242,6 +272,9 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	}
 	if updateProfileArg.UserID != pgUUID(userID) {
 		t.Fatalf("UpdateProfile() user arg got %v want %v", updateProfileArg.UserID, pgUUID(userID))
+	}
+	if updateProfileArg.Handle != pgText(handle) {
+		t.Fatalf("UpdateProfile() handle arg got %v want %v", updateProfileArg.Handle, pgText(handle))
 	}
 
 	publishedProfile, err := repo.PublishProfile(context.Background(), userID)
@@ -308,10 +341,10 @@ func TestRepositoryConversionErrors(t *testing.T) {
 	capabilityRow := testCapabilityRow(userID, now, nil, nil, nil, nil, nil, nil, nil)
 	capabilityRow.UserID = pgtype.UUID{}
 
-	profileRow := testProfileRow(userID, now, nil, nil, nil)
+	profileRow := testProfileRow(userID, now, nil, nil, nil, nil)
 	profileRow.UserID = pgtype.UUID{}
 
-	publicProfileRow := testPublicProfileRow(userID, now, nil, nil, nil)
+	publicProfileRow := testPublicProfileRow(userID, now, nil, nil, nil, nil)
 	publicProfileRow.UserID = pgtype.UUID{}
 
 	repo := newRepository(repositoryStubQueries{
@@ -349,13 +382,13 @@ func TestMapFunctionsRejectInvalidRows(t *testing.T) {
 		t.Fatal("mapCapability() error = nil, want conversion error")
 	}
 
-	invalidProfile := testProfileRow(userID, now, nil, nil, nil)
+	invalidProfile := testProfileRow(userID, now, nil, nil, nil, nil)
 	invalidProfile.CreatedAt = pgtype.Timestamptz{}
 	if _, err := mapProfile(invalidProfile); err == nil {
 		t.Fatal("mapProfile() error = nil, want conversion error")
 	}
 
-	invalidPublicProfile := testPublicProfileRow(userID, now, nil, nil, nil)
+	invalidPublicProfile := testPublicProfileRow(userID, now, nil, nil, nil, nil)
 	invalidPublicProfile.CreatedAt = pgtype.Timestamptz{}
 	if _, err := mapPublicProfile(invalidPublicProfile); err == nil {
 		t.Fatal("mapPublicProfile() error = nil, want conversion error")
@@ -381,10 +414,11 @@ func testCapabilityRow(userID uuid.UUID, now time.Time, rejectionReason *string,
 	}
 }
 
-func testProfileRow(userID uuid.UUID, now time.Time, displayName *string, avatarURL *string, publishedAt *time.Time) sqlc.AppCreatorProfile {
+func testProfileRow(userID uuid.UUID, now time.Time, displayName *string, handle *string, avatarURL *string, publishedAt *time.Time) sqlc.AppCreatorProfile {
 	return sqlc.AppCreatorProfile{
 		UserID:      pgUUID(userID),
 		DisplayName: pgText(displayName),
+		Handle:      pgText(handle),
 		AvatarUrl:   pgText(avatarURL),
 		Bio:         "bio",
 		PublishedAt: pgTime(publishedAt),
@@ -393,10 +427,11 @@ func testProfileRow(userID uuid.UUID, now time.Time, displayName *string, avatar
 	}
 }
 
-func testPublicProfileRow(userID uuid.UUID, now time.Time, displayName *string, avatarURL *string, publishedAt *time.Time) sqlc.AppPublicCreatorProfile {
+func testPublicProfileRow(userID uuid.UUID, now time.Time, displayName *string, handle *string, avatarURL *string, publishedAt *time.Time) sqlc.AppPublicCreatorProfile {
 	return sqlc.AppPublicCreatorProfile{
 		UserID:      pgUUID(userID),
 		DisplayName: pgText(displayName),
+		Handle:      pgText(handle),
 		AvatarUrl:   pgText(avatarURL),
 		Bio:         "bio",
 		PublishedAt: pgTime(publishedAt),
@@ -424,10 +459,11 @@ func wantCapability(userID uuid.UUID, now time.Time, rejectionReason *string, ky
 	}
 }
 
-func wantProfile(userID uuid.UUID, now time.Time, displayName *string, avatarURL *string, publishedAt *time.Time) Profile {
+func wantProfile(userID uuid.UUID, now time.Time, displayName *string, handle *string, avatarURL *string, publishedAt *time.Time) Profile {
 	return Profile{
 		UserID:      userID,
 		DisplayName: displayName,
+		Handle:      handle,
 		AvatarURL:   avatarURL,
 		Bio:         "bio",
 		PublishedAt: publishedAt,

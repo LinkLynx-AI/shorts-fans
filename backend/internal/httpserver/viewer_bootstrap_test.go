@@ -23,9 +23,11 @@ func (s viewerBootstrapReaderStub) ReadCurrentViewer(ctx context.Context, rawSes
 func TestViewerBootstrapReturnsUnauthenticatedState(t *testing.T) {
 	t.Parallel()
 
-	router := NewHandler(nil, viewerBootstrapReaderStub{
-		readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-			return auth.Bootstrap{}, nil
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{}, nil
+			},
 		},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/viewer/bootstrap", nil)
@@ -61,17 +63,19 @@ func TestViewerBootstrapReturnsCurrentViewer(t *testing.T) {
 
 	expectedID := uuid.New()
 	var gotRawSessionToken string
-	router := NewHandler(nil, viewerBootstrapReaderStub{
-		readCurrentViewer: func(_ context.Context, rawSessionToken string) (auth.Bootstrap, error) {
-			gotRawSessionToken = rawSessionToken
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(_ context.Context, rawSessionToken string) (auth.Bootstrap, error) {
+				gotRawSessionToken = rawSessionToken
 
-			return auth.Bootstrap{
-				CurrentViewer: &auth.CurrentViewer{
-					ID:                   expectedID,
-					ActiveMode:           auth.ActiveModeCreator,
-					CanAccessCreatorMode: true,
-				},
-			}, nil
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   expectedID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
 		},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/viewer/bootstrap", nil)
@@ -119,9 +123,11 @@ func TestViewerBootstrapReturnsCurrentViewer(t *testing.T) {
 func TestViewerBootstrapReturnsInternalErrorEnvelope(t *testing.T) {
 	t.Parallel()
 
-	router := NewHandler(nil, viewerBootstrapReaderStub{
-		readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-			return auth.Bootstrap{}, errors.New("query failed")
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{}, errors.New("query failed")
+			},
 		},
 	})
 	req := httptest.NewRequest(http.MethodGet, "/api/viewer/bootstrap", nil)

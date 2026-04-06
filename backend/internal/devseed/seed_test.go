@@ -130,6 +130,9 @@ func TestRunSeedsAllStatementsInOneTransaction(t *testing.T) {
 	if got := tx.execCalls[1].args[0]; got != fanUserID {
 		t.Fatalf("Run() second upsert user arg got %v want %v", got, fanUserID)
 	}
+	if got := tx.execCalls[3].args[2]; got != creatorHandle {
+		t.Fatalf("Run() creator profile handle arg got %v want %v", got, creatorHandle)
+	}
 	if got := tx.execCalls[7].args[0]; got != mainID {
 		t.Fatalf("Run() main upsert id arg got %v want %v", got, mainID)
 	}

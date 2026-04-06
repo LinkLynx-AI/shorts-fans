@@ -23,4 +23,14 @@ describe("creator presenters", () => {
     expect(screen.getByText("@minarei")).toBeInTheDocument();
     expect(screen.getByText("24K")).toBeInTheDocument();
   });
+
+  it("renders initials fallback when avatar is null", () => {
+    if (!creator) {
+      throw new Error("fixture missing");
+    }
+
+    render(<CreatorAvatar creator={{ ...creator, avatar: null }} />);
+
+    expect(screen.getByText("MR")).toBeInTheDocument();
+  });
 });

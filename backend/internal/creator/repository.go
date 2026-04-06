@@ -20,6 +20,9 @@ var ErrCapabilityNotFound = errors.New("creator capability が見つかりませ
 // ErrProfileNotFound は対象の creator profile が存在しないことを表します。
 var ErrProfileNotFound = errors.New("creator profile が見つかりません")
 
+// ErrInvalidHandle は creator handle の形式が不正なことを表します。
+var ErrInvalidHandle = errors.New("creator handle が不正です")
+
 type queries interface {
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
@@ -27,6 +30,9 @@ type queries interface {
 	CreateCreatorProfile(ctx context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	GetPublicCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
+	GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
+	ListRecentPublicCreatorProfiles(ctx context.Context, arg sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	PublishCreatorProfile(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
@@ -90,6 +96,7 @@ type UpdateCapabilityInput struct {
 type Profile struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 	PublishedAt *time.Time
@@ -101,6 +108,7 @@ type Profile struct {
 type CreateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 	PublishedAt *time.Time
@@ -110,6 +118,7 @@ type CreateProfileInput struct {
 type UpdateProfileInput struct {
 	UserID      uuid.UUID
 	DisplayName *string
+	Handle      *string
 	AvatarURL   *string
 	Bio         string
 }
@@ -204,9 +213,15 @@ func (r *Repository) UpdateCapability(ctx context.Context, input UpdateCapabilit
 
 // CreateProfile は creator profile を作成します。
 func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput) (Profile, error) {
+	handle, err := normalizeStoredHandle(input.Handle)
+	if err != nil {
+		return Profile{}, fmt.Errorf("creator profile 作成 handle 正規化: %w", err)
+	}
+
 	row, err := r.queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      postgres.UUIDToPG(input.UserID),
 		DisplayName: postgres.TextToPG(input.DisplayName),
+		Handle:      postgres.TextToPG(handle),
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		PublishedAt: postgres.TimeToPG(input.PublishedAt),
@@ -263,8 +278,14 @@ func (r *Repository) GetPublicProfile(ctx context.Context, userID uuid.UUID) (Pr
 
 // UpdateProfile は creator profile を更新します。
 func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput) (Profile, error) {
+	handle, err := normalizeStoredHandle(input.Handle)
+	if err != nil {
+		return Profile{}, fmt.Errorf("creator profile 更新 handle 正規化: %w", err)
+	}
+
 	row, err := r.queries.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(input.DisplayName),
+		Handle:      postgres.TextToPG(handle),
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		UserID:      postgres.UUIDToPG(input.UserID),
@@ -353,6 +374,7 @@ func mapProfile(row sqlc.AppCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
+		Handle:      postgres.OptionalTextFromPG(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),
@@ -378,6 +400,7 @@ func mapPublicProfile(row sqlc.AppPublicCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
+		Handle:      postgres.OptionalTextFromPG(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),

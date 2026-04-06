@@ -5,7 +5,7 @@ import { useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { CreatorAvatar } from "@/entities/creator";
+import { CreatorAvatar, getCreatorInitials } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { buildCreatorProfileHref } from "@/features/creator-navigation";
 import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features/unlock-entry";
@@ -26,6 +26,9 @@ export type ImmersiveShortSurfaceProps =
       surface: DetailShortSurface;
     };
 
+/**
+ * feed/detail 共通の header 領域を表示する。
+ */
 function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
   if (props.mode === "feed") {
     return (
@@ -67,6 +70,9 @@ type PinRailProps = {
   pinned: boolean;
 };
 
+/**
+ * short の pin 状態を表す操作レールを表示する。
+ */
 function PinRail({ pinned }: PinRailProps) {
   const label = pinned ? "Pinned short" : "Pin short";
 
@@ -107,7 +113,21 @@ type CreatorBlockProps = {
   short: ShortPreviewMeta;
 };
 
+/**
+ * feed surface 用の creator avatar を表示し、avatar 不在時は initials fallback を描画する。
+ */
 function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
+  if (!creator.avatar) {
+    return (
+      <span
+        aria-hidden="true"
+        className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#b2ecff_0%,#65bae0_56%,#1b4362_100%)] text-[11px] font-semibold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      >
+        {getCreatorInitials(creator.displayName)}
+      </span>
+    );
+  }
+
   return (
     <CreatorAvatar
       className="size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
@@ -116,6 +136,9 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
   );
 }
 
+/**
+ * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
+ */
 function CreatorBlock({ creator, followed = false, profileHref, short }: CreatorBlockProps) {
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
@@ -169,12 +192,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           shortId: short.id,
         });
 
+  /**
+   * setup-required main の paywall dialog を開く前に確認状態を初期化する。
+   */
   const handleOpenPaywall = () => {
     setAcceptAge(false);
     setAcceptTerms(false);
     setIsPaywallOpen(true);
   };
 
+  /**
+   * paywall dialog を閉じる。送信中は多重操作を防ぐ。
+   */
   const handleClosePaywall = () => {
     if (isSubmittingMainAccess) {
       return;
@@ -185,6 +214,9 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     setIsPaywallOpen(false);
   };
 
+  /**
+   * main access entry を叩いて main playback へ遷移する。
+   */
   const handleOpenMain = async () => {
     if (isSubmittingMainAccess) {
       return;

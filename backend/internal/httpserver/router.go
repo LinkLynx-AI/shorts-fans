@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -21,6 +23,19 @@ type ReadinessChecker interface {
 type Dependency struct {
 	Name    string
 	Checker ReadinessChecker
+}
+
+// CreatorSearchReader は creator search 用の read 操作を表します。
+type CreatorSearchReader interface {
+	ListRecentPublicProfiles(ctx context.Context, cursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error)
+	SearchPublicProfiles(ctx context.Context, query string, cursor *creator.PublicProfileCursor, limit int) ([]creator.Profile, *creator.PublicProfileCursor, error)
+}
+
+// HandlerConfig は router が依存する read model をまとめます。
+type HandlerConfig struct {
+	CreatorSearch   CreatorSearchReader
+	ViewerBootstrap ViewerBootstrapReader
+	Dependencies    []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -37,7 +52,7 @@ type Server struct {
 }
 
 // NewHandler は API サーバー用の Gin router を構築します。
-func NewHandler(dependencies []Dependency, viewerBootstrapReader ViewerBootstrapReader) *gin.Engine {
+func NewHandler(config HandlerConfig) *gin.Engine {
 	router := gin.New()
 	router.Use(gin.Logger(), gin.Recovery())
 
@@ -46,7 +61,7 @@ func NewHandler(dependencies []Dependency, viewerBootstrapReader ViewerBootstrap
 	})
 	router.GET("/readyz", func(c *gin.Context) {
 		var failed []string
-		for _, dependency := range dependencies {
+		for _, dependency := range config.Dependencies {
 			if dependency.Checker == nil {
 				failed = append(failed, dependency.Name)
 				continue
@@ -71,15 +86,17 @@ func NewHandler(dependencies []Dependency, viewerBootstrapReader ViewerBootstrap
 		c.JSON(http.StatusOK, gin.H{"status": "ready"})
 	})
 
-	if viewerBootstrapReader != nil {
-		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(viewerBootstrapReader))
+	if config.ViewerBootstrap != nil {
+		router.GET("/api/viewer/bootstrap", buildViewerBootstrapHandler(config.ViewerBootstrap))
 	}
+
+	registerCreatorSearchRoutes(router, config.CreatorSearch)
 
 	return router
 }
 
 // New は実行設定と依存先から Server を構築します。
-func New(cfg Config, logger *slog.Logger, dependencies []Dependency, viewerBootstrapReader ViewerBootstrapReader) *Server {
+func New(cfg Config, logger *slog.Logger, handlerConfig HandlerConfig) *Server {
 	if cfg.ShutdownTimeout <= 0 {
 		cfg.ShutdownTimeout = 10 * time.Second
 	}
@@ -87,7 +104,7 @@ func New(cfg Config, logger *slog.Logger, dependencies []Dependency, viewerBoots
 		logger = slog.Default()
 	}
 
-	handler := NewHandler(dependencies, viewerBootstrapReader)
+	handler := NewHandler(handlerConfig)
 
 	return &Server{
 		config: cfg,

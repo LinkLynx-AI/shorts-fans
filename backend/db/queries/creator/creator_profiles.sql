@@ -2,12 +2,14 @@
 INSERT INTO app.creator_profiles (
     user_id,
     display_name,
+    handle,
     avatar_url,
     bio,
     published_at
 ) VALUES (
     sqlc.arg(user_id),
     sqlc.narg(display_name),
+    sqlc.narg(handle),
     sqlc.narg(avatar_url),
     sqlc.arg(bio),
     sqlc.narg(published_at)
@@ -24,6 +26,7 @@ LIMIT 1;
 UPDATE app.creator_profiles
 SET
     display_name = sqlc.narg(display_name),
+    handle = sqlc.narg(handle),
     avatar_url = sqlc.narg(avatar_url),
     bio = sqlc.arg(bio),
     updated_at = CURRENT_TIMESTAMP
@@ -43,3 +46,44 @@ SELECT *
 FROM app.public_creator_profiles
 WHERE user_id = $1
 LIMIT 1;
+
+-- name: GetPublicCreatorProfileByHandle :one
+SELECT *
+FROM app.public_creator_profiles
+WHERE handle = sqlc.arg(handle)
+LIMIT 1;
+
+-- name: ListRecentPublicCreatorProfiles :many
+SELECT *
+FROM app.public_creator_profiles
+WHERE (
+    sqlc.narg(cursor_published_at)::timestamptz IS NULL
+    OR published_at < sqlc.narg(cursor_published_at)::timestamptz
+    OR (
+        published_at = sqlc.narg(cursor_published_at)::timestamptz
+        AND handle > COALESCE(sqlc.narg(cursor_handle)::text, '')
+    )
+)
+ORDER BY published_at DESC, handle ASC
+LIMIT sqlc.arg(limit_count);
+
+-- name: SearchPublicCreatorProfiles :many
+SELECT *
+FROM app.public_creator_profiles
+WHERE (
+    display_name ILIKE '%' || sqlc.arg(display_name_query) || '%' ESCAPE '\'
+    OR (
+        sqlc.arg(handle_prefix_query) <> ''
+        AND handle LIKE sqlc.arg(handle_prefix_query) || '%' ESCAPE '\'
+    )
+)
+AND (
+    sqlc.narg(cursor_published_at)::timestamptz IS NULL
+    OR published_at < sqlc.narg(cursor_published_at)::timestamptz
+    OR (
+        published_at = sqlc.narg(cursor_published_at)::timestamptz
+        AND handle > COALESCE(sqlc.narg(cursor_handle)::text, '')
+    )
+)
+ORDER BY published_at DESC, handle ASC
+LIMIT sqlc.arg(limit_count);

@@ -12,6 +12,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
@@ -57,11 +58,14 @@ func main() {
 			ShutdownTimeout: 10 * time.Second,
 		},
 		logger,
-		[]httpserver.Dependency{
-			{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
-			{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
+		httpserver.HandlerConfig{
+			CreatorSearch:   creator.NewRepository(pool),
+			ViewerBootstrap: viewerBootstrapReader,
+			Dependencies: []httpserver.Dependency{
+				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
+				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
+			},
 		},
-		viewerBootstrapReader,
 	)
 
 	logger.Info("api server starting", "addr", cfg.APIAddr, "app_env", cfg.AppEnv)
