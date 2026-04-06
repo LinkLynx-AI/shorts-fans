@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -20,7 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const integrationPostgresDSNEnv = "POSTGRES_DSN"
@@ -29,11 +28,8 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() error = %v, want nil", err)
-	}
-	if err := migrator.Steps(-2); err != nil {
-		t.Fatalf("migrator.Steps(-2) error = %v, want nil", err)
+	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(3) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 3)
 
@@ -89,8 +85,8 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("GetCreatorProfileByUserID() after down error got %v want %v", err, pgx.ErrNoRows)
 	}
 
-	if err := migrator.Steps(1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Steps(1) second run error = %v, want nil", err)
+	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(3) second run error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 3)
 	assertRelationExists(t, ctx, conn, "app.creator_profile_drafts", false)
@@ -205,6 +201,12 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if !challenge.ConsumedAt.Valid {
 		t.Fatal("ConsumeAuthLoginChallenge() consumed_at valid = false, want true")
 	}
+	if _, err := queries.ConsumeAuthLoginChallenge(ctx, sqlc.ConsumeAuthLoginChallengeParams{
+		ID:         challenge.ID,
+		ConsumedAt: pgTime(now.Add(3 * time.Minute)),
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("ConsumeAuthLoginChallenge() second call error got %v want %v", err, pgx.ErrNoRows)
+	}
 
 	session, err := queries.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
 		UserID:           user.ID,
@@ -268,11 +270,8 @@ func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() error = %v, want nil", err)
-	}
-	if err := migrator.Steps(-1); err != nil {
-		t.Fatalf("migrator.Steps(-1) initial error = %v, want nil", err)
+	if err := migrator.Migrate(4); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(4) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 4)
 
@@ -343,8 +342,8 @@ func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 		t.Fatal("CreateMediaAsset(processing) at version 3 error = nil, want constraint error")
 	}
 
-	if err := migrator.Steps(1); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Steps(1) second run error = %v, want nil", err)
+	if err := migrator.Migrate(4); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(4) second run error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 4)
 
@@ -600,16 +599,12 @@ func newIntegrationEnvironment(t *testing.T) (context.Context, *pgx.Conn, *migra
 		t.Fatalf("CREATE DATABASE %q error = %v, want nil", tempDatabaseName, err)
 	}
 
-	tempDSN, err := dsnWithDatabase(dsn, tempDatabaseName)
-	if err != nil {
-		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
-		adminConn.Close(ctx)
-		t.Fatalf("dsnWithDatabase() error = %v, want nil", err)
-	}
+	tempConfig := baseConfig.Copy()
+	tempConfig.Database = tempDatabaseName
 
-	migrator := newTestMigrator(t, tempDSN)
+	migrator := newTestMigrator(t, tempConfig)
 
-	conn, err := pgx.Connect(ctx, tempDSN)
+	conn, err := pgx.ConnectConfig(ctx, tempConfig)
 	if err != nil {
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
@@ -643,24 +638,10 @@ func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx
 	return nil, fmt.Errorf("connect admin database: %w", lastErr)
 }
 
-func dsnWithDatabase(dsn string, databaseName string) (string, error) {
-	parsed, err := url.Parse(dsn)
-	if err != nil {
-		return "", fmt.Errorf("parse postgres dsn: %w", err)
-	}
-
-	parsed.Path = "/" + databaseName
-
-	return parsed.String(), nil
-}
-
-func newTestMigrator(t *testing.T, dsn string) *migrate.Migrate {
+func newTestMigrator(t *testing.T, config *pgx.ConnConfig) *migrate.Migrate {
 	t.Helper()
 
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open() error = %v, want nil", err)
-	}
+	db := stdlib.OpenDB(*config)
 
 	driver, err := pgmigrate.WithInstance(db, &pgmigrate.Config{})
 	if err != nil {

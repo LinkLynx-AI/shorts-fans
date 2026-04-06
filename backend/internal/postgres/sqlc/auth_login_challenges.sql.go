@@ -17,6 +17,8 @@ SET
     consumed_at = COALESCE($1::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $2
+    AND consumed_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
 RETURNING id, provider, provider_subject, email_normalized, challenge_token_hash, purpose, expires_at, consumed_at, attempt_count, created_at, updated_at
 `
 
@@ -147,6 +149,8 @@ SET
     attempt_count = attempt_count + 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
+    AND consumed_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
 RETURNING id, provider, provider_subject, email_normalized, challenge_token_hash, purpose, expires_at, consumed_at, attempt_count, created_at, updated_at
 `
 

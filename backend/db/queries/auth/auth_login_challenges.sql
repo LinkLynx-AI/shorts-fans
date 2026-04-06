@@ -36,6 +36,8 @@ SET
     attempt_count = attempt_count + 1,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id)
+    AND consumed_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
 RETURNING *;
 
 -- name: ConsumeAuthLoginChallenge :one
@@ -44,4 +46,6 @@ SET
     consumed_at = COALESCE(sqlc.narg(consumed_at)::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id)
+    AND consumed_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
 RETURNING *;
