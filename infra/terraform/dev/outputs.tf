@@ -14,18 +14,33 @@ output "raw_bucket_arn" {
 }
 
 output "short_public_bucket_name" {
-  description = "Public short delivery bucket name."
+  description = "Private S3 origin bucket name for short delivery."
   value       = aws_s3_bucket.short_public.bucket
 }
 
 output "short_public_bucket_arn" {
-  description = "Public short delivery bucket ARN."
+  description = "Private S3 origin bucket ARN for short delivery."
   value       = aws_s3_bucket.short_public.arn
 }
 
 output "short_public_base_url" {
-  description = "Base URL for public short objects when enable_public_short_delivery is true."
-  value       = var.enable_public_short_delivery ? "https://${aws_s3_bucket.short_public.bucket_regional_domain_name}" : null
+  description = "Base URL for public short objects via CloudFront."
+  value       = "https://${aws_cloudfront_distribution.short_public.domain_name}"
+}
+
+output "short_public_cloudfront_distribution_id" {
+  description = "CloudFront distribution ID for public short delivery."
+  value       = aws_cloudfront_distribution.short_public.id
+}
+
+output "short_public_cloudfront_distribution_arn" {
+  description = "CloudFront distribution ARN for public short delivery."
+  value       = aws_cloudfront_distribution.short_public.arn
+}
+
+output "short_public_cloudfront_domain_name" {
+  description = "CloudFront domain name for public short delivery."
+  value       = aws_cloudfront_distribution.short_public.domain_name
 }
 
 output "main_private_bucket_name" {

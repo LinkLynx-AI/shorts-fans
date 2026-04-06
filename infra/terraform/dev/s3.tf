@@ -108,28 +108,30 @@ resource "aws_s3_bucket_public_access_block" "short_public" {
   bucket = aws_s3_bucket.short_public.id
 
   block_public_acls       = true
-  block_public_policy     = !var.enable_public_short_delivery
+  block_public_policy     = true
   ignore_public_acls      = true
-  restrict_public_buckets = !var.enable_public_short_delivery
+  restrict_public_buckets = true
 }
 
 data "aws_iam_policy_document" "short_public_access" {
-  dynamic "statement" {
-    for_each = var.enable_public_short_delivery ? [1] : []
+  statement {
+    sid    = "AllowCloudFrontReadOfShortObjects"
+    effect = "Allow"
 
-    content {
-      sid    = "AllowAnonymousReadOfShortObjects"
-      effect = "Allow"
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
 
-      principals {
-        type        = "*"
-        identifiers = ["*"]
-      }
+    actions = ["s3:GetObject"]
+    resources = [
+      "${aws_s3_bucket.short_public.arn}/*",
+    ]
 
-      actions = ["s3:GetObject"]
-      resources = [
-        "${aws_s3_bucket.short_public.arn}/*",
-      ]
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.short_public.arn]
     }
   }
 
@@ -159,23 +161,6 @@ data "aws_iam_policy_document" "short_public_access" {
 resource "aws_s3_bucket_policy" "short_public" {
   bucket = aws_s3_bucket.short_public.id
   policy = data.aws_iam_policy_document.short_public_access.json
-
-  depends_on = [
-    aws_s3_bucket_ownership_controls.short_public,
-    aws_s3_bucket_public_access_block.short_public,
-  ]
-}
-
-resource "aws_s3_bucket_cors_configuration" "short_public" {
-  bucket = aws_s3_bucket.short_public.id
-
-  cors_rule {
-    allowed_headers = ["*"]
-    allowed_methods = ["GET", "HEAD"]
-    allowed_origins = var.allowed_app_origins
-    expose_headers  = ["ETag"]
-    max_age_seconds = 300
-  }
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "short_public" {
