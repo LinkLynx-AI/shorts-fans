@@ -3,7 +3,6 @@ package dbschema
 import (
 	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -17,7 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 	"gopkg.in/yaml.v3"
 )
 
@@ -95,13 +94,12 @@ func Generate(ctx context.Context, opts Options) (err error) {
 
 	tempConfig := baseConfig.Copy()
 	tempConfig.Database = tempDatabaseName
-	tempDSN := tempConfig.ConnString()
 
-	if err := applyMigrations(tempDSN, migrationDir); err != nil {
+	if err := applyMigrations(tempConfig, migrationDir); err != nil {
 		return err
 	}
 
-	catalog, err := inspectCatalog(ctx, tempDSN)
+	catalog, err := inspectCatalog(ctx, tempConfig)
 	if err != nil {
 		return err
 	}
@@ -192,11 +190,8 @@ func dropDatabase(ctx context.Context, adminConn *pgx.Conn, databaseName string)
 	return nil
 }
 
-func applyMigrations(tempDSN string, migrationDir string) (err error) {
-	db, err := sql.Open("pgx", tempDSN)
-	if err != nil {
-		return fmt.Errorf("open temp database for migrations: %w", err)
-	}
+func applyMigrations(tempConfig *pgx.ConnConfig, migrationDir string) (err error) {
+	db := stdlib.OpenDB(*tempConfig)
 	defer db.Close()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})

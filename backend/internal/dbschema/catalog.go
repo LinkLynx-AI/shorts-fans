@@ -181,8 +181,8 @@ type viewDefinition struct {
 	Definition string
 }
 
-func inspectCatalog(ctx context.Context, dsn string) (catalog, error) {
-	conn, err := pgx.Connect(ctx, dsn)
+func inspectCatalog(ctx context.Context, config *pgx.ConnConfig) (catalog, error) {
+	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
 		return catalog{}, fmt.Errorf("connect temp database for inspection: %w", err)
 	}

@@ -8,9 +8,217 @@ source:
         - 000002_mvp_core_entities.up.sql
         - 000003_unify_creator_profiles.up.sql
         - 000004_expand_media_asset_processing_state.up.sql
+        - 000005_add_auth_tables.up.sql
+        - 000006_require_unique_email_identity.up.sql
 schemas:
     - name: app
       tables:
+        - name: auth_identities
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: provider
+              type: text
+              nullable: false
+            - name: provider_subject
+              type: text
+              nullable: false
+            - name: email_normalized
+              type: text
+              nullable: true
+            - name: verified_at
+              type: timestamp with time zone
+              nullable: true
+            - name: last_authenticated_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: auth_identities_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+          unique_constraints:
+            - name: auth_identities_provider_provider_subject_key
+              columns:
+                - provider
+                - provider_subject
+          check_constraints:
+            - name: auth_identities_email_normalized_check
+              expression: CHECK (email_normalized IS NULL OR email_normalized = lower(btrim(email_normalized)) AND length(btrim(email_normalized)) > 0)
+            - name: auth_identities_email_provider_requires_email_check
+              expression: CHECK (provider <> 'email'::text OR email_normalized IS NOT NULL)
+            - name: auth_identities_provider_check
+              expression: CHECK (length(btrim(provider)) > 0)
+            - name: auth_identities_provider_subject_check
+              expression: CHECK (length(btrim(provider_subject)) > 0)
+          indexes:
+            - name: idx_auth_identities_email_normalized
+              columns:
+                - email_normalized
+              unique: true
+              predicate: ((provider = 'email'::text) AND (email_normalized IS NOT NULL))
+              definition: CREATE UNIQUE INDEX idx_auth_identities_email_normalized ON app.auth_identities USING btree (email_normalized) WHERE ((provider = 'email'::text) AND (email_normalized IS NOT NULL))
+            - name: idx_auth_identities_user_id
+              columns:
+                - user_id
+                - created_at
+                - id
+              definition: CREATE INDEX idx_auth_identities_user_id ON app.auth_identities USING btree (user_id, created_at DESC, id DESC)
+        - name: auth_login_challenges
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: provider
+              type: text
+              nullable: false
+            - name: provider_subject
+              type: text
+              nullable: false
+            - name: email_normalized
+              type: text
+              nullable: true
+            - name: challenge_token_hash
+              type: text
+              nullable: false
+            - name: purpose
+              type: text
+              nullable: false
+              default: '''login''::text'
+            - name: expires_at
+              type: timestamp with time zone
+              nullable: false
+            - name: consumed_at
+              type: timestamp with time zone
+              nullable: true
+            - name: attempt_count
+              type: integer
+              nullable: false
+              default: "0"
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          check_constraints:
+            - name: auth_login_challenges_attempt_count_check
+              expression: CHECK (attempt_count >= 0)
+            - name: auth_login_challenges_challenge_token_hash_check
+              expression: CHECK (length(btrim(challenge_token_hash)) > 0)
+            - name: auth_login_challenges_email_normalized_check
+              expression: CHECK (email_normalized IS NULL OR email_normalized = lower(btrim(email_normalized)) AND length(btrim(email_normalized)) > 0)
+            - name: auth_login_challenges_provider_check
+              expression: CHECK (length(btrim(provider)) > 0)
+            - name: auth_login_challenges_provider_subject_check
+              expression: CHECK (length(btrim(provider_subject)) > 0)
+            - name: auth_login_challenges_purpose_check
+              expression: CHECK (purpose = 'login'::text)
+          indexes:
+            - name: idx_auth_login_challenges_pending_expiration
+              columns:
+                - expires_at
+                - id
+              predicate: (consumed_at IS NULL)
+              definition: CREATE INDEX idx_auth_login_challenges_pending_expiration ON app.auth_login_challenges USING btree (expires_at, id) WHERE (consumed_at IS NULL)
+            - name: idx_auth_login_challenges_subject_created_at
+              columns:
+                - provider
+                - provider_subject
+                - created_at
+                - id
+              definition: CREATE INDEX idx_auth_login_challenges_subject_created_at ON app.auth_login_challenges USING btree (provider, provider_subject, created_at DESC, id DESC)
+        - name: auth_sessions
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: active_mode
+              type: text
+              nullable: false
+              default: '''fan''::text'
+            - name: session_token_hash
+              type: text
+              nullable: false
+            - name: expires_at
+              type: timestamp with time zone
+              nullable: false
+            - name: last_seen_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: revoked_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: auth_sessions_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+          unique_constraints:
+            - name: auth_sessions_session_token_hash_key
+              columns:
+                - session_token_hash
+          check_constraints:
+            - name: auth_sessions_active_mode_check
+              expression: CHECK (active_mode = ANY (ARRAY['fan'::text, 'creator'::text]))
+            - name: auth_sessions_session_token_hash_check
+              expression: CHECK (length(btrim(session_token_hash)) > 0)
+          indexes:
+            - name: idx_auth_sessions_active_lookup
+              columns:
+                - expires_at
+                - id
+              predicate: (revoked_at IS NULL)
+              definition: CREATE INDEX idx_auth_sessions_active_lookup ON app.auth_sessions USING btree (expires_at, id) WHERE (revoked_at IS NULL)
+            - name: idx_auth_sessions_user_id
+              columns:
+                - user_id
+                - created_at
+                - id
+              definition: CREATE INDEX idx_auth_sessions_user_id ON app.auth_sessions USING btree (user_id, created_at DESC, id DESC)
         - name: creator_capabilities
           columns:
             - name: user_id
