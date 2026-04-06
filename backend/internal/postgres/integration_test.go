@@ -18,6 +18,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/stdlib"
 )
@@ -113,7 +114,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 5)
+	assertMigrationVersion(t, migrator, 6)
 
 	queries := sqlc.New(conn)
 	now := time.Now().UTC()
@@ -134,6 +135,42 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAuthIdentity() error = %v, want nil", err)
 	}
+
+	secondUser, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() second user error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "duplicate@example.com",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "google",
+		ProviderSubject:     "google-subject",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthIdentity() non-email duplicate error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "missing-email@example.com",
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23514", "auth_identities_email_provider_requires_email_check")
 
 	gotIdentity, err := queries.GetAuthIdentityByProviderAndSubject(ctx, sqlc.GetAuthIdentityByProviderAndSubjectParams{
 		Provider:        "email",
@@ -252,18 +289,33 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Steps(-1); err != nil {
 		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 4)
-	assertRelationExists(t, ctx, conn, "app.auth_identities", false)
-	assertRelationExists(t, ctx, conn, "app.auth_sessions", false)
-	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", false)
-
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
-	}
 	assertMigrationVersion(t, migrator, 5)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 6)
+	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
+	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
+	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
+
+	thirdUser, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() third user error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              thirdUser.ID,
+		Provider:            "email",
+		ProviderSubject:     "reapplied@example.com",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
 }
 
 func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
@@ -733,6 +785,25 @@ func assertRelationExists(t *testing.T, ctx context.Context, conn *pgx.Conn, rel
 	}
 	if regclass.Valid != want {
 		t.Fatalf("to_regclass(%q) valid got %t want %t", relationName, regclass.Valid, want)
+	}
+}
+
+func assertPgConstraintError(t *testing.T, err error, wantCode string, wantConstraint string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatalf("error = nil, want pg error code %s constraint %s", wantCode, wantConstraint)
+	}
+
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		t.Fatalf("error type got %T want *pgconn.PgError", err)
+	}
+	if pgErr.Code != wantCode {
+		t.Fatalf("pg error code got %q want %q", pgErr.Code, wantCode)
+	}
+	if pgErr.ConstraintName != wantConstraint {
+		t.Fatalf("pg constraint got %q want %q", pgErr.ConstraintName, wantConstraint)
 	}
 }
 
