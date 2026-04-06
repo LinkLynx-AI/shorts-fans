@@ -16,6 +16,10 @@ type stubQueries struct {
 	getProfile    func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
 
+func (s stubQueries) CountCreatorFollowersByCreatorUserID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (s stubQueries) CreateCreatorCapability(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
 	return sqlc.AppCreatorCapability{}, nil
 }
@@ -32,6 +36,10 @@ func (s stubQueries) CreateCreatorProfile(context.Context, sqlc.CreateCreatorPro
 	return sqlc.AppCreatorProfile{}, nil
 }
 
+func (s stubQueries) CountPublicShortsByCreatorUserID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (s stubQueries) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 	return s.getProfile(ctx, userID)
 }
@@ -42,6 +50,10 @@ func (s stubQueries) GetPublicCreatorProfileByUserID(context.Context, pgtype.UUI
 
 func (s stubQueries) GetPublicCreatorProfileByHandle(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
 	return sqlc.AppPublicCreatorProfile{}, nil
+}
+
+func (s stubQueries) ListCreatorProfileShortGridItems(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error) {
+	return nil, nil
 }
 
 func (s stubQueries) ListRecentPublicCreatorProfiles(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {

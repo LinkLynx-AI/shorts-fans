@@ -53,6 +53,11 @@ FROM app.public_creator_profiles
 WHERE handle = sqlc.arg(handle)
 LIMIT 1;
 
+-- name: CountCreatorFollowersByCreatorUserID :one
+SELECT COUNT(*)::bigint
+FROM app.creator_follows
+WHERE creator_user_id = $1;
+
 -- name: ListRecentPublicCreatorProfiles :many
 SELECT *
 FROM app.public_creator_profiles

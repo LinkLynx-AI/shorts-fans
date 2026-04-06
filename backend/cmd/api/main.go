@@ -49,6 +49,7 @@ func main() {
 		}
 	}()
 
+	creatorRepository := creator.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 
@@ -59,8 +60,10 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
-			CreatorSearch:   creator.NewRepository(pool),
-			ViewerBootstrap: viewerBootstrapReader,
+			CreatorSearch:        creatorRepository,
+			CreatorProfile:       creatorRepository,
+			CreatorProfileShorts: creatorRepository,
+			ViewerBootstrap:      viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

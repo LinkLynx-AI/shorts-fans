@@ -11,6 +11,19 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countCreatorFollowersByCreatorUserID = `-- name: CountCreatorFollowersByCreatorUserID :one
+SELECT COUNT(*)::bigint
+FROM app.creator_follows
+WHERE creator_user_id = $1
+`
+
+func (q *Queries) CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countCreatorFollowersByCreatorUserID, creatorUserID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createCreatorProfile = `-- name: CreateCreatorProfile :one
 INSERT INTO app.creator_profiles (
     user_id,

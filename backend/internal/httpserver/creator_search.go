@@ -48,10 +48,10 @@ type creatorSearchResponseData struct {
 }
 
 type creatorSearchResult struct {
-	Creator creatorSearchSummary `json:"creator"`
+	Creator creatorSummary `json:"creator"`
 }
 
-type creatorSearchSummary struct {
+type creatorSummary struct {
 	Avatar      *mediaAsset `json:"avatar"`
 	Bio         string      `json:"bio"`
 	DisplayName string      `json:"displayName"`
@@ -127,8 +127,19 @@ func handleCreatorSearch(c *gin.Context, reader CreatorSearchReader) {
 
 // buildCreatorSearchResult は公開 creator profile を transport response に変換します。
 func buildCreatorSearchResult(profile creator.Profile) (creatorSearchResult, error) {
+	creatorSummary, err := buildCreatorSummary(profile)
+	if err != nil {
+		return creatorSearchResult{}, err
+	}
+
+	return creatorSearchResult{
+		Creator: creatorSummary,
+	}, nil
+}
+
+func buildCreatorSummary(profile creator.Profile) (creatorSummary, error) {
 	if profile.DisplayName == nil || profile.Handle == nil {
-		return creatorSearchResult{}, fmt.Errorf("creator search result に必要な display name または handle がありません")
+		return creatorSummary{}, fmt.Errorf("creator summary に必要な display name または handle がありません")
 	}
 
 	var avatar *mediaAsset
@@ -142,14 +153,12 @@ func buildCreatorSearchResult(profile creator.Profile) (creatorSearchResult, err
 		}
 	}
 
-	return creatorSearchResult{
-		Creator: creatorSearchSummary{
-			Avatar:      avatar,
-			Bio:         profile.Bio,
-			DisplayName: *profile.DisplayName,
-			Handle:      formatHandle(*profile.Handle),
-			ID:          creatorPublicID(profile.UserID),
-		},
+	return creatorSummary{
+		Avatar:      avatar,
+		Bio:         profile.Bio,
+		DisplayName: *profile.DisplayName,
+		Handle:      formatHandle(*profile.Handle),
+		ID:          creator.FormatPublicID(profile.UserID),
 	}, nil
 }
 
@@ -218,14 +227,24 @@ func writeInternalServerError(c *gin.Context, requestScope string) {
 	})
 }
 
+// writeNotFoundError は fan read surface 共通の not found envelope を返します。
+func writeNotFoundError(c *gin.Context, requestScope string, message string) {
+	c.JSON(http.StatusNotFound, responseEnvelope[struct{}]{
+		Data: nil,
+		Meta: responseMeta{
+			RequestID: newRequestID(requestScope),
+			Page:      nil,
+		},
+		Error: &responseError{
+			Code:    "not_found",
+			Message: message,
+		},
+	})
+}
+
 // formatHandle は保存済み handle を API 向けの `@` 付き表現に揃えます。
 func formatHandle(handle string) string {
 	return "@" + strings.TrimPrefix(handle, "@")
-}
-
-// creatorPublicID は user ID から stable な creator identifier を生成します。
-func creatorPublicID(userID uuid.UUID) string {
-	return fmt.Sprintf("creator_%s", strings.ReplaceAll(userID.String(), "-", ""))
 }
 
 // creatorAvatarAssetID は user ID から stable な avatar asset identifier を生成します。
