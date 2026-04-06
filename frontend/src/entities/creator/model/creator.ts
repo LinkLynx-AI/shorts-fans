@@ -4,7 +4,7 @@ type CreatorAvatarAsset = {
   durationSeconds: null;
   id: string;
   kind: "image";
-  posterUrl: null;
+  posterUrl: string | null;
   url: string;
 };
 
@@ -47,6 +47,12 @@ function createAvatarDataUrl(from: string, accent: string, to: string): string {
  */
 const recentCreatorIds = ["aoi", "mina"] as const satisfies readonly CreatorId[];
 
+const creatorAliasIdsById: Readonly<Record<string, CreatorId>> = {
+  creator_aoi_n: "aoi",
+  creator_mina_rei: "mina",
+  creator_sora_vale: "sora",
+};
+
 /**
  * mock creator 用の avatar asset を構築する。
  */
@@ -82,13 +88,31 @@ const creators = [
     handle: "@soravale",
     id: "sora",
   },
+  {
+    avatar: {
+      durationSeconds: null,
+      id: "asset_creator_11111111111111111111111111111111_avatar",
+      kind: "image",
+      posterUrl: null,
+      url: "https://cdn.example.com/mock/creator/avatar-mika-aoi.jpg",
+    },
+    bio: "Public shorts から paid main へつながる creator mock profile.",
+    displayName: "Mika Aoi",
+    handle: "@mikaaoi",
+    id: "creator_11111111111111111111111111111111",
+  },
 ] as const satisfies readonly CreatorSummary[];
 
 const creatorProfileStatsById: Record<string, CreatorProfileStats> = {
   aoi: { fanCount: 19000, shortCount: 11, viewCount: 132000 },
+  creator_11111111111111111111111111111111: { fanCount: 1200, shortCount: 0, viewCount: 8600 },
   mina: { fanCount: 24000, shortCount: 2, viewCount: 184000 },
   sora: { fanCount: 16000, shortCount: 0, viewCount: 118000 },
 };
+
+function resolveCreatorId(id: CreatorId): CreatorId {
+  return creatorAliasIdsById[id] ?? id;
+}
 
 /**
  * creator search query を比較用の lowercase 文字列に正規化する。
@@ -126,7 +150,9 @@ export function getRecentCreators(): readonly CreatorSummary[] {
  * creator ID から summary を取得する。
  */
 export function getCreatorById(id: CreatorId): CreatorSummary | undefined {
-  return creators.find((creator) => creator.id === id);
+  const resolvedID = resolveCreatorId(id);
+
+  return creators.find((creator) => creator.id === resolvedID);
 }
 
 /**
@@ -146,14 +172,14 @@ export function searchCreators(query: string): readonly CreatorSummary[] {
  * creator profile 用の stats を取得する。
  */
 export function getCreatorProfileStatsById(id: CreatorId): CreatorProfileStats | undefined {
-  return creatorProfileStatsById[id];
+  return creatorProfileStatsById[resolveCreatorId(id)];
 }
 
 /**
  * static route 用の creator ID 一覧を取得する。
  */
 export function getCreatorIds(): readonly CreatorId[] {
-  return creators.map((creator) => creator.id);
+  return [...creators.map((creator) => creator.id), ...Object.keys(creatorAliasIdsById)];
 }
 
 /**

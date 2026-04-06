@@ -3,19 +3,27 @@ import type { FeedTab, ShortId } from "@/entities/short";
 
 export type CreatorProfileRouteOrigin =
   | {
+      creatorDisplayName?: string | undefined;
+      creatorHandle?: `@${string}` | undefined;
       from: "feed";
       tab?: FeedTab | undefined;
     }
   | {
+      creatorDisplayName?: string | undefined;
+      creatorHandle?: `@${string}` | undefined;
       from: "search";
       q?: string | undefined;
     }
   | {
+      creatorDisplayName?: string | undefined;
+      creatorHandle?: `@${string}` | undefined;
       from: "short";
       shortId: ShortId;
     };
 
 export type CreatorProfileRouteState = {
+  creatorDisplayName?: string | undefined;
+  creatorHandle?: `@${string}` | undefined;
   from?: CreatorProfileRouteOrigin["from"] | undefined;
   q?: string | undefined;
   shortId?: ShortId | undefined;
@@ -58,6 +66,8 @@ export function buildCreatorProfileHref(
 ): string {
   if (origin.from === "search") {
     return `/creators/${creatorId}${buildQueryString({
+      creatorDisplayName: origin.creatorDisplayName,
+      creatorHandle: origin.creatorHandle,
       from: origin.from,
       q: origin.q?.trim() || undefined,
     })}`;

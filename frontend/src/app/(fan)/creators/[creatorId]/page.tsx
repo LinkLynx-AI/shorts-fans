@@ -14,6 +14,8 @@ export default async function CreatorProfilePage({
 }: {
   params: Promise<{ creatorId: string }>;
   searchParams: Promise<{
+    creatorDisplayName?: string | string[];
+    creatorHandle?: string | string[];
     from?: string | string[];
     q?: string | string[];
     shortId?: string | string[];
@@ -23,13 +25,21 @@ export default async function CreatorProfilePage({
   const rawParams = await params;
   const rawSearchParams = await searchParams;
   const { creatorId } = paramsSchema.parse(rawParams);
+  const creatorHandle = getSingleQueryParam(rawSearchParams.creatorHandle);
   const routeState = {
+    creatorDisplayName: getSingleQueryParam(rawSearchParams.creatorDisplayName),
+    creatorHandle: creatorHandle?.startsWith("@")
+      ? (creatorHandle as `@${string}`)
+      : undefined,
     from: getEnumQueryParam(rawSearchParams.from, ["feed", "search", "short"]),
     q: getSingleQueryParam(rawSearchParams.q),
     shortId: getSingleQueryParam(rawSearchParams.shortId),
     tab: getEnumQueryParam(rawSearchParams.tab, ["following", "recommended"]),
   };
-  const state = getCreatorProfileShellState(creatorId);
+  const state = getCreatorProfileShellState(creatorId, {
+    displayName: routeState.creatorDisplayName,
+    handle: routeState.creatorHandle,
+  });
 
   if (!state) {
     notFound();

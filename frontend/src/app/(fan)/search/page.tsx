@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { loadCreatorSearchState } from "@/features/creator-search";
 import { getSingleQueryParam } from "@/shared/lib";
 import { SearchShell } from "@/widgets/search-shell";
 
@@ -16,6 +17,7 @@ export default async function SearchPage({
   const { q } = searchParamsSchema.parse({
     q: getSingleQueryParam(rawSearchParams.q),
   });
+  const initialState = await loadCreatorSearchState(q);
 
-  return <SearchShell query={q} />;
+  return <SearchShell initialState={initialState} query={q} />;
 }
