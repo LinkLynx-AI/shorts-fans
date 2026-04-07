@@ -20,6 +20,10 @@ const viewerBootstrapFixtures = JSON.parse(await readFile(viewerBootstrapFixture
 const searchFixtures = fixtures["GET /api/fan/creators/search"];
 const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
+const e2eSessionToken = "e2e-viewer-session";
+const existingFanEmail = "fan@example.com";
+const signInChallengeToken = "e2e-sign-in-challenge";
+const signUpChallengeToken = "e2e-sign-up-challenge";
 
 if (!searchFixtures) {
   throw new Error("creator search fixture が見つかりません");
@@ -36,15 +40,32 @@ if (!authenticatedFanBootstrap || !unauthenticatedBootstrap) {
   throw new Error("viewer bootstrap fixture の authenticatedFan / unauthenticated が不足しています");
 }
 
-function writeJson(response, statusCode, body) {
-  response.writeHead(statusCode, {
+function buildCorsHeaders(request) {
+  const origin = request.headers.origin;
+
+  return {
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Accept, Content-Type",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Origin": origin ?? "*",
+    Vary: "Origin",
+  };
+}
+
+function writeJson(request, response, statusCode, body) {
+  response.writeHead(statusCode, {
+    ...buildCorsHeaders(request),
     "Content-Type": "application/json; charset=utf-8",
   });
   response.end(JSON.stringify(body));
+}
+
+function writeNoContent(request, response, headers = {}) {
+  response.writeHead(204, {
+    ...buildCorsHeaders(request),
+    ...headers,
+  });
+  response.end();
 }
 
 function buildSearchResponse(query) {
@@ -94,41 +115,238 @@ function readCookieValue(cookieHeader, cookieName) {
   return null;
 }
 
+async function readJsonBody(request) {
+  const chunks = [];
+
+  for await (const chunk of request) {
+    chunks.push(chunk);
+  }
+
+  const rawBody = Buffer.concat(chunks).toString("utf8");
+
+  if (rawBody.length === 0) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawBody);
+  } catch {
+    return null;
+  }
+}
+
+function isValidEmail(value) {
+  return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 const server = http.createServer((request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://${host}:${port}`);
 
   if (request.method === "OPTIONS") {
     response.writeHead(204, {
-      "Access-Control-Allow-Credentials": "true",
-      "Access-Control-Allow-Headers": "Accept, Content-Type",
-      "Access-Control-Allow-Methods": "GET, OPTIONS",
-      "Access-Control-Allow-Origin": "*",
+      ...buildCorsHeaders(request),
     });
     response.end();
     return;
   }
 
   if (request.method === "GET" && requestUrl.pathname === "/healthz") {
-    writeJson(response, 200, { status: "ok" });
+    writeJson(request, response, 200, { status: "ok" });
     return;
   }
 
   if (request.method === "GET" && requestUrl.pathname === "/api/fan/creators/search") {
     const query = requestUrl.searchParams.get("q")?.trim() ?? "";
-    writeJson(response, 200, buildSearchResponse(query));
+    writeJson(request, response, 200, buildSearchResponse(query));
     return;
   }
 
   if (request.method === "GET" && requestUrl.pathname === "/api/viewer/bootstrap") {
     const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
     const body =
-      sessionToken === "e2e-viewer-session" ? authenticatedFanBootstrap : unauthenticatedBootstrap;
+      sessionToken === e2eSessionToken ? authenticatedFanBootstrap : unauthenticatedBootstrap;
 
-    writeJson(response, 200, body);
+    writeJson(request, response, 200, body);
     return;
   }
 
-  writeJson(response, 404, {
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-in/challenges") {
+    void readJsonBody(request).then((body) => {
+      const email = body?.email;
+
+      if (!isValidEmail(email)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_email",
+            message: "email is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_invalid_email_001",
+          },
+        });
+        return;
+      }
+
+      if (email !== existingFanEmail) {
+        writeJson(request, response, 404, {
+          data: null,
+          error: {
+            code: "email_not_found",
+            message: "email was not found",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_email_not_found_001",
+          },
+        });
+        return;
+      }
+
+      writeJson(request, response, 200, {
+        data: {
+          challengeToken: signInChallengeToken,
+          expiresAt: "2026-04-07T12:00:00Z",
+        },
+        error: null,
+        meta: {
+          page: null,
+          requestId: "req_e2e_sign_in_challenge_001",
+        },
+      });
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up/challenges") {
+    void readJsonBody(request).then((body) => {
+      const email = body?.email;
+
+      if (!isValidEmail(email)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_email",
+            message: "email is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_invalid_email_001",
+          },
+        });
+        return;
+      }
+
+      if (email === existingFanEmail) {
+        writeJson(request, response, 409, {
+          data: null,
+          error: {
+            code: "email_already_registered",
+            message: "email is already registered",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_conflict_001",
+          },
+        });
+        return;
+      }
+
+      writeJson(request, response, 200, {
+        data: {
+          challengeToken: signUpChallengeToken,
+          expiresAt: "2026-04-07T12:00:00Z",
+        },
+        error: null,
+        meta: {
+          page: null,
+          requestId: "req_e2e_sign_up_challenge_001",
+        },
+      });
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-in/session") {
+    void readJsonBody(request).then((body) => {
+      if (body?.email !== existingFanEmail) {
+        writeJson(request, response, 404, {
+          data: null,
+          error: {
+            code: "email_not_found",
+            message: "email was not found",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_session_missing_email_001",
+          },
+        });
+        return;
+      }
+
+      if (body?.challengeToken !== signInChallengeToken) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_challenge",
+            message: "challenge is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_invalid_challenge_001",
+          },
+        });
+        return;
+      }
+
+      writeNoContent(request, response, {
+        "Set-Cookie": `shorts_fans_session=${e2eSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
+      });
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up/session") {
+    void readJsonBody(request).then((body) => {
+      if (body?.email === existingFanEmail) {
+        writeJson(request, response, 409, {
+          data: null,
+          error: {
+            code: "email_already_registered",
+            message: "email is already registered",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_session_conflict_001",
+          },
+        });
+        return;
+      }
+
+      if (body?.challengeToken !== signUpChallengeToken) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_challenge",
+            message: "challenge is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_invalid_challenge_001",
+          },
+        });
+        return;
+      }
+
+      writeNoContent(request, response, {
+        "Set-Cookie": `shorts_fans_session=${e2eSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
+      });
+    });
+    return;
+  }
+
+  writeJson(request, response, 404, {
     data: null,
     error: {
       code: "not_found",
