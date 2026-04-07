@@ -125,6 +125,37 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
 });
 
+test("unauthenticated viewers can sign in from the shared auth modal opened by the profile button", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("link", { name: "マイ" }).click();
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+
+  await page.getByRole("link", { name: "フィード" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: "マイ" }).click();
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+});
+
+test("unauthenticated viewers can sign up from the shared auth modal and enter the fan hub", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("link", { name: "マイ" }).click();
+  await page.getByRole("button", { name: "サインアップへ" }).click();
+  await page.getByRole("textbox", { name: "Email" }).fill("newfan@example.com");
+  await page.getByRole("button", { name: "新規登録を続ける" }).click();
+
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+});
+
 test("invalid grant response does not leak protected playback data", async ({ request }) => {
   const response = await request.get("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid", {
     headers: {

@@ -1,35 +1,50 @@
-import Link from "next/link";
+"use client";
 
-import { Button, SurfacePanel } from "@/shared/ui";
+import { useRouter } from "next/navigation";
+
+import {
+  FanAuthEntryPanel,
+  useFanAuthEntry,
+} from "@/features/fan-auth";
+import { Button } from "@/shared/ui";
 
 /**
  * protected fan surface から到達する fan login entry を表示する。
  */
 export function FanAuthEntryShell() {
+  const router = useRouter();
+  const {
+    email,
+    errorMessage,
+    isSubmitting,
+    mode,
+    setEmail,
+    submit,
+    switchMode,
+  } = useFanAuthEntry();
+
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-[408px] items-center px-4 py-10">
-      <SurfacePanel className="w-full px-5 py-6 text-foreground">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">fan access</p>
-        <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
-          続けるにはログインが必要です
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-muted">
-          フォロー中、library、main 再生のような protected fan surface は、fan session を開始してから続けられます。
-        </p>
-
-        <div className="mt-5 grid gap-2.5">
-          <Button className="w-full" disabled type="button">
-            サインイン / 新規登録
+      <FanAuthEntryPanel
+        dismissAction={(
+          <Button
+            className="w-full"
+            disabled={isSubmitting}
+            onClick={() => router.push("/")}
+            type="button"
+            variant="secondary"
+          >
+            feed に戻る
           </Button>
-          <Button asChild className="w-full" variant="secondary">
-            <Link href="/">feed に戻る</Link>
-          </Button>
-        </div>
-
-        <p className="mt-3 text-xs leading-5 text-muted">
-          sign in / sign up の具体的な modal 接続は後続 issue で行います。この route は protected flow の共通 entry として使います。
-        </p>
-      </SurfacePanel>
+        )}
+        email={email}
+        errorMessage={errorMessage}
+        isSubmitting={isSubmitting}
+        mode={mode}
+        onEmailChange={setEmail}
+        onModeSwitch={switchMode}
+        onSubmit={submit}
+      />
     </main>
   );
 }

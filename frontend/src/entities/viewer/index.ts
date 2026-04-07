@@ -5,9 +5,11 @@ export {
 export {
   CurrentViewerProvider,
   useCurrentViewer,
+  useSetCurrentViewer,
 } from "./model/current-viewer-context";
 export {
   useHasViewerSession,
+  useSetViewerSession,
   ViewerSessionProvider,
 } from "./model/viewer-session-context";
 export {
