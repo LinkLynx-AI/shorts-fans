@@ -18,4 +18,5 @@ export {
   FanAuthDialogProvider,
   useFanAuthDialog,
 } from "./model/fan-auth-dialog-context";
+export { FanAuthDialog } from "./ui/fan-auth-dialog";
 export { FanAuthEntryPanel } from "./ui/fan-auth-entry-panel";
