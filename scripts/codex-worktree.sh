@@ -10,6 +10,7 @@ Usage:
 Behavior:
   - Creates a git worktree under $HOME/.codex/worktrees by default.
   - The worktree directory name is derived from the branch name.
+  - Copies local .env files from the primary worktree into the new worktree.
   - Launches codex with --ask-for-approval never, --sandbox <mode>, and --cd <worktree-path>.
 
 Environment:
@@ -89,6 +90,60 @@ resolve_default_base_ref() {
   git -C "$repo_root" rev-parse --short HEAD
 }
 
+resolve_primary_worktree_path() {
+  local repo_root="$1"
+  local git_common_dir=""
+
+  git_common_dir="$(git -C "$repo_root" rev-parse --git-common-dir)"
+
+  if [[ "$git_common_dir" != /* ]]; then
+    git_common_dir="${repo_root%/}/${git_common_dir}"
+  fi
+
+  git_common_dir="$(cd "$git_common_dir" && pwd -P)"
+
+  if [[ "$(basename "$git_common_dir")" != ".git" ]]; then
+    warn "git common dir does not point to a standard .git directory; falling back to the current worktree as the env source."
+    printf '%s\n' "$repo_root"
+    return 0
+  fi
+
+  printf '%s\n' "$(dirname "$git_common_dir")"
+}
+
+copy_local_env_files() {
+  local source_root="$1"
+  local target_root="$2"
+  local source_path=""
+  local relative_path=""
+  local target_path=""
+  local copied_count=0
+
+  if [[ "$source_root" == "$target_root" ]]; then
+    return 0
+  fi
+
+  while IFS= read -r -d '' source_path; do
+    relative_path="${source_path#"$source_root"/}"
+
+    if git -C "$source_root" ls-files --error-unmatch -- "$relative_path" >/dev/null 2>&1; then
+      continue
+    fi
+
+    target_path="${target_root}/${relative_path}"
+    mkdir -p "$(dirname "$target_path")"
+    cp -p "$source_path" "$target_path"
+    copied_count=$((copied_count + 1))
+    echo "copied env: ${relative_path}"
+  done < <(
+    find "$source_root" -type f \( -name '.env' -o -name '.env.local' -o -name '.env.*' \) -print0
+  )
+
+  if [[ "$copied_count" -eq 0 ]]; then
+    warn "no local .env files were found under ${source_root}."
+  fi
+}
+
 resolve_gh_token() {
   local resolved_token=""
 
@@ -161,6 +216,7 @@ fi
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git -C "${script_dir}/.." rev-parse --show-toplevel)"
+primary_worktree_root="$(resolve_primary_worktree_path "$repo_root")"
 base_ref="$(resolve_default_base_ref "$repo_root")"
 worktree_name="$(slugify "${branch_name#codex/}")"
 
@@ -194,6 +250,8 @@ if git show-ref --verify --quiet "refs/heads/${branch_name}"; then
 else
   git worktree add -b "$branch_name" "$target_worktree_path" "$base_ref"
 fi
+
+copy_local_env_files "$primary_worktree_root" "$target_worktree_path"
 
 echo "worktree: ${target_worktree_path}"
 echo "branch: ${branch_name}"
