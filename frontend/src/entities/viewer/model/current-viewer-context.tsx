@@ -3,7 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -28,10 +27,6 @@ export function CurrentViewerProvider({
   currentViewer,
 }: CurrentViewerProviderProps) {
   const [resolvedCurrentViewer, setResolvedCurrentViewer] = useState(currentViewer);
-
-  useEffect(() => {
-    setResolvedCurrentViewer(currentViewer);
-  }, [currentViewer]);
 
   return (
     <CurrentViewerOverrideContext.Provider value={setResolvedCurrentViewer}>

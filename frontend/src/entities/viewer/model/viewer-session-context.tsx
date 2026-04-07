@@ -3,7 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -24,10 +23,6 @@ export function ViewerSessionProvider({
   hasSession,
 }: ViewerSessionProviderProps) {
   const [resolvedHasSession, setResolvedHasSession] = useState(hasSession);
-
-  useEffect(() => {
-    setResolvedHasSession(hasSession);
-  }, [hasSession]);
 
   return (
     <ViewerSessionOverrideContext.Provider value={setResolvedHasSession}>
