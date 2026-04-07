@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getShortById } from "@/entities/short";
+import { getCurrentViewerBootstrap, viewerSessionCookieName } from "@/entities/viewer";
 import {
   buildMockMainAccessEntryContext,
   buildMockMainPlaybackGrantContext,
@@ -34,6 +35,25 @@ function buildDeniedResponse(fromShortId?: string, status = 403) {
     },
     {
       status,
+    },
+  );
+}
+
+function buildAuthRequiredResponse() {
+  return NextResponse.json(
+    {
+      data: null,
+      meta: {
+        page: null,
+        requestId: "req_mock_main_access_auth_required_001",
+      },
+      error: {
+        code: "auth_required",
+        message: "main playback requires authentication",
+      },
+    },
+    {
+      status: 401,
     },
   );
 }
@@ -72,7 +92,19 @@ function resolveGrantKind(
 /**
  * main 再生用の signed grant を発行する。
  */
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const sessionToken = request.cookies.get(viewerSessionCookieName)?.value;
+
+  if (!sessionToken) {
+    return buildAuthRequiredResponse();
+  }
+
+  const currentViewer = await getCurrentViewerBootstrap({ sessionToken }).catch(() => null);
+
+  if (!currentViewer) {
+    return buildAuthRequiredResponse();
+  }
+
   const parsedBody = mainAccessRequestSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsedBody.success) {

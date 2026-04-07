@@ -1,7 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getShortById } from "@/entities/short";
+import { buildFanLoginHref } from "@/features/fan-auth";
+import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { parseMockMainPlaybackGrantContext } from "@/features/unlock-entry";
 import { readMockSignedToken } from "@/shared/lib/mock-signed-token";
 import {
@@ -65,6 +67,12 @@ export default async function MainPlaybackPage({
   params: Promise<{ mainId: string }>;
   searchParams: Promise<{ fromShortId?: string | string[]; grant?: string | string[] }>;
 }) {
+  const viewerState = await getFanAuthGateState();
+
+  if (!viewerState.hasSession) {
+    redirect(buildFanLoginHref());
+  }
+
   const [rawParams, rawSearchParams] = await Promise.all([params, searchParams]);
   const { mainId } = parseMainPlaybackParams(rawParams);
   const { fromShortId: normalizedFromShortId, grant: normalizedGrant } =

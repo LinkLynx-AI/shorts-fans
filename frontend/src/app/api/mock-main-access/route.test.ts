@@ -2,23 +2,108 @@ import {
   buildMockMainAccessEntryContext,
   parseMockMainPlaybackGrantContext,
 } from "@/features/unlock-entry";
+import {
+  getCurrentViewerBootstrap,
+  viewerSessionCookieName,
+} from "@/entities/viewer";
+import { NextRequest } from "next/server";
 import { issueMockSignedToken, readMockSignedToken } from "@/shared/lib/mock-signed-token";
 
 import { POST } from "./route";
 
-async function postMainAccess(body: object) {
-  return POST(
-    new Request("http://localhost/api/mock-main-access", {
-      body: JSON.stringify(body),
-      headers: {
-        "Content-Type": "application/json",
+vi.mock("@/entities/viewer", async () => {
+  const actual = await vi.importActual<typeof import("@/entities/viewer")>("@/entities/viewer");
+
+  return {
+    ...actual,
+    getCurrentViewerBootstrap: vi.fn(),
+  };
+});
+
+async function postMainAccess(body: object, sessionToken?: string) {
+  const request = {
+    cookies: {
+      get(name: string) {
+        if (!sessionToken || name !== viewerSessionCookieName) {
+          return undefined;
+        }
+
+        return {
+          name,
+          value: sessionToken,
+        };
       },
-      method: "POST",
-    }),
+    },
+    json: async () => body,
+  } as unknown as NextRequest;
+
+  return POST(
+    request,
   );
 }
 
+async function expectPlaybackGrantResponse(
+  response: Response,
+  expected: {
+    fromShortId: string;
+    grantKind: "owner" | "purchased";
+    mainId: string;
+  },
+) {
+  const body = await response.json();
+  const playbackUrl = new URL(body.href, "http://localhost");
+  const grant = playbackUrl.searchParams.get("grant");
+
+  expect(response.status).toBe(200);
+  expect(playbackUrl.pathname).toBe(`/mains/${expected.mainId}`);
+  expect(playbackUrl.searchParams.get("fromShortId")).toBe(expected.fromShortId);
+  expect(grant).toBeTruthy();
+
+  const grantPayload = readMockSignedToken(grant!);
+
+  expect(grantPayload).not.toBeNull();
+
+  if (!grantPayload) {
+    throw new Error("grant payload missing");
+  }
+
+  expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual(expected);
+}
+
 describe("POST /api/mock-main-access", () => {
+  beforeEach(() => {
+    vi.mocked(getCurrentViewerBootstrap).mockResolvedValue({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+  });
+
+  it("returns auth_required when no fan session exists", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+      ),
+      fromShortId: "rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "auth_required",
+        message: "main playback requires authentication",
+      },
+      meta: {
+        page: null,
+        requestId: "req_mock_main_access_auth_required_001",
+      },
+    });
+  });
+
   it("rejects setup-required access without the required confirmations", async () => {
     const response = await postMainAccess({
       acceptedAge: false,
@@ -28,7 +113,7 @@ describe("POST /api/mock-main-access", () => {
       ),
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
+    }, "viewer-session");
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -45,27 +130,47 @@ describe("POST /api/mock-main-access", () => {
       ),
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
-    const body = await response.json();
-    const playbackUrl = new URL(body.href, "http://localhost");
-    const grant = playbackUrl.searchParams.get("grant");
-
-    expect(response.status).toBe(200);
-    expect(playbackUrl.pathname).toBe("/mains/main_mina_quiet_rooftop");
-    expect(playbackUrl.searchParams.get("fromShortId")).toBe("rooftop");
-    expect(grant).toBeTruthy();
-    const grantPayload = readMockSignedToken(grant!);
-
-    expect(grantPayload).not.toBeNull();
-
-    if (!grantPayload) {
-      throw new Error("grant payload missing");
-    }
-
-    expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual({
+    }, "viewer-session");
+    await expectPlaybackGrantResponse(response, {
       fromShortId: "rooftop",
       grantKind: "purchased",
       mainId: "main_mina_quiet_rooftop",
+    });
+  });
+
+  it("issues a purchased playback grant for continue_main entries", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "softlight"),
+      ),
+      fromShortId: "softlight",
+      mainId: "main_aoi_blue_balcony",
+    }, "viewer-session");
+
+    await expectPlaybackGrantResponse(response, {
+      fromShortId: "softlight",
+      grantKind: "purchased",
+      mainId: "main_aoi_blue_balcony",
+    });
+  });
+
+  it("issues an owner playback grant for owner_preview entries", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "balcony"),
+      ),
+      fromShortId: "balcony",
+      mainId: "main_aoi_blue_balcony",
+    }, "viewer-session");
+
+    await expectPlaybackGrantResponse(response, {
+      fromShortId: "balcony",
+      grantKind: "owner",
+      mainId: "main_aoi_blue_balcony",
     });
   });
 
@@ -76,11 +181,38 @@ describe("POST /api/mock-main-access", () => {
       entryToken: "invalid",
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
+    }, "viewer-session");
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
       fallbackHref: "/shorts/rooftop",
+    });
+  });
+
+  it("returns auth_required when bootstrap cannot resolve the session cookie", async () => {
+    vi.mocked(getCurrentViewerBootstrap).mockResolvedValueOnce(null);
+
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+      ),
+      fromShortId: "rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    }, "stale-session");
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "auth_required",
+        message: "main playback requires authentication",
+      },
+      meta: {
+        page: null,
+        requestId: "req_mock_main_access_auth_required_001",
+      },
     });
   });
 });

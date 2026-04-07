@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
+
 import type { FeedTab } from "@/entities/short";
+import { buildFanLoginHref } from "@/features/fan-auth";
+import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { FeedShell, getMockFeedShellState } from "@/widgets/feed-shell";
 
 function normalizeFeedTab(tab: string | string[] | undefined): FeedTab {
@@ -12,6 +16,15 @@ export default async function RootPage({
 }) {
   const { tab } = await searchParams;
   const activeTab = normalizeFeedTab(tab);
+
+  if (activeTab === "following") {
+    const viewerState = await getFanAuthGateState();
+
+    if (!viewerState.hasSession) {
+      redirect(buildFanLoginHref());
+    }
+  }
+
   const state = getMockFeedShellState(activeTab);
 
   return <FeedShell state={state} />;

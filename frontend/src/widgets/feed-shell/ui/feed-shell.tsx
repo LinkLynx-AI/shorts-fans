@@ -1,7 +1,8 @@
 import Link from "next/link";
 
+import { buildFanLoginHref } from "@/features/fan-auth";
 import { cn } from "@/shared/lib";
-import { SurfacePanel } from "@/shared/ui";
+import { Button, SurfacePanel } from "@/shared/ui";
 import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 import type { FeedShellState } from "../model/mock-feed-shell";
@@ -34,9 +35,13 @@ function FeedTabsNavigation({ activeTab }: { activeTab: "following" | "recommend
 }
 
 function FeedFallbackState({
+  ctaHref,
+  ctaLabel,
   description,
   title,
 }: {
+  ctaHref?: string;
+  ctaLabel?: string;
   description: string;
   title: string;
 }) {
@@ -51,6 +56,11 @@ function FeedFallbackState({
           <SurfacePanel className="w-full px-5 py-5 text-foreground">
             <h2 className="font-display text-xl font-semibold tracking-[-0.04em]">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+            {ctaHref && ctaLabel ? (
+              <Button asChild className="mt-4" size="sm">
+                <Link href={ctaHref}>{ctaLabel}</Link>
+              </Button>
+            ) : null}
           </SurfacePanel>
         </div>
       </div>
@@ -77,7 +87,9 @@ export function FeedShell({ state }: FeedShellProps) {
 
   return (
     <FeedFallbackState
-      description="following feed は未認証時に auth_required を返すため、認証必須状態を shell で受けられるようにしています。ログイン導線は後続 task で接続します。"
+      ctaHref={buildFanLoginHref()}
+      ctaLabel="ログインへ進む"
+      description="following feed が auth_required を返したときは、この entry から fan login へ進めるようにしています。"
       title="フォロー中を見るにはログインが必要です"
     />
   );

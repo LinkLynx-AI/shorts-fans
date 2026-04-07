@@ -1,12 +1,27 @@
 import { render, screen } from "@testing-library/react";
 
+import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { buildMockMainPlaybackGrantContext } from "@/features/unlock-entry";
 import { issueMockSignedToken } from "@/shared/lib/mock-signed-token";
 
 import MainPlaybackPage from "./page";
 
+vi.mock("@/features/fan-auth-gate", async () => {
+  const actual = await vi.importActual<typeof import("@/features/fan-auth-gate")>("@/features/fan-auth-gate");
+
+  return {
+    ...actual,
+    getFanAuthGateState: vi.fn(),
+  };
+});
+
 describe("MainPlaybackPage", () => {
   it("renders the locked state when a signed grant is replayed for a different short context", async () => {
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: null,
+      hasSession: true,
+    });
+
     const mismatchedGrant = issueMockSignedToken(
       buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "mirror", "purchased"),
     );
