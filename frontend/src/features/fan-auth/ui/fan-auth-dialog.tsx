@@ -1,10 +1,10 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { useState } from "react";
 
 import { Button } from "@/shared/ui";
 
+import { useFanAuthEntry } from "../model/use-fan-auth-entry";
 import { FanAuthEntryPanel } from "./fan-auth-entry-panel";
 
 type FanAuthDialogProps = {
@@ -21,7 +21,17 @@ export function FanAuthDialog({
   onOpenChange,
   open,
 }: FanAuthDialogProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const {
+    email,
+    errorMessage,
+    isSubmitting,
+    mode,
+    setEmail,
+    submit,
+    switchMode,
+  } = useFanAuthEntry({
+    onAuthenticated,
+  });
 
   return (
     <Dialog.Root
@@ -54,15 +64,20 @@ export function FanAuthDialog({
             email で sign in または sign up を始める modal
           </Dialog.Description>
           <FanAuthEntryPanel
-            dismissAction={({ isSubmitting: panelSubmitting }) => (
+            dismissAction={(
               <Dialog.Close asChild>
-                <Button className="w-full" disabled={panelSubmitting} variant="secondary">
+                <Button className="w-full" disabled={isSubmitting} variant="secondary">
                   閉じる
                 </Button>
               </Dialog.Close>
             )}
-            onAuthenticated={onAuthenticated}
-            onSubmittingChange={setIsSubmitting}
+            email={email}
+            errorMessage={errorMessage}
+            isSubmitting={isSubmitting}
+            mode={mode}
+            onEmailChange={setEmail}
+            onModeSwitch={switchMode}
+            onSubmit={submit}
           />
         </Dialog.Content>
       </Dialog.Portal>

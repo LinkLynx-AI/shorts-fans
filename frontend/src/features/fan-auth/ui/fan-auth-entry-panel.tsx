@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { Button, SurfacePanel } from "@/shared/ui";
 
@@ -10,13 +10,16 @@ import {
   getFanAuthSubmitLabel,
   type FanAuthMode,
 } from "../model/fan-auth";
-import { useFanAuthEntry } from "../model/use-fan-auth-entry";
 
 type FanAuthEntryPanelProps = {
-  dismissAction?: ReactNode | ((options: { isSubmitting: boolean }) => ReactNode);
-  initialMode?: FanAuthMode;
-  onAuthenticated?: () => Promise<string | null> | string | null;
-  onSubmittingChange?: (isSubmitting: boolean) => void;
+  dismissAction?: ReactNode;
+  email: string;
+  errorMessage: string | null;
+  isSubmitting: boolean;
+  mode: FanAuthMode;
+  onEmailChange: (email: string) => void;
+  onModeSwitch: () => void;
+  onSubmit: () => void | Promise<void>;
 };
 
 /**
@@ -24,27 +27,14 @@ type FanAuthEntryPanelProps = {
  */
 export function FanAuthEntryPanel({
   dismissAction,
-  initialMode = "sign-in",
-  onAuthenticated,
-  onSubmittingChange,
+  email,
+  errorMessage,
+  isSubmitting,
+  mode,
+  onEmailChange,
+  onModeSwitch,
+  onSubmit,
 }: FanAuthEntryPanelProps) {
-  const {
-    email,
-    errorMessage,
-    isSubmitting,
-    mode,
-    setEmail,
-    submit,
-    switchMode,
-  } = useFanAuthEntry({
-    initialMode,
-    ...(onAuthenticated ? { onAuthenticated } : {}),
-  });
-
-  useEffect(() => {
-    onSubmittingChange?.(isSubmitting);
-  }, [isSubmitting, onSubmittingChange]);
-
   return (
     <SurfacePanel className="w-full px-5 py-6 text-foreground">
       <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">fan access</p>
@@ -59,7 +49,7 @@ export function FanAuthEntryPanel({
         className="mt-5 grid gap-3"
         onSubmit={(event) => {
           event.preventDefault();
-          void submit();
+          void onSubmit();
         }}
       >
         <label className="grid gap-1.5">
@@ -71,7 +61,7 @@ export function FanAuthEntryPanel({
             className="min-h-12 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60"
             disabled={isSubmitting}
             inputMode="email"
-            onChange={(event) => setEmail(event.target.value)}
+            onChange={(event) => onEmailChange(event.target.value)}
             placeholder="fan@example.com"
             type="email"
             value={email}
@@ -98,18 +88,14 @@ export function FanAuthEntryPanel({
         <button
           className="mt-1 font-semibold text-accent-strong transition hover:text-accent"
           disabled={isSubmitting}
-          onClick={switchMode}
+          onClick={onModeSwitch}
           type="button"
         >
           {getFanAuthModeSwitchLabel(mode)}
         </button>
       </div>
 
-      {dismissAction ? (
-        <div className="mt-3">
-          {typeof dismissAction === "function" ? dismissAction({ isSubmitting }) : dismissAction}
-        </div>
-      ) : null}
+      {dismissAction ? <div className="mt-3">{dismissAction}</div> : null}
     </SurfacePanel>
   );
 }

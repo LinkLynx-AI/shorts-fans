@@ -2,7 +2,10 @@
 
 import { useRouter } from "next/navigation";
 
-import { FanAuthEntryPanel } from "@/features/fan-auth";
+import {
+  FanAuthEntryPanel,
+  useFanAuthEntry,
+} from "@/features/fan-auth";
 import { Button } from "@/shared/ui";
 
 /**
@@ -10,11 +13,20 @@ import { Button } from "@/shared/ui";
  */
 export function FanAuthEntryShell() {
   const router = useRouter();
+  const {
+    email,
+    errorMessage,
+    isSubmitting,
+    mode,
+    setEmail,
+    submit,
+    switchMode,
+  } = useFanAuthEntry();
 
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-[408px] items-center px-4 py-10">
       <FanAuthEntryPanel
-        dismissAction={({ isSubmitting }) => (
+        dismissAction={(
           <Button
             className="w-full"
             disabled={isSubmitting}
@@ -25,6 +37,13 @@ export function FanAuthEntryShell() {
             feed に戻る
           </Button>
         )}
+        email={email}
+        errorMessage={errorMessage}
+        isSubmitting={isSubmitting}
+        mode={mode}
+        onEmailChange={setEmail}
+        onModeSwitch={switchMode}
+        onSubmit={submit}
       />
     </main>
   );
