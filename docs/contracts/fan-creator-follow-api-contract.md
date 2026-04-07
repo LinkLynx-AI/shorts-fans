@@ -41,6 +41,7 @@
 - request body は両 endpoint とも持ちません。
 - success response の `meta.page` は常に `null` です。
 - success response は action 後の post-condition だけを返します。`creator` summary、short grid、following list、`currentViewer` は返しません。
+- success response の `data` は `viewer.isFollowing` と `stats.fanCount` だけを返します。
 - `data.stats.fanCount` は action 適用後の count です。repeat request でも drift しません。
 - `fan` と `creator` は別 identity に分けず、follow relation は fan relation として扱います。
 
@@ -53,7 +54,6 @@
 ```json
 {
   "data": {
-    "creatorId": "creator_mina_rei",
     "viewer": {
       "isFollowing": true
     },
