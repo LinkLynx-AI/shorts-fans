@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 import { usePathname } from "next/navigation";
 
@@ -30,8 +31,9 @@ describe("fan navigation", () => {
     expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
   });
 
-  it("routes the profile tab to login while the backend does not require auth yet", () => {
+  it("opens a temporary auth dialog instead of routing to /login for unauthenticated profile opens", async () => {
     vi.mocked(usePathname).mockReturnValue("/");
+    const user = userEvent.setup();
 
     render(
       <ViewerSessionProvider hasSession={false}>
@@ -39,6 +41,10 @@ describe("fan navigation", () => {
       </ViewerSessionProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
+
+    await user.click(screen.getByRole("link", { name: "マイ" }));
+
+    expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
   });
 });
