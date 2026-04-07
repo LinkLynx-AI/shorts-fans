@@ -1,6 +1,11 @@
 # Codex per-PR scratch memory should stay outside tracked diffs.
 /.local/
 
+# Local environment files should not be committed.
+**/.env
+**/.env.local
+**/.env.*.local
+
 # Terraform local working files should stay outside tracked diffs.
 **/.terraform/
 **/*.tfstate

@@ -39,4 +39,21 @@ describe("CreatorProfileShell", () => {
     expect(screen.getByText("まだ公開中の short はありません。")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /preview/i })).not.toBeInTheDocument();
   });
+
+  it("renders a provisional profile for unknown search creators", () => {
+    const state = getCreatorProfileShellState("creator_22222222222222222222222222222222", {
+      displayName: "Remote Creator",
+      handle: "@remotecreator",
+    });
+
+    if (!state) {
+      throw new Error("fixture missing");
+    }
+
+    render(<CreatorProfileShell routeState={{ from: "search", q: "remote" }} state={state} />);
+
+    expect(screen.getByText("Remote Creator")).toBeInTheDocument();
+    expect(screen.getByText("remotecreator")).toBeInTheDocument();
+    expect(screen.getByText("まだ公開中の short はありません。")).toBeInTheDocument();
+  });
 });

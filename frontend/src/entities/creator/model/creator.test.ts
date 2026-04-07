@@ -10,14 +10,25 @@ import {
 
 describe("creator model", () => {
   it("returns all creator ids", () => {
-    expect(getCreatorIds()).toEqual(["aoi", "mina", "sora"]);
-    expect(listCreators()).toHaveLength(3);
+    expect(getCreatorIds()).toEqual([
+      "aoi",
+      "mina",
+      "sora",
+      "creator_11111111111111111111111111111111",
+      "creator_aoi_n",
+      "creator_mina_rei",
+      "creator_sora_vale",
+    ]);
+    expect(listCreators()).toHaveLength(4);
   });
 
   it("finds creator by id", () => {
     expect(getCreatorById("mina")?.handle).toBe("@minarei");
+    expect(getCreatorById("creator_mina_rei")?.handle).toBe("@minarei");
     expect(getCreatorById("mina")?.displayName).toBe("Mina Rei");
+    expect(getCreatorById("creator_mina_rei")?.displayName).toBe("Mina Rei");
     expect(getCreatorProfileStatsById("mina")?.fanCount).toBe(24000);
+    expect(getCreatorProfileStatsById("creator_mina_rei")?.fanCount).toBe(24000);
     expect(getCreatorProfileStatsById("sora")?.shortCount).toBe(0);
     expect(getCreatorById("unknown")).toBeUndefined();
   });

@@ -23,9 +23,12 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.getByRole("link", { name: "検索" }).click();
   await expect(page).toHaveURL(/\/search$/);
   await page.getByRole("searchbox").fill("mina");
-  await expect(page.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute("href", "/creators/mina?from=search&q=mina");
+  await expect(page.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
+    "href",
+    "/creators/creator_mina_rei?from=search&q=mina",
+  );
   await page.getByRole("link", { name: /Mina Rei/i }).click();
-  await expect(page).toHaveURL(/\/creators\/mina\?from=search&q=mina$/);
+  await expect(page).toHaveURL(/\/creators\/creator_mina_rei\?from=search&q=mina$/);
   await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
   await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
   await expect(page.getByText("Unlock")).toHaveCount(0);
