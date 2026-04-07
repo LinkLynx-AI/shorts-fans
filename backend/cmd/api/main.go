@@ -13,6 +13,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
@@ -50,6 +51,7 @@ func main() {
 	}()
 
 	creatorRepository := creator.NewRepository(pool)
+	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
@@ -65,6 +67,7 @@ func main() {
 			CreatorSearch:        creatorRepository,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
+			FanProfileOverview:   fanProfileRepository,
 			FanAuth:              authLifecycle,
 			AuthCookie:           httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
 			ViewerBootstrap:      viewerBootstrapReader,
