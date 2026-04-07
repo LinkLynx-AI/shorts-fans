@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -173,6 +173,7 @@ function CreatorBlock({ creator, followed = false, profileHref, short }: Creator
  * `feed` と `short detail` で共有する immersive short surface を表示する。
  */
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
+  const [isHydrated, setIsHydrated] = useState(false);
   const [acceptAge, setAcceptAge] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
@@ -200,6 +201,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     setAcceptTerms(false);
     setIsPaywallOpen(false);
   };
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   /**
    * setup-required main の paywall dialog を開く前に確認状態を初期化する。
@@ -296,6 +301,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             className="w-full"
             cta={unlock.unlockCta}
+            disabled={!isHydrated || isSubmittingMainAccess}
             {...(unlockAction === "open_main"
               ? { onClick: handleOpenMain }
               : unlockAction === "open_paywall"

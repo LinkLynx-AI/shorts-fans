@@ -15,6 +15,25 @@ function buildViewerSessionCookieHeader() {
   return `${viewerSessionCookie.name}=${viewerSessionCookie.value}`;
 }
 
+async function expectMainShortcutNavigation(page: Page, options: {
+  buttonName: RegExp;
+  destinationPattern: RegExp;
+  path: string;
+}) {
+  await page.goto(options.path);
+
+  const [response] = await Promise.all([
+    page.waitForResponse((candidate) =>
+      candidate.request().method() === "POST" &&
+      candidate.url().includes("/api/mock-main-access"),
+    ),
+    page.getByRole("button", { name: options.buttonName }).click(),
+  ]);
+
+  expect(response.status()).toBe(200);
+  await expect(page).toHaveURL(options.destinationPattern);
+}
+
 test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.goto("/");
 
@@ -82,21 +101,6 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.goto("/shorts/rooftop");
   await expect(page.getByRole("link", { name: /Back/i })).toBeVisible();
   await expect(page.getByText("quiet rooftop preview.")).toBeVisible();
-
-  await page.goto("/shorts/softlight");
-  await page.getByRole("button", { name: /Continue main/i }).click();
-  await expect(page).toHaveURL(/\/mains\/main_aoi_blue_balcony\?fromShortId=softlight&grant=/);
-  await page.getByRole("button", { name: "Back" }).click();
-
-  await page.goto("/shorts/afterrain");
-  await page.getByRole("button", { name: /Unlock/i }).click();
-  await expect(page).toHaveURL(/\/mains\/main_sora_after_rain\?fromShortId=afterrain&grant=/);
-  await page.getByRole("button", { name: "Back" }).click();
-
-  await page.goto("/shorts/balcony");
-  await page.getByRole("button", { name: /Owner preview/i }).click();
-  await expect(page).toHaveURL(/\/mains\/main_aoi_blue_balcony\?fromShortId=balcony&grant=/);
-  await page.getByRole("button", { name: "Back" }).click();
 
   await page.goto("/mains/main_mina_quiet_rooftop");
   await expect(page.getByRole("heading", { name: "指定された surface はまだ用意されていません。" })).toBeVisible();
@@ -191,6 +195,36 @@ test("main access route rejects direct setup bypass requests after authenticatio
   expect(response.status()).toBe(403);
   await expect(response.json()).resolves.toEqual({
     fallbackHref: "/shorts/rooftop",
+  });
+});
+
+test("authenticated viewers can continue purchased main playback from short detail", async ({ page }) => {
+  await addViewerSession(page);
+
+  await expectMainShortcutNavigation(page, {
+    buttonName: /Continue main/i,
+    destinationPattern: /\/mains\/main_aoi_blue_balcony\?fromShortId=softlight&grant=/,
+    path: "/shorts/softlight",
+  });
+});
+
+test("authenticated viewers can unlock a purchased-required main from short detail", async ({ page }) => {
+  await addViewerSession(page);
+
+  await expectMainShortcutNavigation(page, {
+    buttonName: /Unlock/i,
+    destinationPattern: /\/mains\/main_sora_after_rain\?fromShortId=afterrain&grant=/,
+    path: "/shorts/afterrain",
+  });
+});
+
+test("authenticated viewers can open owner preview main playback from short detail", async ({ page }) => {
+  await addViewerSession(page);
+
+  await expectMainShortcutNavigation(page, {
+    buttonName: /Owner preview/i,
+    destinationPattern: /\/mains\/main_aoi_blue_balcony\?fromShortId=balcony&grant=/,
+    path: "/shorts/balcony",
   });
 });
 

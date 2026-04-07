@@ -42,6 +42,34 @@ async function postMainAccess(body: object, sessionToken?: string) {
   );
 }
 
+async function expectPlaybackGrantResponse(
+  response: Response,
+  expected: {
+    fromShortId: string;
+    grantKind: "owner" | "purchased";
+    mainId: string;
+  },
+) {
+  const body = await response.json();
+  const playbackUrl = new URL(body.href, "http://localhost");
+  const grant = playbackUrl.searchParams.get("grant");
+
+  expect(response.status).toBe(200);
+  expect(playbackUrl.pathname).toBe(`/mains/${expected.mainId}`);
+  expect(playbackUrl.searchParams.get("fromShortId")).toBe(expected.fromShortId);
+  expect(grant).toBeTruthy();
+
+  const grantPayload = readMockSignedToken(grant!);
+
+  expect(grantPayload).not.toBeNull();
+
+  if (!grantPayload) {
+    throw new Error("grant payload missing");
+  }
+
+  expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual(expected);
+}
+
 describe("POST /api/mock-main-access", () => {
   beforeEach(() => {
     vi.mocked(getCurrentViewerBootstrap).mockResolvedValue({
@@ -103,26 +131,46 @@ describe("POST /api/mock-main-access", () => {
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
     }, "viewer-session");
-    const body = await response.json();
-    const playbackUrl = new URL(body.href, "http://localhost");
-    const grant = playbackUrl.searchParams.get("grant");
-
-    expect(response.status).toBe(200);
-    expect(playbackUrl.pathname).toBe("/mains/main_mina_quiet_rooftop");
-    expect(playbackUrl.searchParams.get("fromShortId")).toBe("rooftop");
-    expect(grant).toBeTruthy();
-    const grantPayload = readMockSignedToken(grant!);
-
-    expect(grantPayload).not.toBeNull();
-
-    if (!grantPayload) {
-      throw new Error("grant payload missing");
-    }
-
-    expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual({
+    await expectPlaybackGrantResponse(response, {
       fromShortId: "rooftop",
       grantKind: "purchased",
       mainId: "main_mina_quiet_rooftop",
+    });
+  });
+
+  it("issues a purchased playback grant for continue_main entries", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "softlight"),
+      ),
+      fromShortId: "softlight",
+      mainId: "main_aoi_blue_balcony",
+    }, "viewer-session");
+
+    await expectPlaybackGrantResponse(response, {
+      fromShortId: "softlight",
+      grantKind: "purchased",
+      mainId: "main_aoi_blue_balcony",
+    });
+  });
+
+  it("issues an owner playback grant for owner_preview entries", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "balcony"),
+      ),
+      fromShortId: "balcony",
+      mainId: "main_aoi_blue_balcony",
+    }, "viewer-session");
+
+    await expectPlaybackGrantResponse(response, {
+      fromShortId: "balcony",
+      grantKind: "owner",
+      mainId: "main_aoi_blue_balcony",
     });
   });
 
