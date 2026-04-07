@@ -579,6 +579,8 @@ function fanScreen() {
             <p class="fan-profile-name">My archive</p>
           </div>
 
+          <button class="fan-creator-button" type="button">creatorになる</button>
+
           <div aria-label="Profile sections" class="fan-tabbar" role="tablist">
             ${tabs
               .map(

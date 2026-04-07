@@ -1187,6 +1187,23 @@ button {
   font-weight: 700;
 }
 
+.fan-creator-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 14px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #1082c8 0%, #0a5b8c 100%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 16px 36px rgba(16, 130, 200, 0.2);
+}
+
 .fan-tabbar {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
