@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -41,12 +43,18 @@ type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
 }
 
+// FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
+type FanProfileOverviewReader interface {
+	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
+}
+
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv               string
 	CreatorSearch        CreatorSearchReader
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
 	ViewerBootstrap      ViewerBootstrapReader
@@ -107,6 +115,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
+	registerFanProfileRoutes(router, config.FanProfileOverview, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
 
