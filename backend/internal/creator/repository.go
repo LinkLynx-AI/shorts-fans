@@ -25,6 +25,7 @@ var ErrInvalidHandle = errors.New("creator handle が不正です")
 
 type queries interface {
 	CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
+	HasCreatorFollowByUserIDAndCreatorUserID(ctx context.Context, arg sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error)
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)

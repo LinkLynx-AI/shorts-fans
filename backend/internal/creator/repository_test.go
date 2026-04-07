@@ -20,6 +20,10 @@ func (s stubQueries) CountCreatorFollowersByCreatorUserID(context.Context, pgtyp
 	return 0, nil
 }
 
+func (s stubQueries) HasCreatorFollowByUserIDAndCreatorUserID(context.Context, sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error) {
+	return false, nil
+}
+
 func (s stubQueries) CreateCreatorCapability(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
 	return sqlc.AppCreatorCapability{}, nil
 }

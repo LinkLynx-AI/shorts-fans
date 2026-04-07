@@ -58,6 +58,14 @@ SELECT COUNT(*)::bigint
 FROM app.creator_follows
 WHERE creator_user_id = $1;
 
+-- name: HasCreatorFollowByUserIDAndCreatorUserID :one
+SELECT EXISTS (
+    SELECT 1
+    FROM app.creator_follows
+    WHERE user_id = sqlc.arg(user_id)
+        AND creator_user_id = sqlc.arg(creator_user_id)
+);
+
 -- name: ListRecentPublicCreatorProfiles :many
 SELECT *
 FROM app.public_creator_profiles

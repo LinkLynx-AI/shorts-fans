@@ -49,7 +49,7 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
       "href",
-      "/creators/mina?from=feed&tab=recommended",
+      "/creators/creator_mina_rei?from=feed&tab=recommended",
     );
     expect(screen.queryByRole("link", { name: /Back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
       "href",
-      "/creators/mina?from=short&shortId=rooftop",
+      "/creators/creator_mina_rei?from=short&shortId=rooftop",
     );
     expect(screen.queryByRole("link", { name: /おすすめ/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();

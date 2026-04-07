@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 )
@@ -33,7 +34,7 @@ type CreatorSearchReader interface {
 
 // CreatorProfileReader は creator profile header 用の read 操作を表します。
 type CreatorProfileReader interface {
-	GetPublicProfileHeader(ctx context.Context, creatorID string) (creator.PublicProfileHeader, error)
+	GetPublicProfileHeader(ctx context.Context, creatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error)
 }
 
 // CreatorProfileShortsReader は creator profile short grid 用の read 操作を表します。
@@ -108,7 +109,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.ViewerBootstrap)
 
 	return router
 }

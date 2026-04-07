@@ -10,16 +10,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/google/uuid"
 )
 
 type stubCreatorProfileReader struct {
-	getHeader func(context.Context, string) (creator.PublicProfileHeader, error)
+	getHeader func(context.Context, string, *uuid.UUID) (creator.PublicProfileHeader, error)
 }
 
-func (s stubCreatorProfileReader) GetPublicProfileHeader(ctx context.Context, creatorID string) (creator.PublicProfileHeader, error) {
-	return s.getHeader(ctx, creatorID)
+func (s stubCreatorProfileReader) GetPublicProfileHeader(ctx context.Context, creatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
+	return s.getHeader(ctx, creatorID, viewerUserID)
 }
 
 type stubCreatorProfileShortsReader struct {
@@ -38,9 +39,12 @@ func TestCreatorProfileRoute(t *testing.T) {
 
 	router := NewHandler(HandlerConfig{
 		CreatorProfile: stubCreatorProfileReader{
-			getHeader: func(_ context.Context, gotCreatorID string) (creator.PublicProfileHeader, error) {
+			getHeader: func(_ context.Context, gotCreatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
 				if gotCreatorID != creator.FormatPublicID(creatorID) {
 					t.Fatalf("GetPublicProfileHeader() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
+				}
+				if viewerUserID != nil {
+					t.Fatalf("GetPublicProfileHeader() viewerUserID got %v want nil", *viewerUserID)
 				}
 
 				return creator.PublicProfileHeader{
@@ -93,7 +97,7 @@ func TestCreatorProfileNotFoundRoute(t *testing.T) {
 
 	router := NewHandler(HandlerConfig{
 		CreatorProfile: stubCreatorProfileReader{
-			getHeader: func(context.Context, string) (creator.PublicProfileHeader, error) {
+			getHeader: func(context.Context, string, *uuid.UUID) (creator.PublicProfileHeader, error) {
 				return creator.PublicProfileHeader{}, creator.ErrProfileNotFound
 			},
 		},
@@ -109,6 +113,129 @@ func TestCreatorProfileNotFoundRoute(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
 		t.Fatalf("GET /api/fan/creators/{creatorId} body got %q want not_found", rec.Body.String())
+	}
+}
+
+func TestCreatorProfileRoutePassesAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	viewerID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+
+	router := NewHandler(HandlerConfig{
+		CreatorProfile: stubCreatorProfileReader{
+			getHeader: func(_ context.Context, gotCreatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
+				if gotCreatorID != creator.FormatPublicID(creatorID) {
+					t.Fatalf("GetPublicProfileHeader() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
+				}
+				if viewerUserID == nil || *viewerUserID != viewerID {
+					t.Fatalf("GetPublicProfileHeader() viewerUserID got %v want %v", viewerUserID, viewerID)
+				}
+
+				return creator.PublicProfileHeader{
+					Profile: creator.Profile{
+						UserID:      creatorID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						AvatarURL:   stringPtr("https://cdn.example.com/mina.jpg"),
+						Bio:         "quiet rooftop と hotel light の preview を軸に投稿。",
+						PublishedAt: timePtr(now),
+					},
+					ShortCount:  2,
+					FanCount:    24,
+					IsFollowing: true,
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(_ context.Context, rawSessionToken string) (auth.Bootstrap, error) {
+				if rawSessionToken != "raw-session-token" {
+					t.Fatalf("ReadCurrentViewer() rawSessionToken got %q want %q", rawSessionToken, "raw-session-token")
+				}
+
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeFan,
+						CanAccessCreatorMode: false,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/creators/"+creator.FormatPublicID(creatorID), nil)
+	req.AddCookie(&http.Cookie{
+		Name:  auth.SessionCookieName,
+		Value: "raw-session-token",
+	})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/creators/{creatorId} status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorProfileResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil || !response.Data.Profile.Viewer.IsFollowing {
+		t.Fatalf("response.Data.Profile.Viewer.IsFollowing got %#v want true", response.Data)
+	}
+}
+
+func TestCreatorProfileRouteIgnoresViewerBootstrapFailure(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
+	router := NewHandler(HandlerConfig{
+		CreatorProfile: stubCreatorProfileReader{
+			getHeader: func(_ context.Context, gotCreatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
+				if gotCreatorID != creator.FormatPublicID(creatorID) {
+					t.Fatalf("GetPublicProfileHeader() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
+				}
+				if viewerUserID != nil {
+					t.Fatalf("GetPublicProfileHeader() viewerUserID got %v want nil", *viewerUserID)
+				}
+
+				return creator.PublicProfileHeader{
+					Profile: creator.Profile{
+						UserID:      creatorID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						AvatarURL:   stringPtr("https://cdn.example.com/mina.jpg"),
+						Bio:         "quiet rooftop と hotel light の preview を軸に投稿。",
+						PublishedAt: timePtr(now),
+					},
+					ShortCount:  2,
+					FanCount:    24,
+					IsFollowing: false,
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{}, context.DeadlineExceeded
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/creators/"+creator.FormatPublicID(creatorID), nil)
+	req.AddCookie(&http.Cookie{
+		Name:  auth.SessionCookieName,
+		Value: "raw-session-token",
+	})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/creators/{creatorId} status got %d want %d", rec.Code, http.StatusOK)
 	}
 }
 

@@ -15,6 +15,7 @@ import (
 
 type repositoryStubQueries struct {
 	countFollowers       func(context.Context, pgtype.UUID) (int64, error)
+	hasCreatorFollow     func(context.Context, sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error)
 	createCapability     func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	getCapability        func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	updateCapability     func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
@@ -35,6 +36,13 @@ func (s repositoryStubQueries) CountCreatorFollowersByCreatorUserID(ctx context.
 		return 0, nil
 	}
 	return s.countFollowers(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) HasCreatorFollowByUserIDAndCreatorUserID(ctx context.Context, arg sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error) {
+	if s.hasCreatorFollow == nil {
+		return false, nil
+	}
+	return s.hasCreatorFollow(ctx, arg)
 }
 
 func (s repositoryStubQueries) CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {

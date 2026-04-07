@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 )
 
@@ -52,10 +53,15 @@ type creatorProfileShortGridCursorPayload struct {
 }
 
 // registerCreatorProfileRoutes は creator profile API を router に登録します。
-func registerCreatorProfileRoutes(router gin.IRouter, profileReader CreatorProfileReader, shortsReader CreatorProfileShortsReader) {
+func registerCreatorProfileRoutes(
+	router gin.IRouter,
+	profileReader CreatorProfileReader,
+	shortsReader CreatorProfileShortsReader,
+	viewerReader ViewerBootstrapReader,
+) {
 	if profileReader != nil {
 		router.GET("/api/fan/creators/:creatorId", func(c *gin.Context) {
-			handleCreatorProfile(c, profileReader)
+			handleCreatorProfile(c, profileReader, viewerReader)
 		})
 	}
 	if shortsReader != nil {
@@ -66,9 +72,10 @@ func registerCreatorProfileRoutes(router gin.IRouter, profileReader CreatorProfi
 }
 
 // handleCreatorProfile は creator profile header を返します。
-func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader) {
+func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader, viewerReader ViewerBootstrapReader) {
 	creatorID := strings.TrimSpace(c.Param("creatorId"))
-	profileHeader, err := reader.GetPublicProfileHeader(c.Request.Context(), creatorID)
+	viewerUserID := resolveOptionalCreatorProfileViewerID(c, viewerReader)
+	profileHeader, err := reader.GetPublicProfileHeader(c.Request.Context(), creatorID, viewerUserID)
 	if err != nil {
 		if errors.Is(err, creator.ErrProfileNotFound) {
 			writeNotFoundError(c, "creator_profile", "creator was not found")
@@ -104,6 +111,26 @@ func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader) {
 		},
 		Error: nil,
 	})
+}
+
+func resolveOptionalCreatorProfileViewerID(c *gin.Context, reader ViewerBootstrapReader) *uuid.UUID {
+	if c == nil || reader == nil {
+		return nil
+	}
+
+	rawSessionToken, err := c.Cookie(auth.SessionCookieName)
+	if err != nil {
+		return nil
+	}
+
+	bootstrap, err := reader.ReadCurrentViewer(c.Request.Context(), rawSessionToken)
+	if err != nil || bootstrap.CurrentViewer == nil {
+		return nil
+	}
+
+	viewerID := bootstrap.CurrentViewer.ID
+
+	return &viewerID
 }
 
 // handleCreatorProfileShorts は creator profile short grid を返します。
