@@ -11,6 +11,7 @@ source:
         - 000005_add_auth_tables.up.sql
         - 000006_require_unique_email_identity.up.sql
         - 000007_add_creator_profile_handle.up.sql
+        - 000008_add_creator_follows_following_index.up.sql
 schemas:
     - name: app
       tables:
@@ -355,6 +356,12 @@ schemas:
               columns:
                 - creator_user_id
               definition: CREATE INDEX idx_creator_follows_creator_user_id ON app.creator_follows USING btree (creator_user_id)
+            - name: idx_creator_follows_user_followed_at_creator_user_id
+              columns:
+                - user_id
+                - followed_at
+                - creator_user_id
+              definition: CREATE INDEX idx_creator_follows_user_followed_at_creator_user_id ON app.creator_follows USING btree (user_id, followed_at DESC, creator_user_id)
         - name: creator_profiles
           columns:
             - name: user_id

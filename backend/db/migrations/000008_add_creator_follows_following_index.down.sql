@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS app.idx_creator_follows_user_followed_at_creator_user_id;
