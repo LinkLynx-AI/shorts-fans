@@ -13,6 +13,8 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 )
 
+const fanProfileFollowingRequestScope = "fan_profile_following"
+
 type fanProfileFollowingResponseData struct {
 	Items []fanProfileFollowingItem `json:"items"`
 }
@@ -31,34 +33,17 @@ type fanProfileFollowingCursorPayload struct {
 	FollowedAt    string `json:"followedAt"`
 }
 
-// registerFanProfileRoutes は fan profile private hub API を router に登録します。
-func registerFanProfileRoutes(
-	router gin.IRouter,
-	viewerBootstrapReader ViewerBootstrapReader,
-	followingReader FanProfileFollowingReader,
-) {
-	if router == nil || viewerBootstrapReader == nil || followingReader == nil {
-		return
-	}
-
-	protected := router.Group("/api/fan/profile")
-	protected.Use(buildProtectedFanAuthGuard(viewerBootstrapReader, "fan_profile", "fan profile requires authentication"))
-	protected.GET("/following", func(c *gin.Context) {
-		handleFanProfileFollowing(c, followingReader)
-	})
-}
-
 func handleFanProfileFollowing(c *gin.Context, reader FanProfileFollowingReader) {
 	viewer, ok := authenticatedViewerFromContext(c)
 	if !ok {
-		writeInternalServerError(c, "fan_profile_following")
+		writeInternalServerError(c, fanProfileFollowingRequestScope)
 		return
 	}
 
 	cursor := decodeFanProfileFollowingCursor(strings.TrimSpace(c.Query("cursor")))
 	items, nextCursor, err := reader.ListFollowing(c.Request.Context(), viewer.ID, cursor, fanprofile.DefaultFollowingPageSize)
 	if err != nil {
-		writeInternalServerError(c, "fan_profile_following")
+		writeInternalServerError(c, fanProfileFollowingRequestScope)
 		return
 	}
 
@@ -66,7 +51,7 @@ func handleFanProfileFollowing(c *gin.Context, reader FanProfileFollowingReader)
 	for _, item := range items {
 		responseItem, buildErr := buildFanProfileFollowingItem(item)
 		if buildErr != nil {
-			writeInternalServerError(c, "fan_profile_following")
+			writeInternalServerError(c, fanProfileFollowingRequestScope)
 			return
 		}
 
@@ -78,7 +63,7 @@ func handleFanProfileFollowing(c *gin.Context, reader FanProfileFollowingReader)
 			Items: responseItems,
 		},
 		Meta: responseMeta{
-			RequestID: newRequestID("fan_profile_following"),
+			RequestID: newRequestID(fanProfileFollowingRequestScope),
 			Page: &cursorPageInfo{
 				HasNext:    nextCursor != nil,
 				NextCursor: encodeFanProfileFollowingCursor(nextCursor),

@@ -9,6 +9,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,6 +17,10 @@ import (
 const DefaultFollowingPageSize = 20
 
 type queries interface {
+	GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.AppUser, error)
+	CountCreatorFollowsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountPinnedShortsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
+	CountUnlockedMainsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
 	ListFanProfileFollowingItems(ctx context.Context, arg sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
 }
 

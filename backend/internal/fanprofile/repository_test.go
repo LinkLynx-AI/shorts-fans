@@ -15,6 +15,22 @@ type repositoryStubQueries struct {
 	listFollowing func(context.Context, sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
 }
 
+func (s repositoryStubQueries) GetUserByID(context.Context, pgtype.UUID) (sqlc.AppUser, error) {
+	return sqlc.AppUser{}, nil
+}
+
+func (s repositoryStubQueries) CountCreatorFollowsByUserID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
+func (s repositoryStubQueries) CountPinnedShortsByUserID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
+func (s repositoryStubQueries) CountUnlockedMainsByUserID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (s repositoryStubQueries) ListFanProfileFollowingItems(ctx context.Context, arg sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error) {
 	if s.listFollowing == nil {
 		return nil, nil

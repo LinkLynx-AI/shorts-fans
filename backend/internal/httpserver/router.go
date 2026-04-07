@@ -43,6 +43,11 @@ type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
 }
 
+// FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
+type FanProfileOverviewReader interface {
+	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
+}
+
 // FanProfileFollowingReader は fan profile following 用の read 操作を表します。
 type FanProfileFollowingReader interface {
 	ListFollowing(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.FollowingCursor, limit int) ([]fanprofile.FollowingItem, *fanprofile.FollowingCursor, error)
@@ -55,6 +60,7 @@ type HandlerConfig struct {
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
 	FanProfileFollowing  FanProfileFollowingReader
+	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
 	ViewerBootstrap      ViewerBootstrapReader
@@ -115,9 +121,9 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
+	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
-	registerFanProfileRoutes(router, config.ViewerBootstrap, config.FanProfileFollowing)
 
 	return router
 }
