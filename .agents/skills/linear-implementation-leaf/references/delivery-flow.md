@@ -16,9 +16,8 @@ If start mode is unclear, ask one clarifying question before execution.
 3. Commit in small logical units.
 4. Run repository validations for the touched areas and any issue-specific checks:
 - backend changes: `cd backend && go test ./... && go vet ./...`
-- frontend changes: `cd frontend && pnpm lint && pnpm typecheck && pnpm test:unit`
+- frontend changes: `cd frontend && pnpm lint && pnpm typecheck && pnpm test`
 - combined changes: run both backend and frontend validations
-- do not run `Playwright` or `pnpm test:e2e` unless the user explicitly requests it
 5. Execute review gates defined in `references/review-gates.md`.
 6. If review or validation gate fails, fix and repeat from implementation.
 7. For non-trivial changes, run runtime smoke gate:

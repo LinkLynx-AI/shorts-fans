@@ -54,4 +54,3 @@
 
 - PR に含めない Codex の一時メモは `./.local/codex-memo/` 配下に置くこと
 - `./.local/` は gitignore 対象として扱い、`docs/agent_runs/` や tracked な `.codex/` 配下を外部記憶用途に使わないこと
-- エージェントは明示依頼がない限り `Playwright` や `pnpm test:e2e` のような長時間 E2E テストを実行しないこと
