@@ -83,6 +83,22 @@ const shorts = {
       top: "#edf7ff",
     },
   },
+  rooftopside: {
+    id: "rooftopside",
+    creatorId: "mina",
+    duration: "8分",
+    price: "¥1,800",
+    progress: "6:40 left",
+    searchLabel: "rooftop side light",
+    theme: "rooftop",
+    title: "rooftop side preview",
+    caption: "quiet rooftop の別導線 preview。",
+    tile: {
+      bottom: "#11253a",
+      mid: "#77b8e8",
+      top: "#eef9ff",
+    },
+  },
   poolcut: {
     id: "poolcut",
     creatorId: "sora",
@@ -135,7 +151,7 @@ const shorts = {
 
 const creatorShorts = {
   aoi: ["softlight", "balcony"],
-  mina: ["rooftop", "mirror"],
+  mina: ["rooftop", "rooftopside", "mirror"],
   sora: ["afterrain", "poolcut"],
 };
 
@@ -186,6 +202,14 @@ const creatorDashboardData = {
         tone: "approved",
       },
       {
+        detail: "save rate 8.2%",
+        revenue: "¥22K",
+        shortId: "rooftopside",
+        status: "Approved",
+        title: "rooftop side",
+        tone: "approved",
+      },
+      {
         detail: "review ETA today",
         revenue: "¥36K",
         shortId: "mirror",
@@ -197,13 +221,125 @@ const creatorDashboardData = {
   },
 };
 
+const creatorManagerDetailData = {
+  main: {
+    mirror: {
+      kindLabel: "本編",
+      metrics: [
+        { label: "視聴回数", value: "1.6K" },
+        { label: "unlock数", value: "143" },
+        { label: "売上", value: "¥36K" },
+      ],
+      settings: [
+        { label: "レビュー", value: "審査中" },
+        { label: "価格", value: "¥2,400" },
+        { label: "紐づくショート", value: "1本" },
+        { label: "最終更新", value: "今日 09:18" },
+      ],
+      statusLabel: "審査中",
+      statusTone: "pending",
+      summary: "差し戻し対応を反映した後の再レビュー待ちです。",
+    },
+    rooftop: {
+      kindLabel: "本編",
+      metrics: [
+        { label: "視聴回数", value: "2.4K" },
+        { label: "unlock数", value: "238" },
+        { label: "売上", value: "¥84K" },
+      ],
+      settings: [
+        { label: "レビュー", value: "承認済み" },
+        { label: "価格", value: "¥1,800" },
+        { label: "紐づくショート", value: "2本" },
+        { label: "最終更新", value: "昨日 21:05" },
+      ],
+      statusLabel: "公開中",
+      statusTone: "approved",
+      summary: "short から unlock されたあとに再生される main です。",
+    },
+  },
+  shorts: {
+    mirror: {
+      kindLabel: "ショート",
+      linkedPublicShortCount: 1,
+      mainKey: "mirror",
+      metrics: [
+        { label: "視聴回数", value: "94K" },
+        { label: "unlock数", value: "143" },
+        { label: "売上", value: "¥36K" },
+      ],
+      settings: [
+        { label: "レビュー", value: "再確認待ち" },
+        { label: "公開範囲", value: "プロフィールのみ" },
+        { action: "open-linked-main", label: "リンク先本編", mainKey: "mirror", value: "本編へ" },
+        { label: "最終更新", value: "今日 09:18" },
+      ],
+      statusLabel: "審査中",
+      statusTone: "pending",
+      summary: "差し戻し対応が必要なショートです。",
+    },
+    rooftop: {
+      kindLabel: "ショート",
+      linkedPublicShortCount: 2,
+      mainKey: "rooftop",
+      metrics: [
+        { label: "視聴回数", value: "128K" },
+        { label: "unlock数", value: "186" },
+        { label: "売上", value: "¥48K" },
+      ],
+      settings: [
+        { label: "レビュー", value: "承認済み" },
+        { label: "公開範囲", value: "プロフィール / feed" },
+        { action: "open-linked-main", label: "リンク先本編", mainKey: "rooftop", value: "本編へ" },
+        { label: "最終更新", value: "今日 12:24" },
+      ],
+      statusLabel: "公開中",
+      statusTone: "approved",
+      summary: "プロフィールの先頭で使っている導入ショートです。",
+    },
+    rooftopside: {
+      kindLabel: "ショート",
+      linkedPublicShortCount: 2,
+      mainKey: "rooftop",
+      metrics: [
+        { label: "視聴回数", value: "62K" },
+        { label: "unlock数", value: "52" },
+        { label: "売上", value: "¥22K" },
+      ],
+      settings: [
+        { label: "レビュー", value: "承認済み" },
+        { label: "公開範囲", value: "プロフィール / feed" },
+        { action: "open-linked-main", label: "リンク先本編", mainKey: "rooftop", value: "本編へ" },
+        { label: "最終更新", value: "昨日 19:12" },
+      ],
+      statusLabel: "公開中",
+      statusTone: "approved",
+      summary: "同じ rooftop main に流す別カットのショートです。",
+    },
+  },
+};
+
 const state = {
   acceptAge: false,
   acceptTerms: false,
   currentCreatorId: "mina",
+  creatorManagerDetailShortId: "rooftop",
+  creatorManagerDetailTab: "shorts",
   creatorManagerTab: "shorts",
+  creatorMainFlowState: {
+    mirror: "active",
+    rooftop: "active",
+  },
+  creatorPendingAction: null,
+  creatorShortVisibilityState: {
+    mirror: "live",
+    rooftop: "live",
+    rooftopside: "live",
+  },
+  creatorUploadMode: "new-package",
   creatorUploadMainName: "",
   creatorUploadShortNames: [""],
+  creatorUploadTargetMainId: null,
   currentShortId: "rooftop",
   fanTab: "pinned",
   feedTab: "recommended",
@@ -253,6 +389,22 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  if (action === "confirm-creator-short-action") {
+    confirmCreatorShortAction();
+    return;
+  }
+
+  if (action === "confirm-creator-main-action") {
+    confirmCreatorMainAction();
+    return;
+  }
+
+  if (action === "open-creator-post-actions") {
+    state.overlay = "creator-post-actions";
+    render();
+    return;
+  }
+
   if (action === "open-creator" && creatorId) {
     navigate({
       currentCreatorId: creatorId,
@@ -273,6 +425,8 @@ document.addEventListener("click", (event) => {
 
   if (action === "open-creator-dashboard") {
     navigate({
+      creatorManagerDetailShortId: creatorShorts[viewerCreatorId][0],
+      creatorManagerDetailTab: "shorts",
       creatorManagerTab: "shorts",
       currentCreatorId: viewerCreatorId,
       currentShortId: creatorShorts[viewerCreatorId][0],
@@ -284,10 +438,28 @@ document.addEventListener("click", (event) => {
 
   if (action === "open-creator-upload") {
     navigate({
+      creatorUploadMode: "new-package",
       creatorUploadMainName: "",
       creatorUploadShortNames: [""],
+      creatorUploadTargetMainId: null,
       currentCreatorId: viewerCreatorId,
       currentShortId: creatorShorts[viewerCreatorId][0],
+      rootTab: "fan",
+      screen: "creator-upload",
+    });
+    return;
+  }
+
+  if (action === "open-creator-linked-short-upload") {
+    const targetMainId = state.creatorManagerDetailShortId || state.currentShortId;
+
+    navigate({
+      creatorUploadMode: "link-short",
+      creatorUploadMainName: "",
+      creatorUploadShortNames: [""],
+      creatorUploadTargetMainId: targetMainId,
+      currentCreatorId: viewerCreatorId,
+      currentShortId: targetMainId,
       rootTab: "fan",
       screen: "creator-upload",
     });
@@ -297,6 +469,40 @@ document.addEventListener("click", (event) => {
   if (action === "set-creator-manager-tab" && tab) {
     state.creatorManagerTab = tab === "main" ? "main" : "shorts";
     render();
+    return;
+  }
+
+  if (action === "open-creator-manager-detail" && kind && shortId) {
+    navigate({
+      creatorManagerDetailShortId: shortId,
+      creatorManagerDetailTab: kind === "main" ? "main" : "shorts",
+      currentCreatorId: viewerCreatorId,
+      currentShortId: shortId,
+      rootTab: "fan",
+      screen: "creator-post-detail",
+    });
+    return;
+  }
+
+  if (action === "open-creator-linked-main" && shortId) {
+    navigate({
+      creatorManagerDetailShortId: shortId,
+      creatorManagerDetailTab: "main",
+      currentCreatorId: viewerCreatorId,
+      currentShortId: shortId,
+      rootTab: "fan",
+      screen: "creator-post-detail",
+    });
+    return;
+  }
+
+  if (action === "request-creator-short-action" && kind) {
+    requestCreatorShortAction(kind);
+    return;
+  }
+
+  if (action === "request-creator-main-action" && kind) {
+    requestCreatorMainAction(kind);
     return;
   }
 
@@ -336,7 +542,28 @@ document.addEventListener("click", (event) => {
       return;
     }
 
+    const uploadMode = state.creatorUploadMode;
+    const targetMainId = state.creatorUploadTargetMainId;
+
     resetCreatorUploadDraft();
+
+    if (uploadMode === "link-short" && targetMainId) {
+      state.history.pop();
+      navigate(
+        {
+          creatorManagerDetailShortId: targetMainId,
+          creatorManagerDetailTab: "main",
+          creatorManagerTab: "main",
+          currentCreatorId: viewerCreatorId,
+          currentShortId: targetMainId,
+          rootTab: "fan",
+          screen: "creator-post-detail",
+        },
+        true,
+      );
+      return;
+    }
+
     navigate(
       {
         creatorManagerTab: "shorts",
@@ -484,6 +711,7 @@ document.addEventListener("change", (event) => {
 
 function closeOverlay() {
   state.acceptAge = false;
+  state.creatorPendingAction = null;
   state.acceptTerms = false;
   state.overlay = null;
   state.overlayShortId = null;
@@ -509,16 +737,134 @@ function escapeHtml(value) {
 }
 
 function resetCreatorUploadDraft() {
+  state.creatorUploadMode = "new-package";
   state.creatorUploadMainName = "";
   state.creatorUploadShortNames = [""];
+  state.creatorUploadTargetMainId = null;
 }
 
 function isCreatorUploadReady() {
-  return Boolean(state.creatorUploadMainName && state.creatorUploadShortNames.some(Boolean));
+  const hasShorts = state.creatorUploadShortNames.some(Boolean);
+
+  if (state.creatorUploadMode === "link-short") {
+    return hasShorts;
+  }
+
+  return Boolean(state.creatorUploadMainName && hasShorts);
 }
 
 function currentShort() {
   return shorts[state.currentShortId];
+}
+
+function currentCreatorMainState(mainKey) {
+  return state.creatorMainFlowState[mainKey] || "active";
+}
+
+function currentCreatorShortVisibility(shortId) {
+  return state.creatorShortVisibilityState[shortId] || "live";
+}
+
+function linkedShortIdsForMain(mainKey) {
+  return Object.entries(creatorManagerDetailData.shorts)
+    .filter(([, detail]) => detail.mainKey === mainKey)
+    .map(([shortId]) => shortId);
+}
+
+function linkedLiveShortCountForMain(mainKey) {
+  return linkedShortIdsForMain(mainKey).filter((shortId) => currentCreatorShortVisibility(shortId) === "live").length;
+}
+
+function visibilityStateForAction(actionKind) {
+  return actionKind === "delete" ? "deleted" : "hidden";
+}
+
+function requestCreatorShortAction(actionKind) {
+  const detailTab = state.creatorManagerDetailTab === "main" ? "main" : "shorts";
+  const detailShortId = state.creatorManagerDetailShortId || state.currentShortId;
+
+  if (detailTab !== "shorts") {
+    return;
+  }
+
+  if (currentCreatorShortVisibility(detailShortId) !== "live") {
+    return;
+  }
+
+  const detail = creatorManagerDetailData.shorts[detailShortId];
+
+  if (!detail) {
+    return;
+  }
+
+  state.creatorPendingAction = {
+    actionKind: actionKind === "delete" ? "delete" : "hide",
+    mainKey: detail.mainKey || detailShortId,
+    shortId: detailShortId,
+    willStopMainFlow: linkedLiveShortCountForMain(detail.mainKey || detailShortId) <= 1,
+  };
+  state.overlay = "creator-short-action";
+  render();
+}
+
+function requestCreatorMainAction(actionKind) {
+  const detailTab = state.creatorManagerDetailTab === "main" ? "main" : "shorts";
+  const mainKey = state.creatorManagerDetailShortId || state.currentShortId;
+  const currentState = currentCreatorMainState(mainKey);
+
+  if (detailTab !== "main") {
+    return;
+  }
+
+  if (currentState !== "active" && currentState !== "paused") {
+    return;
+  }
+
+  state.creatorPendingAction = {
+    actionKind: actionKind === "delete" ? "delete" : "hide",
+    linkedShortIds: linkedShortIdsForMain(mainKey),
+    mainKey,
+    targetType: "main",
+  };
+  state.overlay = "creator-main-action";
+  render();
+}
+
+function confirmCreatorShortAction() {
+  const pendingAction = state.creatorPendingAction;
+
+  if (!pendingAction || pendingAction.targetType === "main") {
+    return;
+  }
+
+  state.creatorShortVisibilityState[pendingAction.shortId] = visibilityStateForAction(pendingAction.actionKind);
+
+  if (pendingAction.willStopMainFlow) {
+    state.creatorMainFlowState[pendingAction.mainKey] = "paused";
+  }
+
+  state.creatorPendingAction = null;
+  state.overlay = null;
+  render();
+}
+
+function confirmCreatorMainAction() {
+  const pendingAction = state.creatorPendingAction;
+
+  if (!pendingAction || pendingAction.targetType !== "main") {
+    return;
+  }
+
+  const nextVisibilityState = visibilityStateForAction(pendingAction.actionKind);
+
+  state.creatorMainFlowState[pendingAction.mainKey] = nextVisibilityState;
+  pendingAction.linkedShortIds.forEach((shortId) => {
+    state.creatorShortVisibilityState[shortId] = nextVisibilityState;
+  });
+
+  state.creatorPendingAction = null;
+  state.overlay = null;
+  render();
 }
 
 function currentTheme() {
@@ -1060,7 +1406,9 @@ function creatorDashboardScreen() {
   const dashboard = creatorDashboardData[viewerCreatorId];
   const activeTab = state.creatorManagerTab === "main" ? "main" : "shorts";
   const revisionNotice = dashboard.revisionNotice || null;
-  const visibleItems = activeTab === "main" ? dashboard.mains : dashboard.shorts;
+  const visibleItems = (activeTab === "main" ? dashboard.mains : dashboard.shorts).map((item) =>
+    resolveCreatorDashboardItem(item, activeTab),
+  );
 
   return `
     <section class="screen" data-theme="profile">
@@ -1141,6 +1489,9 @@ function creatorDashboardScreen() {
                   <button
                     aria-label="${short.title}"
                     class="creator-manager-tile is-${item.tone}"
+                    data-action="open-creator-manager-detail"
+                    data-kind="${activeTab}"
+                    data-short-id="${item.shortId}"
                     type="button"
                   >
                     <span
@@ -1150,7 +1501,7 @@ function creatorDashboardScreen() {
                     ></span>
                     <span class="creator-manager-tile-overlay">
                       ${
-                        item.tone === "pending"
+                        item.tone !== "approved"
                           ? `<span class="creator-manager-tile-status is-${item.tone} is-center">${item.status}</span>`
                           : ""
                       }
@@ -1167,12 +1518,327 @@ function creatorDashboardScreen() {
   `;
 }
 
+function currentCreatorManagerDetail() {
+  const detailTab = state.creatorManagerDetailTab === "main" ? "main" : "shorts";
+  const detailShortId = state.creatorManagerDetailShortId || state.currentShortId;
+  const fallbackShortId = creatorShorts[viewerCreatorId][0];
+  const short = shorts[detailShortId] || shorts[fallbackShortId];
+  const baseDetail =
+    creatorManagerDetailData[detailTab][detailShortId] ||
+    creatorManagerDetailData[detailTab][fallbackShortId] ||
+    creatorManagerDetailData.shorts[fallbackShortId];
+  const detail = {
+    ...baseDetail,
+    metrics: baseDetail.metrics.map((item) => ({ ...item })),
+    settings: baseDetail.settings.map((item) => ({ ...item })),
+  };
+  const mainKey = detail.mainKey || detailShortId;
+  const mainState = currentCreatorMainState(mainKey);
+  const shortVisibilityState = currentCreatorShortVisibility(detailShortId);
+
+  if (detailTab === "main") {
+    if (mainState === "paused") {
+      detail.statusLabel = "新規公開停止";
+      detail.statusTone = "paused";
+      detail.summary = "公開中のショートがないため、新規流入は停止中です。既存購入者の視聴は継続します。";
+      detail.settings = detail.settings.map((item) =>
+        item.label === "紐づくショート" ? { label: "公開中ショート", value: "0本" } : item,
+      );
+    }
+
+    if (mainState === "hidden" || mainState === "deleted") {
+      const hidden = mainState === "hidden";
+      detail.statusLabel = hidden ? "非公開" : "削除済み";
+      detail.statusTone = hidden ? "hidden" : "removed";
+      detail.summary = hidden
+        ? "この本編を非公開にしたため、紐づくショートも公開面から外れています。"
+        : "この本編を削除したため、紐づくショートも合わせて削除されています。";
+      detail.settings = detail.settings.map((item) => {
+        if (item.label === "レビュー") {
+          return { ...item, value: hidden ? "非公開" : "削除済み" };
+        }
+
+        if (item.label === "紐づくショート" || item.label === "公開中ショート") {
+          return { label: hidden ? "非公開ショート" : "削除済みショート", value: `${linkedShortIdsForMain(mainKey).length}本` };
+        }
+
+        return item;
+      });
+    }
+  }
+
+  if (detailTab === "shorts" && shortVisibilityState !== "live") {
+    const hidden = shortVisibilityState === "hidden";
+    detail.statusLabel = hidden ? "非公開" : "削除済み";
+    detail.statusTone = hidden ? "hidden" : "removed";
+    detail.summary =
+      mainState === "hidden" || mainState === "deleted"
+        ? `リンク先本編を${mainState === "hidden" ? "非公開" : "削除"}にしたため、このショートも合わせて${hidden ? "非公開" : "削除"}されています。`
+        : mainState === "paused"
+        ? `このショートを${hidden ? "非公開" : "削除"}にしたため、本編の新規公開も停止中です。`
+        : `このショートは${hidden ? "公開面から外れています" : "公開面から削除されています"}。`;
+    detail.settings = detail.settings.map((item) =>
+      item.label === "公開範囲" ? { ...item, value: hidden ? "非公開" : "削除済み" } : item,
+    );
+  }
+
+  return {
+    detail,
+    detailTab,
+    mainState,
+    short,
+    shortVisibilityState,
+  };
+}
+
+function resolveCreatorDashboardItem(item, activeTab) {
+  const resolvedItem = { ...item };
+
+  if (activeTab === "main") {
+    const mainState = currentCreatorMainState(item.shortId);
+
+    if (mainState === "paused") {
+      resolvedItem.status = "停止中";
+      resolvedItem.tone = "paused";
+    }
+
+    if (mainState === "hidden") {
+      resolvedItem.status = "非公開";
+      resolvedItem.tone = "hidden";
+    }
+
+    if (mainState === "deleted") {
+      resolvedItem.status = "削除";
+      resolvedItem.tone = "removed";
+    }
+  }
+
+  if (activeTab === "shorts") {
+    const shortVisibility = currentCreatorShortVisibility(item.shortId);
+
+    if (shortVisibility === "hidden") {
+      resolvedItem.status = "非公開";
+      resolvedItem.tone = "hidden";
+    }
+
+    if (shortVisibility === "deleted") {
+      resolvedItem.status = "削除";
+      resolvedItem.tone = "removed";
+    }
+  }
+
+  return resolvedItem;
+}
+
+function creatorLinkedShortItems(mainKey) {
+  return linkedShortIdsForMain(mainKey).map((shortId) => {
+    const shortDetail = creatorManagerDetailData.shorts[shortId];
+
+    return resolveCreatorDashboardItem(
+      {
+        shortId,
+        status: shortDetail.statusLabel,
+        tone: shortDetail.statusTone,
+      },
+      "shorts",
+    );
+  });
+}
+
+function creatorLinkedMainItem(shortId) {
+  const shortDetail = creatorManagerDetailData.shorts[shortId];
+
+  if (!shortDetail?.mainKey) {
+    return null;
+  }
+
+  const mainDetail = creatorManagerDetailData.main[shortDetail.mainKey];
+
+  if (!mainDetail) {
+    return null;
+  }
+
+  return resolveCreatorDashboardItem(
+    {
+      shortId: shortDetail.mainKey,
+      status: mainDetail.statusLabel,
+      tone: mainDetail.statusTone,
+    },
+    "main",
+  );
+}
+
+function creatorPostDetailScreen() {
+  const creator = creators[viewerCreatorId];
+  const { detail, detailTab, mainState, short, shortVisibilityState } = currentCreatorManagerDetail();
+  const showSettingsButton =
+    detailTab === "main" ? mainState === "active" || mainState === "paused" : shortVisibilityState === "live";
+  const linkedShortItems = detailTab === "main" ? creatorLinkedShortItems(state.creatorManagerDetailShortId || state.currentShortId) : [];
+  const linkedMainItem = detailTab === "shorts" ? creatorLinkedMainItem(state.creatorManagerDetailShortId || state.currentShortId) : null;
+  const visibleSettings = detail.settings.filter((item) => !(detailTab === "shorts" && item.action === "open-linked-main"));
+
+  return `
+    <section class="screen" data-theme="profile">
+      <div class="profile-screen creator-post-detail-screen">
+        <div class="profile-topbar">
+          ${createBackAction()}
+          ${
+            showSettingsButton
+              ? '<button aria-label="投稿操作" class="creator-post-detail-menu-button" data-action="open-creator-post-actions" type="button"><span></span><span></span><span></span></button>'
+              : ""
+          }
+        </div>
+
+        <section class="creator-post-detail-shell">
+          <div class="creator-post-detail-author">
+            <span class="creator-post-detail-avatar"></span>
+            <div class="creator-post-detail-author-copy">
+              <p class="creator-post-detail-handle">${creator.handle}</p>
+            </div>
+          </div>
+
+          <div class="creator-post-detail-media is-${detail.statusTone}">
+            <span
+              aria-hidden="true"
+              class="creator-post-detail-media-frame"
+              style="--tile-top: ${short.tile.top}; --tile-mid: ${short.tile.mid}; --tile-bottom: ${short.tile.bottom};"
+            ></span>
+            <div class="creator-post-detail-media-overlay">
+              <div class="creator-post-detail-media-meta">
+                <span class="creator-post-detail-kind">${detail.kindLabel}</span>
+                <span class="creator-post-detail-status is-${detail.statusTone}">${detail.statusLabel}</span>
+              </div>
+              <span class="creator-post-detail-play" aria-hidden="true"></span>
+              <span class="creator-post-detail-duration">${short.duration}</span>
+            </div>
+          </div>
+
+          <div class="creator-post-detail-summary">
+            <p class="creator-post-detail-summary-text">${detail.summary}</p>
+          </div>
+
+          <div class="creator-post-detail-metrics">
+            ${detail.metrics
+              .map(
+                (metric) => `
+                  <div class="creator-post-detail-metric">
+                    <strong>${metric.value}</strong>
+                    <span>${metric.label}</span>
+                  </div>
+                `,
+              )
+              .join("")}
+          </div>
+
+          <section class="creator-post-detail-section">
+            <h3 class="creator-post-detail-section-title">設定</h3>
+            <div class="creator-post-detail-setting-list">
+              ${visibleSettings
+                .map(
+                  (item) =>
+                    item.action === "open-linked-main"
+                      ? `
+                          <button class="creator-post-detail-setting-row is-link" data-action="open-creator-linked-main" data-short-id="${item.mainKey}" type="button">
+                            <span>${item.label}</span>
+                            <strong>${item.value}</strong>
+                          </button>
+                        `
+                      : `
+                          <div class="creator-post-detail-setting-row">
+                            <span>${item.label}</span>
+                            <strong>${item.value}</strong>
+                          </div>
+                        `,
+                )
+                .join("")}
+            </div>
+          </section>
+
+          ${
+            detailTab === "main"
+              ? `
+                <section class="creator-post-detail-section">
+                  <h3 class="creator-post-detail-section-title">紐づくショート</h3>
+                  <div class="creator-post-detail-linked-grid">
+                    ${linkedShortItems
+                      .map((item) => {
+                        const linkedShort = shorts[item.shortId];
+
+                        return `
+                          <button
+                            aria-label="${linkedShort.title}"
+                            class="creator-post-detail-linked-tile creator-manager-tile is-${item.tone}"
+                            data-action="open-creator-manager-detail"
+                            data-kind="shorts"
+                            data-short-id="${item.shortId}"
+                            type="button"
+                          >
+                            <span
+                              aria-hidden="true"
+                              class="creator-manager-tile-frame"
+                              style="--tile-top: ${linkedShort.tile.top}; --tile-mid: ${linkedShort.tile.mid}; --tile-bottom: ${linkedShort.tile.bottom};"
+                            ></span>
+                            <span class="creator-manager-tile-overlay">
+                              ${item.tone !== "approved" ? `<span class="creator-manager-tile-status is-${item.tone} is-center">${item.status}</span>` : ""}
+                            </span>
+                          </button>
+                        `;
+                      })
+                      .join("")}
+                  </div>
+                </section>
+              `
+              : ""
+          }
+
+          ${
+            detailTab === "shorts" && linkedMainItem
+              ? `
+                <section class="creator-post-detail-section">
+                  <h3 class="creator-post-detail-section-title">紐づく本編</h3>
+                  <div class="creator-post-detail-linked-grid">
+                    <button
+                      aria-label="${shorts[linkedMainItem.shortId].title}"
+                      class="creator-post-detail-linked-tile creator-manager-tile is-${linkedMainItem.tone}"
+                      data-action="open-creator-manager-detail"
+                      data-kind="main"
+                      data-short-id="${linkedMainItem.shortId}"
+                      type="button"
+                    >
+                      <span
+                        aria-hidden="true"
+                        class="creator-manager-tile-frame"
+                        style="--tile-top: ${shorts[linkedMainItem.shortId].tile.top}; --tile-mid: ${shorts[linkedMainItem.shortId].tile.mid}; --tile-bottom: ${shorts[linkedMainItem.shortId].tile.bottom};"
+                      ></span>
+                      <span class="creator-manager-tile-overlay">
+                        ${
+                          linkedMainItem.tone !== "approved"
+                            ? `<span class="creator-manager-tile-status is-${linkedMainItem.tone} is-center">${linkedMainItem.status}</span>`
+                            : ""
+                        }
+                      </span>
+                    </button>
+                  </div>
+                </section>
+              `
+              : ""
+          }
+        </section>
+      </div>
+      ${renderOverlay()}
+    </section>
+  `;
+}
+
 function creatorUploadScreen() {
-  const mainSelected = Boolean(state.creatorUploadMainName);
+  const linkingToExistingMain = state.creatorUploadMode === "link-short" && Boolean(state.creatorUploadTargetMainId);
+  const mainSelected = linkingToExistingMain || Boolean(state.creatorUploadMainName);
   const shortUploadSlots = state.creatorUploadShortNames;
   const shortsSelectedCount = shortUploadSlots.filter(Boolean).length;
   const shortsSelected = shortsSelectedCount > 0;
   const uploadReady = isCreatorUploadReady();
+  const pageTitle = linkingToExistingMain ? "ショートを追加" : "本編とショートを追加";
+  const submitLabel = linkingToExistingMain ? "ショートを追加" : "アップロード";
 
   return `
     <section class="screen" data-theme="profile">
@@ -1182,9 +1848,13 @@ function creatorUploadScreen() {
         </div>
 
         <section class="creator-upload-shell">
-          <h2 class="creator-upload-page-title">本編とショートを追加</h2>
+          <h2 class="creator-upload-page-title">${pageTitle}</h2>
 
-          <input accept="video/*" class="creator-upload-native-input" data-kind="main" data-role="creator-upload-input" type="file" />
+          ${
+            linkingToExistingMain
+              ? ""
+              : '<input accept="video/*" class="creator-upload-native-input" data-kind="main" data-role="creator-upload-input" type="file" />'
+          }
           ${shortUploadSlots
             .map(
               (_, slotIndex) => `
@@ -1201,25 +1871,43 @@ function creatorUploadScreen() {
             .join("")}
 
           <div class="creator-upload-form">
-            <section class="creator-upload-field">
-              <div class="creator-upload-field-head">
-                <div>
-                  <p class="creator-upload-field-label">main</p>
-                  <h3 class="creator-upload-field-title">本編動画</h3>
-                </div>
-                <span class="creator-upload-field-state ${mainSelected ? "is-filled" : ""}">${mainSelected ? "選択済み" : "未選択"}</span>
-              </div>
+            ${
+              linkingToExistingMain
+                ? `
+                  <section class="creator-upload-field">
+                    <div class="creator-upload-field-head">
+                      <div>
+                        <p class="creator-upload-field-label">main</p>
+                        <h3 class="creator-upload-field-title">紐づけ先の本編</h3>
+                      </div>
+                      <span class="creator-upload-field-state is-filled">選択済み</span>
+                    </div>
 
-              ${
-                mainSelected
-                  ? `<p class="creator-upload-file-name">${escapeHtml(state.creatorUploadMainName)}</p>`
-                  : `<p class="creator-upload-empty">本編動画を追加してください</p>`
-              }
+                    <p class="creator-upload-file-name">今開いている本編にショートを追加します</p>
+                  </section>
+                `
+                : `
+                  <section class="creator-upload-field">
+                    <div class="creator-upload-field-head">
+                      <div>
+                        <p class="creator-upload-field-label">main</p>
+                        <h3 class="creator-upload-field-title">本編動画</h3>
+                      </div>
+                      <span class="creator-upload-field-state ${mainSelected ? "is-filled" : ""}">${mainSelected ? "選択済み" : "未選択"}</span>
+                    </div>
 
-              <button class="creator-upload-pick-button" data-action="pick-creator-upload-files" data-kind="main" type="button">
-                ${mainSelected ? "本編を選び直す" : "本編を追加"}
-              </button>
-            </section>
+                    ${
+                      mainSelected
+                        ? `<p class="creator-upload-file-name">${escapeHtml(state.creatorUploadMainName)}</p>`
+                        : `<p class="creator-upload-empty">本編動画を追加してください</p>`
+                    }
+
+                    <button class="creator-upload-pick-button" data-action="pick-creator-upload-files" data-kind="main" type="button">
+                      ${mainSelected ? "本編を選び直す" : "本編を追加"}
+                    </button>
+                  </section>
+                `
+            }
 
             <section class="creator-upload-section">
               <div class="creator-upload-section-head">
@@ -1272,7 +1960,7 @@ function creatorUploadScreen() {
 
           <div class="creator-upload-actions">
             <button class="creator-upload-submit-button" ${uploadReady ? "" : "disabled"} data-action="submit-creator-upload-package" type="button">
-              アップロード
+              ${submitLabel}
             </button>
           </div>
         </section>
@@ -1340,6 +2028,7 @@ function navigate(nextState, replace = false) {
 
   state.acceptAge = false;
   state.acceptTerms = false;
+  state.creatorPendingAction = null;
   state.overlay = null;
   state.overlayShortId = null;
 
@@ -1395,6 +2084,190 @@ function openPaywall(shortId) {
   render();
 }
 
+function creatorShortActionOverlay() {
+  const pendingAction = state.creatorPendingAction;
+
+  if (!pendingAction || pendingAction.targetType === "main") {
+    return "";
+  }
+
+  const short = shorts[pendingAction.shortId];
+  const actionLabel = pendingAction.actionKind === "delete" ? "削除" : "非公開";
+  const confirmLabel = pendingAction.actionKind === "delete" ? "削除する" : "非公開にする";
+
+  return `
+    <div class="overlay-backdrop" data-action="close-overlay"></div>
+    <div class="overlay-panel creator-short-action-panel">
+      <div class="creator-short-action-head">
+        <div>
+          <h3 class="creator-short-action-title">
+            ${
+              pendingAction.willStopMainFlow
+                ? `${actionLabel}にすると、本編の新規公開も停止します`
+                : `${short.title} を${actionLabel}にしますか`
+            }
+          </h3>
+        </div>
+      </div>
+
+      <p class="creator-short-action-copy">
+        ${
+          pendingAction.willStopMainFlow
+            ? "この本編には他に公開中のショートがありません。既存購入者の視聴は維持されます。"
+            : pendingAction.actionKind === "delete"
+              ? "プロフィールと feed から外れ、公開導線として使えなくなります。"
+              : "プロフィールと feed から外れ、公開導線として一時的に止まります。"
+        }
+      </p>
+
+      <div class="creator-short-action-actions">
+        <button class="secondary-action" data-action="close-overlay" type="button">キャンセル</button>
+        ${
+          pendingAction.willStopMainFlow
+            ? `<button class="secondary-action" data-action="open-creator-upload" type="button">ショートを追加してから続ける</button>`
+            : ""
+        }
+        <button class="danger-action" data-action="confirm-creator-short-action" type="button">${confirmLabel}</button>
+      </div>
+    </div>
+  `;
+}
+
+function creatorMainActionOverlay() {
+  const pendingAction = state.creatorPendingAction;
+
+  if (!pendingAction || pendingAction.targetType !== "main") {
+    return "";
+  }
+
+  const actionLabel = pendingAction.actionKind === "delete" ? "削除" : "非公開";
+  const confirmLabel = pendingAction.actionKind === "delete" ? "削除する" : "非公開にする";
+  const linkedShortCount = pendingAction.linkedShortIds.length;
+
+  return `
+    <div class="overlay-backdrop" data-action="close-overlay"></div>
+    <div class="overlay-panel creator-short-action-panel">
+      <div class="creator-short-action-head">
+        <div>
+          <h3 class="creator-short-action-title">本編を${actionLabel}にすると、紐づくショートも合わせて${actionLabel}になります</h3>
+        </div>
+      </div>
+
+      <p class="creator-short-action-copy">
+        ${
+          pendingAction.actionKind === "delete"
+            ? `この本編と紐づくショート${linkedShortCount}本がプロフィールと feed から削除され、公開導線として使えなくなります。`
+            : `この本編と紐づくショート${linkedShortCount}本がプロフィールと feed から外れます。既存購入者の視聴は維持されます。`
+        }
+      </p>
+
+      <div class="creator-short-action-actions">
+        <button class="secondary-action" data-action="close-overlay" type="button">キャンセル</button>
+        <button class="danger-action" data-action="confirm-creator-main-action" type="button">${confirmLabel}</button>
+      </div>
+    </div>
+  `;
+}
+
+function creatorPostActionDataset({ action, kind, shortId }) {
+  const attributes = [`data-action="${action}"`];
+
+  if (kind) {
+    attributes.push(`data-kind="${kind}"`);
+  }
+
+  if (shortId) {
+    attributes.push(`data-short-id="${shortId}"`);
+  }
+
+  return attributes.join(" ");
+}
+
+function creatorPostActionIcon(kind) {
+  if (kind === "link-short") {
+    return `
+      <svg aria-hidden="true" class="creator-post-actions-icon-svg" viewBox="0 0 20 20">
+        <rect x="4.25" y="4.25" width="11.5" height="11.5" rx="3"></rect>
+        <path d="M10 6.3v7.4"></path>
+        <path d="M6.3 10h7.4"></path>
+      </svg>
+    `;
+  }
+
+  if (kind === "open-main") {
+    return `
+      <svg aria-hidden="true" class="creator-post-actions-icon-svg" viewBox="0 0 20 20">
+        <rect x="3.75" y="4.75" width="12.5" height="10.5" rx="2.5"></rect>
+        <path d="M9 8.1l3.3 1.9L9 11.9z"></path>
+      </svg>
+    `;
+  }
+
+  if (kind === "hide") {
+    return `
+      <svg aria-hidden="true" class="creator-post-actions-icon-svg" viewBox="0 0 20 20">
+        <path d="M2.7 10s2.7-4.3 7.3-4.3S17.3 10 17.3 10 14.6 14.3 10 14.3 2.7 10 2.7 10Z"></path>
+        <circle cx="10" cy="10" r="2.1"></circle>
+        <path d="M4.1 15.9 15.9 4.1"></path>
+      </svg>
+    `;
+  }
+
+  return `
+    <svg aria-hidden="true" class="creator-post-actions-icon-svg" viewBox="0 0 20 20">
+      <path d="M6.2 6.5h7.6"></path>
+      <path d="M7.3 6.5V5.1h5.4v1.4"></path>
+      <path d="M7 6.5l.6 8.2h4.8l.6-8.2"></path>
+      <path d="M8.9 8.8v3.8"></path>
+      <path d="M11.1 8.8v3.8"></path>
+    </svg>
+  `;
+}
+
+function creatorPostActionRow(item) {
+  return `
+    <button class="creator-post-actions-row ${item.tone === "danger" ? "is-danger" : ""}" ${creatorPostActionDataset(item)} type="button">
+      <span class="creator-post-actions-row-main">
+        <span class="creator-post-actions-row-icon ${item.tone === "danger" ? "is-danger" : ""}">
+          ${creatorPostActionIcon(item.icon)}
+        </span>
+        <span class="creator-post-actions-row-label">${item.label}</span>
+      </span>
+      ${item.chevron ? '<span aria-hidden="true" class="creator-post-actions-row-chevron">&gt;</span>' : ""}
+    </button>
+  `;
+}
+
+function creatorPostActionsOverlay() {
+  const { detail, detailTab } = currentCreatorManagerDetail();
+
+  const rows =
+    detailTab === "main"
+      ? [
+          { action: "open-creator-linked-short-upload", chevron: true, icon: "link-short", label: "新しいshortsを紐づける" },
+          { action: "request-creator-main-action", icon: "hide", kind: "hide", label: "この本編を非公開にする" },
+          { action: "request-creator-main-action", icon: "delete", kind: "delete", label: "この本編を削除する", tone: "danger" },
+        ]
+      : [
+          { action: "open-creator-linked-main", chevron: true, icon: "open-main", label: "紐づく本編を開く", shortId: detail.mainKey },
+          { action: "request-creator-short-action", icon: "hide", kind: "hide", label: "このショートを非公開にする" },
+          { action: "request-creator-short-action", icon: "delete", kind: "delete", label: "このショートを削除する", tone: "danger" },
+        ];
+
+  return `
+    <div class="overlay-backdrop" data-action="close-overlay"></div>
+    <div class="overlay-panel creator-post-actions-panel">
+      <div aria-hidden="true" class="creator-post-actions-handle"></div>
+
+      <div class="creator-post-actions-group">
+        <div class="creator-post-actions-list">
+          ${rows.map((item) => creatorPostActionRow(item)).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function paywallOverlay() {
   const short = shorts[state.overlayShortId];
 
@@ -1447,6 +2320,18 @@ function render() {
 }
 
 function renderOverlay() {
+  if (state.overlay === "creator-post-actions") {
+    return creatorPostActionsOverlay();
+  }
+
+  if (state.overlay === "creator-main-action") {
+    return creatorMainActionOverlay();
+  }
+
+  if (state.overlay === "creator-short-action") {
+    return creatorShortActionOverlay();
+  }
+
   if (state.overlay === "paywall") {
     return paywallOverlay();
   }
@@ -1457,6 +2342,7 @@ function renderOverlay() {
 function restore(snapshotState) {
   state.acceptAge = false;
   state.acceptTerms = false;
+  state.creatorPendingAction = null;
   state.overlay = null;
   state.overlayShortId = null;
   state.fanTab = snapshotState.fanTab || "pinned";
@@ -1466,15 +2352,23 @@ function restore(snapshotState) {
   state.screen = snapshotState.screen;
   state.feedTab = snapshotState.feedTab;
   state.libraryQuery = snapshotState.libraryQuery;
+  state.creatorManagerDetailShortId = snapshotState.creatorManagerDetailShortId || "rooftop";
+  state.creatorManagerDetailTab = snapshotState.creatorManagerDetailTab || "shorts";
   state.creatorManagerTab = snapshotState.creatorManagerTab || "shorts";
+  state.creatorUploadMode = snapshotState.creatorUploadMode || "new-package";
   state.creatorUploadMainName = snapshotState.creatorUploadMainName || "";
   state.creatorUploadShortNames = snapshotState.creatorUploadShortNames || [];
+  state.creatorUploadTargetMainId = snapshotState.creatorUploadTargetMainId || null;
   state.currentShortId = snapshotState.currentShortId;
   state.currentCreatorId = snapshotState.currentCreatorId;
   render();
 }
 
 function screenMarkup() {
+  if (state.screen === "creator-post-detail") {
+    return creatorPostDetailScreen();
+  }
+
   if (state.screen === "creator-upload") {
     return creatorUploadScreen();
   }
@@ -1575,9 +2469,13 @@ function shortScreen() {
 
 function snapshot() {
   return {
+    creatorManagerDetailShortId: state.creatorManagerDetailShortId,
+    creatorManagerDetailTab: state.creatorManagerDetailTab,
     creatorManagerTab: state.creatorManagerTab,
+    creatorUploadMode: state.creatorUploadMode,
     creatorUploadMainName: state.creatorUploadMainName,
     creatorUploadShortNames: [...state.creatorUploadShortNames],
+    creatorUploadTargetMainId: state.creatorUploadTargetMainId,
     currentCreatorId: state.currentCreatorId,
     currentShortId: state.currentShortId,
     fanTab: state.fanTab,
@@ -1616,7 +2514,7 @@ function switchPrimaryTab(tab) {
 }
 
 function tabBarMarkup() {
-  if (state.screen === "creator-dashboard" || state.screen === "creator-upload") {
+  if (state.screen === "creator-dashboard" || state.screen === "creator-post-detail" || state.screen === "creator-upload") {
     return "";
   }
 
