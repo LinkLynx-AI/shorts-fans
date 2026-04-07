@@ -33,6 +33,6 @@ If start mode is unclear, ask one clarifying question before execution.
 - Leaf issue key and branch name.
 - Start mode decision (child issue start or standalone start).
 - Touched-area validation results and additional issue-specific validation results.
-- Review and UI gate results with blocking finding disposition.
+- Review gate result and blocking finding disposition.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL, base branch, and merge policy state.
