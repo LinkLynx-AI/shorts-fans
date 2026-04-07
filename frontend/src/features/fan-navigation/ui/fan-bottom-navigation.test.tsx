@@ -3,13 +3,36 @@ import { render, screen } from "@testing-library/react";
 import { usePathname } from "next/navigation";
 
 import { ViewerSessionProvider } from "@/entities/viewer";
+import { FanAuthDialogProvider } from "@/features/fan-auth";
 import { FanBottomNavigation, resolveActiveFanNavigation } from "@/features/fan-navigation";
 
-vi.mock("next/navigation", () => ({
-  usePathname: vi.fn(),
+const mockedRouter = vi.hoisted(() => ({
+  back: vi.fn(),
+  forward: vi.fn(),
+  prefetch: vi.fn(),
+  push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
 }));
 
+vi.mock("next/navigation", async () => {
+  return {
+    usePathname: vi.fn(),
+    useRouter: () => mockedRouter,
+  };
+});
+
 describe("fan navigation", () => {
+  function renderNavigation(hasSession: boolean) {
+    return render(
+      <FanAuthDialogProvider>
+        <ViewerSessionProvider hasSession={hasSession}>
+          <FanBottomNavigation />
+        </ViewerSessionProvider>
+      </FanAuthDialogProvider>,
+    );
+  }
+
   it("resolves the active tab from pathname", () => {
     expect(resolveActiveFanNavigation("/")).toBe("feed");
     expect(resolveActiveFanNavigation("/search")).toBe("search");
@@ -20,31 +43,24 @@ describe("fan navigation", () => {
   it("renders the bottom navigation with the current page", () => {
     vi.mocked(usePathname).mockReturnValue("/search");
 
-    render(
-      <ViewerSessionProvider hasSession>
-        <FanBottomNavigation />
-      </ViewerSessionProvider>,
-    );
+    renderNavigation(true);
 
     expect(screen.getByRole("link", { name: "検索" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "フィード" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
   });
 
-  it("opens a temporary auth dialog instead of routing to /login for unauthenticated profile opens", async () => {
+  it("opens the shared auth dialog instead of routing to /login for unauthenticated profile opens", async () => {
     vi.mocked(usePathname).mockReturnValue("/");
     const user = userEvent.setup();
 
-    render(
-      <ViewerSessionProvider hasSession={false}>
-        <FanBottomNavigation />
-      </ViewerSessionProvider>,
-    );
+    renderNavigation(false);
 
     expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
 
     await user.click(screen.getByRole("link", { name: "マイ" }));
 
     expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
   });
 });

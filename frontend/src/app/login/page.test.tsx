@@ -5,9 +5,18 @@ import LoginPage from "./page";
 const { redirect } = vi.hoisted(() => ({
   redirect: vi.fn(),
 }));
+const mockedRouter = vi.hoisted(() => ({
+  back: vi.fn(),
+  forward: vi.fn(),
+  prefetch: vi.fn(),
+  push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
+}));
 
 vi.mock("next/navigation", () => ({
   redirect,
+  useRouter: () => mockedRouter,
 }));
 
 vi.mock("@/features/fan-auth-gate", async () => {

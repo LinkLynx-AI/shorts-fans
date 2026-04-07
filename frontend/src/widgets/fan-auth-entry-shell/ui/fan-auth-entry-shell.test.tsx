@@ -7,7 +7,8 @@ describe("FanAuthEntryShell", () => {
     render(<FanAuthEntryShell />);
 
     expect(screen.getByRole("heading", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "サインイン / 新規登録" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "サインインを続ける" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "feed に戻る" })).toHaveAttribute("href", "/");
   });
 });

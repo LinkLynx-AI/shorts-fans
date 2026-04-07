@@ -1,5 +1,6 @@
 import {
   buildFanLoginHref,
+  getFanAuthErrorMessage,
   isAuthRequiredResponse,
 } from "@/features/fan-auth";
 
@@ -25,5 +26,9 @@ describe("fan auth helpers", () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it("maps fan auth contract errors to UI copy", () => {
+    expect(getFanAuthErrorMessage("invalid_email")).toBe("メールアドレスの形式を確認してください。");
   });
 });

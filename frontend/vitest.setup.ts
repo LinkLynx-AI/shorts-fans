@@ -11,7 +11,11 @@ type MockedLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
 const mockedUsePathname = vi.fn(() => "/");
 const mockedRouter = {
   back: vi.fn(),
+  forward: vi.fn(),
+  prefetch: vi.fn(),
   push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
 };
 const mockedFetch = vi.fn(async () =>
   new Response(JSON.stringify({ href: "/mains/mock?fromShortId=rooftop&grant=test" }), {
@@ -26,7 +30,11 @@ afterEach(() => {
   cleanup();
   mockedFetch.mockClear();
   mockedRouter.back.mockReset();
+  mockedRouter.forward.mockReset();
+  mockedRouter.prefetch.mockReset();
   mockedRouter.push.mockReset();
+  mockedRouter.refresh.mockReset();
+  mockedRouter.replace.mockReset();
 });
 
 vi.mock("next/navigation", () => ({
