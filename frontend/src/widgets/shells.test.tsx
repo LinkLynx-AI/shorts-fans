@@ -29,6 +29,7 @@ describe("widgets", () => {
 
     expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ログインへ進む" })).toHaveAttribute("href", "/login");
   });
 
   it("renders the search UI and keeps query text", () => {

@@ -7,7 +7,9 @@ import { useRouter } from "next/navigation";
 
 import { CreatorAvatar, getCreatorInitials } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
+import { useHasViewerSession } from "@/entities/viewer";
 import { buildCreatorProfileHref } from "@/features/creator-navigation";
+import { buildFanLoginHref, isAuthRequiredResponse } from "@/features/fan-auth";
 import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
@@ -175,6 +177,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
+  const hasViewerSession = useHasViewerSession();
   const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
@@ -192,12 +195,22 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           shortId: short.id,
         });
 
+  const resetPaywallState = () => {
+    setAcceptAge(false);
+    setAcceptTerms(false);
+    setIsPaywallOpen(false);
+  };
+
   /**
    * setup-required main の paywall dialog を開く前に確認状態を初期化する。
    */
   const handleOpenPaywall = () => {
-    setAcceptAge(false);
-    setAcceptTerms(false);
+    if (!hasViewerSession) {
+      router.push(buildFanLoginHref());
+      return;
+    }
+
+    resetPaywallState();
     setIsPaywallOpen(true);
   };
 
@@ -209,15 +222,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       return;
     }
 
-    setAcceptAge(false);
-    setAcceptTerms(false);
-    setIsPaywallOpen(false);
+    resetPaywallState();
   };
 
   /**
    * main access entry を叩いて main playback へ遷移する。
    */
   const handleOpenMain = async () => {
+    if (!hasViewerSession) {
+      router.push(buildFanLoginHref());
+      return;
+    }
+
     if (isSubmittingMainAccess) {
       return;
     }
@@ -240,13 +256,23 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       });
       const payload = (await response.json().catch(() => null)) as
         | {
+            error?: {
+              code: string;
+              message: string;
+            };
             fallbackHref?: string;
             href?: string;
           }
         | null;
 
+      if (!response.ok && isAuthRequiredResponse(payload)) {
+        resetPaywallState();
+        router.push(buildFanLoginHref());
+        return;
+      }
+
       if (response.ok && payload?.href) {
-        handleClosePaywall();
+        resetPaywallState();
         router.push(payload.href);
         return;
       }

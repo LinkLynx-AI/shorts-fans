@@ -2,23 +2,60 @@ import {
   buildMockMainAccessEntryContext,
   parseMockMainPlaybackGrantContext,
 } from "@/features/unlock-entry";
+import { viewerSessionCookieName } from "@/entities/viewer";
+import { NextRequest } from "next/server";
 import { issueMockSignedToken, readMockSignedToken } from "@/shared/lib/mock-signed-token";
 
 import { POST } from "./route";
 
-async function postMainAccess(body: object) {
-  return POST(
-    new Request("http://localhost/api/mock-main-access", {
-      body: JSON.stringify(body),
-      headers: {
-        "Content-Type": "application/json",
+async function postMainAccess(body: object, sessionToken?: string) {
+  const request = {
+    cookies: {
+      get(name: string) {
+        if (!sessionToken || name !== viewerSessionCookieName) {
+          return undefined;
+        }
+
+        return {
+          name,
+          value: sessionToken,
+        };
       },
-      method: "POST",
-    }),
+    },
+    json: async () => body,
+  } as unknown as NextRequest;
+
+  return POST(
+    request,
   );
 }
 
 describe("POST /api/mock-main-access", () => {
+  it("returns auth_required when no fan session exists", async () => {
+    const response = await postMainAccess({
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: issueMockSignedToken(
+        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+      ),
+      fromShortId: "rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    });
+
+    expect(response.status).toBe(401);
+    await expect(response.json()).resolves.toEqual({
+      data: null,
+      error: {
+        code: "auth_required",
+        message: "main playback requires authentication",
+      },
+      meta: {
+        page: null,
+        requestId: "req_mock_main_access_auth_required_001",
+      },
+    });
+  });
+
   it("rejects setup-required access without the required confirmations", async () => {
     const response = await postMainAccess({
       acceptedAge: false,
@@ -28,7 +65,7 @@ describe("POST /api/mock-main-access", () => {
       ),
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
+    }, "viewer-session");
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
@@ -45,7 +82,7 @@ describe("POST /api/mock-main-access", () => {
       ),
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
+    }, "viewer-session");
     const body = await response.json();
     const playbackUrl = new URL(body.href, "http://localhost");
     const grant = playbackUrl.searchParams.get("grant");
@@ -76,7 +113,7 @@ describe("POST /api/mock-main-access", () => {
       entryToken: "invalid",
       fromShortId: "rooftop",
       mainId: "main_mina_quiet_rooftop",
-    });
+    }, "viewer-session");
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({

@@ -1,4 +1,19 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+const viewerSessionCookie = {
+  domain: "127.0.0.1",
+  name: "shorts_fans_session",
+  path: "/",
+  value: "e2e-viewer-session",
+} as const;
+
+async function addViewerSession(page: Page) {
+  await page.context().addCookies([viewerSessionCookie]);
+}
+
+function buildViewerSessionCookieHeader() {
+  return `${viewerSessionCookie.name}=${viewerSessionCookie.value}`;
+}
 
 test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.goto("/");
@@ -8,6 +23,18 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page.getByRole("button", { name: /Unlock/i })).toBeVisible();
   await expect(page.getByText("Mina Rei")).toBeVisible();
 
+  await page.getByRole("button", { name: /Unlock/i }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await expect(page.getByRole("heading", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.goto("/?tab=following");
+  await expect(page).toHaveURL(/\/login$/);
+
+  await page.goto("/fan");
+  await expect(page).toHaveURL(/\/login$/);
+
+  await addViewerSession(page);
+  await page.goto("/");
   await page.getByRole("button", { name: /Unlock/i }).click();
   const paywall = page.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" });
   await expect(paywall).toBeVisible();
@@ -95,7 +122,11 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
 });
 
 test("invalid grant response does not leak protected playback data", async ({ request }) => {
-  const response = await request.get("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid");
+  const response = await request.get("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid", {
+    headers: {
+      Cookie: buildViewerSessionCookieHeader(),
+    },
+  });
   const body = await response.text();
 
   expect(body).toContain("この main はまだ unlock されていません。");
@@ -103,7 +134,7 @@ test("invalid grant response does not leak protected playback data", async ({ re
   expect(body).not.toContain("cdn.example.com/mains/");
 });
 
-test("main access route rejects direct setup bypass requests", async ({ request }) => {
+test("main access route returns auth_required for unauthenticated viewers", async ({ request }) => {
   const response = await request.post("/api/mock-main-access", {
     data: {
       acceptedAge: true,
@@ -114,6 +145,34 @@ test("main access route rejects direct setup bypass requests", async ({ request 
     },
   });
 
+  expect(response.status()).toBe(401);
+  await expect(response.json()).resolves.toEqual({
+    data: null,
+    error: {
+      code: "auth_required",
+      message: "main playback requires authentication",
+    },
+    meta: {
+      page: null,
+      requestId: "req_mock_main_access_auth_required_001",
+    },
+  });
+});
+
+test("main access route rejects direct setup bypass requests after authentication", async ({ request }) => {
+  const response = await request.post("/api/mock-main-access", {
+    data: {
+      acceptedAge: true,
+      acceptedTerms: true,
+      entryToken: "invalid",
+      fromShortId: "rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    },
+    headers: {
+      Cookie: buildViewerSessionCookieHeader(),
+    },
+  });
+
   expect(response.status()).toBe(403);
   await expect(response.json()).resolves.toEqual({
     fallbackHref: "/shorts/rooftop",
@@ -121,6 +180,7 @@ test("main access route rejects direct setup bypass requests", async ({ request 
 });
 
 test("signed grants cannot be replayed against a different main context", async ({ page, request }) => {
+  await addViewerSession(page);
   await page.goto("/");
   await page.getByRole("button", { name: /Unlock/i }).click();
   await page.getByLabel("18歳以上であり、年齢確認に同意する").check();
@@ -133,7 +193,11 @@ test("signed grants cannot be replayed against a different main context", async 
 
   expect(grant).toBeTruthy();
 
-  const response = await request.get(`/mains/main_aoi_blue_balcony?fromShortId=softlight&grant=${grant}`);
+  const response = await request.get(`/mains/main_aoi_blue_balcony?fromShortId=softlight&grant=${grant}`, {
+    headers: {
+      Cookie: buildViewerSessionCookieHeader(),
+    },
+  });
   const body = await response.text();
 
   expect(body).toContain("この main はまだ unlock されていません。");
