@@ -1,6 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
+import { useState } from "react";
 
 import { Button } from "@/shared/ui";
 
@@ -20,24 +21,48 @@ export function FanAuthDialog({
   onOpenChange,
   open,
 }: FanAuthDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   return (
-    <Dialog.Root onOpenChange={onOpenChange} open={open}>
+    <Dialog.Root
+      onOpenChange={(nextOpen) => {
+        if (isSubmitting && !nextOpen) {
+          return;
+        }
+
+        onOpenChange(nextOpen);
+      }}
+      open={open}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#061521]/36 backdrop-blur-[2px]" />
-        <Dialog.Content className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[376px] -translate-y-1/2">
+        <Dialog.Content
+          className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[376px] -translate-y-1/2"
+          onEscapeKeyDown={(event) => {
+            if (isSubmitting) {
+              event.preventDefault();
+            }
+          }}
+          onInteractOutside={(event) => {
+            if (isSubmitting) {
+              event.preventDefault();
+            }
+          }}
+        >
           <Dialog.Title className="sr-only">続けるにはログインが必要です</Dialog.Title>
           <Dialog.Description className="sr-only">
             email で sign in または sign up を始める modal
           </Dialog.Description>
           <FanAuthEntryPanel
-            dismissAction={
+            dismissAction={({ isSubmitting: panelSubmitting }) => (
               <Dialog.Close asChild>
-                <Button className="w-full" variant="secondary">
+                <Button className="w-full" disabled={panelSubmitting} variant="secondary">
                   閉じる
                 </Button>
               </Dialog.Close>
-            }
+            )}
             onAuthenticated={onAuthenticated}
+            onSubmittingChange={setIsSubmitting}
           />
         </Dialog.Content>
       </Dialog.Portal>

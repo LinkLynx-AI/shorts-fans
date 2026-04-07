@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { Button, SurfacePanel } from "@/shared/ui";
 
@@ -13,9 +13,10 @@ import {
 import { useFanAuthEntry } from "../model/use-fan-auth-entry";
 
 type FanAuthEntryPanelProps = {
-  dismissAction?: ReactNode;
+  dismissAction?: ReactNode | ((options: { isSubmitting: boolean }) => ReactNode);
   initialMode?: FanAuthMode;
   onAuthenticated?: () => void;
+  onSubmittingChange?: (isSubmitting: boolean) => void;
 };
 
 /**
@@ -25,6 +26,7 @@ export function FanAuthEntryPanel({
   dismissAction,
   initialMode = "sign-in",
   onAuthenticated,
+  onSubmittingChange,
 }: FanAuthEntryPanelProps) {
   const {
     email,
@@ -38,6 +40,10 @@ export function FanAuthEntryPanel({
     initialMode,
     ...(onAuthenticated ? { onAuthenticated } : {}),
   });
+
+  useEffect(() => {
+    onSubmittingChange?.(isSubmitting);
+  }, [isSubmitting, onSubmittingChange]);
 
   return (
     <SurfacePanel className="w-full px-5 py-6 text-foreground">
@@ -99,7 +105,11 @@ export function FanAuthEntryPanel({
         </button>
       </div>
 
-      {dismissAction ? <div className="mt-3">{dismissAction}</div> : null}
+      {dismissAction ? (
+        <div className="mt-3">
+          {typeof dismissAction === "function" ? dismissAction({ isSubmitting }) : dismissAction}
+        </div>
+      ) : null}
     </SurfacePanel>
   );
 }
