@@ -136,6 +136,12 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
 
   await expect(page).toHaveURL(/\/fan$/);
   await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+
+  await page.getByRole("link", { name: "フィード" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  await page.getByRole("link", { name: "マイ" }).click();
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
 });
 
 test("unauthenticated viewers can sign up from the shared auth modal and enter the fan hub", async ({ page }) => {

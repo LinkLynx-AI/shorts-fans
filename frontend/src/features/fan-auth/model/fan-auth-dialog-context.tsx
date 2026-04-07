@@ -9,6 +9,12 @@ import {
   type ReactNode,
 } from "react";
 
+import {
+  getCurrentViewerBootstrap,
+  useSetCurrentViewer,
+  useSetViewerSession,
+} from "@/entities/viewer";
+
 import { FanAuthDialog } from "../ui/fan-auth-dialog";
 
 type OpenFanAuthDialogOptions = {
@@ -28,6 +34,8 @@ const FanAuthDialogContext = createContext<FanAuthDialogContextValue | null>(nul
  */
 export function FanAuthDialogProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const setCurrentViewer = useSetCurrentViewer();
+  const setViewerSession = useSetViewerSession();
   const [afterAuthenticatedHref, setAfterAuthenticatedHref] = useState<string | null>(null);
   const [isFanAuthDialogOpen, setIsFanAuthDialogOpen] = useState(false);
 
@@ -41,9 +49,21 @@ export function FanAuthDialogProvider({ children }: { children: ReactNode }) {
     setIsFanAuthDialogOpen(true);
   };
 
-  const handleAuthenticated = () => {
+  const handleAuthenticated = async () => {
     const nextHref = afterAuthenticatedHref;
+    const currentViewer = await getCurrentViewerBootstrap({
+      credentials: "include",
+    }).catch(() => null);
 
+    if (currentViewer === null) {
+      setCurrentViewer(null);
+      setViewerSession(false);
+
+      return "認証自体は完了しましたが、状態反映の確認に失敗しました。画面を更新して確認してください。";
+    }
+
+    setCurrentViewer(currentViewer);
+    setViewerSession(currentViewer !== null);
     closeFanAuthDialog();
 
     startTransition(() => {
@@ -54,6 +74,8 @@ export function FanAuthDialogProvider({ children }: { children: ReactNode }) {
 
       router.refresh();
     });
+
+    return null;
   };
 
   return (

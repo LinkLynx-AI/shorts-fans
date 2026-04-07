@@ -9,6 +9,6 @@ describe("FanAuthEntryShell", () => {
     expect(screen.getByRole("heading", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "サインインを続ける" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "feed に戻る" })).toHaveAttribute("href", "/");
+    expect(screen.getByRole("button", { name: "feed に戻る" })).toBeInTheDocument();
   });
 });

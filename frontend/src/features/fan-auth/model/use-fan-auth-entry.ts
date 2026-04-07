@@ -14,7 +14,7 @@ import {
 
 type UseFanAuthEntryOptions = {
   initialMode?: FanAuthMode;
-  onAuthenticated?: () => void;
+  onAuthenticated?: () => Promise<string | null> | string | null;
 };
 
 type UseFanAuthEntryResult = {
@@ -65,12 +65,17 @@ export function useFanAuthEntry({
     try {
       await authenticateFanWithEmail(mode, email);
 
-      startTransition(() => {
-        if (onAuthenticated) {
-          onAuthenticated();
-          return;
+      if (onAuthenticated) {
+        const postAuthErrorMessage = await onAuthenticated();
+
+        if (postAuthErrorMessage) {
+          setErrorMessage(postAuthErrorMessage);
         }
 
+        return;
+      }
+
+      startTransition(() => {
         router.refresh();
       });
     } catch (error) {

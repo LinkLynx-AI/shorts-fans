@@ -15,7 +15,7 @@ import { useFanAuthEntry } from "../model/use-fan-auth-entry";
 type FanAuthEntryPanelProps = {
   dismissAction?: ReactNode | ((options: { isSubmitting: boolean }) => ReactNode);
   initialMode?: FanAuthMode;
-  onAuthenticated?: () => void;
+  onAuthenticated?: () => Promise<string | null> | string | null;
   onSubmittingChange?: (isSubmitting: boolean) => void;
 };
 

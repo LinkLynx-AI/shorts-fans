@@ -1,8 +1,15 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 const ViewerSessionContext = createContext(false);
+const ViewerSessionOverrideContext = createContext<((hasSession: boolean) => void) | null>(null);
 
 type ViewerSessionProviderProps = {
   children: ReactNode;
@@ -16,10 +23,18 @@ export function ViewerSessionProvider({
   children,
   hasSession,
 }: ViewerSessionProviderProps) {
+  const [resolvedHasSession, setResolvedHasSession] = useState(hasSession);
+
+  useEffect(() => {
+    setResolvedHasSession(hasSession);
+  }, [hasSession]);
+
   return (
-    <ViewerSessionContext.Provider value={hasSession}>
-      {children}
-    </ViewerSessionContext.Provider>
+    <ViewerSessionOverrideContext.Provider value={setResolvedHasSession}>
+      <ViewerSessionContext.Provider value={resolvedHasSession}>
+        {children}
+      </ViewerSessionContext.Provider>
+    </ViewerSessionOverrideContext.Provider>
   );
 }
 
@@ -28,4 +43,17 @@ export function ViewerSessionProvider({
  */
 export function useHasViewerSession(): boolean {
   return useContext(ViewerSessionContext);
+}
+
+/**
+ * 現在の request に対する viewer session 判定を client 側から同期する。
+ */
+export function useSetViewerSession(): (hasSession: boolean) => void {
+  const setViewerSession = useContext(ViewerSessionOverrideContext);
+
+  if (setViewerSession === null) {
+    throw new Error("ViewerSessionProvider is required");
+  }
+
+  return setViewerSession;
 }

@@ -27,6 +27,7 @@ export const currentViewerBootstrapSchema = z.object({
 
 type GetCurrentViewerBootstrapOptions = {
   baseUrl?: string;
+  credentials?: RequestCredentials;
   fetcher?: typeof fetch;
   sessionToken?: string;
 };
@@ -36,6 +37,7 @@ type GetCurrentViewerBootstrapOptions = {
  */
 export async function getCurrentViewerBootstrap({
   baseUrl,
+  credentials,
   fetcher,
   sessionToken,
 }: GetCurrentViewerBootstrapOptions = {}): Promise<CurrentViewer | null> {
@@ -50,6 +52,7 @@ export async function getCurrentViewerBootstrap({
     ...(fetcher ? { fetcher } : {}),
     init: {
       cache: "no-store",
+      ...(credentials ? { credentials } : {}),
       headers,
     },
     path: "/api/viewer/bootstrap",

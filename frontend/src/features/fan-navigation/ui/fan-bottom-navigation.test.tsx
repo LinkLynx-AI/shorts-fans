@@ -2,7 +2,10 @@ import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 import { usePathname } from "next/navigation";
 
-import { ViewerSessionProvider } from "@/entities/viewer";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
 import { FanAuthDialogProvider } from "@/features/fan-auth";
 import { FanBottomNavigation, resolveActiveFanNavigation } from "@/features/fan-navigation";
 
@@ -25,11 +28,13 @@ vi.mock("next/navigation", async () => {
 describe("fan navigation", () => {
   function renderNavigation(hasSession: boolean) {
     return render(
-      <FanAuthDialogProvider>
-        <ViewerSessionProvider hasSession={hasSession}>
+      <ViewerSessionProvider hasSession={hasSession}>
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
           <FanBottomNavigation />
-        </ViewerSessionProvider>
-      </FanAuthDialogProvider>,
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
     );
   }
 

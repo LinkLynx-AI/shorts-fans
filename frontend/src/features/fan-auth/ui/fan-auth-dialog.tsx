@@ -8,7 +8,7 @@ import { Button } from "@/shared/ui";
 import { FanAuthEntryPanel } from "./fan-auth-entry-panel";
 
 type FanAuthDialogProps = {
-  onAuthenticated: () => void;
+  onAuthenticated: () => Promise<string | null> | string | null;
   onOpenChange: (open: boolean) => void;
   open: boolean;
 };
