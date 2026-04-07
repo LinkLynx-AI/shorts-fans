@@ -9,7 +9,7 @@ describe("authenticateFanWithEmail", () => {
           JSON.stringify({
             data: {
               challengeToken: "challenge-token",
-              expiresAt: "2026-04-07T12:00:00Z",
+              expiresAt: "2026-04-07T21:00:00+09:00",
             },
             error: null,
             meta: {

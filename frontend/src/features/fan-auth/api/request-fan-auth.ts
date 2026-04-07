@@ -12,7 +12,7 @@ import {
 const fanAuthChallengeResponseSchema = z.object({
   data: z.object({
     challengeToken: z.string().min(1),
-    expiresAt: z.string().datetime(),
+    expiresAt: z.string().datetime({ offset: true }),
   }),
   error: z.null(),
   meta: z.object({
