@@ -6,29 +6,14 @@ import (
 	"fmt"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const overviewTitle = "My archive"
 
 // ErrProfileNotFound は対象の fan profile が存在しないことを表します。
 var ErrProfileNotFound = errors.New("fan profile が見つかりません")
-
-type queries interface {
-	GetUserByID(ctx context.Context, id pgtype.UUID) (sqlc.AppUser, error)
-	CountCreatorFollowsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountPinnedShortsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
-	CountUnlockedMainsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
-}
-
-// Repository は fan profile overview 関連の永続化操作を包みます。
-type Repository struct {
-	queries queries
-}
 
 // OverviewCounts は fan profile overview の count 群を表します。
 type OverviewCounts struct {
@@ -41,15 +26,6 @@ type OverviewCounts struct {
 type Overview struct {
 	Title  string
 	Counts OverviewCounts
-}
-
-// NewRepository は pgxpool ベースの fan profile repository を構築します。
-func NewRepository(pool *pgxpool.Pool) *Repository {
-	return newRepository(sqlc.New(pool))
-}
-
-func newRepository(q queries) *Repository {
-	return &Repository{queries: q}
 }
 
 // GetOverview は fan profile overview の counts-only payload を返します。

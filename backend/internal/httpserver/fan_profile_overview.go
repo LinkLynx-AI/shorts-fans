@@ -30,23 +30,36 @@ type fanProfileOverviewCounts struct {
 	Library      int64 `json:"library"`
 }
 
-// registerFanProfileRoutes は fan profile overview API を router に登録します。
+// registerFanProfileRoutes は fan profile private hub API を router に登録します。
 func registerFanProfileRoutes(
 	router gin.IRouter,
 	overviewReader FanProfileOverviewReader,
+	followingReader FanProfileFollowingReader,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
-	if overviewReader == nil {
+	if router == nil || viewerBootstrap == nil {
 		return
 	}
 
-	router.GET(
-		"/api/fan/profile",
-		buildProtectedFanAuthGuard(viewerBootstrap, fanProfileOverviewRequestScope, fanProfileAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleFanProfileOverview(c, overviewReader)
-		},
-	)
+	if overviewReader != nil {
+		router.GET(
+			"/api/fan/profile",
+			buildProtectedFanAuthGuard(viewerBootstrap, fanProfileOverviewRequestScope, fanProfileAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleFanProfileOverview(c, overviewReader)
+			},
+		)
+	}
+
+	if followingReader != nil {
+		router.GET(
+			"/api/fan/profile/following",
+			buildProtectedFanAuthGuard(viewerBootstrap, fanProfileFollowingRequestScope, fanProfileAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleFanProfileFollowing(c, followingReader)
+			},
+		)
+	}
 }
 
 // handleFanProfileOverview は private hub overview を返します。

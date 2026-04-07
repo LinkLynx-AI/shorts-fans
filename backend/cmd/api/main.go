@@ -68,6 +68,7 @@ func main() {
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
 			FanProfileOverview:   fanProfileRepository,
+			FanProfileFollowing:  fanProfileRepository,
 			FanAuth:              authLifecycle,
 			AuthCookie:           httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
 			ViewerBootstrap:      viewerBootstrapReader,

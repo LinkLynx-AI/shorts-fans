@@ -48,12 +48,18 @@ type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
 }
 
+// FanProfileFollowingReader は fan profile following 用の read 操作を表します。
+type FanProfileFollowingReader interface {
+	ListFollowing(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.FollowingCursor, limit int) ([]fanprofile.FollowingItem, *fanprofile.FollowingCursor, error)
+}
+
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv               string
 	CreatorSearch        CreatorSearchReader
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	FanProfileFollowing  FanProfileFollowingReader
 	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
@@ -115,7 +121,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
-	registerFanProfileRoutes(router, config.FanProfileOverview, config.ViewerBootstrap)
+	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
 

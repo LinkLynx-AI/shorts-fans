@@ -35,6 +35,10 @@ func (s queriesStub) CountUnlockedMainsByUserID(ctx context.Context, userID pgty
 	return s.countUnlockedMainsByUser(ctx, userID)
 }
 
+func (s queriesStub) ListFanProfileFollowingItems(context.Context, sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error) {
+	return nil, nil
+}
+
 func TestGetOverviewPopulated(t *testing.T) {
 	t.Parallel()
 

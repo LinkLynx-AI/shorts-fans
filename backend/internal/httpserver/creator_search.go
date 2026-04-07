@@ -142,23 +142,33 @@ func buildCreatorSummary(profile creator.Profile) (creatorSummary, error) {
 		return creatorSummary{}, fmt.Errorf("creator summary に必要な display name または handle がありません")
 	}
 
+	return buildCreatorSummaryFields(profile.UserID, *profile.DisplayName, *profile.Handle, profile.AvatarURL, profile.Bio)
+}
+
+func buildCreatorSummaryFields(userID uuid.UUID, displayName string, handle string, avatarURL *string, bio string) (creatorSummary, error) {
+	trimmedDisplayName := strings.TrimSpace(displayName)
+	trimmedHandle := strings.TrimSpace(handle)
+	if trimmedDisplayName == "" || trimmedHandle == "" {
+		return creatorSummary{}, fmt.Errorf("creator summary に必要な display name または handle がありません")
+	}
+
 	var avatar *mediaAsset
-	if profile.AvatarURL != nil && strings.TrimSpace(*profile.AvatarURL) != "" {
+	if avatarURL != nil && strings.TrimSpace(*avatarURL) != "" {
 		avatar = &mediaAsset{
 			DurationSeconds: nil,
-			ID:              creatorAvatarAssetID(profile.UserID),
+			ID:              creatorAvatarAssetID(userID),
 			Kind:            "image",
 			PosterURL:       nil,
-			URL:             strings.TrimSpace(*profile.AvatarURL),
+			URL:             strings.TrimSpace(*avatarURL),
 		}
 	}
 
 	return creatorSummary{
 		Avatar:      avatar,
-		Bio:         profile.Bio,
-		DisplayName: *profile.DisplayName,
-		Handle:      formatHandle(*profile.Handle),
-		ID:          creator.FormatPublicID(profile.UserID),
+		Bio:         bio,
+		DisplayName: trimmedDisplayName,
+		Handle:      formatHandle(trimmedHandle),
+		ID:          creator.FormatPublicID(userID),
 	}, nil
 }
 
