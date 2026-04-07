@@ -27,7 +27,6 @@
 - Child issue key and branch name.
 - Touched-area validation results and additional issue-specific validation results.
 - Review gate result and blocking finding disposition.
-- UI gate result and UI review result when applicable.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL, base branch, and merge or auto-merge status.
 

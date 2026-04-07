@@ -36,5 +36,5 @@ description: Execute parent Linear issues for this repository by delivering chil
 
 ## Done Criteria
 - Every child issue in the parent scope reaches merge step per policy.
-- Validation, review gates, UI gates (when applicable), and runtime smoke gate are recorded for each child.
+- Validation, review gate, and runtime smoke gate are recorded for each child.
 - PR status and merge policy outcome are recorded for each child.
