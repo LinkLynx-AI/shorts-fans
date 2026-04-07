@@ -27,14 +27,16 @@ export const getFanAuthGateState = cache(async (): Promise<FanAuthGateState> => 
   }
 
   try {
+    const currentViewer = await getCurrentViewerBootstrap({ sessionToken });
+
     return {
-      currentViewer: await getCurrentViewerBootstrap({ sessionToken }),
-      hasSession: true,
+      currentViewer,
+      hasSession: currentViewer !== null,
     };
   } catch {
     return {
       currentViewer: null,
-      hasSession: true,
+      hasSession: false,
     };
   }
 });

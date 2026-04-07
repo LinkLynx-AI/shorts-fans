@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getShortById } from "@/entities/short";
-import { viewerSessionCookieName } from "@/entities/viewer";
+import { getCurrentViewerBootstrap, viewerSessionCookieName } from "@/entities/viewer";
 import {
   buildMockMainAccessEntryContext,
   buildMockMainPlaybackGrantContext,
@@ -93,7 +93,15 @@ function resolveGrantKind(
  * main 再生用の signed grant を発行する。
  */
 export async function POST(request: NextRequest) {
-  if (!request.cookies.get(viewerSessionCookieName)?.value) {
+  const sessionToken = request.cookies.get(viewerSessionCookieName)?.value;
+
+  if (!sessionToken) {
+    return buildAuthRequiredResponse();
+  }
+
+  const currentViewer = await getCurrentViewerBootstrap({ sessionToken }).catch(() => null);
+
+  if (!currentViewer) {
     return buildAuthRequiredResponse();
   }
 

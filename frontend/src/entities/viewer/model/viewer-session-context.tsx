@@ -10,7 +10,7 @@ type ViewerSessionProviderProps = {
 };
 
 /**
- * request cookie に viewer session があるかを context として配下に渡す。
+ * protected fan flow を継続できる viewer session があるかを context として配下に渡す。
  */
 export function ViewerSessionProvider({
   children,
@@ -24,7 +24,7 @@ export function ViewerSessionProvider({
 }
 
 /**
- * 現在の request に viewer session cookie があるかを参照する。
+ * 現在の request で protected fan flow を継続できるかを参照する。
  */
 export function useHasViewerSession(): boolean {
   return useContext(ViewerSessionContext);

@@ -159,6 +159,21 @@ test("main access route returns auth_required for unauthenticated viewers", asyn
   });
 });
 
+test("stale session cookies are treated as unauthenticated on protected fan surfaces", async ({ page }) => {
+  await page.context().addCookies([
+    {
+      ...viewerSessionCookie,
+      value: "stale-e2e-session",
+    },
+  ]);
+
+  await page.goto("/fan");
+  await expect(page).toHaveURL(/\/login$/);
+  await page.goto("/shorts/softlight");
+  await page.getByRole("button", { name: /Continue main/i }).click();
+  await expect(page).toHaveURL(/\/login$/);
+});
+
 test("main access route rejects direct setup bypass requests after authentication", async ({ request }) => {
   const response = await request.post("/api/mock-main-access", {
     data: {
