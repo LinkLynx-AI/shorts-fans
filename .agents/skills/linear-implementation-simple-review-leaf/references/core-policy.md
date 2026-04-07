@@ -33,7 +33,7 @@
 ## PR Convention
 - Branch format: `codex/<ISSUE-KEY>-<slug>` when a dedicated issue branch is required.
 - PR body must include what and why, acceptance criteria mapping, test steps with results, migration or breaking notes, and Linear link.
-- Include review and UI check outcomes in PR body.
+- Include review outcomes in PR body.
 
 ## Global Done Criteria
 - Acceptance criteria are satisfied.

@@ -14,20 +14,19 @@
 2. Run sub-agents for exploration, implementation, and validation.
 3. Execute review gates defined in `references/review-gates.md`.
 4. If review or validation gate fails, fix and repeat from implementation.
-5. For non-trivial changes, run runtime smoke gate:
+5. Do not run `Playwright` or `pnpm test:e2e` unless the user explicitly requests it.
+6. For non-trivial changes, run runtime smoke gate:
 - start the affected app(s) in `backend/` and/or `frontend/` if local runtime is available
 - verify changed route(s) or endpoint(s) and check for fatal runtime errors
-- run Playwright smoke checks for primary user-visible flow(s) when frontend UI is touched
-6. If runtime smoke fails, fix and repeat from implementation.
-7. Open PR from child branch to the parent branch.
-8. Apply merge policy from `references/core-policy.md`.
-9. Start next child issue only after merge step and evidence are complete.
+7. If runtime smoke fails, fix and repeat from implementation.
+8. Open PR from child branch to the parent branch.
+9. Apply merge policy from `references/core-policy.md`.
+10. Start next child issue only after merge step and evidence are complete.
 
 ## Required Per-child Evidence
 - Child issue key and branch name.
 - Touched-area validation results and additional issue-specific validation results.
 - Review gate result and blocking finding disposition.
-- UI gate result and UI review result when applicable.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL, base branch, and merge or auto-merge status.
 

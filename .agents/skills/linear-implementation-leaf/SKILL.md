@@ -38,4 +38,4 @@ description: Execute leaf issue runs for this repository with one issue equals o
 
 ## Done Criteria
 - The target leaf issue reaches PR step and merge status follows policy for the base branch.
-- Validation, review, UI checks (when applicable), and runtime smoke gate evidence are recorded.
+- Validation, review, and runtime smoke gate evidence are recorded.

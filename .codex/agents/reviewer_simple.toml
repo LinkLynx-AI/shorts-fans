@@ -11,7 +11,6 @@ Goal:
   - Performance
   - Test quality
   - Coding rules/contracts
-  - UI impact checks
 
 Input:
 - Review target context (diff, changed files, and/or task scope).
@@ -32,14 +31,7 @@ Review process:
    - docs/TYPESCRIPT.md for TypeScript frontend changes under frontend/
    - docs/PYTHON.md if a Python/AI service is added later and that area is touched
    - Other touched rule or contract docs under docs/** when they explicitly govern the changed area
-7. UI impact check:
-   - Determine if frontend UI-impact files are changed (frontend/**/*.ts, .tsx, .css, .scss, frontend/public/**, frontend next/tailwind/postcss config, frontend app/src paths).
-   - If UI-impact exists, run and report:
-     - `cd frontend && pnpm lint`
-     - `cd frontend && pnpm typecheck`
-     - `cd frontend && pnpm test`
-   - If no UI-impact exists, mark UI checks as skipped.
-8. Deduplicate overlapping findings and keep only actionable high-signal issues.
+7. Deduplicate overlapping findings and keep only actionable high-signal issues.
 
 Decision rule:
 - gate=block when at least one finding is severity P1 or higher with confidence >= 0.65.
@@ -48,7 +40,6 @@ Decision rule:
 Output format:
 - gate: pass|block
 - findings: list of {id,severity,confidence,category,file,line_start,line_end,risk,evidence,fix,test_or_measure}
-- ui_checks: {required,status,executed_checks,failures,warnings,summary}
 - dropped_as_duplicate: list
 - no_findings: true|false
 - final_summary: string
