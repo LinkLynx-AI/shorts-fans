@@ -40,7 +40,7 @@ type PublicProfileShortCursor struct {
 }
 
 // GetPublicProfileHeader は creator profile header に必要な公開情報を返します。
-func (r *Repository) GetPublicProfileHeader(ctx context.Context, creatorID string) (PublicProfileHeader, error) {
+func (r *Repository) GetPublicProfileHeader(ctx context.Context, creatorID string, viewerUserID *uuid.UUID) (PublicProfileHeader, error) {
 	userID, err := ParsePublicID(creatorID)
 	if err != nil {
 		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile header 取得 creator=%q: %w", creatorID, ErrProfileNotFound)
@@ -61,11 +61,22 @@ func (r *Repository) GetPublicProfileHeader(ctx context.Context, creatorID strin
 		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile follower count 取得 creator=%q: %w", creatorID, err)
 	}
 
+	isFollowing := false
+	if viewerUserID != nil && *viewerUserID != userID {
+		isFollowing, err = r.queries.HasCreatorFollowByUserIDAndCreatorUserID(ctx, sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams{
+			UserID:        postgres.UUIDToPG(*viewerUserID),
+			CreatorUserID: postgres.UUIDToPG(userID),
+		})
+		if err != nil {
+			return PublicProfileHeader{}, fmt.Errorf("公開 creator profile follow relation 取得 creator=%q viewer=%s: %w", creatorID, *viewerUserID, err)
+		}
+	}
+
 	return PublicProfileHeader{
 		Profile:     profile,
 		ShortCount:  shortCount,
 		FanCount:    fanCount,
-		IsFollowing: false,
+		IsFollowing: isFollowing,
 	}, nil
 }
 

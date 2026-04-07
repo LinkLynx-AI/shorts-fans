@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import type { CreatorProfileStats, CreatorSummary } from "../model/creator";
+import type { CreatorSummary } from "../model/creator";
 import { getCreatorInitials } from "../model/creator";
 import { cn } from "@/shared/lib";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
@@ -18,7 +18,11 @@ type CreatorIdentityProps = {
 
 type CreatorStatListProps = {
   className?: string;
-  stats: CreatorProfileStats;
+  stats: {
+    fanCount: number;
+    shortCount: number;
+    viewCount?: number | undefined;
+  };
   variant?: "default" | "creatorProfile";
 };
 
@@ -77,7 +81,9 @@ export function CreatorStatList({
   const items = [
     { label: "shorts", value: stats.shortCount.toString() },
     { label: "fans", value: formatCompactCount(stats.fanCount) },
-    { label: "views", value: formatCompactCount(stats.viewCount) },
+    ...(stats.viewCount !== undefined
+      ? [{ label: "views", value: formatCompactCount(stats.viewCount) }]
+      : []),
   ] as const;
 
   return (

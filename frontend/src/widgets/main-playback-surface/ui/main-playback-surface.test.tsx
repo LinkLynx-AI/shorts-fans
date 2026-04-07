@@ -39,7 +39,10 @@ describe("MainPlaybackSurface", () => {
     expect(screen.getByText("resume without another confirmation")).toBeInTheDocument();
     expect(screen.getByText("3:18")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pin short" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute("href", "/creators/aoi");
+    expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute(
+      "href",
+      "/creators/creator_aoi_n",
+    );
     expect(screen.getByText("soft light preview の続き。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));

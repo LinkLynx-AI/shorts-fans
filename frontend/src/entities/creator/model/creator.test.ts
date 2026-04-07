@@ -11,13 +11,13 @@ import {
 describe("creator model", () => {
   it("returns all creator ids", () => {
     expect(getCreatorIds()).toEqual([
-      "aoi",
-      "mina",
-      "sora",
-      "creator_11111111111111111111111111111111",
       "creator_aoi_n",
       "creator_mina_rei",
       "creator_sora_vale",
+      "creator_11111111111111111111111111111111",
+      "aoi",
+      "mina",
+      "sora",
     ]);
     expect(listCreators()).toHaveLength(4);
   });
@@ -39,9 +39,9 @@ describe("creator model", () => {
   });
 
   it("returns recent creators and filters by display name / handle only", () => {
-    expect(getRecentCreators().map((creator) => creator.id)).toEqual(["aoi", "mina"]);
-    expect(searchCreators("mina").map((creator) => creator.id)).toEqual(["mina"]);
-    expect(searchCreators("@sora").map((creator) => creator.id)).toEqual(["sora"]);
+    expect(getRecentCreators().map((creator) => creator.id)).toEqual(["creator_aoi_n", "creator_mina_rei"]);
+    expect(searchCreators("mina").map((creator) => creator.id)).toEqual(["creator_mina_rei"]);
+    expect(searchCreators("@sora").map((creator) => creator.id)).toEqual(["creator_sora_vale"]);
     expect(searchCreators("  ")).toEqual(getRecentCreators());
   });
 });

@@ -144,6 +144,27 @@ func (q *Queries) GetPublicCreatorProfileByUserID(ctx context.Context, userID pg
 	return i, err
 }
 
+const hasCreatorFollowByUserIDAndCreatorUserID = `-- name: HasCreatorFollowByUserIDAndCreatorUserID :one
+SELECT EXISTS (
+    SELECT 1
+    FROM app.creator_follows
+    WHERE user_id = $1
+        AND creator_user_id = $2
+)
+`
+
+type HasCreatorFollowByUserIDAndCreatorUserIDParams struct {
+	UserID        pgtype.UUID
+	CreatorUserID pgtype.UUID
+}
+
+func (q *Queries) HasCreatorFollowByUserIDAndCreatorUserID(ctx context.Context, arg HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error) {
+	row := q.db.QueryRow(ctx, hasCreatorFollowByUserIDAndCreatorUserID, arg.UserID, arg.CreatorUserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listRecentPublicCreatorProfiles = `-- name: ListRecentPublicCreatorProfiles :many
 SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 FROM app.public_creator_profiles

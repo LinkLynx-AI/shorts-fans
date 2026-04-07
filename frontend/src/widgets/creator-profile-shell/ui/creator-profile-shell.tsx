@@ -1,23 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 
 import { CreatorAvatar, CreatorStatList } from "@/entities/creator";
-import { ShortPoster } from "@/entities/short";
+import { useHasViewerSession } from "@/entities/viewer";
 import {
   buildCreatorShortDetailHref,
   resolveCreatorProfileBackHref,
   type CreatorProfileRouteState,
 } from "@/features/creator-navigation";
+import { useFanAuthDialog } from "@/features/fan-auth";
 import { Button } from "@/shared/ui";
 import { DetailShell } from "@/widgets/detail-shell";
 
-import type { CreatorProfileShellState } from "../model/mock-creator-profile-shell";
+import type {
+  CreatorProfileShellShortItem,
+  CreatorProfileShellState,
+} from "../model/load-creator-profile-shell-state";
 
 type CreatorProfileShellProps = {
   routeState: CreatorProfileRouteState;
   state: CreatorProfileShellState;
+};
+
+type CreatorProfileShortGridTileProps = {
+  creatorDisplayName: string;
+  creatorId: string;
+  routeState: CreatorProfileRouteState;
+  short: CreatorProfileShellShortItem;
 };
 
 function ShortsGridTab() {
@@ -43,6 +53,44 @@ function ShortsGridTab() {
   );
 }
 
+function formatPreviewDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+
+  return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function CreatorProfileShortGridTile({
+  creatorDisplayName,
+  creatorId,
+  routeState,
+  short,
+}: CreatorProfileShortGridTileProps) {
+  const previewDuration = formatPreviewDuration(short.previewDurationSeconds);
+
+  return (
+    <Link
+      aria-label={`${creatorDisplayName} preview ${previewDuration}`}
+      className="group relative block aspect-[3/4] overflow-hidden bg-[linear-gradient(180deg,#d7f4ff_0%,#81c7f1_44%,#1f4f73_100%)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
+      href={buildCreatorShortDetailHref(short.routeShortId, creatorId, routeState)}
+    >
+      <video
+        aria-hidden="true"
+        className="absolute inset-0 size-full object-cover transition duration-200 group-hover:scale-[1.02]"
+        muted
+        playsInline
+        poster={short.media.posterUrl ?? undefined}
+        preload="metadata"
+        src={short.media.url}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.04)_0%,rgba(6,21,33,0.28)_72%,rgba(6,21,33,0.62)_100%)]" />
+      <span className="absolute bottom-2 right-2 rounded-full bg-black/54 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+        {previewDuration}
+      </span>
+    </Link>
+  );
+}
+
 /**
  * creator profile の header と short grid を表示する。
  */
@@ -51,9 +99,12 @@ export function CreatorProfileShell({
   state,
 }: CreatorProfileShellProps) {
   const { creator, shorts, stats, viewer } = state;
+  const { openFanAuthDialog } = useFanAuthDialog();
+  const hasViewerSession = useHasViewerSession();
   const backHref = resolveCreatorProfileBackHref(routeState);
   const displayHandle = creator.handle.replace(/^@/, "");
-  const [isFollowing, setIsFollowing] = useState(viewer.isFollowing);
+  const isFollowing = viewer.isFollowing;
+  const isFollowReadOnly = hasViewerSession && !isFollowing;
 
   return (
     <DetailShell
@@ -89,10 +140,13 @@ export function CreatorProfileShell({
             className={
               isFollowing
                 ? "min-h-9 w-full rounded-[10px] border-transparent bg-[#edf2f7] text-[13px] font-bold text-foreground shadow-none backdrop-blur-none"
-                : "min-h-9 w-full rounded-[10px] bg-accent-strong text-[13px] font-bold text-white shadow-none"
+                : "min-h-9 w-full rounded-[10px] bg-accent-strong text-[13px] font-bold text-white shadow-none disabled:brightness-90"
             }
+            disabled={isFollowReadOnly}
             onClick={() => {
-              setIsFollowing((currentValue) => !currentValue);
+              if (!hasViewerSession) {
+                openFanAuthDialog();
+              }
             }}
             type="button"
             variant={isFollowing ? "secondary" : "default"}
@@ -110,14 +164,13 @@ export function CreatorProfileShell({
         ) : (
           <div className="mt-0.5 grid grid-cols-3 gap-[3px]">
             {shorts.map((short) => (
-              <Link
+              <CreatorProfileShortGridTile
+                creatorDisplayName={creator.displayName}
+                creatorId={creator.id}
                 key={short.id}
-                aria-label={`${creator.displayName} ${short.title}`}
-                className="block focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
-                href={buildCreatorShortDetailHref(short.id, creator.id, routeState)}
-              >
-                <ShortPoster short={short} variant="profile" />
-              </Link>
+                routeState={routeState}
+                short={short}
+              />
             ))}
           </div>
         )}
