@@ -6,7 +6,7 @@ import { FanAuthEntryShell } from "@/widgets/fan-auth-entry-shell";
 export default async function LoginPage() {
   const viewerState = await getFanAuthGateState();
 
-  if (viewerState.hasSession) {
+  if (viewerState.currentViewer) {
     redirect("/");
   }
 
