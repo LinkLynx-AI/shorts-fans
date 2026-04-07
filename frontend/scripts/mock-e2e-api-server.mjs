@@ -43,11 +43,18 @@ if (!authenticatedFanBootstrap || !unauthenticatedBootstrap) {
 function buildCorsHeaders(request) {
   const origin = request.headers.origin;
 
+  if (!origin) {
+    return {
+      "Access-Control-Allow-Headers": "Accept, Content-Type",
+      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    };
+  }
+
   return {
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Accept, Content-Type",
     "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-    "Access-Control-Allow-Origin": origin ?? "*",
+    "Access-Control-Allow-Origin": origin,
     Vary: "Origin",
   };
 }
