@@ -129,6 +129,7 @@
 - `data.profile.stats.fanCount`: `number`
 - `data.profile.viewer.isFollowing`: `boolean`
 - `meta.page = null`
+- follow relation の write contract は `docs/contracts/fan-creator-follow-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
 
 #### Guardrail
 

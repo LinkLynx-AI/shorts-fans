@@ -18,6 +18,7 @@
 - [contracts/viewer-bootstrap-api-contract.md](contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
+- [contracts/fan-creator-follow-api-contract.md](contracts/fan-creator-follow-api-contract.md): `creator profile` からの `follow / unfollow` mutation 契約
 - [contracts/fan-unlock-main-api-contract.md](contracts/fan-unlock-main-api-contract.md): `unlock / main player` の read 契約
 - [contracts/fan-profile-api-contract.md](contracts/fan-profile-api-contract.md): `fan profile private hub` の read 契約
 - [contracts/fan-mvp-fixtures-and-integration-guide.md](contracts/fan-mvp-fixtures-and-integration-guide.md): fixture と backend / frontend 接続順の参照ガイド

@@ -1,0 +1,138 @@
+{
+  "PUT /api/fan/creators/{creatorId}/follow": {
+    "follow_success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "creatorId": "creator_mina_rei",
+          "viewer": {
+            "isFollowing": true
+          },
+          "stats": {
+            "fanCount": 24001
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_follow_put_success_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "follow_auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_follow_put_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "creator follow requires authentication"
+        }
+      }
+    },
+    "follow_not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_follow_put_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator was not found"
+        }
+      }
+    },
+    "follow_repeat": {
+      "status": 200,
+      "body": {
+        "data": {
+          "creatorId": "creator_mina_rei",
+          "viewer": {
+            "isFollowing": true
+          },
+          "stats": {
+            "fanCount": 24001
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_follow_put_repeat_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "DELETE /api/fan/creators/{creatorId}/follow": {
+    "unfollow_success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "creatorId": "creator_mina_rei",
+          "viewer": {
+            "isFollowing": false
+          },
+          "stats": {
+            "fanCount": 24000
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_follow_delete_success_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "unfollow_auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_follow_delete_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "creator unfollow requires authentication"
+        }
+      }
+    },
+    "unfollow_not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_follow_delete_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator was not found"
+        }
+      }
+    },
+    "unfollow_repeat": {
+      "status": 200,
+      "body": {
+        "data": {
+          "creatorId": "creator_mina_rei",
+          "viewer": {
+            "isFollowing": false
+          },
+          "stats": {
+            "fanCount": 24000
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_follow_delete_repeat_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  }
+}
