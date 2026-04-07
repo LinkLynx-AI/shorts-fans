@@ -144,10 +144,66 @@ const feedShortByTab = {
   recommended: "rooftop",
 };
 
+const viewerCreatorId = "mina";
+
+const creatorDashboardData = {
+  mina: {
+    description: "quiet rooftop 系の release をまとめて管理し、review と unlock の動きを profile から見返します。",
+    profileStats: [
+      { label: "shorts", value: "14" },
+      { label: "unlocks", value: "238" },
+      { label: "followers", value: "24K" },
+    ],
+    revisionNotice: {
+      detail: "キャプション連携を確認してください",
+      label: "差し戻しが1件あります",
+    },
+    mains: [
+      {
+        detail: "2 linked shorts",
+        metric: "¥48K",
+        shortId: "rooftop",
+        status: "Approved",
+        title: "quiet rooftop main",
+        tone: "approved",
+      },
+      {
+        detail: "unlock review running",
+        metric: "Queue",
+        shortId: "mirror",
+        status: "Pending",
+        title: "hotel mirror main",
+        tone: "pending",
+      },
+    ],
+    shorts: [
+      {
+        detail: "paywall views 1.2K",
+        revenue: "¥48K",
+        shortId: "rooftop",
+        status: "Approved",
+        title: "quiet rooftop",
+        tone: "approved",
+      },
+      {
+        detail: "review ETA today",
+        revenue: "¥36K",
+        shortId: "mirror",
+        status: "Pending",
+        title: "hotel mirror",
+        tone: "pending",
+      },
+    ],
+  },
+};
+
 const state = {
   acceptAge: false,
   acceptTerms: false,
   currentCreatorId: "mina",
+  creatorManagerTab: "shorts",
+  creatorUploadMainName: "",
+  creatorUploadShortNames: [""],
   currentShortId: "rooftop",
   fanTab: "pinned",
   feedTab: "recommended",
@@ -178,7 +234,7 @@ document.addEventListener("click", (event) => {
     return;
   }
 
-  const { action, creatorId, shortId, tab } = actionButton.dataset;
+  const { action, creatorId, shortId, tab, kind, index } = actionButton.dataset;
 
   if (action === "back") {
     handleBack();
@@ -212,6 +268,85 @@ document.addEventListener("click", (event) => {
       currentShortId: shortId,
       screen: "short",
     });
+    return;
+  }
+
+  if (action === "open-creator-dashboard") {
+    navigate({
+      creatorManagerTab: "shorts",
+      currentCreatorId: viewerCreatorId,
+      currentShortId: creatorShorts[viewerCreatorId][0],
+      rootTab: "fan",
+      screen: "creator-dashboard",
+    });
+    return;
+  }
+
+  if (action === "open-creator-upload") {
+    navigate({
+      creatorUploadMainName: "",
+      creatorUploadShortNames: [""],
+      currentCreatorId: viewerCreatorId,
+      currentShortId: creatorShorts[viewerCreatorId][0],
+      rootTab: "fan",
+      screen: "creator-upload",
+    });
+    return;
+  }
+
+  if (action === "set-creator-manager-tab" && tab) {
+    state.creatorManagerTab = tab === "main" ? "main" : "shorts";
+    render();
+    return;
+  }
+
+  if (action === "pick-creator-upload-files" && kind) {
+    const inputSelector =
+      kind === "shorts" && typeof index !== "undefined"
+        ? `[data-role="creator-upload-input"][data-kind="${kind}"][data-index="${index}"]`
+        : `[data-role="creator-upload-input"][data-kind="${kind}"]`;
+    const uploadInput = root.querySelector(inputSelector);
+
+    if (uploadInput instanceof HTMLInputElement) {
+      uploadInput.click();
+    }
+
+    return;
+  }
+
+  if (action === "add-creator-upload-short-slot") {
+    state.creatorUploadShortNames = [...state.creatorUploadShortNames, ""];
+    render();
+    return;
+  }
+
+  if (action === "remove-creator-upload-short-slot" && typeof index !== "undefined") {
+    const slotIndex = Number(index);
+
+    if (Number.isInteger(slotIndex) && slotIndex >= 0) {
+      state.creatorUploadShortNames = state.creatorUploadShortNames.filter((_, currentIndex) => currentIndex !== slotIndex);
+      render();
+    }
+
+    return;
+  }
+
+  if (action === "submit-creator-upload-package") {
+    if (!isCreatorUploadReady()) {
+      return;
+    }
+
+    resetCreatorUploadDraft();
+    navigate(
+      {
+        creatorManagerTab: "shorts",
+        currentCreatorId: viewerCreatorId,
+        currentShortId: creatorShorts[viewerCreatorId][0],
+        rootTab: "fan",
+        screen: "creator-dashboard",
+      },
+      true,
+    );
     return;
   }
 
@@ -323,6 +458,30 @@ document.addEventListener("input", (event) => {
   }
 });
 
+document.addEventListener("change", (event) => {
+  const target = event.target;
+
+  if (target instanceof HTMLInputElement && target.matches("[data-role='creator-upload-input']") && target.files?.length) {
+    const fileNames = Array.from(target.files).map((file) => file.name);
+
+    if (target.dataset.kind === "main") {
+      state.creatorUploadMainName = fileNames[0] || "";
+    }
+
+    if (target.dataset.kind === "shorts") {
+      const slotIndex = Number(target.dataset.index);
+
+      if (Number.isInteger(slotIndex) && slotIndex >= 0) {
+        state.creatorUploadShortNames = state.creatorUploadShortNames.map((fileName, currentIndex) =>
+          currentIndex === slotIndex ? fileNames[0] || "" : fileName,
+        );
+      }
+    }
+
+    render();
+  }
+});
+
 function closeOverlay() {
   state.acceptAge = false;
   state.acceptTerms = false;
@@ -334,6 +493,28 @@ function closeOverlay() {
 
 function createBackAction() {
   return `<button aria-label="Back" class="back-button" data-action="back" type="button">&lt;</button>`;
+}
+
+function createCreatorAddAction() {
+  return `<button aria-label="動画を追加" class="creator-topbar-add-button" data-action="open-creator-upload" type="button">+</button>`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function resetCreatorUploadDraft() {
+  state.creatorUploadMainName = "";
+  state.creatorUploadShortNames = [""];
+}
+
+function isCreatorUploadReady() {
+  return Boolean(state.creatorUploadMainName && state.creatorUploadShortNames.some(Boolean));
 }
 
 function currentShort() {
@@ -579,7 +760,7 @@ function fanScreen() {
             <p class="fan-profile-name">My archive</p>
           </div>
 
-          <button class="fan-creator-button" type="button">creatorになる</button>
+          <button class="fan-creator-button" data-action="open-creator-dashboard" type="button">creator管理画面へ</button>
 
           <div aria-label="Profile sections" class="fan-tabbar" role="tablist">
             ${tabs
@@ -874,6 +1055,232 @@ function creatorScreen() {
   `;
 }
 
+function creatorDashboardScreen() {
+  const creator = creators[viewerCreatorId];
+  const dashboard = creatorDashboardData[viewerCreatorId];
+  const activeTab = state.creatorManagerTab === "main" ? "main" : "shorts";
+  const revisionNotice = dashboard.revisionNotice || null;
+  const visibleItems = activeTab === "main" ? dashboard.mains : dashboard.shorts;
+
+  return `
+    <section class="screen" data-theme="profile">
+      <div class="profile-screen creator-profile-screen creator-manager-screen">
+        <div class="profile-topbar">
+          ${createBackAction()}
+          ${createCreatorAddAction()}
+        </div>
+
+        <section class="creator-profile-shell">
+          <div class="creator-profile-head">
+            <span class="creator-profile-avatar"></span>
+            <div class="creator-profile-stats">
+              ${dashboard.profileStats
+                .map(
+                  (item) => `
+                    <div class="creator-profile-stat">
+                      <strong>${item.value}</strong>
+                      <span>${item.label}</span>
+                    </div>
+                  `,
+                )
+                .join("")}
+            </div>
+          </div>
+
+          <div class="creator-profile-copy creator-manager-copy">
+            <p class="creator-profile-handle">${creator.handle}</p>
+            <p class="creator-profile-name">${creator.name}</p>
+            <p class="creator-profile-bio">${dashboard.description}</p>
+          </div>
+
+          ${
+            revisionNotice
+              ? `
+                <div class="creator-manager-alert" role="status">
+                  <span class="creator-manager-alert-badge">差し戻し</span>
+                  <div class="creator-manager-alert-copy">
+                    <b>${revisionNotice.label}</b>
+                    <span>${revisionNotice.detail}</span>
+                  </div>
+                </div>
+              `
+              : ""
+          }
+
+          <div aria-label="Managed posts" class="creator-profile-tabbar" role="tablist">
+            <button
+              aria-label="Shorts"
+              aria-selected="${activeTab === "shorts" ? "true" : "false"}"
+              class="creator-profile-tab creator-manager-tab-button ${activeTab === "shorts" ? "is-active" : ""}"
+              data-action="set-creator-manager-tab"
+              data-tab="shorts"
+              role="tab"
+              type="button"
+            >
+              Shorts
+            </button>
+            <button
+              aria-label="Main"
+              aria-selected="${activeTab === "main" ? "true" : "false"}"
+              class="creator-profile-tab creator-manager-tab-button ${activeTab === "main" ? "is-active" : ""}"
+              data-action="set-creator-manager-tab"
+              data-tab="main"
+              role="tab"
+              type="button"
+            >
+              Main
+            </button>
+          </div>
+
+          <div class="creator-manager-grid">
+            ${visibleItems
+              .map((item) => {
+                const short = shorts[item.shortId];
+
+                return `
+                  <button
+                    aria-label="${short.title}"
+                    class="creator-manager-tile is-${item.tone}"
+                    type="button"
+                  >
+                    <span
+                      aria-hidden="true"
+                      class="creator-manager-tile-frame"
+                      style="--tile-top: ${short.tile.top}; --tile-mid: ${short.tile.mid}; --tile-bottom: ${short.tile.bottom};"
+                    ></span>
+                    <span class="creator-manager-tile-overlay">
+                      ${
+                        item.tone === "pending"
+                          ? `<span class="creator-manager-tile-status is-${item.tone} is-center">${item.status}</span>`
+                          : ""
+                      }
+                    </span>
+                  </button>
+                `;
+              })
+              .join("")}
+          </div>
+        </section>
+      </div>
+      ${renderOverlay()}
+    </section>
+  `;
+}
+
+function creatorUploadScreen() {
+  const mainSelected = Boolean(state.creatorUploadMainName);
+  const shortUploadSlots = state.creatorUploadShortNames;
+  const shortsSelectedCount = shortUploadSlots.filter(Boolean).length;
+  const shortsSelected = shortsSelectedCount > 0;
+  const uploadReady = isCreatorUploadReady();
+
+  return `
+    <section class="screen" data-theme="profile">
+      <div class="profile-screen creator-upload-screen">
+        <div class="profile-topbar">
+          ${createBackAction()}
+        </div>
+
+        <section class="creator-upload-shell">
+          <h2 class="creator-upload-page-title">本編とショートを追加</h2>
+
+          <input accept="video/*" class="creator-upload-native-input" data-kind="main" data-role="creator-upload-input" type="file" />
+          ${shortUploadSlots
+            .map(
+              (_, slotIndex) => `
+                <input
+                  accept="video/*"
+                  class="creator-upload-native-input"
+                  data-index="${slotIndex}"
+                  data-kind="shorts"
+                  data-role="creator-upload-input"
+                  type="file"
+                />
+              `,
+            )
+            .join("")}
+
+          <div class="creator-upload-form">
+            <section class="creator-upload-field">
+              <div class="creator-upload-field-head">
+                <div>
+                  <p class="creator-upload-field-label">main</p>
+                  <h3 class="creator-upload-field-title">本編動画</h3>
+                </div>
+                <span class="creator-upload-field-state ${mainSelected ? "is-filled" : ""}">${mainSelected ? "選択済み" : "未選択"}</span>
+              </div>
+
+              ${
+                mainSelected
+                  ? `<p class="creator-upload-file-name">${escapeHtml(state.creatorUploadMainName)}</p>`
+                  : `<p class="creator-upload-empty">本編動画を追加してください</p>`
+              }
+
+              <button class="creator-upload-pick-button" data-action="pick-creator-upload-files" data-kind="main" type="button">
+                ${mainSelected ? "本編を選び直す" : "本編を追加"}
+              </button>
+            </section>
+
+            <section class="creator-upload-section">
+              <div class="creator-upload-section-head">
+                <div>
+                  <p class="creator-upload-field-label">shorts</p>
+                  <h3 class="creator-upload-field-title">ショート動画</h3>
+                </div>
+                <div class="creator-upload-section-side">
+                  <span class="creator-upload-field-state ${shortsSelected ? "is-filled" : ""}">${shortsSelected ? `${shortsSelectedCount}本` : "未選択"}</span>
+                  <button aria-label="ショート欄を追加" class="creator-upload-short-add-button" data-action="add-creator-upload-short-slot" type="button">+</button>
+                </div>
+              </div>
+
+              <div class="creator-upload-short-list">
+                ${
+                  shortUploadSlots.length
+                    ? shortUploadSlots
+                        .map(
+                          (fileName, slotIndex) => `
+                            <section class="creator-upload-field creator-upload-short-field">
+                              <div class="creator-upload-field-head">
+                                <div>
+                                  <p class="creator-upload-field-label">short ${slotIndex + 1}</p>
+                                  <h3 class="creator-upload-field-title">ショート動画 ${slotIndex + 1}</h3>
+                                </div>
+                                <div class="creator-upload-field-side">
+                                  <span class="creator-upload-field-state ${fileName ? "is-filled" : ""}">${fileName ? "選択済み" : "未選択"}</span>
+                                  <button aria-label="ショート欄を削除" class="creator-upload-short-remove-button" data-action="remove-creator-upload-short-slot" data-index="${slotIndex}" type="button">-</button>
+                                </div>
+                              </div>
+
+                              ${
+                                fileName
+                                  ? `<p class="creator-upload-file-name">${escapeHtml(fileName)}</p>`
+                                  : `<p class="creator-upload-empty">ショート動画を追加してください</p>`
+                              }
+
+                              <button class="creator-upload-pick-button" data-action="pick-creator-upload-files" data-index="${slotIndex}" data-kind="shorts" type="button">
+                                ${fileName ? "ショートを選び直す" : "ショートを追加"}
+                              </button>
+                            </section>
+                          `,
+                        )
+                        .join("")
+                    : `<p class="creator-upload-short-empty">ショート動画を追加してください</p>`
+                }
+              </div>
+            </section>
+          </div>
+
+          <div class="creator-upload-actions">
+            <button class="creator-upload-submit-button" ${uploadReady ? "" : "disabled"} data-action="submit-creator-upload-package" type="button">
+              アップロード
+            </button>
+          </div>
+        </section>
+      </div>
+    </section>
+  `;
+}
+
 function handleBack() {
   if (state.overlay) {
     closeOverlay();
@@ -1059,12 +1466,23 @@ function restore(snapshotState) {
   state.screen = snapshotState.screen;
   state.feedTab = snapshotState.feedTab;
   state.libraryQuery = snapshotState.libraryQuery;
+  state.creatorManagerTab = snapshotState.creatorManagerTab || "shorts";
+  state.creatorUploadMainName = snapshotState.creatorUploadMainName || "";
+  state.creatorUploadShortNames = snapshotState.creatorUploadShortNames || [];
   state.currentShortId = snapshotState.currentShortId;
   state.currentCreatorId = snapshotState.currentCreatorId;
   render();
 }
 
 function screenMarkup() {
+  if (state.screen === "creator-upload") {
+    return creatorUploadScreen();
+  }
+
+  if (state.screen === "creator-dashboard") {
+    return creatorDashboardScreen();
+  }
+
   if (state.screen === "creator") {
     return creatorScreen();
   }
@@ -1157,6 +1575,9 @@ function shortScreen() {
 
 function snapshot() {
   return {
+    creatorManagerTab: state.creatorManagerTab,
+    creatorUploadMainName: state.creatorUploadMainName,
+    creatorUploadShortNames: [...state.creatorUploadShortNames],
     currentCreatorId: state.currentCreatorId,
     currentShortId: state.currentShortId,
     fanTab: state.fanTab,
@@ -1195,6 +1616,10 @@ function switchPrimaryTab(tab) {
 }
 
 function tabBarMarkup() {
+  if (state.screen === "creator-dashboard" || state.screen === "creator-upload") {
+    return "";
+  }
+
   const items = [
     { action: "open-feed", ariaLabel: "フィード", icon: "feed", key: "feed" },
     { action: "open-search", ariaLabel: "検索", icon: "search", key: "search" },
