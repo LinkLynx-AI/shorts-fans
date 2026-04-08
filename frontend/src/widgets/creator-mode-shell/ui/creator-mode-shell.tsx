@@ -1,14 +1,19 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import {
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+} from "lucide-react";
 
 import { CreatorAvatar } from "@/entities/creator";
+import { useFanModeEntry } from "@/features/creator-entry";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
@@ -138,6 +143,68 @@ function AccountMenuIcon() {
   );
 }
 
+function CreatorWorkspaceAccountMenu() {
+  const {
+    clearError,
+    enterFanMode,
+    errorMessage,
+    isSubmitting,
+  } = useFanModeEntry();
+
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button
+          aria-label="Account menu"
+          className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] transition hover:bg-[#1082c8]/10"
+          onClick={clearError}
+          type="button"
+        >
+          <AccountMenuIcon />
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
+        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
+          <Dialog.Title className="sr-only">アカウントメニュー</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            creator workspace から fan mode へ戻るメニュー
+          </Dialog.Description>
+
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
+          />
+
+          <div className="rounded-[24px] bg-[#f3f6f8] py-1">
+            <button
+              className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
+              disabled={isSubmitting}
+              onClick={() => {
+                void enterFanMode();
+              }}
+              type="button"
+            >
+              <span>{isSubmitting ? "Fan mode に切り替えています..." : "Fan mode に切り替え"}</span>
+              <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+            </button>
+          </div>
+
+          {errorMessage ? (
+            <p
+              aria-live="polite"
+              className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+              role="alert"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function CreatorWorkspaceTopBar() {
   return (
     <div className="flex items-center justify-between gap-2.5">
@@ -149,12 +216,7 @@ function CreatorWorkspaceTopBar() {
           +
         </span>
       </CreatorWorkspaceActionButton>
-      <CreatorWorkspaceActionButton
-        ariaLabel="Account menu"
-        className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
-      >
-        <AccountMenuIcon />
-      </CreatorWorkspaceActionButton>
+      <CreatorWorkspaceAccountMenu />
     </div>
   );
 }
