@@ -29,7 +29,7 @@
 ## 補助ディレクトリ
 
 - `contracts/`: SSOT を置き換えずに、実装者向けの契約や境界責務をまとめる
-- `contracts/fixtures/`: fan MVP surface 契約の representative JSON fixture を置く
+- `contracts/fixtures/`: fan / creator-private 契約の representative JSON fixture を置く
 - `.local/`: Codex の PR 単位一時メモを置く gitignored ディレクトリ。`./.local/codex-memo/` を使い、PR には含めない
 
 ## 今後追加する文書領域
