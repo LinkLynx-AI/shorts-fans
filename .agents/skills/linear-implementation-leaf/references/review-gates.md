@@ -7,6 +7,10 @@
 - Meta reviewer orchestrates specialist reviewers in parallel and consolidates findings.
 - Specialist coverage: security, correctness, performance, test quality, and coding rules.
 - Blocking rule: block when at least one `P1` or higher finding has confidence `>= 0.65`.
+- Reviewer output must be findings only.
+- Each finding must include severity, confidence, file path, and rationale.
+- If the diff is clean, the reviewer must return exactly `No findings. Gate clean.`
+- A response that does not satisfy this format is invalid for gate classification and does not count as a pass.
 - No separate UI review gate is required. UI-impact validation remains covered by touched-area validations and runtime smoke evidence in delivery flow.
 
 ## Remediation Loop
