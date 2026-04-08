@@ -40,8 +40,9 @@ func (s *ModeSwitcher) SwitchActiveMode(ctx context.Context, rawSessionToken str
 		return ErrSessionNotFound
 	}
 
-	if _, err := s.repository.UpdateActiveModeByTokenHash(ctx, HashSessionToken(trimmedToken), activeMode); err != nil {
-		return fmt.Errorf("active mode 切替 token=%s mode=%s: %w", trimmedToken, activeMode, err)
+	tokenHash := HashSessionToken(trimmedToken)
+	if _, err := s.repository.UpdateActiveModeByTokenHash(ctx, tokenHash, activeMode); err != nil {
+		return fmt.Errorf("active mode 切替 token_hash=%s mode=%s: %w", tokenHash, activeMode, err)
 	}
 
 	return nil

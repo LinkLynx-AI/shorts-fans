@@ -291,6 +291,51 @@ func TestViewerCreatorRegistrationRejectsInvalidJSON(t *testing.T) {
 	}
 }
 
+func TestViewerCreatorRegistrationRejectsUnknownField(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         uuid.New(),
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				writerCalled = true
+				return creator.SelfServeRegistrationResult{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/viewer/creator-registration",
+		bytes.NewBufferString(`{"displayName":"Mina","bio":"bio","unexpected":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("POST /api/viewer/creator-registration writerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_request", rec.Body.String())
+	}
+}
+
 func TestViewerCreatorRegistrationReturnsInternalErrorWhenWriterFails(t *testing.T) {
 	t.Parallel()
 
@@ -352,6 +397,52 @@ func TestViewerActiveModeSwitchRejectsInvalidJSON(t *testing.T) {
 		http.MethodPut,
 		"/api/viewer/active-mode",
 		bytes.NewBufferString(`{"activeMode":"creator"}{"extra":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/viewer/active-mode status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if switcherCalled {
+		t.Fatal("PUT /api/viewer/active-mode switcherCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("PUT /api/viewer/active-mode body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestViewerActiveModeSwitchRejectsUnknownField(t *testing.T) {
+	t.Parallel()
+
+	switcherCalled := false
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.New(),
+						ActiveMode:           auth.ActiveModeFan,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+		ViewerActiveMode: viewerActiveModeSwitcherStub{
+			switchActiveMode: func(context.Context, string, auth.ActiveMode) error {
+				switcherCalled = true
+				return nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/viewer/active-mode",
+		bytes.NewBufferString(`{"activeMode":"fan","unexpected":true}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})

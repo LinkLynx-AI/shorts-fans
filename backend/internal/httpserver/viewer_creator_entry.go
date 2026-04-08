@@ -142,6 +142,7 @@ func decodeViewerCreatorEntryJSON[T any](
 	requestScope string,
 ) bool {
 	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(target); err != nil {
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, code, message, requestScope)
 		return false

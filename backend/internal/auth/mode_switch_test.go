@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 )
 
@@ -96,5 +97,11 @@ func TestModeSwitcherWrapsRepositoryError(t *testing.T) {
 	err := switcher.SwitchActiveMode(context.Background(), "raw-session-token", ActiveModeFan)
 	if !errors.Is(err, repositoryErr) {
 		t.Fatalf("SwitchActiveMode() error got %v want wrapped %v", err, repositoryErr)
+	}
+	if strings.Contains(err.Error(), "raw-session-token") {
+		t.Fatalf("SwitchActiveMode() error got %q want redacted token", err)
+	}
+	if !strings.Contains(err.Error(), HashSessionToken("raw-session-token")) {
+		t.Fatalf("SwitchActiveMode() error got %q want token hash", err)
 	}
 }
