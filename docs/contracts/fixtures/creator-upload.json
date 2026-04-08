@@ -1,0 +1,237 @@
+{
+  "POST /api/creator/upload-packages": {
+    "request": {
+      "main": {
+        "fileName": "quiet-rooftop-main.mp4",
+        "mimeType": "video/mp4",
+        "fileSizeBytes": 184320041
+      },
+      "shorts": [
+        {
+          "fileName": "quiet-rooftop-short-a.mp4",
+          "mimeType": "video/mp4",
+          "fileSizeBytes": 24182019
+        },
+        {
+          "fileName": "quiet-rooftop-short-b.mp4",
+          "mimeType": "video/mp4",
+          "fileSizeBytes": 21944882
+        }
+      ]
+    },
+    "success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "expiresAt": "2026-04-08T12:15:00Z",
+          "packageToken": "cupkg_01hrp6wjkq7mh6f3d2f6c5j8rz",
+          "uploadTargets": {
+            "main": {
+              "fileName": "quiet-rooftop-main.mp4",
+              "mimeType": "video/mp4",
+              "role": "main",
+              "upload": {
+                "headers": {
+                  "Content-Type": "video/mp4"
+                },
+                "method": "PUT",
+                "url": "https://raw-bucket.example.com/presigned/main"
+              },
+              "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf"
+            },
+            "shorts": [
+              {
+                "fileName": "quiet-rooftop-short-a.mp4",
+                "mimeType": "video/mp4",
+                "role": "short",
+                "upload": {
+                  "headers": {
+                    "Content-Type": "video/mp4"
+                  },
+                  "method": "PUT",
+                  "url": "https://raw-bucket.example.com/presigned/short-a"
+                },
+                "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55"
+              },
+              {
+                "fileName": "quiet-rooftop-short-b.mp4",
+                "mimeType": "video/mp4",
+                "role": "short",
+                "upload": {
+                  "headers": {
+                    "Content-Type": "video/mp4"
+                  },
+                  "method": "PUT",
+                  "url": "https://raw-bucket.example.com/presigned/short-b"
+                },
+                "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne"
+              }
+            ]
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_create_001"
+        },
+        "error": null
+      }
+    },
+    "authRequired": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_auth_required_001"
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "creator upload requires authentication"
+        }
+      }
+    },
+    "capabilityRequired": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_capability_required_001"
+        },
+        "error": {
+          "code": "capability_required",
+          "message": "approved creator capability is required"
+        }
+      }
+    },
+    "validationErrorMainRequired": {
+      "status": 400,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_validation_main_001"
+        },
+        "error": {
+          "code": "validation_error",
+          "message": "main is required"
+        }
+      }
+    },
+    "validationErrorShortsRequired": {
+      "status": 400,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_validation_shorts_001"
+        },
+        "error": {
+          "code": "validation_error",
+          "message": "at least one short is required"
+        }
+      }
+    },
+    "storageFailure": {
+      "status": 503,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_storage_failure_001"
+        },
+        "error": {
+          "code": "storage_failure",
+          "message": "creator upload target generation failed"
+        }
+      }
+    }
+  },
+  "POST /api/creator/upload-packages/complete": {
+    "request": {
+      "packageToken": "cupkg_01hrp6wjkq7mh6f3d2f6c5j8rz",
+      "main": {
+        "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf"
+      },
+      "shorts": [
+        {
+          "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55"
+        },
+        {
+          "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne"
+        }
+      ]
+    },
+    "success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "main": {
+            "id": "c5bc96d4-5b38-4fcf-a723-b7e2f04fd9e9",
+            "mediaAsset": {
+              "id": "4f571b4b-2755-49c2-8d77-7dd205899f8d",
+              "mimeType": "video/mp4",
+              "processingState": "uploaded"
+            },
+            "state": "draft"
+          },
+          "shorts": [
+            {
+              "canonicalMainId": "c5bc96d4-5b38-4fcf-a723-b7e2f04fd9e9",
+              "id": "c8d7c617-61b3-48c5-8b43-c1f3807fa19e",
+              "mediaAsset": {
+                "id": "a890caef-5b4b-4ddd-b08d-866ddf5286d0",
+                "mimeType": "video/mp4",
+                "processingState": "uploaded"
+              },
+              "state": "draft"
+            },
+            {
+              "canonicalMainId": "c5bc96d4-5b38-4fcf-a723-b7e2f04fd9e9",
+              "id": "8bbf6f50-31ee-4478-9f68-b56046fae1aa",
+              "mediaAsset": {
+                "id": "3306acb1-b4db-443e-8d48-53f630cfee06",
+                "mimeType": "video/mp4",
+                "processingState": "uploaded"
+              },
+              "state": "draft"
+            }
+          ]
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_complete_001"
+        },
+        "error": null
+      }
+    },
+    "uploadExpired": {
+      "status": 409,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_complete_expired_001"
+        },
+        "error": {
+          "code": "upload_expired",
+          "message": "creator upload package has expired"
+        }
+      }
+    },
+    "uploadFailure": {
+      "status": 422,
+      "body": {
+        "data": null,
+        "meta": {
+          "page": null,
+          "requestId": "req_creator_upload_packages_complete_upload_failure_001"
+        },
+        "error": {
+          "code": "upload_failure",
+          "message": "creator upload package is incomplete"
+        }
+      }
+    }
+  }
+}
