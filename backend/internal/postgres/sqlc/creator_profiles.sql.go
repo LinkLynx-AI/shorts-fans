@@ -46,7 +46,7 @@ RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, upda
 type CreateCreatorProfileParams struct {
 	UserID      pgtype.UUID
 	DisplayName pgtype.Text
-	Handle      pgtype.Text
+	Handle      string
 	AvatarUrl   pgtype.Text
 	Bio         string
 	PublishedAt pgtype.Timestamptz
@@ -121,7 +121,7 @@ WHERE handle = $1
 LIMIT 1
 `
 
-func (q *Queries) GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (AppPublicCreatorProfile, error) {
+func (q *Queries) GetPublicCreatorProfileByHandle(ctx context.Context, handle string) (AppPublicCreatorProfile, error) {
 	row := q.db.QueryRow(ctx, getPublicCreatorProfileByHandle, handle)
 	var i AppPublicCreatorProfile
 	err := row.Scan(
@@ -356,7 +356,7 @@ RETURNING user_id, display_name, avatar_url, bio, published_at, created_at, upda
 
 type UpdateCreatorProfileParams struct {
 	DisplayName pgtype.Text
-	Handle      pgtype.Text
+	Handle      string
 	AvatarUrl   pgtype.Text
 	Bio         string
 	UserID      pgtype.UUID

@@ -17,9 +17,11 @@ export function CreatorRegistrationPanel() {
     bio,
     displayName,
     errorMessage,
+    handle,
     isSubmitting,
     setBio,
     setDisplayName,
+    setHandle,
     submit,
   } = useCreatorRegistration();
 
@@ -33,8 +35,8 @@ export function CreatorRegistrationPanel() {
           Creator登録を始める
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          この最小実装では申込完了後すぐに creator mode を使えます。ここでは表示名と自己紹介だけを受け取り、
-          avatar は未設定のまま作成します。
+          この最小実装では申込完了後すぐに creator mode を使えます。ここでは表示名、unique な handle、
+          自己紹介を受け取り、avatar は未設定のまま作成します。
         </p>
 
         <form
@@ -58,6 +60,36 @@ export function CreatorRegistrationPanel() {
               value={displayName}
             />
           </label>
+
+          <div className="grid gap-1.5">
+            <label
+              className="grid gap-1.5"
+              htmlFor="creator-registration-handle"
+            >
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+                Handle
+              </span>
+            </label>
+            <input
+              aria-describedby="creator-registration-handle-help"
+              autoCapitalize="none"
+              autoCorrect="off"
+              className="min-h-12 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60"
+              disabled={isSubmitting}
+              id="creator-registration-handle"
+              onChange={(event) => setHandle(event.target.value)}
+              placeholder="@minarei"
+              spellCheck={false}
+              type="text"
+              value={handle}
+            />
+            <p
+              className="text-xs leading-5 text-muted"
+              id="creator-registration-handle-help"
+            >
+              creator ごとに unique です。`@` は省略可、使える文字は英数字・`.`・`_` です。
+            </p>
+          </div>
 
           <section className="rounded-[20px] border border-dashed border-[#c9d8e1] bg-[#f7fafc] px-4 py-3">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">

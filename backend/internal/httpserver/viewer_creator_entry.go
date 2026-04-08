@@ -22,6 +22,7 @@ const (
 type viewerCreatorRegistrationRequest struct {
 	Bio         string `json:"bio"`
 	DisplayName string `json:"displayName"`
+	Handle      string `json:"handle"`
 }
 
 type viewerActiveModeRequest struct {
@@ -76,12 +77,19 @@ func handleViewerCreatorRegistration(c *gin.Context, writer ViewerCreatorRegistr
 	_, err := writer.RegisterApprovedCreator(c.Request.Context(), creator.SelfServeRegistrationInput{
 		UserID:      viewer.ID,
 		DisplayName: request.DisplayName,
+		Handle:      request.Handle,
 		Bio:         request.Bio,
 	})
 	if err != nil {
 		switch {
 		case errors.Is(err, creator.ErrInvalidDisplayName):
 			writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_display_name", "display name is invalid", viewerCreatorRegistrationRequestScope)
+			return
+		case errors.Is(err, creator.ErrInvalidHandle):
+			writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_handle", "handle is invalid", viewerCreatorRegistrationRequestScope)
+			return
+		case errors.Is(err, creator.ErrHandleAlreadyTaken):
+			writeViewerCreatorEntryError(c, http.StatusConflict, "handle_already_taken", "handle is already taken", viewerCreatorRegistrationRequestScope)
 			return
 		default:
 			writeInternalServerError(c, viewerCreatorRegistrationRequestScope)

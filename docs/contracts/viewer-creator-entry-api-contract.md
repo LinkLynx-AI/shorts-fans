@@ -11,13 +11,14 @@
 - authenticated fan が `fan profile` から creator registration を開始できるようにする。
 - registration 完了後に `canAccessCreatorMode = true` を bootstrap へ反映できるようにする。
 - success surface の CTA から `activeMode = creator` を明示的に切り替えられるようにする。
+- creator registration の時点で unique な handle を取得し、既存 creator を含めて handle を必須に保つ。
 
 ## Non-goals
 
 - creator dashboard / creator home 自体の read 契約
 - review / pending / reject / resubmit workflow
 - avatar upload
-- public creator publish / handle 取得 / public search 露出
+- public creator publish / public search 露出
 
 ## Canonical Sources
 
@@ -40,6 +41,7 @@
 ```json
 {
   "displayName": "Mina Rei",
+  "handle": "@minarei",
   "bio": "quiet rooftop の continuation を中心に投稿します。"
 }
 ```
@@ -47,6 +49,7 @@
 | field | type | required | notes |
 | --- | --- | --- | --- |
 | `displayName` | `string` | yes | trim 後 non-empty |
+| `handle` | `string` | yes | trim 後 non-empty、先頭 `@` 任意、保存時は lowercase + `@` なし |
 | `bio` | `string` | yes | empty string は許容 |
 
 ### Success
@@ -59,8 +62,8 @@
 
 - request user を viewer 自身の creator として登録します。
 - creator capability は即時 `approved` で upsert します。
-- creator profile は private profile として upsert し、初回は `handle = null`、`avatar_url = null`、`published_at = null` で保存します。
-- 既存 profile がある場合は `displayName` と `bio` を更新し、`handle` / `avatar_url` / `published_at` は保持します。
+- creator profile は private profile として upsert し、初回は normalized handle、`avatar_url = null`、`published_at = null` で保存します。
+- 既存 profile がある場合は `displayName`、`handle`、`bio` を更新し、`avatar_url` / `published_at` は保持します。
 - registration 完了だけでは public creator profile にはなりません。
 
 ### Error Contract
@@ -69,7 +72,9 @@
 | --- | --- | --- |
 | `400` | `invalid_request` | malformed JSON / extra payload |
 | `400` | `invalid_display_name` | trim 後 empty |
+| `400` | `invalid_handle` | trim 後 empty、または許可外文字を含む |
 | `401` | `auth_required` | session 不在 |
+| `409` | `handle_already_taken` | normalized handle が既存 creator と衝突 |
 | `500` | `internal_error` | unexpected failure |
 
 ## `PUT /api/viewer/active-mode`

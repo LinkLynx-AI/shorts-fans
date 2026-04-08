@@ -2,6 +2,7 @@
   "POST /api/viewer/creator-registration": {
     "request": {
       "displayName": "Mina Rei",
+      "handle": "@minarei",
       "bio": "quiet rooftop の continuation を中心に投稿します。"
     },
     "success": {
@@ -20,6 +21,34 @@
         }
       },
       "status": 400
+    },
+    "invalidHandle": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "invalid_handle",
+          "message": "handle is invalid"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_invalid_handle_001"
+        }
+      },
+      "status": 400
+    },
+    "handleAlreadyTaken": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "handle_already_taken",
+          "message": "handle is already taken"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_handle_already_taken_001"
+        }
+      },
+      "status": 409
     }
   },
   "PUT /api/viewer/active-mode": {

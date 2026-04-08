@@ -12,6 +12,7 @@ source:
         - 000006_require_unique_email_identity.up.sql
         - 000007_add_creator_profile_handle.up.sql
         - 000008_add_creator_follows_following_index.up.sql
+        - 000009_require_creator_profile_handle.up.sql
 schemas:
     - name: app
       tables:
@@ -390,7 +391,7 @@ schemas:
               default: CURRENT_TIMESTAMP
             - name: handle
               type: text
-              nullable: true
+              nullable: false
           primary_key:
             - user_id
           foreign_keys:
@@ -406,11 +407,11 @@ schemas:
             - name: creator_profiles_display_name_trimmed_check
               expression: CHECK (display_name IS NULL OR length(btrim(display_name)) > 0)
             - name: creator_profiles_handle_format_check
-              expression: CHECK (handle IS NULL OR handle ~ '^[a-z0-9._]+$'::text)
+              expression: CHECK (handle ~ '^[a-z0-9._]+$'::text)
             - name: creator_profiles_handle_lowercase_check
-              expression: CHECK (handle IS NULL OR handle = lower(handle))
+              expression: CHECK (handle = lower(handle))
             - name: creator_profiles_handle_trimmed_check
-              expression: CHECK (handle IS NULL OR handle = btrim(handle))
+              expression: CHECK (handle = btrim(handle))
             - name: creator_profiles_public_fields_check
               expression: CHECK (published_at IS NULL OR display_name IS NOT NULL AND handle IS NOT NULL)
           indexes:
@@ -418,8 +419,7 @@ schemas:
               columns:
                 - handle
               unique: true
-              predicate: (handle IS NOT NULL)
-              definition: CREATE UNIQUE INDEX creator_profiles_handle_unique_idx ON app.creator_profiles USING btree (handle) WHERE (handle IS NOT NULL)
+              definition: CREATE UNIQUE INDEX creator_profiles_handle_unique_idx ON app.creator_profiles USING btree (handle)
             - name: creator_profiles_public_display_name_trgm_idx
               columns:
                 - display_name

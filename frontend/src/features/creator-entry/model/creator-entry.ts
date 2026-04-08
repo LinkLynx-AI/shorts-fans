@@ -40,6 +40,12 @@ export function getCreatorRegistrationErrorMessage(error: unknown): string {
   if (code === "invalid_display_name") {
     return "表示名を入力してください。";
   }
+  if (code === "invalid_handle") {
+    return "handleは英数字・`.`・`_`のみ使えます。`@`は先頭に付けても構いません。";
+  }
+  if (code === "handle_already_taken") {
+    return "そのhandleは既に使われています。別のhandleを入力してください。";
+  }
 
   if (error instanceof ApiError && error.code === "network") {
     return "登録を完了できませんでした。通信状態を確認してから再度お試しください。";

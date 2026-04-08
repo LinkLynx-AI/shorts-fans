@@ -56,7 +56,7 @@ func (s stubQueries) GetPublicCreatorProfileByUserID(context.Context, pgtype.UUI
 	return sqlc.AppPublicCreatorProfile{}, nil
 }
 
-func (s stubQueries) GetPublicCreatorProfileByHandle(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+func (s stubQueries) GetPublicCreatorProfileByHandle(context.Context, string) (sqlc.AppPublicCreatorProfile, error) {
 	return sqlc.AppPublicCreatorProfile{}, nil
 }
 

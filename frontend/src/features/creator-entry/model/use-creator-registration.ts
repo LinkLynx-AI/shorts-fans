@@ -19,9 +19,11 @@ type UseCreatorRegistrationResult = {
   bio: string;
   displayName: string;
   errorMessage: string | null;
+  handle: string;
   isSubmitting: boolean;
   setBio: (bio: string) => void;
   setDisplayName: (displayName: string) => void;
+  setHandle: (handle: string) => void;
   submit: () => Promise<void>;
 };
 
@@ -34,6 +36,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   const setViewerSession = useSetViewerSession();
   const [bio, setBioState] = useState("");
   const [displayName, setDisplayNameState] = useState("");
+  const [handle, setHandleState] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -51,6 +54,13 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     }
   };
 
+  const setHandle = (nextHandle: string) => {
+    setHandleState(nextHandle);
+    if (errorMessage !== null) {
+      setErrorMessage(null);
+    }
+  };
+
   const submit = async () => {
     if (isSubmitting) {
       return;
@@ -58,6 +68,10 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
 
     if (displayName.trim() === "") {
       setErrorMessage("表示名を入力してください。");
+      return;
+    }
+    if (handle.trim() === "") {
+      setErrorMessage("handleを入力してください。");
       return;
     }
 
@@ -68,6 +82,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
       await registerCreator({
         bio,
         displayName,
+        handle,
       });
 
       const currentViewer = await getCurrentViewerBootstrap({
@@ -96,9 +111,11 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     bio,
     displayName,
     errorMessage,
+    handle,
     isSubmitting,
     setBio,
     setDisplayName,
+    setHandle,
     submit,
   };
 }
