@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { ApiError } from "@/shared/api";
+
 export const fanLoginPath = "/login" as const;
 export const fanAuthModes = ["sign-in", "sign-up"] as const;
 
@@ -64,6 +66,21 @@ export function buildFanLoginHref(): string {
  */
 export function isAuthRequiredResponse(value: unknown): value is AuthRequiredResponse {
   return authRequiredResponseSchema.safeParse(value).success;
+}
+
+/**
+ * API error が auth_required 応答を含むかを判定する。
+ */
+export function isAuthRequiredApiError(error: unknown): boolean {
+  if (!(error instanceof ApiError) || error.status !== 401 || !error.details) {
+    return false;
+  }
+
+  try {
+    return isAuthRequiredResponse(JSON.parse(error.details) as unknown);
+  } catch {
+    return false;
+  }
 }
 
 /**

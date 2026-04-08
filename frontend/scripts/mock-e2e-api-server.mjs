@@ -47,6 +47,47 @@ const creatorBaseStatsById = {
     shortCount: 0,
   },
 };
+const creatorSummaryById = {
+  creator_aoi_n: {
+    avatar: {
+      durationSeconds: null,
+      id: "asset_creator_aoi_avatar",
+      kind: "image",
+      posterUrl: null,
+      url: "https://cdn.example.com/creator/aoi/avatar.jpg",
+    },
+    bio: "soft light と close framing の short を中心に更新中。",
+    displayName: "Aoi N",
+    handle: "@aoina",
+    id: "creator_aoi_n",
+  },
+  creator_mina_rei: {
+    avatar: {
+      durationSeconds: null,
+      id: "asset_creator_mina_avatar",
+      kind: "image",
+      posterUrl: null,
+      url: "https://cdn.example.com/creator/mina/avatar.jpg",
+    },
+    bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+    displayName: "Mina Rei",
+    handle: "@minarei",
+    id: "creator_mina_rei",
+  },
+  creator_sora_vale: {
+    avatar: {
+      durationSeconds: null,
+      id: "asset_creator_sora_avatar",
+      kind: "image",
+      posterUrl: null,
+      url: "https://cdn.example.com/creator/sora/avatar.jpg",
+    },
+    bio: "after rain と balcony mood の short をまとめています。",
+    displayName: "Sora Vale",
+    handle: "@soravale",
+    id: "creator_sora_vale",
+  },
+};
 const defaultFollowedCreatorIds = ["creator_mina_rei"];
 const followedCreatorIdsBySessionToken = new Map();
 let issuedSessionCount = 0;
@@ -185,6 +226,51 @@ function resolveCreatorFanCount(creatorId, sessionToken) {
   }
 
   return baseStats.fanCount + (isCreatorFollowed(creatorId, sessionToken) ? 1 : 0);
+}
+
+function buildFanProfileOverviewResponse(sessionToken) {
+  return {
+    data: {
+      fanProfile: {
+        counts: {
+          following: getFollowedCreatorIds(sessionToken)?.size ?? defaultFollowedCreatorIds.length,
+          library: 3,
+          pinnedShorts: 3,
+        },
+        title: "My archive",
+      },
+    },
+    error: null,
+    meta: {
+      page: null,
+      requestId: "req_e2e_fan_profile_overview_001",
+    },
+  };
+}
+
+function buildFanProfileFollowingResponse(sessionToken) {
+  const items = Object.values(creatorSummaryById)
+    .filter((creator) => isCreatorFollowed(creator.id, sessionToken))
+    .map((creator) => ({
+      creator,
+      viewer: {
+        isFollowing: true,
+      },
+    }));
+
+  return {
+    data: {
+      items,
+    },
+    error: null,
+    meta: {
+      page: {
+        hasNext: false,
+        nextCursor: null,
+      },
+      requestId: "req_e2e_fan_profile_following_001",
+    },
+  };
 }
 
 function buildCreatorFollowMutationResponse(method, creatorId, sessionToken) {
@@ -437,6 +523,24 @@ function isValidEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isAuthenticatedFanRequest(request) {
+  return isAuthenticatedSessionToken(readCookieValue(request.headers.cookie, "shorts_fans_session"));
+}
+
+function writeAuthRequired(request, response, requestId) {
+  writeJson(request, response, 401, {
+    data: null,
+    error: {
+      code: "auth_required",
+      message: "fan profile requires authentication",
+    },
+    meta: {
+      page: null,
+      requestId,
+    },
+  });
+}
+
 const server = http.createServer((request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://${host}:${port}`);
 
@@ -513,6 +617,30 @@ const server = http.createServer((request, response) => {
       isAuthenticatedSessionToken(sessionToken) ? authenticatedFanBootstrap : unauthenticatedBootstrap;
 
     writeJson(request, response, 200, body);
+    return;
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/fan/profile") {
+    const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+
+    if (!isAuthenticatedFanRequest(request)) {
+      writeAuthRequired(request, response, "req_e2e_fan_profile_auth_required_001");
+      return;
+    }
+
+    writeJson(request, response, 200, buildFanProfileOverviewResponse(sessionToken));
+    return;
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/fan/profile/following") {
+    const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+
+    if (!isAuthenticatedFanRequest(request)) {
+      writeAuthRequired(request, response, "req_e2e_fan_profile_following_auth_required_001");
+      return;
+    }
+
+    writeJson(request, response, 200, buildFanProfileFollowingResponse(sessionToken));
     return;
   }
 

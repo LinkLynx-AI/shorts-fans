@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Runbook"
+  short_description: "Execute the plan with live status logging"
+  default_prompt: "Use $implementation-runbook to implement the current Plan.md and keep Documentation.md current."

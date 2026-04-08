@@ -58,7 +58,8 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 
   await page.goto("/fan");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
 
   await addViewerSession(page);
   await page.goto("/");
@@ -138,13 +139,16 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
   await page.goto("/");
 
   await page.getByRole("link", { name: "マイ" }).click();
+  await expect(page).toHaveURL(/\/fan$/);
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
   await page.getByRole("button", { name: "サインインを続ける" }).click();
 
   await expect(page).toHaveURL(/\/fan$/);
-  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible({ timeout: 15000 });
 
   await page.getByRole("link", { name: "フィード" }).click();
   await expect(page).toHaveURL(/\/$/);
@@ -199,12 +203,15 @@ test("unauthenticated viewers can sign up from the shared auth modal and enter t
   await page.goto("/");
 
   await page.getByRole("link", { name: "マイ" }).click();
+  await expect(page).toHaveURL(/\/fan$/);
   await page.getByRole("button", { name: "サインアップへ" }).click();
   await page.getByRole("textbox", { name: "Email" }).fill("newfan@example.com");
   await page.getByRole("button", { name: "新規登録を続ける" }).click();
 
   await expect(page).toHaveURL(/\/fan$/);
-  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible({ timeout: 15000 });
 });
 
 test("invalid grant response does not leak protected playback data", async ({ request }) => {
@@ -254,7 +261,8 @@ test("stale session cookies are treated as unauthenticated on protected fan surf
   ]);
 
   await page.goto("/fan");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
   await page.goto("/shorts/softlight");
   await page.getByRole("button", { name: /Continue main/i }).click();
   await expect(page).toHaveURL(/\/login$/);

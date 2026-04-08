@@ -1,12 +1,13 @@
 # Review Gates (Simple Reviewer)
 
-## Required Review Agents
+## Required Review Agent
 - `reviewer_simple` as unified review entrypoint.
 
-## `reviewer_simple` Gate Contract
+## Gate Contract
 - Unified review covers security, correctness, performance, test quality, and coding rules.
 - Blocking rule: block when at least one `P1` or higher finding has confidence `>= 0.65`.
 - UI-impact handling stays inside `reviewer_simple`. No separate `reviewer_ui_guard` or `reviewer_ui` gate is required.
 
-## Gate Failure Handling
-- If any required gate fails, fix issues and return to implementation step.
+## Remediation Loop
+- Review is complete only when the gate is clean.
+- If any blocking finding is returned, fix it, rerun the impacted local validation, and rerun `reviewer_simple`.

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Planner"
+  short_description: "Build Plan.md with milestones and validations"
+  default_prompt: "Use $implementation-planner to convert the current Prompt.md into an execution-ready Plan.md."

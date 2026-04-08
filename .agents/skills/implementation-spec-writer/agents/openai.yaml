@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implementation Spec Writer"
+  short_description: "Freeze one task into Prompt.md from repo SoR"
+  default_prompt: "Use $implementation-spec-writer to turn the current implementation request into a run-local Prompt.md."

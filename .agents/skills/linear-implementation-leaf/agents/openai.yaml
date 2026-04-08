@@ -1,4 +1,4 @@
 interface:
   display_name: "Linear Implementation Leaf"
-  short_description: "Run leaf-issue single delivery workflow"
-  default_prompt: "Use $linear-implementation-leaf to execute a leaf issue run for a child issue or standalone issue."
+  short_description: "Orchestrate leaf delivery through repo implementation skills"
+  default_prompt: "Use $linear-implementation-leaf to orchestrate a leaf issue from spec freeze through reviewer loop and PR handoff."

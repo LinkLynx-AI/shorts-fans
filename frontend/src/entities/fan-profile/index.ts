@@ -1,4 +1,11 @@
 export {
+  fetchFanProfileFollowingPage,
+} from "./api/fetch-fan-profile-following";
+export type { FanProfileFollowingPage } from "./api/fetch-fan-profile-following";
+export {
+  fetchFanProfileOverview,
+} from "./api/fetch-fan-profile-overview";
+export {
   getFanHubState,
   getFanProfileOverview,
   listFanSettingsSections,
