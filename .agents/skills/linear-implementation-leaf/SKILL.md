@@ -22,6 +22,11 @@ description: Orchestrate one leaf issue delivery by routing through repo-scoped 
   - Standalone smallest-unit start (no parent-child decomposition required).
 - If the issue type is unclear, ask exactly one clarifying question before execution.
 
+## Review Selection Policy
+- Do not use this skill as the repository default.
+- Use this skill only when specialist review decomposition is justified by repository review escalation conditions or the user explicitly asks for full review.
+- If the change is local and a unified review is sufficient, prefer `linear-implementation-simple-review-leaf`.
+
 ## Must-load Resources
 - `references/orchestration-policy.md`
 - `references/core-policy.md`

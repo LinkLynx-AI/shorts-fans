@@ -19,6 +19,11 @@ description: Execute parent Linear issues for this repository by delivering chil
 - Do not use this skill for a single child issue or standalone issue request.
 - If it is unclear whether the input is a parent issue, ask exactly one clarifying question before execution.
 
+## Review Selection Policy
+- Do not use this skill as the repository default.
+- Use this skill only when child deliveries meet repository review escalation conditions, or the user explicitly asks for full review.
+- If specialist decomposition is not justified, prefer `linear-implementation-simple-review-parent`.
+
 ## Must-load References
 - `references/core-policy.md`
 - `references/delivery-flow.md`
