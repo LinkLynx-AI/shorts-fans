@@ -27,9 +27,11 @@ const creatorProfileHeaderFixtures = fixtures["GET /api/fan/creators/{creatorId}
 const creatorProfileShortGridFixtures = fixtures["GET /api/fan/creators/{creatorId}/shorts"];
 const creatorFollowPutFixtures = creatorFollowFixtures["PUT /api/fan/creators/{creatorId}/follow"];
 const creatorFollowDeleteFixtures = creatorFollowFixtures["DELETE /api/fan/creators/{creatorId}/follow"];
+const authenticatedCreatorBootstrap = viewerBootstrapFixtures.authenticatedCreator;
 const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
 const e2eSessionToken = "e2e-viewer-session";
+const e2eCreatorSessionToken = "e2e-creator-session";
 const existingFanEmail = "fan@example.com";
 const signInChallengeToken = "e2e-sign-in-challenge";
 const signUpChallengeToken = "e2e-sign-up-challenge";
@@ -116,8 +118,10 @@ if (
   throw new Error("creator profile fixture が不足しています");
 }
 
-if (!authenticatedFanBootstrap || !unauthenticatedBootstrap) {
-  throw new Error("viewer bootstrap fixture の authenticatedFan / unauthenticated が不足しています");
+if (!authenticatedCreatorBootstrap || !authenticatedFanBootstrap || !unauthenticatedBootstrap) {
+  throw new Error(
+    "viewer bootstrap fixture の authenticatedCreator / authenticatedFan / unauthenticated が不足しています",
+  );
 }
 
 if (!creatorFollowPutFixtures || !creatorFollowDeleteFixtures) {
@@ -184,8 +188,15 @@ function buildSearchResponse(query) {
   };
 }
 
-function isAuthenticatedSessionToken(sessionToken) {
+function isAuthenticatedCreatorSessionToken(sessionToken) {
   return (
+    typeof sessionToken === "string" &&
+    (sessionToken === e2eCreatorSessionToken || sessionToken.startsWith(`${e2eCreatorSessionToken}-`))
+  );
+}
+
+function isAuthenticatedSessionToken(sessionToken) {
+  return isAuthenticatedCreatorSessionToken(sessionToken) || (
     typeof sessionToken === "string" &&
     (sessionToken === e2eSessionToken || sessionToken.startsWith(`${e2eSessionToken}-`))
   );
@@ -613,8 +624,11 @@ const server = http.createServer((request, response) => {
 
   if (request.method === "GET" && requestUrl.pathname === "/api/viewer/bootstrap") {
     const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
-    const body =
-      isAuthenticatedSessionToken(sessionToken) ? authenticatedFanBootstrap : unauthenticatedBootstrap;
+    const body = isAuthenticatedCreatorSessionToken(sessionToken)
+      ? authenticatedCreatorBootstrap
+      : isAuthenticatedSessionToken(sessionToken)
+        ? authenticatedFanBootstrap
+        : unauthenticatedBootstrap;
 
     writeJson(request, response, 200, body);
     return;
