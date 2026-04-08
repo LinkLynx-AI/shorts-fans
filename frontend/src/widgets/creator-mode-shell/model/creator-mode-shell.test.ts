@@ -19,12 +19,15 @@ describe("creator mode shell state", () => {
         }),
         kind: "ready",
         workspace: expect.objectContaining({
-          summaryStats: expect.arrayContaining([
-            expect.objectContaining({
-              label: "revenue",
-              value: "¥120K",
-            }),
-          ]),
+          overviewMetrics: expect.objectContaining({
+            grossUnlockRevenueJpy: 120000,
+            uniquePurchaserCount: 164,
+            unlockCount: 238,
+          }),
+          revisionRequestedSummary: expect.objectContaining({
+            shortCount: 1,
+            totalCount: 1,
+          }),
         }),
       }),
     );
@@ -73,7 +76,11 @@ describe("creator mode shell state", () => {
     const state = getMockCreatorModeShellState();
 
     expect(state.creator.id).toBe("creator_mina_rei");
-    expect(state.workspace.summaryStats).toHaveLength(3);
+    expect(state.workspace.overviewMetrics).toEqual({
+      grossUnlockRevenueJpy: 120000,
+      uniquePurchaserCount: 164,
+      unlockCount: 238,
+    });
     expect(state.workspace.managedCollections.itemsByTab.shorts).toHaveLength(3);
     expect(state.workspace.managedCollections.itemsByTab.main).toHaveLength(2);
   });

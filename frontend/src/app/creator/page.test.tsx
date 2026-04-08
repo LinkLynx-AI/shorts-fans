@@ -35,7 +35,10 @@ describe("CreatorPage", () => {
     expect(screen.getByRole("button", { name: "Account menu" })).toBeDisabled();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("@minarei")).toBeInTheDocument();
+    expect(screen.getByText("quiet rooftop と hotel light の preview を軸に投稿。")).toBeInTheDocument();
+    expect(screen.getByText("¥120,000")).toBeInTheDocument();
     expect(screen.getByText("差し戻しが1件あります")).toBeInTheDocument();
+    expect(screen.getByText("short 1件を確認してください")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Top main" }));
