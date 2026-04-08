@@ -39,13 +39,26 @@ export default async function CreatorProfilePage({
     tab: getEnumQueryParam(rawSearchParams.tab, ["following", "recommended"]),
   };
   const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(viewerSessionCookieName)?.value;
   const state = await loadCreatorProfileShellState(creatorId, {
-    sessionToken: cookieStore.get(viewerSessionCookieName)?.value,
+    sessionToken,
   });
 
   if (!state) {
     notFound();
   }
 
-  return <CreatorProfileShell routeState={routeState} state={state} />;
+  return (
+    <CreatorProfileShell
+      key={[
+        creatorId,
+        state.kind,
+        state.viewer.isFollowing ? "following" : "not-following",
+        state.stats.fanCount.toString(),
+        sessionToken ? "session" : "guest",
+      ].join(":")}
+      routeState={routeState}
+      state={state}
+    />
+  );
 }

@@ -27,6 +27,21 @@ export const creatorProfileViewerSchema = z.object({
   isFollowing: z.boolean(),
 });
 
+export const creatorFollowErrorCodeSchema = z.enum([
+  "auth_required",
+  "internal_error",
+  "not_found",
+]);
+
+export const creatorFollowStatsSchema = z.object({
+  fanCount: z.number().int().nonnegative(),
+});
+
+export const creatorFollowMutationResultSchema = z.object({
+  stats: creatorFollowStatsSchema,
+  viewer: creatorProfileViewerSchema,
+});
+
 export const creatorProfileHeaderSchema = z.object({
   creator: creatorSummarySchema,
   stats: creatorProfileStatsSchema,
