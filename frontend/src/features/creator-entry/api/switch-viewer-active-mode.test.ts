@@ -1,11 +1,11 @@
 import { switchViewerActiveMode } from "@/features/creator-entry";
 
 describe("switchViewerActiveMode", () => {
-  it("puts the next active mode with credentials included", async () => {
+  it.each(["creator", "fan"] as const)("puts %s as the next active mode with credentials included", async (activeMode) => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(new Response(null, { status: 204 }));
 
     await expect(
-      switchViewerActiveMode("creator", {
+      switchViewerActiveMode(activeMode, {
         baseUrl: "https://api.example.com",
         fetcher,
       }),
@@ -15,7 +15,7 @@ describe("switchViewerActiveMode", () => {
       new URL("https://api.example.com/api/viewer/active-mode"),
       expect.objectContaining({
         body: JSON.stringify({
-          activeMode: "creator",
+          activeMode,
         }),
         credentials: "include",
         method: "PUT",
