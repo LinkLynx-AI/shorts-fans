@@ -37,7 +37,11 @@ function getFollowingCreatorRelationErrorMessage(error: unknown): string {
   }
 
   if (error instanceof ApiError) {
-    return "フォロー状態を更新できませんでした。通信状態を確認してから再度お試しください。";
+    if (error.code === "network") {
+      return "フォロー状態を更新できませんでした。通信状態を確認してから再度お試しください。";
+    }
+
+    return "フォロー状態を更新できませんでした。少し時間を置いてから再度お試しください。";
   }
 
   return "フォロー状態を更新できませんでした。少し時間を置いてから再度お試しください。";
@@ -174,7 +178,7 @@ export function FollowingShell({
                     unfollowPending: "フォロー解除中...",
                   }}
                   onClick={() => {
-                    void toggleFollowing(row.creator.id);
+                    void toggleFollowing(row.creator.id).catch(() => undefined);
                   }}
                 />
               </div>

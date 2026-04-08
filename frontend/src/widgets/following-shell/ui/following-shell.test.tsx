@@ -201,4 +201,24 @@ describe("FollowingShell", () => {
     expect(screen.getByText("3 creators")).toBeInTheDocument();
     expect(getFirstFollowingButton()).toBeEnabled();
   });
+
+  it("shows a generic retry message when unfollow fails with a non-network api error", async () => {
+    const user = userEvent.setup();
+
+    mockedUpdateCreatorFollow.mockRejectedValue(
+      new ApiError("server failed", {
+        code: "http",
+        status: 500,
+      }),
+    );
+
+    render(<FollowingShell items={listFollowingItems()} />);
+
+    await user.click(getFirstFollowingButton());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "フォロー状態を更新できませんでした。少し時間を置いてから再度お試しください。",
+    );
+    expect(openFanAuthDialog).not.toHaveBeenCalled();
+  });
 });

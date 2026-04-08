@@ -93,8 +93,8 @@ export function useFollowingCreatorRows({
         ...currentFollowingByCreatorId,
         [creatorId]: !isFollowing,
       }));
-    } catch {
-      return;
+    } catch (error) {
+      throw error;
     } finally {
       setPendingByCreatorId((currentPendingByCreatorId) =>
         removePendingState(currentPendingByCreatorId, creatorId),
