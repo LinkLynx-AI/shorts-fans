@@ -31,6 +31,33 @@ type CreatorWorkspaceDetailSelection = {
   tab: ApprovedCreatorWorkspaceManagedTab;
 };
 
+function formatCount(value: number): string {
+  return value.toLocaleString("ja-JP");
+}
+
+function formatJpy(value: number): string {
+  return `¥${value.toLocaleString("ja-JP")}`;
+}
+
+function buildRevisionRequestedDetail({
+  mainCount,
+  shortCount,
+}: {
+  mainCount: number;
+  shortCount: number;
+}): string {
+  const scopes = [
+    shortCount > 0 ? `short ${formatCount(shortCount)}件` : null,
+    mainCount > 0 ? `main ${formatCount(mainCount)}件` : null,
+  ].filter((scope) => scope !== null);
+
+  if (scopes.length === 0) {
+    return "修正依頼内容を確認してください";
+  }
+
+  return `${scopes.join(" / ")}を確認してください`;
+}
+
 function CreatorModeBlockedFrame({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-svh bg-[radial-gradient(circle_at_top,rgba(214,242,247,0.82),transparent_34%),linear-gradient(180deg,#f7fcfd_0%,#eef7f8_42%,#e8eff6_100%)] text-foreground">
@@ -195,9 +222,24 @@ function CreatorWorkspaceTopBar() {
 }
 
 function CreatorWorkspaceMetricStrip({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
+  const metrics = [
+    {
+      label: "revenue",
+      value: formatJpy(workspace.overviewMetrics.grossUnlockRevenueJpy),
+    },
+    {
+      label: "unlocks",
+      value: formatCount(workspace.overviewMetrics.unlockCount),
+    },
+    {
+      label: "purchasers",
+      value: formatCount(workspace.overviewMetrics.uniquePurchaserCount),
+    },
+  ] as const;
+
   return (
     <div className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2 text-center">
-      {workspace.summaryStats.map((item) => (
+      {metrics.map((item) => (
         <div key={item.label} className="min-w-0">
           <strong className="block text-base font-bold leading-[1.2] tracking-[-0.03em] text-foreground">
             {item.value}
@@ -223,25 +265,34 @@ function CreatorWorkspaceHeader({ state }: { state: Extract<CreatorModeShellStat
       <div className="mt-[14px]">
         <p className="m-0 text-[15px] font-bold text-foreground">{state.creator.handle}</p>
         <p className="mt-1 text-[13px] font-bold text-foreground">{state.creator.displayName}</p>
-        <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{state.workspace.description}</p>
+        {state.creator.bio.trim().length > 0 ? (
+          <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{state.creator.bio}</p>
+        ) : null}
       </div>
     </section>
   );
 }
 
 function CreatorWorkspaceRevisionNotice({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
-  if (workspace.revisionNotice === null) {
+  const summary = workspace.revisionRequestedSummary;
+
+  if (summary === null) {
     return null;
   }
 
   return (
     <div className="mt-[14px] flex items-center gap-3 rounded-[18px] border border-[rgba(244,152,45,0.18)] bg-[linear-gradient(180deg,rgba(255,248,238,0.96),rgba(252,242,224,0.92))] px-[14px] py-3 text-foreground">
       <span className="inline-flex min-h-7 items-center justify-center rounded-full bg-[rgba(244,152,45,0.14)] px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8e4e0a]">
-        {workspace.revisionNotice.badge}
+        差し戻し
       </span>
       <div className="grid gap-1">
-        <b className="text-[13px] leading-[1.35] text-foreground">{workspace.revisionNotice.label}</b>
-        <span className="text-[11px] text-muted">{workspace.revisionNotice.detail}</span>
+        <b className="text-[13px] leading-[1.35] text-foreground">差し戻しが{formatCount(summary.totalCount)}件あります</b>
+        <span className="text-[11px] text-muted">
+          {buildRevisionRequestedDetail({
+            mainCount: summary.mainCount,
+            shortCount: summary.shortCount,
+          })}
+        </span>
       </div>
     </div>
   );

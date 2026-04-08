@@ -5,6 +5,10 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import {
+  CreatorModeShell,
+  getMockCreatorModeShellState,
+} from "@/widgets/creator-mode-shell";
 import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-viewer-active-mode";
 
 import CreatorPage from "./page";
@@ -85,7 +89,10 @@ describe("CreatorPage", () => {
     expect(screen.getByRole("button", { name: "Account menu" })).toBeEnabled();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("@minarei")).toBeInTheDocument();
+    expect(screen.getByText("quiet rooftop と hotel light の preview を軸に投稿。")).toBeInTheDocument();
+    expect(screen.getByText("¥120,000")).toBeInTheDocument();
     expect(screen.getByText("差し戻しが1件あります")).toBeInTheDocument();
+    expect(screen.getByText("short 1件を確認してください")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Top main" }));
@@ -214,5 +221,28 @@ describe("CreatorPage", () => {
 
     expect(screen.getByRole("heading", { name: "creator mode に切り替えてから開いてください。" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");
+  });
+
+  it("falls back to a generic revision message when revision counts are inconsistent", () => {
+    const state = getMockCreatorModeShellState();
+
+    render(
+      <CreatorModeShell
+        state={{
+          ...state,
+          workspace: {
+            ...state.workspace,
+            revisionRequestedSummary: {
+              mainCount: 0,
+              shortCount: 0,
+              totalCount: 0,
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("差し戻しが0件あります")).toBeInTheDocument();
+    expect(screen.getByText("修正依頼内容を確認してください")).toBeInTheDocument();
   });
 });
