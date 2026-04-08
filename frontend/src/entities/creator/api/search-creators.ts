@@ -3,22 +3,7 @@ import { z } from "zod";
 import { requestJson } from "@/shared/api";
 
 import type { CreatorSummary } from "../model/creator";
-
-const creatorAvatarAssetSchema = z.object({
-  durationSeconds: z.null(),
-  id: z.string().min(1),
-  kind: z.literal("image"),
-  posterUrl: z.string().min(1).nullable(),
-  url: z.string().min(1),
-});
-
-const creatorSummarySchema = z.object({
-  avatar: creatorAvatarAssetSchema.nullable(),
-  bio: z.string(),
-  displayName: z.string().min(1),
-  handle: z.custom<`@${string}`>((value) => typeof value === "string" && value.startsWith("@")),
-  id: z.string().min(1),
-});
+import { creatorSummarySchema } from "./contracts";
 
 const creatorSearchResponseSchema = z.object({
   data: z.object({

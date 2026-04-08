@@ -45,12 +45,12 @@ function createAvatarDataUrl(from: string, accent: string, to: string): string {
 /**
  * creator search 初期表示に使う recent creator ID 一覧を保持する。
  */
-const recentCreatorIds = ["aoi", "mina"] as const satisfies readonly CreatorId[];
+const recentCreatorIds = ["creator_aoi_n", "creator_mina_rei"] as const satisfies readonly CreatorId[];
 
 const creatorAliasIdsById: Readonly<Record<string, CreatorId>> = {
-  creator_aoi_n: "aoi",
-  creator_mina_rei: "mina",
-  creator_sora_vale: "sora",
+  aoi: "creator_aoi_n",
+  mina: "creator_mina_rei",
+  sora: "creator_sora_vale",
 };
 
 /**
@@ -68,25 +68,25 @@ function createAvatarAsset(creatorId: CreatorId, from: string, accent: string, t
 
 const creators = [
   {
-    avatar: createAvatarAsset("aoi", "#d6f5ff", "#65bae0", "#1c4e6f"),
+    avatar: createAvatarAsset("creator_aoi_n", "#d6f5ff", "#65bae0", "#1c4e6f"),
     bio: "soft light と close framing の short を中心に更新中。",
     displayName: "Aoi N",
     handle: "@aoina",
-    id: "aoi",
+    id: "creator_aoi_n",
   },
   {
-    avatar: createAvatarAsset("mina", "#edf7ff", "#7bcbe6", "#315f8d"),
+    avatar: createAvatarAsset("creator_mina_rei", "#edf7ff", "#7bcbe6", "#315f8d"),
     bio: "quiet rooftop と hotel light の preview を軸に投稿。",
     displayName: "Mina Rei",
     handle: "@minarei",
-    id: "mina",
+    id: "creator_mina_rei",
   },
   {
-    avatar: createAvatarAsset("sora", "#fff4dc", "#79c8ef", "#264f70"),
+    avatar: createAvatarAsset("creator_sora_vale", "#fff4dc", "#79c8ef", "#264f70"),
     bio: "after rain と balcony mood の short をまとめています。",
     displayName: "Sora Vale",
     handle: "@soravale",
-    id: "sora",
+    id: "creator_sora_vale",
   },
   {
     avatar: {
@@ -104,10 +104,10 @@ const creators = [
 ] as const satisfies readonly CreatorSummary[];
 
 const creatorProfileStatsById: Record<string, CreatorProfileStats> = {
-  aoi: { fanCount: 19000, shortCount: 11, viewCount: 132000 },
+  creator_aoi_n: { fanCount: 19000, shortCount: 11, viewCount: 132000 },
   creator_11111111111111111111111111111111: { fanCount: 1200, shortCount: 0, viewCount: 8600 },
-  mina: { fanCount: 24000, shortCount: 2, viewCount: 184000 },
-  sora: { fanCount: 16000, shortCount: 0, viewCount: 118000 },
+  creator_mina_rei: { fanCount: 24000, shortCount: 2, viewCount: 184000 },
+  creator_sora_vale: { fanCount: 16000, shortCount: 0, viewCount: 118000 },
 };
 
 function resolveCreatorId(id: CreatorId): CreatorId {

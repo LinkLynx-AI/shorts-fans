@@ -11,10 +11,9 @@ import (
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 )
 
 const (
@@ -113,7 +112,6 @@ func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader, viewerBoo
 		writeInternalServerError(c, "creator_profile")
 		return
 	}
-
 	profileHeader, err := reader.GetPublicProfileHeader(c.Request.Context(), creatorID, viewerUserID)
 	if err != nil {
 		if errors.Is(err, creator.ErrProfileNotFound) {

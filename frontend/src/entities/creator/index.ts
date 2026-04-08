@@ -1,3 +1,16 @@
+export {
+  getCreatorProfileHeader,
+} from "./api/get-creator-profile-header";
+export type {
+  CreatorProfileHeader,
+} from "./api/get-creator-profile-header";
+export {
+  getCreatorProfileShortGrid,
+} from "./api/get-creator-profile-short-grid";
+export type {
+  CreatorProfileShortGridItem,
+  CreatorProfileShortGridPage,
+} from "./api/get-creator-profile-short-grid";
 export { getCreatorSearchResults } from "./api/search-creators";
 export type { CreatorSearchPage } from "./api/search-creators";
 export {

@@ -110,16 +110,16 @@ func TestCreatorProfileRoutePassesAuthenticatedViewer(t *testing.T) {
 
 	now := time.Unix(1710000000, 0).UTC()
 	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	viewerID := uuid.MustParse("99999999-9999-9999-9999-999999999999")
+	viewerID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
 
 	router := NewHandler(HandlerConfig{
 		CreatorProfile: stubCreatorProfileReader{
-			getHeader: func(_ context.Context, gotCreatorID string, gotViewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
+			getHeader: func(_ context.Context, gotCreatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error) {
 				if gotCreatorID != creator.FormatPublicID(creatorID) {
 					t.Fatalf("GetPublicProfileHeader() creatorID got %q want %q", gotCreatorID, creator.FormatPublicID(creatorID))
 				}
-				if gotViewerUserID == nil || *gotViewerUserID != viewerID {
-					t.Fatalf("GetPublicProfileHeader() viewerUserID got %#v want %s", gotViewerUserID, viewerID)
+				if viewerUserID == nil || *viewerUserID != viewerID {
+					t.Fatalf("GetPublicProfileHeader() viewerUserID got %v want %v", viewerUserID, viewerID)
 				}
 
 				return creator.PublicProfileHeader{
@@ -138,7 +138,11 @@ func TestCreatorProfileRoutePassesAuthenticatedViewer(t *testing.T) {
 			},
 		},
 		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+			readCurrentViewer: func(_ context.Context, rawSessionToken string) (auth.Bootstrap, error) {
+				if rawSessionToken != "raw-session-token" {
+					t.Fatalf("ReadCurrentViewer() rawSessionToken got %q want %q", rawSessionToken, "raw-session-token")
+				}
+
 				return auth.Bootstrap{
 					CurrentViewer: &auth.CurrentViewer{
 						ID:                   viewerID,
@@ -168,7 +172,7 @@ func TestCreatorProfileRoutePassesAuthenticatedViewer(t *testing.T) {
 		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
 	}
 	if response.Data == nil || !response.Data.Profile.Viewer.IsFollowing {
-		t.Fatalf("response.Data.Profile.Viewer got %#v want isFollowing=true", response.Data)
+		t.Fatalf("response.Data.Profile.Viewer.IsFollowing got %#v want true", response.Data)
 	}
 }
 

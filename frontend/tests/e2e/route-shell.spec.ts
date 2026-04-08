@@ -84,11 +84,11 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("link", { name: /Mina Rei/i }).click();
-  await expect(page).toHaveURL(/\/creators\/mina\?from=feed&tab=recommended$/);
-  await page.getByRole("link", { name: /Mina Rei quiet rooftop preview/i }).click();
-  await expect(page).toHaveURL(/\/shorts\/rooftop\?creatorId=mina&from=creator&profileFrom=feed&profileTab=recommended$/);
+  await expect(page).toHaveURL(/\/creators\/creator_mina_rei\?from=feed&tab=recommended$/);
+  await page.getByRole("link", { name: /Mina Rei preview 0:16/i }).click();
+  await expect(page).toHaveURL(/\/shorts\/rooftop\?creatorId=creator_mina_rei&from=creator&profileFrom=feed&profileTab=recommended$/);
   await page.getByRole("link", { name: /Back/i }).click();
-  await expect(page).toHaveURL(/\/creators\/mina\?from=feed&tab=recommended$/);
+  await expect(page).toHaveURL(/\/creators\/creator_mina_rei\?from=feed&tab=recommended$/);
 
   await page.getByRole("link", { name: "マイ" }).click();
   await expect(page).toHaveURL(/\/fan$/);
@@ -108,14 +108,15 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await page.goto("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid");
   await expect(page.getByRole("heading", { name: "この main はまだ unlock されていません。" })).toBeVisible();
 
-  await page.goto("/creators/mina");
+  await page.goto("/creators/creator_mina_rei");
   await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
 
-  await page.goto("/creators/sora");
+  await page.goto("/creators/creator_sora_vale");
   await expect(page.getByText("まだ公開中の short はありません。")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Follow" })).toBeDisabled();
 
-  await page.goto("/creators/mina?from=twitter&tab=other");
-  await expect(page).toHaveURL(/\/creators\/mina\?from=twitter&tab=other$/);
+  await page.goto("/creators/creator_mina_rei?from=twitter&tab=other");
+  await expect(page).toHaveURL(/\/creators\/creator_mina_rei\?from=twitter&tab=other$/);
   await expect(page.getByRole("heading", { name: /Mina Rei creator profile/i })).toHaveCount(1);
   await expect(page.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
 
@@ -142,6 +143,19 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
   await page.getByRole("link", { name: "マイ" }).click();
   await expect(page).toHaveURL(/\/fan$/);
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+});
+
+test("unauthenticated viewers can open the shared auth modal from creator profile follow", async ({ page }) => {
+  await page.goto("/creators/creator_mina_rei");
+
+  await page.getByRole("button", { name: "Follow" }).click();
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page).toHaveURL(/\/creators\/creator_mina_rei$/);
+  await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
 });
 
 test("unauthenticated viewers can sign up from the shared auth modal and enter the fan hub", async ({ page }) => {
@@ -237,6 +251,19 @@ test("authenticated viewers can continue purchased main playback from short deta
     destinationPattern: /\/mains\/main_aoi_blue_balcony\?fromShortId=softlight&grant=/,
     path: "/shorts/softlight",
   });
+});
+
+test("authenticated viewers can open Aoi creator profile from main playback", async ({ page }) => {
+  await addViewerSession(page);
+  await page.goto("/shorts/softlight");
+  await page.getByRole("button", { name: /Continue main/i }).click();
+  await expect(page).toHaveURL(/\/mains\/main_aoi_blue_balcony\?fromShortId=softlight&grant=/);
+
+  await page.getByRole("link", { name: /Aoi N/i }).click();
+
+  await expect(page).toHaveURL(/\/creators\/creator_aoi_n$/);
+  await expect(page.getByRole("heading", { name: /Aoi N creator profile/i })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
 });
 
 test("authenticated viewers can unlock a purchased-required main from short detail", async ({ page }) => {
