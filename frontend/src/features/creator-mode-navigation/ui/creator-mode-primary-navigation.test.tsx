@@ -15,4 +15,13 @@ describe("CreatorModePrimaryNavigation", () => {
     expect(screen.getByText("Review")).toBeInTheDocument();
     expect(screen.getAllByText("soon")).toHaveLength(3);
   });
+
+  it("can render the shared creator navigation in compact mode", () => {
+    render(<CreatorModePrimaryNavigation activeKey="dashboard" variant="compact" />);
+
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Upload")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("Linkage")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByText("Review")).toHaveAttribute("aria-disabled", "true");
+  });
 });

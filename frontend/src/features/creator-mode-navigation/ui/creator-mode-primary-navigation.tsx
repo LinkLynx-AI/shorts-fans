@@ -25,6 +25,7 @@ const navigationIconByKey: Record<CreatorModeNavigationKey, LucideIcon> = {
 type CreatorModePrimaryNavigationProps = {
   activeKey: CreatorModeNavigationKey;
   className?: string;
+  variant?: "cards" | "compact";
 };
 
 type CreatorModeNavigationCardProps = {
@@ -110,7 +111,49 @@ function CreatorModeNavigationCard({
 export function CreatorModePrimaryNavigation({
   activeKey,
   className,
+  variant = "cards",
 }: CreatorModePrimaryNavigationProps) {
+  if (variant === "compact") {
+    return (
+      <nav aria-label="Creator primary" className={className}>
+        <div className="grid grid-cols-4 gap-2">
+          {getCreatorModeNavigationItems().map((item) => {
+            const active = item.key === activeKey;
+            const available = isCreatorModeNavigationAvailable(item.key);
+
+            if (available) {
+              return (
+                <Link
+                  aria-current={active ? "page" : undefined}
+                  className={cn(
+                    "inline-flex min-h-9 items-center justify-center rounded-full px-2 text-[11px] font-semibold tracking-[-0.01em] transition",
+                    active
+                      ? "bg-[linear-gradient(135deg,#123d55_0%,#216277_100%)] text-white shadow-[0_10px_24px_rgba(18,61,85,0.18)]"
+                      : "border border-[#d9ecf2] bg-white text-[#0f566a] shadow-[0_8px_18px_rgba(36,94,132,0.08)] hover:bg-[#f5fbfd]",
+                  )}
+                  href={item.href}
+                  key={item.key}
+                >
+                  {item.label}
+                </Link>
+              );
+            }
+
+            return (
+              <div
+                aria-disabled="true"
+                className="inline-flex min-h-9 items-center justify-center rounded-full border border-[#e3edf1] bg-[#f7fafb] px-2 text-[11px] font-semibold tracking-[-0.01em] text-muted"
+                key={item.key}
+              >
+                {item.label}
+              </div>
+            );
+          })}
+        </div>
+      </nav>
+    );
+  }
+
   return (
     <nav aria-label="Creator primary" className={className}>
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
