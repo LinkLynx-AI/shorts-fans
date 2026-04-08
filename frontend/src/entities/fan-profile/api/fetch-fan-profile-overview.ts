@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { requestJson } from "@/shared/api";
+import { viewerSessionCookieName } from "@/entities/viewer";
 
 import type { FanProfileOverview } from "../model/fan-profile";
 
@@ -39,7 +40,7 @@ export async function fetchFanProfileOverview({
   const headers = new Headers();
 
   if (sessionToken) {
-    headers.set("Cookie", `shorts_fans_session=${sessionToken}`);
+    headers.set("Cookie", `${viewerSessionCookieName}=${sessionToken}`);
   }
 
   const response = await requestJson({

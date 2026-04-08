@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { viewerSessionCookieName } from "@/entities/viewer";
 import { requestJson } from "@/shared/api";
 
 import type { FanFollowingItem } from "../model/fan-profile";
@@ -84,7 +85,7 @@ export async function fetchFanProfileFollowingPage({
   const headers = new Headers();
 
   if (sessionToken) {
-    headers.set("Cookie", `shorts_fans_session=${sessionToken}`);
+    headers.set("Cookie", `${viewerSessionCookieName}=${sessionToken}`);
   }
 
   const response = await requestJson({
