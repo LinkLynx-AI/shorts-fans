@@ -33,6 +33,10 @@ function buildFollowingState(items: readonly FanFollowingItem[]): Record<string,
   return Object.fromEntries(items.map((item) => [item.creator.id, item.viewer.isFollowing]));
 }
 
+function getInitialFollowingState(items: readonly FanFollowingItem[], creatorId: string): boolean | undefined {
+  return items.find((item) => item.creator.id === creatorId)?.viewer.isFollowing;
+}
+
 function removePendingState(
   pendingByCreatorId: Record<string, boolean>,
   creatorId: string,
@@ -69,7 +73,12 @@ export function useFollowingCreatorRows({
       return;
     }
 
-    const isFollowing = followingByCreatorId[creatorId] ?? true;
+    const isFollowing = followingByCreatorId[creatorId] ?? getInitialFollowingState(items, creatorId);
+
+    if (isFollowing === undefined) {
+      return;
+    }
+
     const action = isFollowing ? "unfollow" : "follow";
 
     setPendingByCreatorId((currentPendingByCreatorId) => ({

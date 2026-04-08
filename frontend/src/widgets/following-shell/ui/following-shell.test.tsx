@@ -35,8 +35,10 @@ describe("FollowingShell", () => {
 
     await user.click(firstFollowingButton);
 
-    expect(screen.getAllByRole("button", { name: "フォロー中" })).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "フォロー" })).toHaveAttribute("aria-pressed", "false");
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "フォロー中" })).toHaveLength(2);
+      expect(screen.getByRole("button", { name: "フォロー" })).toHaveAttribute("aria-pressed", "false");
+    });
   });
 
   it("keeps a row CTA disabled while the update is pending", async () => {
