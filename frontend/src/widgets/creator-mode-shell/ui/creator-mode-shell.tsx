@@ -9,7 +9,6 @@ import {
 import { ArrowLeft } from "lucide-react";
 
 import { CreatorAvatar } from "@/entities/creator";
-import { CreatorModePrimaryNavigation } from "@/features/creator-mode-navigation";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
@@ -624,7 +623,6 @@ function CreatorWorkspaceDashboard({
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-24 pt-[14px] text-foreground">
       <h1 className="sr-only">{state.creator.displayName} creator workspace</h1>
       <CreatorWorkspaceTopBar />
-      <CreatorModePrimaryNavigation activeKey={state.activeNavigation} className="mt-[18px]" variant="compact" />
       <CreatorWorkspaceHeader state={state} />
       <CreatorWorkspaceRevisionNotice workspace={state.workspace} />
       <CreatorWorkspaceTopPerformers onOpenDetail={onOpenDetail} workspace={state.workspace} />

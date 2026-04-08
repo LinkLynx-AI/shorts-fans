@@ -33,7 +33,7 @@ describe("CreatorPage", () => {
 
     expect(screen.getByRole("button", { name: "動画を追加" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Account menu" })).toBeDisabled();
-    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("@minarei")).toBeInTheDocument();
     expect(screen.getByText("差し戻しが1件あります")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
