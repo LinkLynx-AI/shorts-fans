@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -14,6 +15,18 @@ import (
 )
 
 const defaultContentType = "application/octet-stream"
+
+// PresignedUpload は direct upload 用の presigned request を表します。
+type PresignedUpload struct {
+	URL     string
+	Headers map[string]string
+}
+
+// ObjectMetadata は object verification に必要な最小メタデータです。
+type ObjectMetadata struct {
+	ContentLength int64
+	ContentType   string
+}
 
 // Config は S3 client の最小設定を表します。
 type Config struct {
@@ -32,10 +45,12 @@ func (c Config) Validate() error {
 type objectAPI interface {
 	PutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.Options)) (*awss3.PutObjectOutput, error)
 	DeleteObject(ctx context.Context, params *awss3.DeleteObjectInput, optFns ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error)
+	HeadObject(ctx context.Context, params *awss3.HeadObjectInput, optFns ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error)
 }
 
 type presignAPI interface {
 	PresignGetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
+	PresignPutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.PresignOptions)) (*v4.PresignedHTTPRequest, error)
 }
 
 // Client は media sandbox で使う最小限の S3 操作を包みます。
@@ -137,6 +152,69 @@ func (c *Client) PresignGetObject(ctx context.Context, bucket string, key string
 	return request.URL, nil
 }
 
+// PresignPutObject は direct upload 用の signed PUT request を生成します。
+func (c *Client) PresignPutObject(ctx context.Context, bucket string, key string, contentType string, expires time.Duration) (PresignedUpload, error) {
+	if c == nil {
+		return PresignedUpload{}, fmt.Errorf("s3 client is nil")
+	}
+	if err := validateBucketAndKey(bucket, key); err != nil {
+		return PresignedUpload{}, err
+	}
+	if strings.TrimSpace(contentType) == "" {
+		return PresignedUpload{}, fmt.Errorf("content type is required")
+	}
+	if expires <= 0 {
+		return PresignedUpload{}, fmt.Errorf("expires must be greater than zero")
+	}
+
+	request, err := c.presigner.PresignPutObject(ctx, &awss3.PutObjectInput{
+		Bucket:      aws.String(bucket),
+		Key:         aws.String(key),
+		ContentType: aws.String(contentType),
+	}, func(options *awss3.PresignOptions) {
+		options.Expires = expires
+	})
+	if err != nil {
+		return PresignedUpload{}, fmt.Errorf("presign put object bucket=%s key=%s: %w", bucket, key, err)
+	}
+
+	return PresignedUpload{
+		URL: request.URL,
+		Headers: withRequiredContentType(
+			normalizeSignedHeaders(request.SignedHeader),
+			contentType,
+		),
+	}, nil
+}
+
+// HeadObject は object verification 用の metadata を返します。
+func (c *Client) HeadObject(ctx context.Context, bucket string, key string) (ObjectMetadata, error) {
+	if c == nil {
+		return ObjectMetadata{}, fmt.Errorf("s3 client is nil")
+	}
+	if err := validateBucketAndKey(bucket, key); err != nil {
+		return ObjectMetadata{}, err
+	}
+
+	output, err := c.api.HeadObject(ctx, &awss3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return ObjectMetadata{}, fmt.Errorf("head object bucket=%s key=%s: %w", bucket, key, err)
+	}
+
+	var contentLength int64
+	if output.ContentLength != nil {
+		contentLength = *output.ContentLength
+	}
+
+	return ObjectMetadata{
+		ContentLength: contentLength,
+		ContentType:   strings.TrimSpace(aws.ToString(output.ContentType)),
+	}, nil
+}
+
 func validateBucketAndKey(bucket string, key string) error {
 	switch {
 	case strings.TrimSpace(bucket) == "":
@@ -146,4 +224,32 @@ func validateBucketAndKey(bucket string, key string) error {
 	default:
 		return nil
 	}
+}
+
+func normalizeSignedHeaders(headers http.Header) map[string]string {
+	if len(headers) == 0 {
+		return map[string]string{}
+	}
+
+	normalized := make(map[string]string, len(headers))
+	for key, values := range headers {
+		if strings.EqualFold(key, "host") || len(values) == 0 {
+			continue
+		}
+
+		normalized[http.CanonicalHeaderKey(key)] = strings.Join(values, ",")
+	}
+
+	return normalized
+}
+
+func withRequiredContentType(headers map[string]string, contentType string) map[string]string {
+	if headers == nil {
+		headers = make(map[string]string, 1)
+	}
+	if _, ok := headers["Content-Type"]; !ok {
+		headers["Content-Type"] = contentType
+	}
+
+	return headers
 }

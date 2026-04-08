@@ -77,7 +77,7 @@ func (c Config) ValidateAPI() error {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
-	return nil
+	return c.validateMediaSandbox(true)
 }
 
 // ValidateWorker は worker 設定の整合性を検証します。

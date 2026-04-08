@@ -189,7 +189,7 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
-`cmd/api` は `POSTGRES_DSN` と `REDIS_ADDR` を必須にします。`cmd/worker` は SQS 設定が未投入でも骨格起動できます。
+`cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、および media sandbox 用 env 一式を必須にします。creator upload endpoint が常時有効なため、`AWS_REGION` と media bucket / queue / role 設定が不足している場合は fail fast します。`cmd/worker` は SQS 設定が未投入でも骨格起動できます。
 
 `cmd/media-smoke` は次を前提にします。
 
