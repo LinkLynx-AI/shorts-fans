@@ -46,6 +46,10 @@ function buildRevisionRequestedDetail({
     mainCount > 0 ? `main ${formatCount(mainCount)}件` : null,
   ].filter((scope) => scope !== null);
 
+  if (scopes.length === 0) {
+    return "修正依頼内容を確認してください";
+  }
+
   return `${scopes.join(" / ")}を確認してください`;
 }
 

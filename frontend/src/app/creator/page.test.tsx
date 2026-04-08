@@ -4,6 +4,11 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import {
+  CreatorModeShell,
+  getMockCreatorModeShellState,
+} from "@/widgets/creator-mode-shell";
+
 import CreatorPage from "./page";
 
 vi.mock("@/features/fan-auth-gate", async () => {
@@ -104,5 +109,28 @@ describe("CreatorPage", () => {
 
     expect(screen.getByRole("heading", { name: "creator mode に切り替えてから開いてください。" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");
+  });
+
+  it("falls back to a generic revision message when revision counts are inconsistent", () => {
+    const state = getMockCreatorModeShellState();
+
+    render(
+      <CreatorModeShell
+        state={{
+          ...state,
+          workspace: {
+            ...state.workspace,
+            revisionRequestedSummary: {
+              mainCount: 0,
+              shortCount: 0,
+              totalCount: 0,
+            },
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByText("差し戻しが0件あります")).toBeInTheDocument();
+    expect(screen.getByText("修正依頼内容を確認してください")).toBeInTheDocument();
   });
 });

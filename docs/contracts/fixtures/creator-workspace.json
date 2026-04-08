@@ -94,7 +94,7 @@
         },
         "error": {
           "code": "creator_mode_unavailable",
-          "message": "creator workspace is unavailable"
+          "message": "creator mode is not available"
         }
       }
     },
