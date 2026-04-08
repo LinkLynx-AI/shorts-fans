@@ -1,0 +1,47 @@
+{
+  "POST /api/viewer/creator-registration": {
+    "request": {
+      "displayName": "Mina Rei",
+      "bio": "quiet rooftop の continuation を中心に投稿します。"
+    },
+    "success": {
+      "status": 204
+    },
+    "invalidDisplayName": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "invalid_display_name",
+          "message": "display name is invalid"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_invalid_display_name_001"
+        }
+      },
+      "status": 400
+    }
+  },
+  "PUT /api/viewer/active-mode": {
+    "request": {
+      "activeMode": "creator"
+    },
+    "success": {
+      "status": 204
+    },
+    "creatorModeUnavailable": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "creator_mode_unavailable",
+          "message": "creator mode is not available"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_active_mode_forbidden_001"
+        }
+      },
+      "status": 403
+    }
+  }
+}

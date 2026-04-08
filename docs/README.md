@@ -16,6 +16,7 @@
 - [contracts/mvp-media-workflow-contract.md](contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
 - [contracts/fan-auth-api-contract.md](contracts/fan-auth-api-contract.md): fan sign in / sign up / session start / logout の transport 契約
 - [contracts/viewer-bootstrap-api-contract.md](contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
+- [contracts/viewer-creator-entry-api-contract.md](contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
 - [contracts/fan-creator-follow-api-contract.md](contracts/fan-creator-follow-api-contract.md): `creator profile` からの `follow / unfollow` mutation 契約
