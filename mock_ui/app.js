@@ -166,8 +166,9 @@ const creatorDashboardData = {
   mina: {
     description: "quiet rooftop 系の release をまとめて管理し、review と unlock の動きを profile から見返します。",
     profileStats: [
-      { label: "shorts", value: "14" },
+      { label: "revenue", value: "¥120K" },
       { label: "unlocks", value: "238" },
+      { label: "shorts", value: "14" },
       { label: "followers", value: "24K" },
     ],
     revisionNotice: {
@@ -1421,7 +1422,7 @@ function creatorDashboardScreen() {
         <section class="creator-profile-shell">
           <div class="creator-profile-head">
             <span class="creator-profile-avatar"></span>
-            <div class="creator-profile-stats">
+            <div class="creator-profile-stats creator-manager-stats">
               ${dashboard.profileStats
                 .map(
                   (item) => `
