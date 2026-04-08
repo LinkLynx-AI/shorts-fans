@@ -55,6 +55,7 @@ func main() {
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
+	modeSwitcher := auth.NewModeSwitcher(authRepository)
 
 	server := httpserver.New(
 		httpserver.Config{
@@ -68,10 +69,12 @@ func main() {
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
 			CreatorFollow:        creatorRepository,
+			CreatorRegistration:  creatorRepository,
 			FanProfileOverview:   fanProfileRepository,
 			FanProfileFollowing:  fanProfileRepository,
 			FanAuth:              authLifecycle,
 			AuthCookie:           httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
+			ViewerActiveMode:     modeSwitcher,
 			ViewerBootstrap:      viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},

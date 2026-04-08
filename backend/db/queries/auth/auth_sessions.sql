@@ -40,6 +40,16 @@ WHERE s.session_token_hash = sqlc.arg(session_token_hash)
     AND s.expires_at > CURRENT_TIMESTAMP
 LIMIT 1;
 
+-- name: UpdateActiveAuthSessionModeByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    active_mode = sqlc.arg(active_mode),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = sqlc.arg(session_token_hash)
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING *;
+
 -- name: ListAuthSessionsByUserID :many
 SELECT *
 FROM app.auth_sessions

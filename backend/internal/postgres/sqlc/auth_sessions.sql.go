@@ -119,6 +119,39 @@ func (q *Queries) GetCurrentViewerBySessionTokenHash(ctx context.Context, sessio
 	return i, err
 }
 
+const updateActiveAuthSessionModeByTokenHash = `-- name: UpdateActiveAuthSessionModeByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    active_mode = $1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = $2
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+`
+
+type UpdateActiveAuthSessionModeByTokenHashParams struct {
+	ActiveMode       string
+	SessionTokenHash string
+}
+
+func (q *Queries) UpdateActiveAuthSessionModeByTokenHash(ctx context.Context, arg UpdateActiveAuthSessionModeByTokenHashParams) (AppAuthSession, error) {
+	row := q.db.QueryRow(ctx, updateActiveAuthSessionModeByTokenHash, arg.ActiveMode, arg.SessionTokenHash)
+	var i AppAuthSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActiveMode,
+		&i.SessionTokenHash,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listAuthSessionsByUserID = `-- name: ListAuthSessionsByUserID :many
 SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
 FROM app.auth_sessions

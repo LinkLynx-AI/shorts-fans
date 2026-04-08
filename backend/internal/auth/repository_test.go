@@ -18,6 +18,7 @@ import (
 
 type stubQueries struct {
 	touchAuthSessionLastSeenByTokenHash func(context.Context, sqlc.TouchAuthSessionLastSeenByTokenHashParams) (sqlc.AppAuthSession, error)
+	updateActiveModeByTokenHash         func(context.Context, sqlc.UpdateActiveAuthSessionModeByTokenHashParams) (sqlc.AppAuthSession, error)
 	getCurrentViewerBySessionTokenHash  func(context.Context, string) (sqlc.GetCurrentViewerBySessionTokenHashRow, error)
 }
 
@@ -37,6 +38,17 @@ func (s stubQueries) GetCurrentViewerBySessionTokenHash(
 	sessionTokenHash string,
 ) (sqlc.GetCurrentViewerBySessionTokenHashRow, error) {
 	return s.getCurrentViewerBySessionTokenHash(ctx, sessionTokenHash)
+}
+
+func (s stubQueries) UpdateActiveAuthSessionModeByTokenHash(
+	ctx context.Context,
+	arg sqlc.UpdateActiveAuthSessionModeByTokenHashParams,
+) (sqlc.AppAuthSession, error) {
+	if s.updateActiveModeByTokenHash == nil {
+		return sqlc.AppAuthSession{}, nil
+	}
+
+	return s.updateActiveModeByTokenHash(ctx, arg)
 }
 
 type dbtxStub struct {
@@ -687,6 +699,70 @@ func TestTouchSessionLastSeenByTokenHashNotFound(t *testing.T) {
 
 	if _, err := repository.TouchSessionLastSeenByTokenHash(context.Background(), "session-token-hash", time.Now().UTC()); !errors.Is(err, ErrSessionNotFound) {
 		t.Fatalf("TouchSessionLastSeenByTokenHash() error got %v want %v", err, ErrSessionNotFound)
+	}
+}
+
+func TestUpdateActiveModeByTokenHash(t *testing.T) {
+	t.Parallel()
+
+	expectedID := uuid.New()
+	userID := uuid.New()
+	now := time.Unix(1710000000, 0).UTC()
+	var gotArgs []any
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(_ context.Context, _ string, args ...any) pgx.Row {
+				gotArgs = args
+				return rowWithValues(
+					pgUUID(expectedID),
+					pgUUID(userID),
+					string(ActiveModeCreator),
+					"session-token-hash",
+					pgTime(now.Add(time.Hour)),
+					pgTime(now),
+					pgtype.Timestamptz{},
+					pgTime(now),
+					pgTime(now.Add(time.Minute)),
+				)
+			},
+		},
+	}
+
+	got, err := repository.UpdateActiveModeByTokenHash(context.Background(), "session-token-hash", ActiveModeCreator)
+	if err != nil {
+		t.Fatalf("UpdateActiveModeByTokenHash() error = %v, want nil", err)
+	}
+	if got.ID != expectedID {
+		t.Fatalf("UpdateActiveModeByTokenHash() id got %s want %s", got.ID, expectedID)
+	}
+	if got.ActiveMode != ActiveModeCreator {
+		t.Fatalf("UpdateActiveModeByTokenHash() active mode got %q want %q", got.ActiveMode, ActiveModeCreator)
+	}
+	if len(gotArgs) != 2 {
+		t.Fatalf("UpdateActiveModeByTokenHash() arg count got %d want %d", len(gotArgs), 2)
+	}
+	if gotArgs[0] != string(ActiveModeCreator) {
+		t.Fatalf("UpdateActiveModeByTokenHash() active mode arg got %#v want %q", gotArgs[0], ActiveModeCreator)
+	}
+	if gotArgs[1] != "session-token-hash" {
+		t.Fatalf("UpdateActiveModeByTokenHash() token arg got %#v want %q", gotArgs[1], "session-token-hash")
+	}
+}
+
+func TestUpdateActiveModeByTokenHashMissingSession(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.UpdateActiveModeByTokenHash(context.Background(), "session-token-hash", ActiveModeCreator); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("UpdateActiveModeByTokenHash() error got %v want %v", err, ErrSessionNotFound)
 	}
 }
 

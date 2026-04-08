@@ -28,6 +28,7 @@ const creatorProfileShortGridFixtures = fixtures["GET /api/fan/creators/{creator
 const creatorFollowPutFixtures = creatorFollowFixtures["PUT /api/fan/creators/{creatorId}/follow"];
 const creatorFollowDeleteFixtures = creatorFollowFixtures["DELETE /api/fan/creators/{creatorId}/follow"];
 const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
+const authenticatedCreatorBootstrap = viewerBootstrapFixtures.authenticatedCreator;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
 const e2eSessionToken = "e2e-viewer-session";
 const existingFanEmail = "fan@example.com";
@@ -90,6 +91,7 @@ const creatorSummaryById = {
 };
 const defaultFollowedCreatorIds = ["creator_mina_rei"];
 const followedCreatorIdsBySessionToken = new Map();
+const viewerStateBySessionToken = new Map();
 let issuedSessionCount = 0;
 
 if (!searchFixtures) {
@@ -116,8 +118,8 @@ if (
   throw new Error("creator profile fixture が不足しています");
 }
 
-if (!authenticatedFanBootstrap || !unauthenticatedBootstrap) {
-  throw new Error("viewer bootstrap fixture の authenticatedFan / unauthenticated が不足しています");
+if (!authenticatedFanBootstrap || !authenticatedCreatorBootstrap || !unauthenticatedBootstrap) {
+  throw new Error("viewer bootstrap fixture の authenticatedFan / authenticatedCreator / unauthenticated が不足しています");
 }
 
 if (!creatorFollowPutFixtures || !creatorFollowDeleteFixtures) {
@@ -194,6 +196,50 @@ function isAuthenticatedSessionToken(sessionToken) {
 function createE2ESessionToken() {
   issuedSessionCount += 1;
   return `${e2eSessionToken}-${issuedSessionCount}`;
+}
+
+function buildDefaultViewerState() {
+  return structuredClone(authenticatedFanBootstrap.data.currentViewer);
+}
+
+function getViewerState(sessionToken) {
+  if (!isAuthenticatedSessionToken(sessionToken)) {
+    return null;
+  }
+
+  const existingViewerState = viewerStateBySessionToken.get(sessionToken);
+
+  if (existingViewerState) {
+    return existingViewerState;
+  }
+
+  const nextViewerState = buildDefaultViewerState();
+
+  viewerStateBySessionToken.set(sessionToken, nextViewerState);
+
+  return nextViewerState;
+}
+
+function buildViewerBootstrapResponse(sessionToken) {
+  const viewerState = getViewerState(sessionToken);
+
+  if (!viewerState) {
+    return structuredClone(unauthenticatedBootstrap);
+  }
+
+  return {
+    data: {
+      currentViewer: structuredClone(viewerState),
+    },
+    error: null,
+    meta: {
+      page: null,
+      requestId:
+        viewerState.activeMode === "creator"
+          ? authenticatedCreatorBootstrap.meta.requestId
+          : authenticatedFanBootstrap.meta.requestId,
+    },
+  };
 }
 
 function getFollowedCreatorIds(sessionToken) {
@@ -527,12 +573,12 @@ function isAuthenticatedFanRequest(request) {
   return isAuthenticatedSessionToken(readCookieValue(request.headers.cookie, "shorts_fans_session"));
 }
 
-function writeAuthRequired(request, response, requestId) {
+function writeAuthRequired(request, response, requestId, message = "fan profile requires authentication") {
   writeJson(request, response, 401, {
     data: null,
     error: {
       code: "auth_required",
-      message: "fan profile requires authentication",
+      message,
     },
     meta: {
       page: null,
@@ -613,10 +659,115 @@ const server = http.createServer((request, response) => {
 
   if (request.method === "GET" && requestUrl.pathname === "/api/viewer/bootstrap") {
     const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
-    const body =
-      isAuthenticatedSessionToken(sessionToken) ? authenticatedFanBootstrap : unauthenticatedBootstrap;
+    const body = buildViewerBootstrapResponse(sessionToken);
 
     writeJson(request, response, 200, body);
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/viewer/creator-registration") {
+    const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+
+    if (!isAuthenticatedSessionToken(sessionToken)) {
+      writeAuthRequired(
+        request,
+        response,
+        "req_e2e_creator_registration_auth_required_001",
+        "creator registration requires authentication",
+      );
+      return;
+    }
+
+    void readJsonBody(request).then((body) => {
+      if (typeof body?.displayName !== "string" || body.displayName.trim() === "") {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_display_name",
+            message: "display name is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_creator_registration_invalid_display_name_001",
+          },
+        });
+        return;
+      }
+
+      const viewerState = getViewerState(sessionToken);
+
+      if (viewerState) {
+        viewerState.canAccessCreatorMode = true;
+        viewerState.activeMode = "fan";
+      }
+
+      writeNoContent(request, response);
+    });
+    return;
+  }
+
+  if (request.method === "PUT" && requestUrl.pathname === "/api/viewer/active-mode") {
+    const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+
+    if (!isAuthenticatedSessionToken(sessionToken)) {
+      writeAuthRequired(
+        request,
+        response,
+        "req_e2e_viewer_active_mode_auth_required_001",
+        "viewer mode switch requires authentication",
+      );
+      return;
+    }
+
+    void readJsonBody(request).then((body) => {
+      const nextActiveMode = body?.activeMode;
+
+      if (nextActiveMode !== "fan" && nextActiveMode !== "creator") {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_active_mode",
+            message: "active mode is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_viewer_active_mode_invalid_001",
+          },
+        });
+        return;
+      }
+
+      const viewerState = getViewerState(sessionToken);
+
+      if (!viewerState) {
+        writeAuthRequired(
+          request,
+          response,
+          "req_e2e_viewer_active_mode_auth_required_002",
+          "viewer mode switch requires authentication",
+        );
+        return;
+      }
+
+      if (nextActiveMode === "creator" && !viewerState.canAccessCreatorMode) {
+        writeJson(request, response, 403, {
+          data: null,
+          error: {
+            code: "creator_mode_unavailable",
+            message: "creator mode is not available",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_viewer_active_mode_unavailable_001",
+          },
+        });
+        return;
+      }
+
+      viewerState.activeMode = nextActiveMode;
+
+      writeNoContent(request, response);
+    });
     return;
   }
 
@@ -774,8 +925,12 @@ const server = http.createServer((request, response) => {
         return;
       }
 
+      const nextSessionToken = createE2ESessionToken();
+
+      viewerStateBySessionToken.set(nextSessionToken, buildDefaultViewerState());
+
       writeNoContent(request, response, {
-        "Set-Cookie": `shorts_fans_session=${createE2ESessionToken()}; Path=/; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `shorts_fans_session=${nextSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;
@@ -813,8 +968,12 @@ const server = http.createServer((request, response) => {
         return;
       }
 
+      const nextSessionToken = createE2ESessionToken();
+
+      viewerStateBySessionToken.set(nextSessionToken, buildDefaultViewerState());
+
       writeNoContent(request, response, {
-        "Set-Cookie": `shorts_fans_session=${createE2ESessionToken()}; Path=/; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `shorts_fans_session=${nextSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;

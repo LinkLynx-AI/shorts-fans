@@ -7,6 +7,24 @@ import { FanHubShell } from "@/widgets/fan-hub-shell";
 import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
 import { SearchShell } from "@/widgets/search-shell";
 
+const mockedRouter = vi.hoisted(() => ({
+  back: vi.fn(),
+  forward: vi.fn(),
+  prefetch: vi.fn(),
+  push: vi.fn(),
+  refresh: vi.fn(),
+  replace: vi.fn(),
+}));
+
+vi.mock("next/navigation", async () => {
+  const actual = await vi.importActual<typeof import("next/navigation")>("next/navigation");
+
+  return {
+    ...actual,
+    useRouter: () => mockedRouter,
+  };
+});
+
 describe("widgets", () => {
   it("renders the feed shell", () => {
     render(<FeedShell state={getMockFeedShellState("recommended")} />);

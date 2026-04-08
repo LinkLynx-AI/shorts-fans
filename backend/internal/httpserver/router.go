@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 )
@@ -49,6 +50,16 @@ type CreatorFollowWriter interface {
 	UnfollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
 }
 
+// ViewerCreatorRegistrationWriter は creator registration mutation を表します。
+type ViewerCreatorRegistrationWriter interface {
+	RegisterApprovedCreator(ctx context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error)
+}
+
+// ViewerActiveModeSwitcher は viewer active mode 切替を表します。
+type ViewerActiveModeSwitcher interface {
+	SwitchActiveMode(ctx context.Context, rawSessionToken string, activeMode auth.ActiveMode) error
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -66,10 +77,12 @@ type HandlerConfig struct {
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
 	CreatorFollow        CreatorFollowWriter
+	CreatorRegistration  ViewerCreatorRegistrationWriter
 	FanProfileFollowing  FanProfileFollowingReader
 	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
+	ViewerActiveMode     ViewerActiveModeSwitcher
 	ViewerBootstrap      ViewerBootstrapReader
 	Dependencies         []Dependency
 }
@@ -131,6 +144,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
+	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.ViewerActiveMode, config.ViewerBootstrap)
 
 	return router
 }

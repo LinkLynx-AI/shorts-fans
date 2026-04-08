@@ -37,6 +37,7 @@ var (
 type queries interface {
 	GetCurrentViewerBySessionTokenHash(ctx context.Context, sessionTokenHash string) (sqlc.GetCurrentViewerBySessionTokenHashRow, error)
 	TouchAuthSessionLastSeenByTokenHash(ctx context.Context, arg sqlc.TouchAuthSessionLastSeenByTokenHashParams) (sqlc.AppAuthSession, error)
+	UpdateActiveAuthSessionModeByTokenHash(ctx context.Context, arg sqlc.UpdateActiveAuthSessionModeByTokenHashParams) (sqlc.AppAuthSession, error)
 }
 
 // Repository は auth 関連の永続化操作を包みます。
@@ -427,6 +428,33 @@ func (r *Repository) RevokeActiveSessionByTokenHash(ctx context.Context, session
 	session, err := mapSession(row)
 	if err != nil {
 		return SessionRecord{}, fmt.Errorf("auth session revoke 結果の変換 token=%s: %w", sessionTokenHash, err)
+	}
+
+	return session, nil
+}
+
+// UpdateActiveModeByTokenHash は session token hash で active mode を更新します。
+func (r *Repository) UpdateActiveModeByTokenHash(ctx context.Context, sessionTokenHash string, activeMode ActiveMode) (SessionRecord, error) {
+	q, err := r.dbQueries()
+	if err != nil {
+		return SessionRecord{}, err
+	}
+
+	row, err := q.UpdateActiveAuthSessionModeByTokenHash(ctx, sqlc.UpdateActiveAuthSessionModeByTokenHashParams{
+		ActiveMode:       string(activeMode),
+		SessionTokenHash: sessionTokenHash,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionRecord{}, fmt.Errorf("auth session active mode 更新 token=%s: %w", sessionTokenHash, ErrSessionNotFound)
+		}
+
+		return SessionRecord{}, fmt.Errorf("auth session active mode 更新 token=%s: %w", sessionTokenHash, err)
+	}
+
+	session, err := mapSession(row)
+	if err != nil {
+		return SessionRecord{}, fmt.Errorf("auth session active mode 更新結果の変換 token=%s: %w", sessionTokenHash, err)
 	}
 
 	return session, nil
