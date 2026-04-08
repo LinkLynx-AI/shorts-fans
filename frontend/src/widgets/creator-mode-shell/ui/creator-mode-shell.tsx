@@ -127,14 +127,14 @@ function CreatorWorkspaceAccountMenu() {
   return (
     <Dialog.Root>
       <Dialog.Trigger asChild>
-        <CreatorWorkspaceActionButton
-          ariaLabel="Account menu"
+        <button
+          aria-label="Account menu"
           className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] transition hover:bg-[#1082c8]/10"
-          disabled={false}
           onClick={clearError}
+          type="button"
         >
           <AccountMenuIcon />
-        </CreatorWorkspaceActionButton>
+        </button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
