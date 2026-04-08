@@ -2,9 +2,8 @@ import {
   render,
   screen,
 } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 
-import CreatorPage from "./page";
+import CreatorUploadPage from "./page";
 
 vi.mock("@/features/fan-auth-gate", async () => {
   const actual = await vi.importActual<typeof import("@/features/fan-auth-gate")>("@/features/fan-auth-gate");
@@ -15,10 +14,9 @@ vi.mock("@/features/fan-auth-gate", async () => {
   };
 });
 
-describe("CreatorPage", () => {
-  it("renders the creator route shell for creator-mode viewers", async () => {
+describe("CreatorUploadPage", () => {
+  it("renders the creator upload route for creator-mode viewers", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
-    const user = userEvent.setup();
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
       currentViewer: {
@@ -29,28 +27,11 @@ describe("CreatorPage", () => {
       hasSession: true,
     });
 
-    render(await CreatorPage());
+    render(await CreatorUploadPage());
 
-    expect(screen.getByRole("link", { name: "動画を追加" })).toHaveAttribute("href", "/creator/upload");
-    expect(screen.getByRole("button", { name: "Account menu" })).toBeDisabled();
-    expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
-    expect(screen.getByText("@minarei")).toBeInTheDocument();
-    expect(screen.getByText("差し戻しが1件あります")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Top main" }));
-
-    expect(screen.getByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "rooftop side preview" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "rooftop side preview" }));
-
-    expect(screen.getByText("同じ main に送る別導線として比較しているショートです。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Back" }));
-
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/creator");
+    expect(screen.getByRole("heading", { name: "本編とショートを追加" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "アップロード" })).toBeDisabled();
   });
 
   it("renders the login-required state for unauthenticated viewers", async () => {
@@ -61,13 +42,13 @@ describe("CreatorPage", () => {
       hasSession: false,
     });
 
-    render(await CreatorPage());
+    render(await CreatorUploadPage());
 
     expect(screen.getByRole("heading", { name: "creator mode を開くにはログインが必要です。" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "ログインへ進む" })).toHaveAttribute("href", "/login");
   });
 
-  it("renders the capability-required state for authenticated fan-only viewers", async () => {
+  it("renders the capability-required state for fan-only viewers", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
@@ -79,13 +60,12 @@ describe("CreatorPage", () => {
       hasSession: true,
     });
 
-    render(await CreatorPage());
+    render(await CreatorUploadPage());
 
     expect(screen.getByRole("heading", { name: "creator mode はまだ利用できません。" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");
   });
 
-  it("renders a mode mismatch state when the viewer has not switched into creator mode yet", async () => {
+  it("renders the mode-required state when the viewer has not switched into creator mode yet", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
@@ -97,7 +77,7 @@ describe("CreatorPage", () => {
       hasSession: true,
     });
 
-    render(await CreatorPage());
+    render(await CreatorUploadPage());
 
     expect(screen.getByRole("heading", { name: "creator mode に切り替えてから開いてください。" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");

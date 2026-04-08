@@ -114,14 +114,15 @@ function AccountMenuIcon() {
 function CreatorWorkspaceTopBar() {
   return (
     <div className="flex items-center justify-between gap-2.5">
-      <CreatorWorkspaceActionButton
-        ariaLabel="動画を追加"
-        className="inline-flex size-7 items-center justify-center bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
+      <Link
+        aria-label="動画を追加"
+        className="inline-flex size-7 items-center justify-center bg-transparent text-[#1082c8] transition hover:opacity-80"
+        href="/creator/upload"
       >
         <span aria-hidden="true" className="text-[34px] font-extralight leading-none">
           +
         </span>
-      </CreatorWorkspaceActionButton>
+      </Link>
       <CreatorWorkspaceActionButton
         ariaLabel="Account menu"
         className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"

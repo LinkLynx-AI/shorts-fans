@@ -56,11 +56,12 @@ function CreatorModeNavigationCard({
 
   if (available) {
     return (
-        <Link
-          aria-current={active ? "page" : undefined}
-          className={cardClassName}
-          href={href}
-        >
+      <Link
+        aria-current={active ? "page" : undefined}
+        aria-label={label}
+        className={cardClassName}
+        href={href}
+      >
         <div className="flex items-start justify-between gap-3">
           <span
             className={cn(
@@ -125,6 +126,7 @@ export function CreatorModePrimaryNavigation({
               return (
                 <Link
                   aria-current={active ? "page" : undefined}
+                  aria-label={item.label}
                   className={cn(
                     "inline-flex min-h-9 items-center justify-center rounded-full px-2 text-[11px] font-semibold tracking-[-0.01em] transition",
                     active

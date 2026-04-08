@@ -70,8 +70,9 @@ describe("creator mode shell state", () => {
   });
 
   it("builds the shell from the shared mock creator profile", () => {
-    const state = getMockCreatorModeShellState();
+    const state = getMockCreatorModeShellState("upload");
 
+    expect(state.activeNavigation).toBe("upload");
     expect(state.creator.id).toBe("creator_mina_rei");
     expect(state.workspace.summaryStats).toHaveLength(3);
     expect(state.workspace.managedCollections.itemsByTab.shorts).toHaveLength(3);

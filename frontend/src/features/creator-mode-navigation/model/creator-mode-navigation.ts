@@ -45,7 +45,7 @@ export function getCreatorModeNavigationItems(): readonly CreatorModeNavigationI
  * 現在の run で遷移可能な creator navigation かを判定する。
  */
 export function isCreatorModeNavigationAvailable(key: CreatorModeNavigationKey): boolean {
-  return key === "dashboard";
+  return key === "dashboard" || key === "upload";
 }
 
 /**
