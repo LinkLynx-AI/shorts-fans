@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 
-import { CreatorAvatar, CreatorStatList } from "@/entities/creator";
+import {
+  CreatorAvatar,
+  CreatorFollowButton,
+  CreatorStatList,
+} from "@/entities/creator";
 import { useHasViewerSession } from "@/entities/viewer";
 import {
   buildCreatorShortDetailHref,
@@ -10,7 +14,6 @@ import {
   type CreatorProfileRouteState,
 } from "@/features/creator-navigation";
 import { useFanAuthDialog } from "@/features/fan-auth";
-import { Button } from "@/shared/ui";
 import { DetailShell } from "@/widgets/detail-shell";
 
 import type {
@@ -122,13 +125,6 @@ export function CreatorProfileShell({
       openFanAuthDialog();
     },
   });
-  const followButtonLabel = isPending
-    ? isFollowing
-      ? "Unfollowing..."
-      : "Following..."
-    : isFollowing
-      ? "Following"
-      : "Follow";
   const resolvedStats = {
     ...stats,
     fanCount,
@@ -163,23 +159,14 @@ export function CreatorProfileShell({
         <p className="mt-4 text-[13px] leading-[1.6] text-muted">{creator.bio}</p>
 
         <div className="mt-[14px]">
-          <Button
-            aria-busy={isPending || undefined}
-            aria-pressed={isFollowing}
-            className={
-              isFollowing
-                ? "min-h-9 w-full rounded-[10px] border-transparent bg-[#edf2f7] text-[13px] font-bold text-foreground shadow-none backdrop-blur-none"
-                : "min-h-9 w-full rounded-[10px] bg-accent-strong text-[13px] font-bold text-white shadow-none disabled:brightness-90"
-            }
-            disabled={isPending}
+          <CreatorFollowButton
+            fullWidth
             onClick={() => {
               void toggleFollow();
             }}
-            type="button"
-            variant={isFollowing ? "secondary" : "default"}
-          >
-            {followButtonLabel}
-          </Button>
+            isFollowing={isFollowing}
+            isPending={isPending}
+          />
           {errorMessage ? (
             <p
               className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
