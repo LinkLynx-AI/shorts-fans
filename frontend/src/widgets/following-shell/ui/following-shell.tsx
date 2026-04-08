@@ -6,10 +6,14 @@ import { useDeferredValue, useState } from "react";
 
 import type { FanFollowingItem } from "@/entities/fan-profile";
 import {
+  CreatorFollowApiError,
   CreatorAvatar,
   CreatorFollowButton,
   CreatorIdentity,
+  updateCreatorFollow,
 } from "@/entities/creator";
+import { useFanAuthDialog } from "@/features/fan-auth";
+import { ApiError } from "@/shared/api";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -22,6 +26,37 @@ type FollowingShellProps = {
   items: readonly FanFollowingItem[];
   updateFollowingCreatorRelation?: UpdateFollowingCreatorRelation | undefined;
 };
+
+function getFollowingCreatorRelationErrorMessage(error: unknown): string {
+  if (error instanceof CreatorFollowApiError) {
+    if (error.code === "not_found") {
+      return "この creator は現在利用できません。";
+    }
+
+    return "フォロー状態を更新できませんでした。少し時間を置いてから再度お試しください。";
+  }
+
+  if (error instanceof ApiError) {
+    return "フォロー状態を更新できませんでした。通信状態を確認してから再度お試しください。";
+  }
+
+  return "フォロー状態を更新できませんでした。少し時間を置いてから再度お試しください。";
+}
+
+function removeCreatorErrorMessage(
+  errorMessageByCreatorId: Record<string, string>,
+  creatorId: string,
+): Record<string, string> {
+  if (!(creatorId in errorMessageByCreatorId)) {
+    return errorMessageByCreatorId;
+  }
+
+  const nextErrorMessageByCreatorId = { ...errorMessageByCreatorId };
+
+  delete nextErrorMessageByCreatorId[creatorId];
+
+  return nextErrorMessageByCreatorId;
+}
 
 function matchesCreatorQuery(
   item: {
@@ -45,11 +80,38 @@ export function FollowingShell({
   items,
   updateFollowingCreatorRelation,
 }: FollowingShellProps) {
+  const { openFanAuthDialog } = useFanAuthDialog();
   const [query, setQuery] = useState("");
+  const [errorMessageByCreatorId, setErrorMessageByCreatorId] = useState<Record<string, string>>({});
   const deferredQuery = useDeferredValue(query);
+  const resolveUpdateFollowingCreatorRelation =
+    updateFollowingCreatorRelation ??
+    (async ({ action, creatorId }) => {
+      setErrorMessageByCreatorId((currentErrorMessageByCreatorId) =>
+        removeCreatorErrorMessage(currentErrorMessageByCreatorId, creatorId),
+      );
+
+      try {
+        await updateCreatorFollow({
+          action,
+          creatorId,
+        });
+      } catch (error) {
+        if (error instanceof CreatorFollowApiError && error.code === "auth_required") {
+          openFanAuthDialog();
+          throw error;
+        }
+
+        setErrorMessageByCreatorId((currentErrorMessageByCreatorId) => ({
+          ...currentErrorMessageByCreatorId,
+          [creatorId]: getFollowingCreatorRelationErrorMessage(error),
+        }));
+        throw error;
+      }
+    });
   const { rows, toggleFollowing } = useFollowingCreatorRows({
     items,
-    updateFollowingCreatorRelation,
+    updateFollowingCreatorRelation: resolveUpdateFollowingCreatorRelation,
   });
   const visibleRows = rows.filter((row) => matchesCreatorQuery(row, deferredQuery));
 
@@ -90,30 +152,40 @@ export function FollowingShell({
             <div
               key={row.creator.id}
               className={cn(
-                "flex items-center justify-between gap-3 border-b border-border/55 py-3.5",
+                "border-b border-border/55 py-3.5",
                 index === 0 && "border-t border-border/55",
               )}
             >
-              <Link className="min-w-0 flex-1 text-left transition hover:opacity-90" href={`/creators/${row.creator.id}`}>
-                <span className="flex items-center gap-3">
-                  <CreatorAvatar className="size-10 rounded-[16px]" creator={row.creator} />
-                  <CreatorIdentity className="text-foreground" creator={row.creator} />
-                </span>
-              </Link>
-              <CreatorFollowButton
-                className="h-9 shrink-0 px-4"
-                isFollowing={row.isFollowing}
-                isPending={row.isPending}
-                labels={{
-                  follow: "フォロー",
-                  followPending: "フォロー中...",
-                  following: "フォロー中",
-                  unfollowPending: "フォロー解除中...",
-                }}
-                onClick={() => {
-                  void toggleFollowing(row.creator.id);
-                }}
-              />
+              <div className="flex items-center justify-between gap-3">
+                <Link className="min-w-0 flex-1 text-left transition hover:opacity-90" href={`/creators/${row.creator.id}`}>
+                  <span className="flex items-center gap-3">
+                    <CreatorAvatar className="size-10 rounded-[16px]" creator={row.creator} />
+                    <CreatorIdentity className="text-foreground" creator={row.creator} />
+                  </span>
+                </Link>
+                <CreatorFollowButton
+                  className="h-9 shrink-0 px-4"
+                  isFollowing={row.isFollowing}
+                  isPending={row.isPending}
+                  labels={{
+                    follow: "フォロー",
+                    followPending: "フォロー中...",
+                    following: "フォロー中",
+                    unfollowPending: "フォロー解除中...",
+                  }}
+                  onClick={() => {
+                    void toggleFollowing(row.creator.id);
+                  }}
+                />
+              </div>
+              {errorMessageByCreatorId[row.creator.id] ? (
+                <p
+                  className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+                  role="alert"
+                >
+                  {errorMessageByCreatorId[row.creator.id]}
+                </p>
+              ) : null}
             </div>
           ))
         ) : (
