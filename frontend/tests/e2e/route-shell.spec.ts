@@ -17,9 +17,11 @@ async function addViewerSession(page: Page, value = createViewerSessionToken()) 
       value,
     },
   ]);
+
+  return value;
 }
 
-function buildViewerSessionCookieHeader(value = createViewerSessionToken()) {
+function buildViewerSessionCookieHeader(value: string) {
   return `${viewerSessionCookieBase.name}=${value}`;
 }
 
@@ -215,9 +217,10 @@ test("unauthenticated viewers can sign up from the shared auth modal and enter t
 });
 
 test("invalid grant response does not leak protected playback data", async ({ request }) => {
+  const viewerSessionToken = createViewerSessionToken();
   const response = await request.get("/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=invalid", {
     headers: {
-      Cookie: buildViewerSessionCookieHeader(),
+      Cookie: buildViewerSessionCookieHeader(viewerSessionToken),
     },
   });
   const body = await response.text();
@@ -269,6 +272,7 @@ test("stale session cookies are treated as unauthenticated on protected fan surf
 });
 
 test("main access route rejects direct setup bypass requests after authentication", async ({ request }) => {
+  const viewerSessionToken = createViewerSessionToken();
   const response = await request.post("/api/mock-main-access", {
     data: {
       acceptedAge: true,
@@ -278,7 +282,7 @@ test("main access route rejects direct setup bypass requests after authenticatio
       mainId: "main_mina_quiet_rooftop",
     },
     headers: {
-      Cookie: buildViewerSessionCookieHeader(),
+      Cookie: buildViewerSessionCookieHeader(viewerSessionToken),
     },
   });
 
@@ -332,7 +336,7 @@ test("authenticated viewers can open owner preview main playback from short deta
 });
 
 test("signed grants cannot be replayed against a different main context", async ({ page, request }) => {
-  await addViewerSession(page);
+  const viewerSessionToken = await addViewerSession(page);
   await page.goto("/");
   await page.getByRole("button", { name: /Unlock/i }).click();
   await page.getByLabel("18歳以上であり、年齢確認に同意する").check();
@@ -347,7 +351,7 @@ test("signed grants cannot be replayed against a different main context", async 
 
   const response = await request.get(`/mains/main_aoi_blue_balcony?fromShortId=softlight&grant=${grant}`, {
     headers: {
-      Cookie: buildViewerSessionCookieHeader(),
+      Cookie: buildViewerSessionCookieHeader(viewerSessionToken),
     },
   });
   const body = await response.text();

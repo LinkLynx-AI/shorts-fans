@@ -182,7 +182,6 @@ export function CreatorProfileShell({
           </Button>
           {errorMessage ? (
             <p
-              aria-live="polite"
               className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
               role="alert"
             >
