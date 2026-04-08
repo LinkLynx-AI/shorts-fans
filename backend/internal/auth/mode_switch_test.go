@@ -72,3 +72,29 @@ func TestModeSwitcherRejectsBlankToken(t *testing.T) {
 		t.Fatalf("SwitchActiveMode() error got %v want %v", err, ErrSessionNotFound)
 	}
 }
+
+func TestModeSwitcherRejectsUninitializedSwitcher(t *testing.T) {
+	t.Parallel()
+
+	var switcher *ModeSwitcher
+
+	if err := switcher.SwitchActiveMode(context.Background(), "raw-session-token", ActiveModeFan); err == nil {
+		t.Fatal("SwitchActiveMode() error = nil, want initialization error")
+	}
+}
+
+func TestModeSwitcherWrapsRepositoryError(t *testing.T) {
+	t.Parallel()
+
+	repositoryErr := errors.New("update failed")
+	switcher := NewModeSwitcher(activeModeRepositoryStub{
+		updateActiveModeByTokenHash: func(context.Context, string, ActiveMode) (SessionRecord, error) {
+			return SessionRecord{}, repositoryErr
+		},
+	})
+
+	err := switcher.SwitchActiveMode(context.Background(), "raw-session-token", ActiveModeFan)
+	if !errors.Is(err, repositoryErr) {
+		t.Fatalf("SwitchActiveMode() error got %v want wrapped %v", err, repositoryErr)
+	}
+}

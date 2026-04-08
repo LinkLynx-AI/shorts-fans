@@ -219,3 +219,101 @@ func TestRegisterApprovedCreatorRejectsBlankDisplayName(t *testing.T) {
 		t.Fatalf("RegisterApprovedCreator() error got %v want %v", err, ErrInvalidDisplayName)
 	}
 }
+
+func TestRegisterApprovedCreatorRejectsUninitializedRepository(t *testing.T) {
+	t.Parallel()
+
+	var nilRepo *Repository
+	if _, err := nilRepo.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		UserID:      uuid.New(),
+		DisplayName: "Mina",
+	}); err == nil {
+		t.Fatal("RegisterApprovedCreator() nil repo error = nil, want initialization error")
+	}
+
+	repoWithoutQueries := &Repository{txBeginner: &creatorTxBeginnerStub{}}
+	if _, err := repoWithoutQueries.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		UserID:      uuid.New(),
+		DisplayName: "Mina",
+	}); err == nil {
+		t.Fatal("RegisterApprovedCreator() nil query factory error = nil, want initialization error")
+	}
+}
+
+func TestRegisterApprovedCreatorReturnsWrappedErrorWhenCapabilityLookupFails(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	tx := &creatorTxStub{}
+	beginner := &creatorTxBeginnerStub{tx: tx}
+	expectedErr := errors.New("capability lookup failed")
+
+	repo := &Repository{
+		txBeginner: beginner,
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryStubQueries{
+				getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{}, expectedErr
+				},
+			}
+		},
+	}
+
+	_, err := repo.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Bio:         "bio",
+	})
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("RegisterApprovedCreator() error got %v want wrapped %v", err, expectedErr)
+	}
+	if !tx.rolledBack {
+		t.Fatal("RegisterApprovedCreator() rolledBack = false, want true")
+	}
+}
+
+func TestRegisterApprovedCreatorKeepsApprovedCapabilityState(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	userID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	tx := &creatorTxStub{}
+	beginner := &creatorTxBeginnerStub{tx: tx}
+	updateCalled := false
+
+	repo := &Repository{
+		txBeginner: beginner,
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryStubQueries{
+				getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return testCapabilityRow(userID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+				},
+				updateCapability: func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
+					updateCalled = true
+					return sqlc.AppCreatorCapability{}, nil
+				},
+				getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return sqlc.AppCreatorProfile{}, pgx.ErrNoRows
+				},
+				createProfile: func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
+					return testProfileRow(userID, now, stringPtr("Mina"), nil, nil, nil), nil
+				},
+			}
+		},
+	}
+
+	got, err := repo.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Bio:         "bio",
+	})
+	if err != nil {
+		t.Fatalf("RegisterApprovedCreator() error = %v, want nil", err)
+	}
+	if updateCalled {
+		t.Fatal("RegisterApprovedCreator() update capability called = true, want false")
+	}
+	if got.Capability.State != "approved" {
+		t.Fatalf("RegisterApprovedCreator() capability state got %q want approved", got.Capability.State)
+	}
+}
