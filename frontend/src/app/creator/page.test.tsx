@@ -1,4 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import {
+  render,
+  screen,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import CreatorPage from "./page";
 
@@ -14,6 +18,7 @@ vi.mock("@/features/fan-auth-gate", async () => {
 describe("CreatorPage", () => {
   it("renders the creator route shell for creator-mode viewers", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
       currentViewer: {
@@ -26,10 +31,26 @@ describe("CreatorPage", () => {
 
     render(await CreatorPage());
 
-    expect(screen.getByRole("heading", { name: "Dashboard shell" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Dashboard/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
-    expect(screen.getByText("creator route shell")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "動画を追加" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Account menu" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "Dashboard" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("@minarei")).toBeInTheDocument();
+    expect(screen.getByText("差し戻しが1件あります")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Top main" }));
+
+    expect(screen.getByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "rooftop side preview" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "rooftop side preview" }));
+
+    expect(screen.getByText("同じ main に送る別導線として比較しているショートです。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
   });
 
   it("renders the login-required state for unauthenticated viewers", async () => {

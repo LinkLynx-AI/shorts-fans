@@ -14,8 +14,18 @@ describe("creator mode shell state", () => {
     ).toEqual(
       expect.objectContaining({
         activeNavigation: "dashboard",
+        creator: expect.objectContaining({
+          id: "creator_mina_rei",
+        }),
         kind: "ready",
-        title: "Dashboard shell",
+        workspace: expect.objectContaining({
+          summaryStats: expect.arrayContaining([
+            expect.objectContaining({
+              label: "revenue",
+              value: "¥120K",
+            }),
+          ]),
+        }),
       }),
     );
   });
@@ -63,7 +73,8 @@ describe("creator mode shell state", () => {
     const state = getMockCreatorModeShellState();
 
     expect(state.creator.id).toBe("creator_mina_rei");
-    expect(state.structureItems).toHaveLength(4);
-    expect(state.slots).toHaveLength(2);
+    expect(state.workspace.summaryStats).toHaveLength(3);
+    expect(state.workspace.managedCollections.itemsByTab.shorts).toHaveLength(3);
+    expect(state.workspace.managedCollections.itemsByTab.main).toHaveLength(2);
   });
 });
