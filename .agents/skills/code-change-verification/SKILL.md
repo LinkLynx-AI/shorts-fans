@@ -28,7 +28,7 @@ description: Run touched-area validation, runtime smoke checks, architecture gua
 - Backend dependency changes:
   - `cd backend && go mod tidy && govulncheck ./...`
 - Frontend changes:
-  - `cd frontend && pnpm lint && pnpm typecheck && pnpm test`
+  - `cd frontend && pnpm lint && pnpm typecheck && pnpm test:unit`
 - Frontend review-ready coverage when logic or tests under `src/shared`, `src/entities`, `src/features`, or `src/widgets` changed:
   - `cd frontend && pnpm test:coverage:check`
 - Docs-only changes:
@@ -36,7 +36,8 @@ description: Run touched-area validation, runtime smoke checks, architecture gua
 
 ## Runtime Smoke Rules
 - For non-trivial backend behavior changes, exercise the affected endpoint or local runtime path.
-- For non-trivial frontend UI changes, run a smoke flow on the affected route and use Playwright when the user-visible flow warrants it.
+- For non-trivial frontend UI changes, run a smoke flow on the affected route.
+- Do not use Playwright unless the user explicitly requested E2E validation.
 - If a smoke check is skipped, record why the change is trivial enough to skip it.
 
 ## Procedure

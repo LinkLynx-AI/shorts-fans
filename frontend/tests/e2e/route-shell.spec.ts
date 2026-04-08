@@ -1,13 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 
+type ViewerSessionMode = "creator" | "fan";
+
 const viewerSessionCookieBase = {
   domain: "127.0.0.1",
   name: "shorts_fans_session",
   path: "/",
 } as const;
 
-function createViewerSessionToken(): string {
-  return `e2e-viewer-session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+function createViewerSessionToken(mode: ViewerSessionMode = "fan"): string {
+  const prefix = mode === "creator" ? "e2e-creator-session" : "e2e-viewer-session";
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 async function addViewerSession(page: Page, value = createViewerSessionToken()) {
@@ -135,6 +139,16 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page).toHaveURL(/\/shorts\/rooftop\?from=share&profileFrom=other$/);
   await expect(page.getByText("quiet rooftop preview.")).toBeVisible();
   await expect(page.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
+});
+
+test("creator route shell renders for creator-mode viewers", async ({ page }) => {
+  await addViewerSession(page, createViewerSessionToken("creator"));
+  await page.goto("/creator");
+
+  await expect(page).toHaveURL(/\/creator$/);
+  await expect(page.getByRole("heading", { name: "Dashboard shell" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Dashboard/i })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("creator route shell")).toBeVisible();
 });
 
 test("unauthenticated viewers can sign in from the shared auth modal opened by the profile button", async ({ page }) => {

@@ -5,15 +5,30 @@ import { ArrowLeft, Search } from "lucide-react";
 import { useDeferredValue, useState } from "react";
 
 import type { FanFollowingItem } from "@/entities/fan-profile";
-import { CreatorAvatar, CreatorIdentity } from "@/entities/creator";
+import {
+  CreatorAvatar,
+  CreatorFollowButton,
+  CreatorIdentity,
+} from "@/entities/creator";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
+import {
+  useFollowingCreatorRows,
+  type UpdateFollowingCreatorRelation,
+} from "../model/use-following-creator-rows";
+
 type FollowingShellProps = {
   items: readonly FanFollowingItem[];
+  updateFollowingCreatorRelation?: UpdateFollowingCreatorRelation | undefined;
 };
 
-function matchesCreatorQuery(item: FanFollowingItem, query: string): boolean {
+function matchesCreatorQuery(
+  item: {
+    creator: FanFollowingItem["creator"];
+  },
+  query: string,
+): boolean {
   const normalizedQuery = query.trim().toLowerCase();
 
   if (!normalizedQuery) {
@@ -26,10 +41,17 @@ function matchesCreatorQuery(item: FanFollowingItem, query: string): boolean {
 /**
  * following 詳細画面を表示する。
  */
-export function FollowingShell({ items }: FollowingShellProps) {
+export function FollowingShell({
+  items,
+  updateFollowingCreatorRelation,
+}: FollowingShellProps) {
   const [query, setQuery] = useState("");
   const deferredQuery = useDeferredValue(query);
-  const visibleItems = items.filter((item) => matchesCreatorQuery(item, deferredQuery));
+  const { rows, toggleFollowing } = useFollowingCreatorRows({
+    items,
+    updateFollowingCreatorRelation,
+  });
+  const visibleRows = rows.filter((row) => matchesCreatorQuery(row, deferredQuery));
 
   return (
     <section className="min-h-full overflow-y-auto px-4 pb-28 pt-4 text-foreground">
@@ -59,31 +81,39 @@ export function FollowingShell({ items }: FollowingShellProps) {
 
       <div className="mt-6 flex items-end justify-between gap-3">
         <p className="font-display text-[11px] font-semibold uppercase tracking-[0.24em] text-accent">all creators</p>
-        <span className="text-[12px] text-muted">{visibleItems.length} creators</span>
+        <span className="text-[12px] text-muted">{visibleRows.length} creators</span>
       </div>
 
       <div className="mt-3">
-        {visibleItems.length ? (
-          visibleItems.map((item, index) => (
+        {visibleRows.length ? (
+          visibleRows.map((row, index) => (
             <div
-              key={item.creator.id}
+              key={row.creator.id}
               className={cn(
                 "flex items-center justify-between gap-3 border-b border-border/55 py-3.5",
                 index === 0 && "border-t border-border/55",
               )}
             >
-              <Link className="min-w-0 flex-1 text-left transition hover:opacity-90" href={`/creators/${item.creator.id}`}>
+              <Link className="min-w-0 flex-1 text-left transition hover:opacity-90" href={`/creators/${row.creator.id}`}>
                 <span className="flex items-center gap-3">
-                  <CreatorAvatar className="size-10 rounded-[16px]" creator={item.creator} />
-                  <CreatorIdentity className="text-foreground" creator={item.creator} />
+                  <CreatorAvatar className="size-10 rounded-[16px]" creator={row.creator} />
+                  <CreatorIdentity className="text-foreground" creator={row.creator} />
                 </span>
               </Link>
-              <button
-                className="min-h-8 shrink-0 rounded-[8px] border border-border bg-transparent px-2.5 text-[12px] font-bold text-muted transition hover:border-border/80 hover:text-muted-strong"
-                type="button"
-              >
-                削除
-              </button>
+              <CreatorFollowButton
+                className="h-9 shrink-0 px-4"
+                isFollowing={row.isFollowing}
+                isPending={row.isPending}
+                labels={{
+                  follow: "フォロー",
+                  followPending: "フォロー中...",
+                  following: "フォロー中",
+                  unfollowPending: "フォロー解除中...",
+                }}
+                onClick={() => {
+                  void toggleFollowing(row.creator.id);
+                }}
+              />
             </div>
           ))
         ) : (

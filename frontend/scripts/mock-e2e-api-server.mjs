@@ -27,10 +27,11 @@ const creatorProfileHeaderFixtures = fixtures["GET /api/fan/creators/{creatorId}
 const creatorProfileShortGridFixtures = fixtures["GET /api/fan/creators/{creatorId}/shorts"];
 const creatorFollowPutFixtures = creatorFollowFixtures["PUT /api/fan/creators/{creatorId}/follow"];
 const creatorFollowDeleteFixtures = creatorFollowFixtures["DELETE /api/fan/creators/{creatorId}/follow"];
-const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const authenticatedCreatorBootstrap = viewerBootstrapFixtures.authenticatedCreator;
+const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
 const e2eSessionToken = "e2e-viewer-session";
+const e2eCreatorSessionToken = "e2e-creator-session";
 const existingFanEmail = "fan@example.com";
 const signInChallengeToken = "e2e-sign-in-challenge";
 const signUpChallengeToken = "e2e-sign-up-challenge";
@@ -118,8 +119,10 @@ if (
   throw new Error("creator profile fixture が不足しています");
 }
 
-if (!authenticatedFanBootstrap || !authenticatedCreatorBootstrap || !unauthenticatedBootstrap) {
-  throw new Error("viewer bootstrap fixture の authenticatedFan / authenticatedCreator / unauthenticated が不足しています");
+if (!authenticatedCreatorBootstrap || !authenticatedFanBootstrap || !unauthenticatedBootstrap) {
+  throw new Error(
+    "viewer bootstrap fixture の authenticatedCreator / authenticatedFan / unauthenticated が不足しています",
+  );
 }
 
 if (!creatorFollowPutFixtures || !creatorFollowDeleteFixtures) {
@@ -186,8 +189,15 @@ function buildSearchResponse(query) {
   };
 }
 
-function isAuthenticatedSessionToken(sessionToken) {
+function isAuthenticatedCreatorSessionToken(sessionToken) {
   return (
+    typeof sessionToken === "string" &&
+    (sessionToken === e2eCreatorSessionToken || sessionToken.startsWith(`${e2eCreatorSessionToken}-`))
+  );
+}
+
+function isAuthenticatedSessionToken(sessionToken) {
+  return isAuthenticatedCreatorSessionToken(sessionToken) || (
     typeof sessionToken === "string" &&
     (sessionToken === e2eSessionToken || sessionToken.startsWith(`${e2eSessionToken}-`))
   );
@@ -198,8 +208,12 @@ function createE2ESessionToken() {
   return `${e2eSessionToken}-${issuedSessionCount}`;
 }
 
-function buildDefaultViewerState() {
-  return structuredClone(authenticatedFanBootstrap.data.currentViewer);
+function buildDefaultViewerState(sessionToken = null) {
+  const bootstrapFixture = isAuthenticatedCreatorSessionToken(sessionToken)
+    ? authenticatedCreatorBootstrap
+    : authenticatedFanBootstrap;
+
+  return structuredClone(bootstrapFixture.data.currentViewer);
 }
 
 function getViewerState(sessionToken) {
@@ -213,7 +227,7 @@ function getViewerState(sessionToken) {
     return existingViewerState;
   }
 
-  const nextViewerState = buildDefaultViewerState();
+  const nextViewerState = buildDefaultViewerState(sessionToken);
 
   viewerStateBySessionToken.set(sessionToken, nextViewerState);
 
@@ -227,19 +241,13 @@ function buildViewerBootstrapResponse(sessionToken) {
     return structuredClone(unauthenticatedBootstrap);
   }
 
-  return {
-    data: {
-      currentViewer: structuredClone(viewerState),
-    },
-    error: null,
-    meta: {
-      page: null,
-      requestId:
-        viewerState.activeMode === "creator"
-          ? authenticatedCreatorBootstrap.meta.requestId
-          : authenticatedFanBootstrap.meta.requestId,
-    },
-  };
+  const bootstrapBody = structuredClone(
+    viewerState.activeMode === "creator" ? authenticatedCreatorBootstrap : authenticatedFanBootstrap,
+  );
+
+  bootstrapBody.data.currentViewer = structuredClone(viewerState);
+
+  return bootstrapBody;
 }
 
 function getFollowedCreatorIds(sessionToken) {

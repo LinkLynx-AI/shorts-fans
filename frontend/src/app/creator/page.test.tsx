@@ -2,19 +2,6 @@ import { render, screen } from "@testing-library/react";
 
 import CreatorPage from "./page";
 
-const { redirect } = vi.hoisted(() => ({
-  redirect: vi.fn(),
-}));
-
-vi.mock("next/navigation", async () => {
-  const actual = await vi.importActual<typeof import("next/navigation")>("next/navigation");
-
-  return {
-    ...actual,
-    redirect,
-  };
-});
-
 vi.mock("@/features/fan-auth-gate", async () => {
   const actual = await vi.importActual<typeof import("@/features/fan-auth-gate")>("@/features/fan-auth-gate");
 
@@ -25,41 +12,73 @@ vi.mock("@/features/fan-auth-gate", async () => {
 });
 
 describe("CreatorPage", () => {
-  afterEach(() => {
-    redirect.mockReset();
-  });
-
-  it("redirects creator-capable viewers in fan mode to the success surface", async () => {
-    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
-
-    vi.mocked(getFanAuthGateState).mockResolvedValue({
-      currentViewer: {
-        activeMode: "fan",
-        canAccessCreatorMode: true,
-        id: "viewer_123",
-      },
-      hasSession: true,
-    });
-
-    await CreatorPage();
-
-    expect(redirect).toHaveBeenCalledWith("/fan/creator/success");
-  });
-
-  it("renders the placeholder creator route when creator mode is active", async () => {
+  it("renders the creator route shell for creator-mode viewers", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
       currentViewer: {
         activeMode: "creator",
         canAccessCreatorMode: true,
-        id: "viewer_123",
+        id: "viewer_creator_001",
       },
       hasSession: true,
     });
 
     render(await CreatorPage());
 
-    expect(screen.getByRole("heading", { name: "Creator mode" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Dashboard shell" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Dashboard/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Upload" })).not.toBeInTheDocument();
+    expect(screen.getByText("creator route shell")).toBeInTheDocument();
+  });
+
+  it("renders the login-required state for unauthenticated viewers", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: null,
+      hasSession: false,
+    });
+
+    render(await CreatorPage());
+
+    expect(screen.getByRole("heading", { name: "creator mode を開くにはログインが必要です。" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ログインへ進む" })).toHaveAttribute("href", "/login");
+  });
+
+  it("renders the capability-required state for authenticated fan-only viewers", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_fan_001",
+      },
+      hasSession: true,
+    });
+
+    render(await CreatorPage());
+
+    expect(screen.getByRole("heading", { name: "creator mode はまだ利用できません。" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");
+  });
+
+  it("renders a mode mismatch state when the viewer has not switched into creator mode yet", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_002",
+      },
+      hasSession: true,
+    });
+
+    render(await CreatorPage());
+
+    expect(screen.getByRole("heading", { name: "creator mode に切り替えてから開いてください。" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "フィードへ戻る" })).toHaveAttribute("href", "/");
   });
 });

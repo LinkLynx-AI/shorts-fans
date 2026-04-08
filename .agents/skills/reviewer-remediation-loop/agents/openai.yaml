@@ -1,4 +1,4 @@
 interface:
   display_name: "Reviewer Remediation Loop"
   short_description: "Repeat reviewer gates until blocking findings are gone"
-  default_prompt: "Use $reviewer-remediation-loop to enforce the reviewer gate and keep fixing until the gate passes."
+  default_prompt: "Use $reviewer-remediation-loop to enforce the reviewer gate. Require reviewer outputs in findings-only format with severity, confidence, file path, and rationale for each finding, or the exact clean response `No findings. Gate clean.`"

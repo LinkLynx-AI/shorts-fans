@@ -37,7 +37,8 @@ Review process:
    - If UI-impact exists, run and report:
      - `cd frontend && pnpm lint`
      - `cd frontend && pnpm typecheck`
-     - `cd frontend && pnpm test`
+     - `cd frontend && pnpm test:unit`
+   - Do not run Playwright or `cd frontend && pnpm test:e2e` unless the user explicitly requested E2E validation.
    - If no UI-impact exists, mark UI checks as skipped.
 8. Deduplicate overlapping findings and keep only actionable high-signal issues.
 

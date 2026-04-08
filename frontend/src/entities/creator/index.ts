@@ -41,3 +41,5 @@ export {
   CreatorIdentity,
   CreatorStatList,
 } from "./ui/creator-presenters";
+export { CreatorFollowButton } from "./ui/creator-follow-button";
+export type { CreatorFollowButtonProps } from "./ui/creator-follow-button";
