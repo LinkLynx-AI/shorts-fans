@@ -2,9 +2,10 @@ import type { CreatorId } from "@/entities/creator";
 
 export type ApprovedCreatorWorkspaceManagedTab = "main" | "shorts";
 
-export type ApprovedCreatorWorkspaceMetric = {
-  label: string;
-  value: string;
+export type ApprovedCreatorWorkspaceOverviewMetrics = {
+  grossUnlockRevenueJpy: number;
+  uniquePurchaserCount: number;
+  unlockCount: number;
 };
 
 export type ApprovedCreatorWorkspacePoster = {
@@ -17,10 +18,10 @@ export type ApprovedCreatorWorkspacePoster = {
   };
 };
 
-export type ApprovedCreatorWorkspaceRevisionNotice = {
-  badge: string;
-  detail: string;
-  label: string;
+export type ApprovedCreatorWorkspaceRevisionRequestedSummary = {
+  mainCount: number;
+  shortCount: number;
+  totalCount: number;
 };
 
 export type ApprovedCreatorWorkspaceTopPerformer = {
@@ -72,7 +73,6 @@ export type ApprovedCreatorWorkspaceDetailState = {
 
 export type ApprovedCreatorWorkspaceState = {
   detailsByTab: Readonly<Record<ApprovedCreatorWorkspaceManagedTab, Readonly<Record<string, ApprovedCreatorWorkspaceDetailState>>>>;
-  description: string;
   managedCollections: {
     defaultTab: ApprovedCreatorWorkspaceManagedTab;
     itemsByTab: Readonly<Record<ApprovedCreatorWorkspaceManagedTab, readonly ApprovedCreatorWorkspaceManagedItem[]>>;
@@ -81,9 +81,9 @@ export type ApprovedCreatorWorkspaceState = {
       label: string;
     }[];
   };
+  overviewMetrics: ApprovedCreatorWorkspaceOverviewMetrics;
   posters: Readonly<Record<string, ApprovedCreatorWorkspacePoster>>;
-  revisionNotice: ApprovedCreatorWorkspaceRevisionNotice | null;
-  summaryStats: readonly ApprovedCreatorWorkspaceMetric[];
+  revisionRequestedSummary: ApprovedCreatorWorkspaceRevisionRequestedSummary | null;
   topPerformers: readonly ApprovedCreatorWorkspaceTopPerformer[];
 };
 
@@ -213,7 +213,6 @@ const minaWorkspace = {
       },
     },
   },
-  description: "quiet rooftop 系の release をまとめて管理し、review と unlock の動きを profile から見返します。",
   managedCollections: {
     defaultTab: "shorts",
     itemsByTab: {
@@ -264,6 +263,11 @@ const minaWorkspace = {
     },
     tabs: dashboardTabs,
   },
+  overviewMetrics: {
+    grossUnlockRevenueJpy: 120000,
+    uniquePurchaserCount: 164,
+    unlockCount: 238,
+  },
   posters: {
     mirror: {
       shortId: "mirror",
@@ -293,16 +297,11 @@ const minaWorkspace = {
       title: "rooftop side preview",
     },
   },
-  revisionNotice: {
-    badge: "差し戻し",
-    detail: "キャプション連携を確認してください",
-    label: "差し戻しが1件あります",
+  revisionRequestedSummary: {
+    mainCount: 0,
+    shortCount: 1,
+    totalCount: 1,
   },
-  summaryStats: [
-    { label: "revenue", value: "¥120K" },
-    { label: "unlocks", value: "238" },
-    { label: "purchasers", value: "164" },
-  ],
   topPerformers: [
     { kind: "main", label: "Top main", metric: "¥84K", shortId: "rooftop" },
     { kind: "shorts", label: "Top short", metric: "186 unlocks", shortId: "rooftop" },

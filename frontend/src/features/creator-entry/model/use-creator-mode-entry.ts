@@ -1,13 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import {
-  startTransition,
-  useState,
-} from "react";
-
-import { switchViewerActiveMode } from "../api/switch-viewer-active-mode";
 import { getCreatorModeEntryErrorMessage } from "./creator-entry";
+import { useViewerModeEntry } from "./use-viewer-mode-entry";
 
 type UseCreatorModeEntryResult = {
   clearError: () => void;
@@ -20,43 +14,20 @@ type UseCreatorModeEntryResult = {
  * fan surface から creator mode へ遷移する submit 状態を管理する。
  */
 export function useCreatorModeEntry(): UseCreatorModeEntryResult {
-  const router = useRouter();
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const clearError = () => {
-    if (errorMessage !== null) {
-      setErrorMessage(null);
-    }
-  };
-
-  const enterCreatorMode = async () => {
-    if (isSubmitting) {
-      return false;
-    }
-
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    try {
-      await switchViewerActiveMode("creator");
-
-      startTransition(() => {
-        router.push("/creator");
-      });
-
-      return true;
-    } catch (error) {
-      setErrorMessage(getCreatorModeEntryErrorMessage(error));
-      return false;
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const {
+    clearError,
+    enterMode,
+    errorMessage,
+    isSubmitting,
+  } = useViewerModeEntry({
+    activeMode: "creator",
+    destination: "/creator",
+    getErrorMessage: getCreatorModeEntryErrorMessage,
+  });
 
   return {
     clearError,
-    enterCreatorMode,
+    enterCreatorMode: enterMode,
     errorMessage,
     isSubmitting,
   };

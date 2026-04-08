@@ -1,0 +1,130 @@
+{
+  "GET /api/creator/workspace": {
+    "workspace_normal": {
+      "status": 200,
+      "body": {
+        "data": {
+          "workspace": {
+            "creator": {
+              "id": "creator_mina_rei",
+              "displayName": "Mina Rei",
+              "handle": "@minarei",
+              "avatar": {
+                "id": "asset_creator_mina_avatar",
+                "kind": "image",
+                "url": "https://cdn.example.com/creator/mina/avatar.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
+            },
+            "overviewMetrics": {
+              "grossUnlockRevenueJpy": 120000,
+              "unlockCount": 238,
+              "uniquePurchaserCount": 164
+            },
+            "revisionRequestedSummary": {
+              "totalCount": 1,
+              "mainCount": 0,
+              "shortCount": 1
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "workspace_without_revision_requested": {
+      "status": 200,
+      "body": {
+        "data": {
+          "workspace": {
+            "creator": {
+              "id": "creator_sora_vale",
+              "displayName": "Sora Vale",
+              "handle": "@soravale",
+              "avatar": {
+                "id": "asset_creator_sora_avatar",
+                "kind": "image",
+                "url": "https://cdn.example.com/creator/sora/avatar.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "bio": "after rain と balcony mood の short をまとめています。"
+            },
+            "overviewMetrics": {
+              "grossUnlockRevenueJpy": 82000,
+              "unlockCount": 91,
+              "uniquePurchaserCount": 74
+            },
+            "revisionRequestedSummary": null
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_002",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "creator workspace requires authentication"
+        }
+      }
+    },
+    "creator_mode_unavailable": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_forbidden_001",
+          "page": null
+        },
+        "error": {
+          "code": "creator_mode_unavailable",
+          "message": "creator mode is not available"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator workspace was not found"
+        }
+      }
+    },
+    "internal_error": {
+      "status": 500,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_500_001",
+          "page": null
+        },
+        "error": {
+          "code": "internal_error",
+          "message": "creator workspace could not be loaded"
+        }
+      }
+    }
+  }
+}

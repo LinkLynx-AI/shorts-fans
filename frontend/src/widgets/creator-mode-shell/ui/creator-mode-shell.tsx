@@ -1,14 +1,19 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import {
   useState,
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+} from "lucide-react";
 
 import { CreatorAvatar } from "@/entities/creator";
+import { useFanModeEntry } from "@/features/creator-entry";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
@@ -25,6 +30,33 @@ type CreatorWorkspaceDetailSelection = {
   shortId: string;
   tab: ApprovedCreatorWorkspaceManagedTab;
 };
+
+function formatCount(value: number): string {
+  return value.toLocaleString("ja-JP");
+}
+
+function formatJpy(value: number): string {
+  return `¥${value.toLocaleString("ja-JP")}`;
+}
+
+function buildRevisionRequestedDetail({
+  mainCount,
+  shortCount,
+}: {
+  mainCount: number;
+  shortCount: number;
+}): string {
+  const scopes = [
+    shortCount > 0 ? `short ${formatCount(shortCount)}件` : null,
+    mainCount > 0 ? `main ${formatCount(mainCount)}件` : null,
+  ].filter((scope) => scope !== null);
+
+  if (scopes.length === 0) {
+    return "修正依頼内容を確認してください";
+  }
+
+  return `${scopes.join(" / ")}を確認してください`;
+}
 
 function CreatorModeBlockedFrame({ children }: { children: ReactNode }) {
   return (
@@ -111,6 +143,68 @@ function AccountMenuIcon() {
   );
 }
 
+function CreatorWorkspaceAccountMenu() {
+  const {
+    clearError,
+    enterFanMode,
+    errorMessage,
+    isSubmitting,
+  } = useFanModeEntry();
+
+  return (
+    <Dialog.Root>
+      <Dialog.Trigger asChild>
+        <button
+          aria-label="Account menu"
+          className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] transition hover:bg-[#1082c8]/10"
+          onClick={clearError}
+          type="button"
+        >
+          <AccountMenuIcon />
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
+        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
+          <Dialog.Title className="sr-only">アカウントメニュー</Dialog.Title>
+          <Dialog.Description className="sr-only">
+            creator workspace から fan mode へ戻るメニュー
+          </Dialog.Description>
+
+          <div
+            aria-hidden="true"
+            className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
+          />
+
+          <div className="rounded-[24px] bg-[#f3f6f8] py-1">
+            <button
+              className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
+              disabled={isSubmitting}
+              onClick={() => {
+                void enterFanMode();
+              }}
+              type="button"
+            >
+              <span>{isSubmitting ? "Fan mode に切り替えています..." : "Fan mode に切り替え"}</span>
+              <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+            </button>
+          </div>
+
+          {errorMessage ? (
+            <p
+              aria-live="polite"
+              className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+              role="alert"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
 function CreatorWorkspaceTopBar() {
   return (
     <div className="flex items-center justify-between gap-2.5">
@@ -123,20 +217,30 @@ function CreatorWorkspaceTopBar() {
           +
         </span>
       </Link>
-      <CreatorWorkspaceActionButton
-        ariaLabel="Account menu"
-        className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
-      >
-        <AccountMenuIcon />
-      </CreatorWorkspaceActionButton>
+      <CreatorWorkspaceAccountMenu />
     </div>
   );
 }
 
 function CreatorWorkspaceMetricStrip({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
+  const metrics = [
+    {
+      label: "revenue",
+      value: formatJpy(workspace.overviewMetrics.grossUnlockRevenueJpy),
+    },
+    {
+      label: "unlocks",
+      value: formatCount(workspace.overviewMetrics.unlockCount),
+    },
+    {
+      label: "purchasers",
+      value: formatCount(workspace.overviewMetrics.uniquePurchaserCount),
+    },
+  ] as const;
+
   return (
     <div className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2 text-center">
-      {workspace.summaryStats.map((item) => (
+      {metrics.map((item) => (
         <div key={item.label} className="min-w-0">
           <strong className="block text-base font-bold leading-[1.2] tracking-[-0.03em] text-foreground">
             {item.value}
@@ -162,25 +266,34 @@ function CreatorWorkspaceHeader({ state }: { state: Extract<CreatorModeShellStat
       <div className="mt-[14px]">
         <p className="m-0 text-[15px] font-bold text-foreground">{state.creator.handle}</p>
         <p className="mt-1 text-[13px] font-bold text-foreground">{state.creator.displayName}</p>
-        <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{state.workspace.description}</p>
+        {state.creator.bio.trim().length > 0 ? (
+          <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{state.creator.bio}</p>
+        ) : null}
       </div>
     </section>
   );
 }
 
 function CreatorWorkspaceRevisionNotice({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
-  if (workspace.revisionNotice === null) {
+  const summary = workspace.revisionRequestedSummary;
+
+  if (summary === null) {
     return null;
   }
 
   return (
     <div className="mt-[14px] flex items-center gap-3 rounded-[18px] border border-[rgba(244,152,45,0.18)] bg-[linear-gradient(180deg,rgba(255,248,238,0.96),rgba(252,242,224,0.92))] px-[14px] py-3 text-foreground">
       <span className="inline-flex min-h-7 items-center justify-center rounded-full bg-[rgba(244,152,45,0.14)] px-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#8e4e0a]">
-        {workspace.revisionNotice.badge}
+        差し戻し
       </span>
       <div className="grid gap-1">
-        <b className="text-[13px] leading-[1.35] text-foreground">{workspace.revisionNotice.label}</b>
-        <span className="text-[11px] text-muted">{workspace.revisionNotice.detail}</span>
+        <b className="text-[13px] leading-[1.35] text-foreground">差し戻しが{formatCount(summary.totalCount)}件あります</b>
+        <span className="text-[11px] text-muted">
+          {buildRevisionRequestedDetail({
+            mainCount: summary.mainCount,
+            shortCount: summary.shortCount,
+          })}
+        </span>
       </div>
     </div>
   );
