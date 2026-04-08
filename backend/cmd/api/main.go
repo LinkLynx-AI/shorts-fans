@@ -67,6 +67,7 @@ func main() {
 			CreatorSearch:        creatorRepository,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
+			CreatorFollow:        creatorRepository,
 			FanProfileOverview:   fanProfileRepository,
 			FanProfileFollowing:  fanProfileRepository,
 			FanAuth:              authLifecycle,

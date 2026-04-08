@@ -366,6 +366,114 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
 }
 
+func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 7)
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+
+	viewer, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() viewer error = %v, want nil", err)
+	}
+	creatorUser, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() creator error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creatorUser.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+	_, err = queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
+		UserID:      creatorUser.ID,
+		DisplayName: pgText("creator"),
+		Handle:      pgText("creator"),
+		Bio:         "public bio",
+		PublishedAt: pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateCreatorProfile() error = %v, want nil", err)
+	}
+
+	if err := queries.PutCreatorFollow(ctx, sqlc.PutCreatorFollowParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	}); err != nil {
+		t.Fatalf("PutCreatorFollow() first call error = %v, want nil", err)
+	}
+	if err := queries.PutCreatorFollow(ctx, sqlc.PutCreatorFollowParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	}); err != nil {
+		t.Fatalf("PutCreatorFollow() second call error = %v, want nil", err)
+	}
+
+	isFollowing, err := queries.GetViewerCreatorFollowState(ctx, sqlc.GetViewerCreatorFollowStateParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	})
+	if err != nil {
+		t.Fatalf("GetViewerCreatorFollowState() after follow error = %v, want nil", err)
+	}
+	if !isFollowing {
+		t.Fatal("GetViewerCreatorFollowState() after follow got false want true")
+	}
+
+	fanCount, err := queries.CountCreatorFollowersByCreatorUserID(ctx, creatorUser.ID)
+	if err != nil {
+		t.Fatalf("CountCreatorFollowersByCreatorUserID() after follow error = %v, want nil", err)
+	}
+	if fanCount != 1 {
+		t.Fatalf("CountCreatorFollowersByCreatorUserID() after follow got %d want %d", fanCount, 1)
+	}
+
+	if err := queries.DeleteCreatorFollow(ctx, sqlc.DeleteCreatorFollowParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	}); err != nil {
+		t.Fatalf("DeleteCreatorFollow() first call error = %v, want nil", err)
+	}
+	if err := queries.DeleteCreatorFollow(ctx, sqlc.DeleteCreatorFollowParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	}); err != nil {
+		t.Fatalf("DeleteCreatorFollow() second call error = %v, want nil", err)
+	}
+
+	isFollowing, err = queries.GetViewerCreatorFollowState(ctx, sqlc.GetViewerCreatorFollowStateParams{
+		UserID:        viewer.ID,
+		CreatorUserID: creatorUser.ID,
+	})
+	if err != nil {
+		t.Fatalf("GetViewerCreatorFollowState() after unfollow error = %v, want nil", err)
+	}
+	if isFollowing {
+		t.Fatal("GetViewerCreatorFollowState() after unfollow got true want false")
+	}
+
+	fanCount, err = queries.CountCreatorFollowersByCreatorUserID(ctx, creatorUser.ID)
+	if err != nil {
+		t.Fatalf("CountCreatorFollowersByCreatorUserID() after unfollow error = %v, want nil", err)
+	}
+	if fanCount != 0 {
+		t.Fatalf("CountCreatorFollowersByCreatorUserID() after unfollow got %d want %d", fanCount, 0)
+	}
+}
+
 func TestMediaAssetProcessingMigrationLatestRevision(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()

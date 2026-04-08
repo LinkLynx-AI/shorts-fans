@@ -40,8 +40,16 @@ func (s stubQueries) CountPublicShortsByCreatorUserID(context.Context, pgtype.UU
 	return 0, nil
 }
 
+func (s stubQueries) DeleteCreatorFollow(context.Context, sqlc.DeleteCreatorFollowParams) error {
+	return nil
+}
+
 func (s stubQueries) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 	return s.getProfile(ctx, userID)
+}
+
+func (s stubQueries) GetViewerCreatorFollowState(context.Context, sqlc.GetViewerCreatorFollowStateParams) (bool, error) {
+	return false, nil
 }
 
 func (s stubQueries) GetPublicCreatorProfileByUserID(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error) {
@@ -58,6 +66,10 @@ func (s stubQueries) ListCreatorProfileShortGridItems(context.Context, sqlc.List
 
 func (s stubQueries) ListRecentPublicCreatorProfiles(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
 	return nil, nil
+}
+
+func (s stubQueries) PutCreatorFollow(context.Context, sqlc.PutCreatorFollowParams) error {
+	return nil
 }
 
 func (s stubQueries) SearchPublicCreatorProfiles(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {

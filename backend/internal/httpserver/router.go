@@ -35,12 +35,18 @@ type CreatorSearchReader interface {
 
 // CreatorProfileReader は creator profile header 用の read 操作を表します。
 type CreatorProfileReader interface {
-	GetPublicProfileHeader(ctx context.Context, creatorID string) (creator.PublicProfileHeader, error)
+	GetPublicProfileHeader(ctx context.Context, creatorID string, viewerUserID *uuid.UUID) (creator.PublicProfileHeader, error)
 }
 
 // CreatorProfileShortsReader は creator profile short grid 用の read 操作を表します。
 type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
+}
+
+// CreatorFollowWriter は creator follow mutation を表します。
+type CreatorFollowWriter interface {
+	FollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
+	UnfollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
 }
 
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
@@ -59,6 +65,7 @@ type HandlerConfig struct {
 	CreatorSearch        CreatorSearchReader
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	CreatorFollow        CreatorFollowWriter
 	FanProfileFollowing  FanProfileFollowingReader
 	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
@@ -123,7 +130,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
 
 	return router
 }

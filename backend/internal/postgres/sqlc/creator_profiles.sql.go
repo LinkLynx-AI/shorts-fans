@@ -75,6 +75,22 @@ func (q *Queries) CreateCreatorProfile(ctx context.Context, arg CreateCreatorPro
 	return i, err
 }
 
+const deleteCreatorFollow = `-- name: DeleteCreatorFollow :exec
+DELETE FROM app.creator_follows
+WHERE user_id = $1
+AND creator_user_id = $2
+`
+
+type DeleteCreatorFollowParams struct {
+	UserID        pgtype.UUID
+	CreatorUserID pgtype.UUID
+}
+
+func (q *Queries) DeleteCreatorFollow(ctx context.Context, arg DeleteCreatorFollowParams) error {
+	_, err := q.db.Exec(ctx, deleteCreatorFollow, arg.UserID, arg.CreatorUserID)
+	return err
+}
+
 const getCreatorProfileByUserID = `-- name: GetCreatorProfileByUserID :one
 SELECT user_id, display_name, avatar_url, bio, published_at, created_at, updated_at, handle
 FROM app.creator_profiles
@@ -142,6 +158,27 @@ func (q *Queries) GetPublicCreatorProfileByUserID(ctx context.Context, userID pg
 		&i.Handle,
 	)
 	return i, err
+}
+
+const getViewerCreatorFollowState = `-- name: GetViewerCreatorFollowState :one
+SELECT EXISTS (
+    SELECT 1
+    FROM app.creator_follows
+    WHERE user_id = $1
+    AND creator_user_id = $2
+) AS is_following
+`
+
+type GetViewerCreatorFollowStateParams struct {
+	UserID        pgtype.UUID
+	CreatorUserID pgtype.UUID
+}
+
+func (q *Queries) GetViewerCreatorFollowState(ctx context.Context, arg GetViewerCreatorFollowStateParams) (bool, error) {
+	row := q.db.QueryRow(ctx, getViewerCreatorFollowState, arg.UserID, arg.CreatorUserID)
+	var is_following bool
+	err := row.Scan(&is_following)
+	return is_following, err
 }
 
 const listRecentPublicCreatorProfiles = `-- name: ListRecentPublicCreatorProfiles :many
@@ -217,6 +254,27 @@ func (q *Queries) PublishCreatorProfile(ctx context.Context, userID pgtype.UUID)
 		&i.Handle,
 	)
 	return i, err
+}
+
+const putCreatorFollow = `-- name: PutCreatorFollow :exec
+INSERT INTO app.creator_follows (
+    user_id,
+    creator_user_id
+) VALUES (
+    $1,
+    $2
+)
+ON CONFLICT (user_id, creator_user_id) DO NOTHING
+`
+
+type PutCreatorFollowParams struct {
+	UserID        pgtype.UUID
+	CreatorUserID pgtype.UUID
+}
+
+func (q *Queries) PutCreatorFollow(ctx context.Context, arg PutCreatorFollowParams) error {
+	_, err := q.db.Exec(ctx, putCreatorFollow, arg.UserID, arg.CreatorUserID)
+	return err
 }
 
 const searchPublicCreatorProfiles = `-- name: SearchPublicCreatorProfiles :many

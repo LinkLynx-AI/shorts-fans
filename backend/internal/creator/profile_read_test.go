@@ -55,7 +55,7 @@ func TestGetPublicProfileHeader(t *testing.T) {
 		},
 	})
 
-	header, err := repo.GetPublicProfileHeader(context.Background(), FormatPublicID(userID))
+	header, err := repo.GetPublicProfileHeader(context.Background(), FormatPublicID(userID), nil)
 	if err != nil {
 		t.Fatalf("GetPublicProfileHeader() error = %v, want nil", err)
 	}
@@ -81,8 +81,47 @@ func TestGetPublicProfileHeaderRejectsInvalidCreatorID(t *testing.T) {
 
 	repo := newRepository(repositoryStubQueries{})
 
-	if _, err := repo.GetPublicProfileHeader(context.Background(), "bad"); !errors.Is(err, ErrProfileNotFound) {
+	if _, err := repo.GetPublicProfileHeader(context.Background(), "bad", nil); !errors.Is(err, ErrProfileNotFound) {
 		t.Fatalf("GetPublicProfileHeader() error got %v want %v", err, ErrProfileNotFound)
+	}
+}
+
+func TestGetPublicProfileHeaderIncludesViewerFollowState(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerID := uuid.MustParse("99999999-9999-9999-9999-999999999999")
+	creatorUserID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	var gotFollowStateParams sqlc.GetViewerCreatorFollowStateParams
+
+	repo := newRepository(repositoryStubQueries{
+		getPublicProfile: func(_ context.Context, userIDArg pgtype.UUID) (sqlc.AppPublicCreatorProfile, error) {
+			return testPublicProfileRow(creatorUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), stringPtr("https://cdn.example.com/mina.jpg"), timePtr(now)), nil
+		},
+		countFollowers: func(_ context.Context, creatorUserID pgtype.UUID) (int64, error) {
+			return 24, nil
+		},
+		countPublicShorts: func(_ context.Context, creatorUserID pgtype.UUID) (int64, error) {
+			return 2, nil
+		},
+		getViewerFollowState: func(_ context.Context, arg sqlc.GetViewerCreatorFollowStateParams) (bool, error) {
+			gotFollowStateParams = arg
+			return true, nil
+		},
+	})
+
+	header, err := repo.GetPublicProfileHeader(context.Background(), FormatPublicID(creatorUserID), &viewerID)
+	if err != nil {
+		t.Fatalf("GetPublicProfileHeader() error = %v, want nil", err)
+	}
+	if !header.IsFollowing {
+		t.Fatal("GetPublicProfileHeader() isFollowing = false, want true")
+	}
+	if gotFollowStateParams.UserID != pgUUID(viewerID) {
+		t.Fatalf("GetPublicProfileHeader() viewer arg got %v want %v", gotFollowStateParams.UserID, pgUUID(viewerID))
+	}
+	if gotFollowStateParams.CreatorUserID != pgUUID(creatorUserID) {
+		t.Fatalf("GetPublicProfileHeader() creator arg got %v want %v", gotFollowStateParams.CreatorUserID, pgUUID(creatorUserID))
 	}
 }
 
