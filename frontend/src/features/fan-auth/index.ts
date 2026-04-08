@@ -6,6 +6,7 @@ export {
   getFanAuthModeHint,
   getFanAuthModeSwitchLabel,
   getFanAuthSubmitLabel,
+  isAuthRequiredApiError,
   isAuthRequiredResponse,
 } from "./model/fan-auth";
 export type {
@@ -21,3 +22,4 @@ export {
 export { useFanAuthEntry } from "./model/use-fan-auth-entry";
 export { FanAuthDialog } from "./ui/fan-auth-dialog";
 export { FanAuthEntryPanel } from "./ui/fan-auth-entry-panel";
+export { FanAuthRequiredDialogTrigger } from "./ui/fan-auth-required-dialog-trigger";

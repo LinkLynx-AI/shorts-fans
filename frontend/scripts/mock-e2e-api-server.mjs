@@ -24,6 +24,91 @@ const e2eSessionToken = "e2e-viewer-session";
 const existingFanEmail = "fan@example.com";
 const signInChallengeToken = "e2e-sign-in-challenge";
 const signUpChallengeToken = "e2e-sign-up-challenge";
+const fanProfileOverviewResponse = {
+  data: {
+    fanProfile: {
+      counts: {
+        following: 3,
+        library: 3,
+        pinnedShorts: 3,
+      },
+      title: "My archive",
+    },
+  },
+  error: null,
+  meta: {
+    page: null,
+    requestId: "req_e2e_fan_profile_overview_001",
+  },
+};
+const fanProfileFollowingResponse = {
+  data: {
+    items: [
+      {
+        creator: {
+          avatar: {
+            durationSeconds: null,
+            id: "asset_creator_aoi_avatar",
+            kind: "image",
+            posterUrl: null,
+            url: "https://cdn.example.com/creator/aoi/avatar.jpg",
+          },
+          bio: "soft light と close framing の short を中心に更新中。",
+          displayName: "Aoi N",
+          handle: "@aoina",
+          id: "creator_aoi_n",
+        },
+        viewer: {
+          isFollowing: true,
+        },
+      },
+      {
+        creator: {
+          avatar: {
+            durationSeconds: null,
+            id: "asset_creator_mina_avatar",
+            kind: "image",
+            posterUrl: null,
+            url: "https://cdn.example.com/creator/mina/avatar.jpg",
+          },
+          bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+          displayName: "Mina Rei",
+          handle: "@minarei",
+          id: "creator_mina_rei",
+        },
+        viewer: {
+          isFollowing: true,
+        },
+      },
+      {
+        creator: {
+          avatar: {
+            durationSeconds: null,
+            id: "asset_creator_sora_avatar",
+            kind: "image",
+            posterUrl: null,
+            url: "https://cdn.example.com/creator/sora/avatar.jpg",
+          },
+          bio: "after rain と balcony mood の short をまとめています。",
+          displayName: "Sora Vale",
+          handle: "@soravale",
+          id: "creator_sora_vale",
+        },
+        viewer: {
+          isFollowing: true,
+        },
+      },
+    ],
+  },
+  error: null,
+  meta: {
+    page: {
+      hasNext: false,
+      nextCursor: null,
+    },
+    requestId: "req_e2e_fan_profile_following_001",
+  },
+};
 
 if (!searchFixtures) {
   throw new Error("creator search fixture が見つかりません");
@@ -146,6 +231,24 @@ function isValidEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isAuthenticatedFanRequest(request) {
+  return readCookieValue(request.headers.cookie, "shorts_fans_session") === e2eSessionToken;
+}
+
+function writeAuthRequired(request, response, requestId) {
+  writeJson(request, response, 401, {
+    data: null,
+    error: {
+      code: "auth_required",
+      message: "fan profile requires authentication",
+    },
+    meta: {
+      page: null,
+      requestId,
+    },
+  });
+}
+
 const server = http.createServer((request, response) => {
   const requestUrl = new URL(request.url ?? "/", `http://${host}:${port}`);
 
@@ -174,6 +277,26 @@ const server = http.createServer((request, response) => {
       sessionToken === e2eSessionToken ? authenticatedFanBootstrap : unauthenticatedBootstrap;
 
     writeJson(request, response, 200, body);
+    return;
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/fan/profile") {
+    if (!isAuthenticatedFanRequest(request)) {
+      writeAuthRequired(request, response, "req_e2e_fan_profile_auth_required_001");
+      return;
+    }
+
+    writeJson(request, response, 200, fanProfileOverviewResponse);
+    return;
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/fan/profile/following") {
+    if (!isAuthenticatedFanRequest(request)) {
+      writeAuthRequired(request, response, "req_e2e_fan_profile_following_auth_required_001");
+      return;
+    }
+
+    writeJson(request, response, 200, fanProfileFollowingResponse);
     return;
   }
 

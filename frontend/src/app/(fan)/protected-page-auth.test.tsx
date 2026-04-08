@@ -1,11 +1,14 @@
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
 
-import FanPage from "./fan/page";
-import FollowingPage from "./fan/following/page";
 import RootPage from "./page";
 
-const { redirect } = vi.hoisted(() => ({
+const { cookiesMock, redirect } = vi.hoisted(() => ({
+  cookiesMock: vi.fn(),
   redirect: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+  cookies: cookiesMock,
 }));
 
 vi.mock("next/navigation", async () => {
@@ -28,6 +31,7 @@ vi.mock("@/features/fan-auth-gate", async () => {
 
 describe("protected fan route auth gates", () => {
   afterEach(() => {
+    cookiesMock.mockReset();
     redirect.mockReset();
   });
 
@@ -44,20 +48,5 @@ describe("protected fan route auth gates", () => {
     });
 
     expect(redirect).toHaveBeenCalledWith("/login");
-  });
-
-  it("redirects unauthenticated fan hub access to the login entry", async () => {
-    vi.mocked(getFanAuthGateState).mockResolvedValue({
-      currentViewer: null,
-      hasSession: false,
-    });
-
-    await FanPage({
-      searchParams: Promise.resolve({}),
-    });
-    await FollowingPage();
-
-    expect(redirect).toHaveBeenNthCalledWith(1, "/login");
-    expect(redirect).toHaveBeenNthCalledWith(2, "/login");
   });
 });
