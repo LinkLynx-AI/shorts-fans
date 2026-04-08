@@ -1,0 +1,4 @@
+interface:
+  display_name: "Docs Sync"
+  short_description: "Keep docs and indexes aligned with the current diff"
+  default_prompt: "Use $docs-sync to check whether the current diff requires documentation or index updates."
