@@ -15,17 +15,19 @@ import (
 
 type repositoryStubQueries struct {
 	countFollowers       func(context.Context, pgtype.UUID) (int64, error)
-	hasCreatorFollow     func(context.Context, sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error)
 	createCapability     func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	getCapability        func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	updateCapability     func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	countPublicShorts    func(context.Context, pgtype.UUID) (int64, error)
+	deleteCreatorFollow  func(context.Context, sqlc.DeleteCreatorFollowParams) error
 	createProfile        func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	getProfile           func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	getViewerFollowState func(context.Context, sqlc.GetViewerCreatorFollowStateParams) (bool, error)
 	getPublicProfile     func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
 	getPublicByHandle    func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
 	listProfileShortGrid func(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
 	listRecentPublic     func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	putCreatorFollow     func(context.Context, sqlc.PutCreatorFollowParams) error
 	searchPublic         func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
 	updateProfile        func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	publishProfile       func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
@@ -36,13 +38,6 @@ func (s repositoryStubQueries) CountCreatorFollowersByCreatorUserID(ctx context.
 		return 0, nil
 	}
 	return s.countFollowers(ctx, creatorUserID)
-}
-
-func (s repositoryStubQueries) HasCreatorFollowByUserIDAndCreatorUserID(ctx context.Context, arg sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams) (bool, error) {
-	if s.hasCreatorFollow == nil {
-		return false, nil
-	}
-	return s.hasCreatorFollow(ctx, arg)
 }
 
 func (s repositoryStubQueries) CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
@@ -80,11 +75,25 @@ func (s repositoryStubQueries) CountPublicShortsByCreatorUserID(ctx context.Cont
 	return s.countPublicShorts(ctx, creatorUserID)
 }
 
+func (s repositoryStubQueries) DeleteCreatorFollow(ctx context.Context, arg sqlc.DeleteCreatorFollowParams) error {
+	if s.deleteCreatorFollow == nil {
+		return nil
+	}
+	return s.deleteCreatorFollow(ctx, arg)
+}
+
 func (s repositoryStubQueries) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 	if s.getProfile == nil {
 		return sqlc.AppCreatorProfile{}, nil
 	}
 	return s.getProfile(ctx, userID)
+}
+
+func (s repositoryStubQueries) GetViewerCreatorFollowState(ctx context.Context, arg sqlc.GetViewerCreatorFollowStateParams) (bool, error) {
+	if s.getViewerFollowState == nil {
+		return false, nil
+	}
+	return s.getViewerFollowState(ctx, arg)
 }
 
 func (s repositoryStubQueries) GetPublicCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppPublicCreatorProfile, error) {
@@ -113,6 +122,13 @@ func (s repositoryStubQueries) ListRecentPublicCreatorProfiles(ctx context.Conte
 		return nil, nil
 	}
 	return s.listRecentPublic(ctx, arg)
+}
+
+func (s repositoryStubQueries) PutCreatorFollow(ctx context.Context, arg sqlc.PutCreatorFollowParams) error {
+	if s.putCreatorFollow == nil {
+		return nil
+	}
+	return s.putCreatorFollow(ctx, arg)
 }
 
 func (s repositoryStubQueries) SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {

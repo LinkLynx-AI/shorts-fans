@@ -58,13 +58,28 @@ SELECT COUNT(*)::bigint
 FROM app.creator_follows
 WHERE creator_user_id = $1;
 
--- name: HasCreatorFollowByUserIDAndCreatorUserID :one
+-- name: PutCreatorFollow :exec
+INSERT INTO app.creator_follows (
+    user_id,
+    creator_user_id
+) VALUES (
+    sqlc.arg(user_id),
+    sqlc.arg(creator_user_id)
+)
+ON CONFLICT (user_id, creator_user_id) DO NOTHING;
+
+-- name: DeleteCreatorFollow :exec
+DELETE FROM app.creator_follows
+WHERE user_id = sqlc.arg(user_id)
+AND creator_user_id = sqlc.arg(creator_user_id);
+
+-- name: GetViewerCreatorFollowState :one
 SELECT EXISTS (
     SELECT 1
     FROM app.creator_follows
     WHERE user_id = sqlc.arg(user_id)
-        AND creator_user_id = sqlc.arg(creator_user_id)
-);
+    AND creator_user_id = sqlc.arg(creator_user_id)
+) AS is_following;
 
 -- name: ListRecentPublicCreatorProfiles :many
 SELECT *

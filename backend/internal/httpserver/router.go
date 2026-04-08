@@ -43,6 +43,12 @@ type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
 }
 
+// CreatorFollowWriter は creator follow mutation を表します。
+type CreatorFollowWriter interface {
+	FollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
+	UnfollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -59,6 +65,7 @@ type HandlerConfig struct {
 	CreatorSearch        CreatorSearchReader
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	CreatorFollow        CreatorFollowWriter
 	FanProfileFollowing  FanProfileFollowingReader
 	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
@@ -123,7 +130,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.ViewerBootstrap)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
 
 	return router
 }

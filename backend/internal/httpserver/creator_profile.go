@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -9,11 +10,17 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
-
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+)
+
+const (
+	creatorFollowDeleteAuthRequiredMessage = "creator unfollow requires authentication"
+	creatorFollowDeleteRequestScope        = "creator_follow_delete"
+	creatorFollowPutAuthRequiredMessage    = "creator follow requires authentication"
+	creatorFollowPutRequestScope           = "creator_follow_put"
 )
 
 type creatorProfileResponseData struct {
@@ -39,6 +46,15 @@ type creatorProfileShortGridResponseData struct {
 	Items []creatorProfileShortGridItem `json:"items"`
 }
 
+type creatorFollowResponseData struct {
+	Stats  creatorFollowStats   `json:"stats"`
+	Viewer creatorProfileViewer `json:"viewer"`
+}
+
+type creatorFollowStats struct {
+	FanCount int64 `json:"fanCount"`
+}
+
 type creatorProfileShortGridItem struct {
 	CanonicalMainID        string     `json:"canonicalMainId"`
 	CreatorID              string     `json:"creatorId"`
@@ -57,11 +73,12 @@ func registerCreatorProfileRoutes(
 	router gin.IRouter,
 	profileReader CreatorProfileReader,
 	shortsReader CreatorProfileShortsReader,
-	viewerReader ViewerBootstrapReader,
+	followWriter CreatorFollowWriter,
+	viewerBootstrap ViewerBootstrapReader,
 ) {
 	if profileReader != nil {
 		router.GET("/api/fan/creators/:creatorId", func(c *gin.Context) {
-			handleCreatorProfile(c, profileReader, viewerReader)
+			handleCreatorProfile(c, profileReader, viewerBootstrap)
 		})
 	}
 	if shortsReader != nil {
@@ -69,12 +86,32 @@ func registerCreatorProfileRoutes(
 			handleCreatorProfileShorts(c, shortsReader)
 		})
 	}
+	if followWriter != nil && viewerBootstrap != nil {
+		router.PUT(
+			"/api/fan/creators/:creatorId/follow",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorFollowPutRequestScope, creatorFollowPutAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorFollowPut(c, followWriter)
+			},
+		)
+		router.DELETE(
+			"/api/fan/creators/:creatorId/follow",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorFollowDeleteRequestScope, creatorFollowDeleteAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorFollowDelete(c, followWriter)
+			},
+		)
+	}
 }
 
 // handleCreatorProfile は creator profile header を返します。
-func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader, viewerReader ViewerBootstrapReader) {
+func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader, viewerBootstrap ViewerBootstrapReader) {
 	creatorID := strings.TrimSpace(c.Param("creatorId"))
-	viewerUserID := resolveOptionalCreatorProfileViewerID(c, viewerReader)
+	viewerUserID, err := resolveOptionalViewerUserID(c, viewerBootstrap)
+	if err != nil {
+		writeInternalServerError(c, "creator_profile")
+		return
+	}
 	profileHeader, err := reader.GetPublicProfileHeader(c.Request.Context(), creatorID, viewerUserID)
 	if err != nil {
 		if errors.Is(err, creator.ErrProfileNotFound) {
@@ -113,24 +150,52 @@ func handleCreatorProfile(c *gin.Context, reader CreatorProfileReader, viewerRea
 	})
 }
 
-func resolveOptionalCreatorProfileViewerID(c *gin.Context, reader ViewerBootstrapReader) *uuid.UUID {
-	if c == nil || reader == nil {
-		return nil
+func handleCreatorFollowPut(c *gin.Context, writer CreatorFollowWriter) {
+	handleCreatorFollowMutation(c, writer.FollowPublicCreator, creatorFollowPutRequestScope)
+}
+
+func handleCreatorFollowDelete(c *gin.Context, writer CreatorFollowWriter) {
+	handleCreatorFollowMutation(c, writer.UnfollowPublicCreator, creatorFollowDeleteRequestScope)
+}
+
+func handleCreatorFollowMutation(
+	c *gin.Context,
+	mutate func(context.Context, uuid.UUID, string) (creator.FollowMutationResult, error),
+	requestScope string,
+) {
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeInternalServerError(c, requestScope)
+		return
 	}
 
-	rawSessionToken, err := c.Cookie(auth.SessionCookieName)
+	creatorID := strings.TrimSpace(c.Param("creatorId"))
+	result, err := mutate(c.Request.Context(), viewerUserID, creatorID)
 	if err != nil {
-		return nil
+		if errors.Is(err, creator.ErrProfileNotFound) {
+			writeNotFoundError(c, requestScope, "creator was not found")
+			return
+		}
+
+		writeInternalServerError(c, requestScope)
+		return
 	}
 
-	bootstrap, err := reader.ReadCurrentViewer(c.Request.Context(), rawSessionToken)
-	if err != nil || bootstrap.CurrentViewer == nil {
-		return nil
-	}
-
-	viewerID := bootstrap.CurrentViewer.ID
-
-	return &viewerID
+	c.JSON(http.StatusOK, responseEnvelope[creatorFollowResponseData]{
+		Data: &creatorFollowResponseData{
+			Stats: creatorFollowStats{
+				FanCount: result.FanCount,
+			},
+			Viewer: creatorProfileViewer{
+				IsFollowing: result.IsFollowing,
+			},
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(requestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
 }
 
 // handleCreatorProfileShorts は creator profile short grid を返します。
@@ -255,4 +320,30 @@ func mainPublicID(mainID uuid.UUID) string {
 
 func mediaAssetPublicID(mediaAssetID uuid.UUID) string {
 	return fmt.Sprintf("asset_%s", strings.ReplaceAll(mediaAssetID.String(), "-", ""))
+}
+
+func resolveOptionalViewerUserID(c *gin.Context, viewerBootstrap ViewerBootstrapReader) (*uuid.UUID, error) {
+	if viewerBootstrap == nil {
+		return nil, nil
+	}
+
+	rawSessionToken, err := c.Cookie(auth.SessionCookieName)
+	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+
+	bootstrap, err := viewerBootstrap.ReadCurrentViewer(c.Request.Context(), rawSessionToken)
+	if err != nil {
+		return nil, err
+	}
+	if bootstrap.CurrentViewer == nil {
+		return nil, nil
+	}
+
+	viewerUserID := bootstrap.CurrentViewer.ID
+	return &viewerUserID, nil
 }

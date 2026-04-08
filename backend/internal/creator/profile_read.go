@@ -22,6 +22,12 @@ type PublicProfileHeader struct {
 	IsFollowing bool
 }
 
+type publicProfileHeaderMetrics struct {
+	FanCount    int64
+	IsFollowing bool
+	ShortCount  int64
+}
+
 // PublicProfileShort は creator profile short grid 用の read model です。
 type PublicProfileShort struct {
 	ID                     uuid.UUID
@@ -51,32 +57,16 @@ func (r *Repository) GetPublicProfileHeader(ctx context.Context, creatorID strin
 		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile header 取得 creator=%q: %w", creatorID, err)
 	}
 
-	shortCount, err := r.queries.CountPublicShortsByCreatorUserID(ctx, postgres.UUIDToPG(userID))
+	metrics, err := r.getPublicProfileHeaderMetrics(ctx, userID, viewerUserID)
 	if err != nil {
-		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile short count 取得 creator=%q: %w", creatorID, err)
-	}
-
-	fanCount, err := r.queries.CountCreatorFollowersByCreatorUserID(ctx, postgres.UUIDToPG(userID))
-	if err != nil {
-		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile follower count 取得 creator=%q: %w", creatorID, err)
-	}
-
-	isFollowing := false
-	if viewerUserID != nil && *viewerUserID != userID {
-		isFollowing, err = r.queries.HasCreatorFollowByUserIDAndCreatorUserID(ctx, sqlc.HasCreatorFollowByUserIDAndCreatorUserIDParams{
-			UserID:        postgres.UUIDToPG(*viewerUserID),
-			CreatorUserID: postgres.UUIDToPG(userID),
-		})
-		if err != nil {
-			return PublicProfileHeader{}, fmt.Errorf("公開 creator profile follow relation 取得 creator=%q viewer=%s: %w", creatorID, *viewerUserID, err)
-		}
+		return PublicProfileHeader{}, fmt.Errorf("公開 creator profile header 指標取得 creator=%q: %w", creatorID, err)
 	}
 
 	return PublicProfileHeader{
 		Profile:     profile,
-		ShortCount:  shortCount,
-		FanCount:    fanCount,
-		IsFollowing: isFollowing,
+		ShortCount:  metrics.ShortCount,
+		FanCount:    metrics.FanCount,
+		IsFollowing: metrics.IsFollowing,
 	}, nil
 }
 
@@ -186,5 +176,34 @@ func mapPublicProfileShort(row sqlc.ListCreatorProfileShortGridItemsRow) (Public
 		MediaURL:               strings.TrimSpace(row.PlaybackUrl.String),
 		PreviewDurationSeconds: (row.DurationMs.Int64 + 999) / 1000,
 		PublishedAt:            publishedAt,
+	}, nil
+}
+
+func (r *Repository) getPublicProfileHeaderMetrics(ctx context.Context, creatorUserID uuid.UUID, viewerUserID *uuid.UUID) (publicProfileHeaderMetrics, error) {
+	shortCount, err := r.queries.CountPublicShortsByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
+	if err != nil {
+		return publicProfileHeaderMetrics{}, fmt.Errorf("公開 creator profile short count 取得 creator=%s: %w", creatorUserID, err)
+	}
+
+	fanCount, err := r.queries.CountCreatorFollowersByCreatorUserID(ctx, postgres.UUIDToPG(creatorUserID))
+	if err != nil {
+		return publicProfileHeaderMetrics{}, fmt.Errorf("公開 creator profile follower count 取得 creator=%s: %w", creatorUserID, err)
+	}
+
+	isFollowing := false
+	if viewerUserID != nil {
+		isFollowing, err = r.queries.GetViewerCreatorFollowState(ctx, sqlc.GetViewerCreatorFollowStateParams{
+			UserID:        postgres.UUIDToPG(*viewerUserID),
+			CreatorUserID: postgres.UUIDToPG(creatorUserID),
+		})
+		if err != nil {
+			return publicProfileHeaderMetrics{}, fmt.Errorf("公開 creator profile follow state 取得 viewer=%s creator=%s: %w", *viewerUserID, creatorUserID, err)
+		}
+	}
+
+	return publicProfileHeaderMetrics{
+		ShortCount:  shortCount,
+		FanCount:    fanCount,
+		IsFollowing: isFollowing,
 	}, nil
 }
