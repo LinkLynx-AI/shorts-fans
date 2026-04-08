@@ -19,9 +19,11 @@ pnpm dev
 - `pnpm lint:eslint`: ESLint だけを実行
 - `pnpm fsd:check`: FSD checker を実行
 - `pnpm typecheck`: TypeScript の型検査を実行
+- `pnpm test`: 既定の frontend test を実行 (`unit / component` のみ)
 - `pnpm test:unit`: Vitest の unit / component test を実行
 - `pnpm test:coverage:check`: Vitest の coverage 計測を実行
-- `pnpm test:e2e`: Playwright の smoke test を実行
+- `pnpm test:all`: unit / component test と Playwright E2E をまとめて実行
+- `pnpm test:e2e`: Playwright の明示的な E2E / smoke test を実行
 - `pnpm test:e2e:install`: Playwright の Chromium を導入
 - `pnpm build`: production build を実行
 - `pnpm start`: build 済みアプリを起動
@@ -40,6 +42,7 @@ pnpm dev
 - 追加の設計ルールは repo 直下の `AGENTS.md` と `docs/TYPESCRIPT.md` に従います。
 - UI は `Tailwind CSS v4 + shadcn/ui 互換 primitive + Radix Primitives` を前提にします。
 - `.env.example` に frontend 起動時の最小 env 契約を定義しています。
+- Playwright E2E は既定の review/CI 経路には含めず、必要時だけ明示的に実行します。
 
 ## Deploy on Vercel
 

@@ -115,9 +115,12 @@
 ## 10. Minimum Testing Rules
 - `model/` (pure logic): prioritize unit tests.
 - `ui/` (rendering): keep component tests minimal but meaningful.
-- E2E: prioritize critical flows (auth, message send, permissions).
+- Default frontend validation uses lint, typecheck, unit/component tests, and coverage checks when required.
+- E2E is optional targeted validation for critical flows (auth, message send, permissions) and is not part of the default review or coverage gate.
+- Run Playwright E2E only when the user explicitly requests it or when release-risk validation needs a deliberate manual pass.
 - Before review, run `make coverage-check` (or `pnpm run test:coverage:check`) and ensure coverage thresholds are satisfied.
 - Coverage excludes static/non-executable artifacts (test files, `d.ts`, `src/shared/styles/**`) and UI shell entries (`src/app/**`).
+- Coverage thresholds are enforced by Vitest; Playwright E2E is outside the coverage target.
 - Coverage gate is separated by layer:
   - Global: `lines/functions/statements >= 80%`, `branches >= 70%`
   - `src/shared/**`, `src/{entities,features,widgets}/**`: `lines/functions/statements >= 80%`, `branches >= 70%`

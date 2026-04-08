@@ -12,7 +12,8 @@ Precondition:
 Primary checks (frontend workspace):
 1. `cd frontend && pnpm lint`
 2. `cd frontend && pnpm typecheck`
-3. `cd frontend && pnpm test`
+3. `cd frontend && pnpm test:unit`
+4. Do not run Playwright or `cd frontend && pnpm test:e2e` unless the user explicitly requested E2E validation.
 
 Optional smoke check:
 - If browser automation tools are available, run a minimal smoke check for the changed route/components and report console/runtime errors.
