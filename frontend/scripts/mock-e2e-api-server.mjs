@@ -14,18 +14,42 @@ const viewerBootstrapFixturePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../docs/contracts/fixtures/viewer-bootstrap.json",
 );
+const creatorFollowFixturePath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../docs/contracts/fixtures/fan-creator-follow.json",
+);
 
 const fixtures = JSON.parse(await readFile(fixturePath, "utf8"));
 const viewerBootstrapFixtures = JSON.parse(await readFile(viewerBootstrapFixturePath, "utf8"));
+const creatorFollowFixtures = JSON.parse(await readFile(creatorFollowFixturePath, "utf8"));
 const searchFixtures = fixtures["GET /api/fan/creators/search"];
 const creatorProfileHeaderFixtures = fixtures["GET /api/fan/creators/{creatorId}"];
 const creatorProfileShortGridFixtures = fixtures["GET /api/fan/creators/{creatorId}/shorts"];
+const creatorFollowPutFixtures = creatorFollowFixtures["PUT /api/fan/creators/{creatorId}/follow"];
+const creatorFollowDeleteFixtures = creatorFollowFixtures["DELETE /api/fan/creators/{creatorId}/follow"];
 const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
 const e2eSessionToken = "e2e-viewer-session";
 const existingFanEmail = "fan@example.com";
 const signInChallengeToken = "e2e-sign-in-challenge";
 const signUpChallengeToken = "e2e-sign-up-challenge";
+const creatorBaseStatsById = {
+  creator_aoi_n: {
+    fanCount: 19000,
+    shortCount: 2,
+  },
+  creator_mina_rei: {
+    fanCount: 24000,
+    shortCount: 2,
+  },
+  creator_sora_vale: {
+    fanCount: 16000,
+    shortCount: 0,
+  },
+};
+const defaultFollowedCreatorIds = ["creator_mina_rei"];
+const followedCreatorIdsBySessionToken = new Map();
+let issuedSessionCount = 0;
 
 if (!searchFixtures) {
   throw new Error("creator search fixture が見つかりません");
@@ -55,20 +79,24 @@ if (!authenticatedFanBootstrap || !unauthenticatedBootstrap) {
   throw new Error("viewer bootstrap fixture の authenticatedFan / unauthenticated が不足しています");
 }
 
+if (!creatorFollowPutFixtures || !creatorFollowDeleteFixtures) {
+  throw new Error("creator follow fixture が不足しています");
+}
+
 function buildCorsHeaders(request) {
   const origin = request.headers.origin;
 
   if (!origin) {
     return {
       "Access-Control-Allow-Headers": "Accept, Content-Type",
-      "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     };
   }
 
   return {
     "Access-Control-Allow-Credentials": "true",
     "Access-Control-Allow-Headers": "Accept, Content-Type",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Origin": origin,
     Vary: "Origin",
   };
@@ -115,8 +143,107 @@ function buildSearchResponse(query) {
   };
 }
 
+function isAuthenticatedSessionToken(sessionToken) {
+  return (
+    typeof sessionToken === "string" &&
+    (sessionToken === e2eSessionToken || sessionToken.startsWith(`${e2eSessionToken}-`))
+  );
+}
+
+function createE2ESessionToken() {
+  issuedSessionCount += 1;
+  return `${e2eSessionToken}-${issuedSessionCount}`;
+}
+
+function getFollowedCreatorIds(sessionToken) {
+  if (!isAuthenticatedSessionToken(sessionToken)) {
+    return null;
+  }
+
+  const existingFollowedCreatorIds = followedCreatorIdsBySessionToken.get(sessionToken);
+
+  if (existingFollowedCreatorIds) {
+    return existingFollowedCreatorIds;
+  }
+
+  const nextFollowedCreatorIds = new Set(defaultFollowedCreatorIds);
+
+  followedCreatorIdsBySessionToken.set(sessionToken, nextFollowedCreatorIds);
+
+  return nextFollowedCreatorIds;
+}
+
+function isCreatorFollowed(creatorId, sessionToken) {
+  return getFollowedCreatorIds(sessionToken)?.has(creatorId) ?? false;
+}
+
+function resolveCreatorFanCount(creatorId, sessionToken) {
+  const baseStats = creatorBaseStatsById[creatorId];
+
+  if (!baseStats) {
+    return null;
+  }
+
+  return baseStats.fanCount + (isCreatorFollowed(creatorId, sessionToken) ? 1 : 0);
+}
+
+function buildCreatorFollowMutationResponse(method, creatorId, sessionToken) {
+  const authRequiredResponse =
+    method === "PUT"
+      ? creatorFollowPutFixtures.follow_auth_required
+      : creatorFollowDeleteFixtures.unfollow_auth_required;
+
+  if (!isAuthenticatedSessionToken(sessionToken)) {
+    return authRequiredResponse;
+  }
+
+  if (!creatorBaseStatsById[creatorId]) {
+    return method === "PUT"
+      ? creatorFollowPutFixtures.follow_not_found
+      : creatorFollowDeleteFixtures.unfollow_not_found;
+  }
+
+  const followedCreatorIds = getFollowedCreatorIds(sessionToken);
+
+  if (!followedCreatorIds) {
+    return authRequiredResponse;
+  }
+
+  if (method === "PUT") {
+    const responseFixture = followedCreatorIds.has(creatorId)
+      ? creatorFollowPutFixtures.follow_repeat
+      : creatorFollowPutFixtures.follow_success;
+
+    followedCreatorIds.add(creatorId);
+
+    const body = structuredClone(responseFixture.body);
+
+    body.data.stats.fanCount = resolveCreatorFanCount(creatorId, sessionToken);
+
+    return {
+      body,
+      status: responseFixture.status,
+    };
+  }
+
+  const responseFixture = followedCreatorIds.has(creatorId)
+    ? creatorFollowDeleteFixtures.unfollow_success
+    : creatorFollowDeleteFixtures.unfollow_repeat;
+
+  followedCreatorIds.delete(creatorId);
+
+  const body = structuredClone(responseFixture.body);
+
+  body.data.stats.fanCount = resolveCreatorFanCount(creatorId, sessionToken);
+
+  return {
+    body,
+    status: responseFixture.status,
+  };
+}
+
 function buildCreatorProfileHeaderResponse(creatorId, sessionToken) {
-  const isAuthenticated = sessionToken === e2eSessionToken;
+  const resolvedFanCount = resolveCreatorFanCount(creatorId, sessionToken);
 
   if (creatorId === "creator_aoi_n") {
     return {
@@ -138,11 +265,11 @@ function buildCreatorProfileHeaderResponse(creatorId, sessionToken) {
               bio: "soft light と close framing の short を中心に更新中。",
             },
             stats: {
-              shortCount: 2,
-              fanCount: 19000,
+              shortCount: creatorBaseStatsById.creator_aoi_n.shortCount,
+              fanCount: resolvedFanCount ?? creatorBaseStatsById.creator_aoi_n.fanCount,
             },
             viewer: {
-              isFollowing: isAuthenticated,
+              isFollowing: isCreatorFollowed(creatorId, sessionToken),
             },
           },
         },
@@ -158,7 +285,8 @@ function buildCreatorProfileHeaderResponse(creatorId, sessionToken) {
   if (creatorId === "creator_mina_rei") {
     const body = structuredClone(creatorProfileHeaderFixtures.creator_profile_header_normal.body);
 
-    body.data.profile.viewer.isFollowing = isAuthenticated;
+    body.data.profile.stats.fanCount = resolvedFanCount ?? creatorBaseStatsById.creator_mina_rei.fanCount;
+    body.data.profile.viewer.isFollowing = isCreatorFollowed(creatorId, sessionToken);
     return {
       body,
       status: 200,
@@ -185,11 +313,11 @@ function buildCreatorProfileHeaderResponse(creatorId, sessionToken) {
               bio: "after rain と balcony mood の short をまとめています。",
             },
             stats: {
-              shortCount: 0,
-              fanCount: 16000,
+              shortCount: creatorBaseStatsById.creator_sora_vale.shortCount,
+              fanCount: resolvedFanCount ?? creatorBaseStatsById.creator_sora_vale.fanCount,
             },
             viewer: {
-              isFollowing: false,
+              isFollowing: isCreatorFollowed(creatorId, sessionToken),
             },
           },
         },
@@ -331,6 +459,30 @@ const server = http.createServer((request, response) => {
     return;
   }
 
+  if (
+    (request.method === "PUT" || request.method === "DELETE") &&
+    requestUrl.pathname.startsWith("/api/fan/creators/")
+  ) {
+    const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+    const pathnameParts = requestUrl.pathname.split("/").filter(Boolean);
+    const creatorId = pathnameParts[3];
+    const lastSegment = pathnameParts.at(-1);
+
+    if (!creatorId || lastSegment !== "follow") {
+      writeJson(request, response, 404, creatorProfileNotFoundResponse.body);
+      return;
+    }
+
+    const followMutationResponse = buildCreatorFollowMutationResponse(
+      request.method,
+      creatorId,
+      sessionToken,
+    );
+
+    writeJson(request, response, followMutationResponse.status, followMutationResponse.body);
+    return;
+  }
+
   if (request.method === "GET" && requestUrl.pathname.startsWith("/api/fan/creators/")) {
     const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
     const pathnameParts = requestUrl.pathname.split("/").filter(Boolean);
@@ -358,7 +510,7 @@ const server = http.createServer((request, response) => {
   if (request.method === "GET" && requestUrl.pathname === "/api/viewer/bootstrap") {
     const sessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
     const body =
-      sessionToken === e2eSessionToken ? authenticatedFanBootstrap : unauthenticatedBootstrap;
+      isAuthenticatedSessionToken(sessionToken) ? authenticatedFanBootstrap : unauthenticatedBootstrap;
 
     writeJson(request, response, 200, body);
     return;
@@ -495,7 +647,7 @@ const server = http.createServer((request, response) => {
       }
 
       writeNoContent(request, response, {
-        "Set-Cookie": `shorts_fans_session=${e2eSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `shorts_fans_session=${createE2ESessionToken()}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;
@@ -534,7 +686,7 @@ const server = http.createServer((request, response) => {
       }
 
       writeNoContent(request, response, {
-        "Set-Cookie": `shorts_fans_session=${e2eSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `shorts_fans_session=${createE2ESessionToken()}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;

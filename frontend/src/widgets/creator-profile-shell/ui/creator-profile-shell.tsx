@@ -17,6 +17,7 @@ import type {
   CreatorProfileShellShortItem,
   CreatorProfileShellState,
 } from "../model/load-creator-profile-shell-state";
+import { useCreatorProfileFollow } from "../model/use-creator-profile-follow";
 
 type CreatorProfileShellProps = {
   routeState: CreatorProfileRouteState;
@@ -103,8 +104,35 @@ export function CreatorProfileShell({
   const hasViewerSession = useHasViewerSession();
   const backHref = resolveCreatorProfileBackHref(routeState);
   const displayHandle = creator.handle.replace(/^@/, "");
-  const isFollowing = viewer.isFollowing;
-  const isFollowReadOnly = hasViewerSession && !isFollowing;
+  const {
+    errorMessage,
+    fanCount,
+    isFollowing,
+    isPending,
+    toggleFollow,
+  } = useCreatorProfileFollow({
+    creatorId: creator.id,
+    hasViewerSession,
+    initialFanCount: stats.fanCount,
+    initialIsFollowing: viewer.isFollowing,
+    onAuthRequired: () => {
+      openFanAuthDialog();
+    },
+    onUnauthenticated: () => {
+      openFanAuthDialog();
+    },
+  });
+  const followButtonLabel = isPending
+    ? isFollowing
+      ? "Unfollowing..."
+      : "Following..."
+    : isFollowing
+      ? "Following"
+      : "Follow";
+  const resolvedStats = {
+    ...stats,
+    fanCount,
+  };
 
   return (
     <DetailShell
@@ -128,7 +156,7 @@ export function CreatorProfileShell({
             <p className="truncate text-[18px] font-semibold tracking-[-0.03em] text-foreground">
               {creator.displayName}
             </p>
-            <CreatorStatList className="mt-3 gap-[10px]" stats={stats} variant="creatorProfile" />
+            <CreatorStatList className="mt-3 gap-[10px]" stats={resolvedStats} variant="creatorProfile" />
           </div>
         </div>
 
@@ -136,23 +164,31 @@ export function CreatorProfileShell({
 
         <div className="mt-[14px]">
           <Button
+            aria-busy={isPending || undefined}
             aria-pressed={isFollowing}
             className={
               isFollowing
                 ? "min-h-9 w-full rounded-[10px] border-transparent bg-[#edf2f7] text-[13px] font-bold text-foreground shadow-none backdrop-blur-none"
                 : "min-h-9 w-full rounded-[10px] bg-accent-strong text-[13px] font-bold text-white shadow-none disabled:brightness-90"
             }
-            disabled={isFollowReadOnly}
+            disabled={isPending}
             onClick={() => {
-              if (!hasViewerSession) {
-                openFanAuthDialog();
-              }
+              void toggleFollow();
             }}
             type="button"
             variant={isFollowing ? "secondary" : "default"}
           >
-            {isFollowing ? "Following" : "Follow"}
+            {followButtonLabel}
           </Button>
+          {errorMessage ? (
+            <p
+              aria-live="polite"
+              className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+              role="alert"
+            >
+              {errorMessage}
+            </p>
+          ) : null}
         </div>
 
         <ShortsGridTab />

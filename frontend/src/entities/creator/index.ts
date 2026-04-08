@@ -5,6 +5,15 @@ export type {
   CreatorProfileHeader,
 } from "./api/get-creator-profile-header";
 export {
+  CreatorFollowApiError,
+  updateCreatorFollow,
+} from "./api/update-creator-follow";
+export type {
+  CreatorFollowAction,
+  CreatorFollowApiErrorCode,
+  CreatorFollowMutationResult,
+} from "./api/update-creator-follow";
+export {
   getCreatorProfileShortGrid,
 } from "./api/get-creator-profile-short-grid";
 export type {

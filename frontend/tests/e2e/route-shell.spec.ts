@@ -1,18 +1,26 @@
 import { expect, test, type Page } from "@playwright/test";
 
-const viewerSessionCookie = {
+const viewerSessionCookieBase = {
   domain: "127.0.0.1",
   name: "shorts_fans_session",
   path: "/",
-  value: "e2e-viewer-session",
 } as const;
 
-async function addViewerSession(page: Page) {
-  await page.context().addCookies([viewerSessionCookie]);
+function createViewerSessionToken(): string {
+  return `e2e-viewer-session-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function buildViewerSessionCookieHeader() {
-  return `${viewerSessionCookie.name}=${viewerSessionCookie.value}`;
+async function addViewerSession(page: Page, value = createViewerSessionToken()) {
+  await page.context().addCookies([
+    {
+      ...viewerSessionCookieBase,
+      value,
+    },
+  ]);
+}
+
+function buildViewerSessionCookieHeader(value = createViewerSessionToken()) {
+  return `${viewerSessionCookieBase.name}=${value}`;
 }
 
 async function expectMainShortcutNavigation(page: Page, options: {
@@ -113,7 +121,7 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
 
   await page.goto("/creators/creator_sora_vale");
   await expect(page.getByText("まだ公開中の short はありません。")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Follow" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Follow" })).toBeEnabled();
 
   await page.goto("/creators/creator_mina_rei?from=twitter&tab=other");
   await expect(page).toHaveURL(/\/creators\/creator_mina_rei\?from=twitter&tab=other$/);
@@ -145,8 +153,8 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
 });
 
-test("unauthenticated viewers can open the shared auth modal from creator profile follow", async ({ page }) => {
-  await page.goto("/creators/creator_mina_rei");
+test("unauthenticated viewers can open the shared auth modal from creator profile follow without auto-following", async ({ page }) => {
+  await page.goto("/creators/creator_aoi_n");
 
   await page.getByRole("button", { name: "Follow" }).click();
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
@@ -154,8 +162,37 @@ test("unauthenticated viewers can open the shared auth modal from creator profil
   await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
   await page.getByRole("button", { name: "サインインを続ける" }).click();
 
-  await expect(page).toHaveURL(/\/creators\/creator_mina_rei$/);
+  await expect(page).toHaveURL(/\/creators\/creator_aoi_n$/);
+  await expect(page.getByRole("button", { name: "Follow" })).toBeVisible();
+});
+
+test("authenticated viewers can follow and unfollow from creator profile", async ({ page }) => {
+  await addViewerSession(page);
+  await page.goto("/creators/creator_aoi_n");
+
+  await expect(page.getByRole("button", { name: "Follow" })).toBeVisible();
+
+  const [followResponse] = await Promise.all([
+    page.waitForResponse((candidate) =>
+      candidate.request().method() === "PUT" &&
+      candidate.url().includes("/api/fan/creators/creator_aoi_n/follow"),
+    ),
+    page.getByRole("button", { name: "Follow" }).click(),
+  ]);
+
+  expect(followResponse.status()).toBe(200);
   await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
+
+  const [unfollowResponse] = await Promise.all([
+    page.waitForResponse((candidate) =>
+      candidate.request().method() === "DELETE" &&
+      candidate.url().includes("/api/fan/creators/creator_aoi_n/follow"),
+    ),
+    page.getByRole("button", { name: "Following" }).click(),
+  ]);
+
+  expect(unfollowResponse.status()).toBe(200);
+  await expect(page.getByRole("button", { name: "Follow" })).toBeVisible();
 });
 
 test("unauthenticated viewers can sign up from the shared auth modal and enter the fan hub", async ({ page }) => {
@@ -211,7 +248,7 @@ test("main access route returns auth_required for unauthenticated viewers", asyn
 test("stale session cookies are treated as unauthenticated on protected fan surfaces", async ({ page }) => {
   await page.context().addCookies([
     {
-      ...viewerSessionCookie,
+      ...viewerSessionCookieBase,
       value: "stale-e2e-session",
     },
   ]);
@@ -263,7 +300,7 @@ test("authenticated viewers can open Aoi creator profile from main playback", as
 
   await expect(page).toHaveURL(/\/creators\/creator_aoi_n$/);
   await expect(page.getByRole("heading", { name: /Aoi N creator profile/i })).toHaveCount(1);
-  await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Follow" })).toBeVisible();
 });
 
 test("authenticated viewers can unlock a purchased-required main from short detail", async ({ page }) => {
