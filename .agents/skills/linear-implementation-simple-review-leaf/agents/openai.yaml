@@ -1,4 +1,4 @@
 interface:
   display_name: "Linear Implementation Simple Review Leaf"
   short_description: "Orchestrate leaf delivery with reviewer_simple loop"
-  default_prompt: "Use $linear-implementation-simple-review-leaf to orchestrate a leaf issue with reviewer_simple until the gate is clean."
+  default_prompt: "Use $linear-implementation-simple-review-leaf to orchestrate a leaf issue with reviewer_simple until the gate is clean. Require reviewer outputs in findings-only format with severity, confidence, file path, and rationale for each finding, or the exact clean response `No findings. Gate clean.`"
