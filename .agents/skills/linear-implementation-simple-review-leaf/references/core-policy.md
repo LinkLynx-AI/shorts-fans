@@ -41,5 +41,5 @@
 - Runtime smoke gate passes for non-trivial changes.
 - Reviewer remediation loop passes or an explicit blocker is recorded.
 - PR handoff is prepared.
-- For non-`main` base branches, auto-merge is enabled after review and validation gates pass and merge is completed.
+- For non-`main` base branches, auto-merge is enabled once required validations pass and the reviewer remediation loop finishes with no blocking findings.
 - For `main` base branch, stop at human review required state.

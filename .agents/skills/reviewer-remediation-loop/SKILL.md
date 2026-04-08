@@ -26,12 +26,12 @@ description: Run the required reviewer agent after local verification, fix block
 3. Run the required reviewer agent.
 4. Classify findings using the profile's blocking rule.
 5. If blocking findings exist:
-- fix the highest-severity findings first
-- rerun the targeted local validation affected by the fix
-- rerun the same reviewer gate
+   - fix the highest-severity findings first
+   - rerun the targeted local validation affected by the fix
+   - rerun the same reviewer gate
 6. Repeat the loop until:
-- no blocking findings remain, or
-- an explicit external blocker or user decision prevents further progress
+   - no blocking findings remain, or
+   - an explicit external blocker or user decision prevents further progress
 7. Record every review pass, finding disposition, and fix loop result in `Verification.md`.
 8. Do not proceed to PR handoff while blocking findings remain.
 

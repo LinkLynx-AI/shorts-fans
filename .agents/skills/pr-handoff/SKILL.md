@@ -24,20 +24,20 @@ description: Produce a Japanese PR-ready handoff from `Prompt.md`, `Plan.md`, `D
 - Explain both what changed and why it changed.
 - Map each acceptance criterion to concrete implementation or test evidence.
 - If the base branch is `main`, prepare for human review and do not assume auto-merge.
-- If the base branch is not `main`, only prepare auto-merge-ready handoff after verification and reviewer gates pass.
+- If the base branch is not `main`, only prepare auto-merge-ready handoff after verification passes and the reviewer remediation loop finishes with no blocking findings.
 
 ## Procedure
 1. Read the run artifacts instead of reconstructing the story from memory.
 2. Create or refresh `./.local/codex-memo/<ISSUE>/PR.md`.
 3. Fill:
-- title
-- summary of what changed
-- intent and rationale
-- acceptance criteria mapping
-- validation and smoke results
-- residual risks or follow-ups
-- review focus points
-- issue link
+   - title
+   - summary of what changed
+   - intent and rationale
+   - acceptance criteria mapping
+   - validation and smoke results
+   - residual risks or follow-ups
+   - review focus points
+   - issue link
 4. Keep the wording concise and reviewer-friendly.
 
 ## Output Contract

@@ -27,6 +27,6 @@ If start mode is unclear, ask one clarifying question before execution.
 - Start mode decision (child issue start or standalone start).
 - `Prompt.md`, `Plan.md`, `Documentation.md`, `Verification.md`, and `PR.md`.
 - Touched-area validation results and additional issue-specific validation results.
-- Review gate result and blocking finding disposition for every remediation loop pass.
+- Reviewer remediation loop result and blocking finding disposition for every remediation loop pass.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL or PR handoff state, base branch, and merge policy state.

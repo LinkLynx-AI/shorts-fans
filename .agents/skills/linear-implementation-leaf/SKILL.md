@@ -24,6 +24,9 @@ description: Orchestrate one leaf issue delivery by routing through repo-scoped 
 
 ## Must-load Resources
 - `references/orchestration-policy.md`
+- `references/core-policy.md`
+- `references/delivery-flow.md`
+- `references/review-gates.md`
 - `references/reviewer-profile.md`
 - `../implementation-spec-writer/SKILL.md`
 - `../implementation-planner/SKILL.md`
