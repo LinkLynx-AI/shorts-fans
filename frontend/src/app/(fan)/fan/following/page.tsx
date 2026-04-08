@@ -1,16 +1,27 @@
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
-import { listFollowingItems } from "@/entities/fan-profile";
-import { buildFanLoginHref } from "@/features/fan-auth";
-import { getFanAuthGateState } from "@/features/fan-auth-gate";
+import { fetchFanProfileFollowingPage } from "@/entities/fan-profile";
+import { viewerSessionCookieName } from "@/entities/viewer";
+import {
+  FanAuthRequiredDialogTrigger,
+  isAuthRequiredApiError,
+} from "@/features/fan-auth";
 import { FollowingShell } from "@/widgets/following-shell";
 
 export default async function FollowingPage() {
-  const viewerState = await getFanAuthGateState();
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(viewerSessionCookieName)?.value;
+  let response;
 
-  if (!viewerState.hasSession) {
-    redirect(buildFanLoginHref());
+  try {
+    response = await fetchFanProfileFollowingPage({ sessionToken });
+  } catch (error) {
+    if (isAuthRequiredApiError(error)) {
+      return <FanAuthRequiredDialogTrigger />;
+    }
+
+    throw error;
   }
 
-  return <FollowingShell items={listFollowingItems()} />;
+  return <FollowingShell items={response.items} />;
 }

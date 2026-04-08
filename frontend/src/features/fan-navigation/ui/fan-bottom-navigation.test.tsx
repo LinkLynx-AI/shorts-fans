@@ -55,7 +55,7 @@ describe("fan navigation", () => {
     expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
   });
 
-  it("opens the shared auth dialog instead of routing to /login for unauthenticated profile opens", async () => {
+  it("does not open the shared auth dialog before /fan responds with auth_required", async () => {
     vi.mocked(usePathname).mockReturnValue("/");
     const user = userEvent.setup();
 
@@ -65,7 +65,6 @@ describe("fan navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "マイ" }));
 
-    expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Email" })).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "続けるにはログインが必要です" })).not.toBeInTheDocument();
   });
 });

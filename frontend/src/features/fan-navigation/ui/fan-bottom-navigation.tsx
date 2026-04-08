@@ -3,8 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import { useHasViewerSession } from "@/entities/viewer";
-import { useFanAuthDialog } from "@/features/fan-auth";
 import { cn } from "@/shared/lib";
 
 import { getFanNavigationItems, resolveActiveFanNavigation } from "../model/fan-navigation";
@@ -13,8 +11,6 @@ import { getFanNavigationItems, resolveActiveFanNavigation } from "../model/fan-
  * fan mode 共通の bottom navigation を表示する。
  */
 export function FanBottomNavigation() {
-  const hasViewerSession = useHasViewerSession();
-  const { openFanAuthDialog } = useFanAuthDialog();
   const pathname = usePathname();
   const activeKey = resolveActiveFanNavigation(pathname);
 
@@ -36,14 +32,6 @@ export function FanBottomNavigation() {
               isActive ? "text-accent-strong" : "text-accent-strong/72 hover:text-accent-strong/84",
             )}
             href={item.href}
-            onClick={(event) => {
-              if (item.key === "fan" && !hasViewerSession) {
-                event.preventDefault();
-                openFanAuthDialog({
-                  afterAuthenticatedHref: item.href,
-                });
-              }
-            }}
           >
             <item.icon aria-hidden="true" className="size-[18px]" strokeWidth={1.9} />
             <span className="sr-only">{item.ariaLabel}</span>
