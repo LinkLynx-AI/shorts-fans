@@ -1,0 +1,4 @@
+interface:
+  display_name: "Code Change Verification"
+  short_description: "Run validations, smoke checks, and repo guards"
+  default_prompt: "Use $code-change-verification to validate the current diff and write Verification.md."

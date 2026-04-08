@@ -1,0 +1,4 @@
+interface:
+  display_name: "Architecture Guard"
+  short_description: "Check repo-specific architecture and boundary rules"
+  default_prompt: "Use $architecture-guard to inspect the current diff for repo-specific architecture violations."

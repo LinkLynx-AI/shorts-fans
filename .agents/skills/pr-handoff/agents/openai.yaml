@@ -1,0 +1,4 @@
+interface:
+  display_name: "PR Handoff"
+  short_description: "Prepare Japanese PR title and body from run artifacts"
+  default_prompt: "Use $pr-handoff to turn the current run artifacts into a Japanese PR-ready handoff."
