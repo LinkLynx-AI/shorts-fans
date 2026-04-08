@@ -64,3 +64,14 @@ export function getCreatorModeEntryErrorMessage(error: unknown): string {
 
   return "creator mode を開けませんでした。少し時間を置いてからやり直してください。";
 }
+
+/**
+ * fan mode 遷移失敗時の UI message を返す。
+ */
+export function getFanModeEntryErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && error.code === "network") {
+    return "fan mode に戻れませんでした。通信状態を確認してから再度お試しください。";
+  }
+
+  return "fan mode に戻れませんでした。少し時間を置いてからやり直してください。";
+}
