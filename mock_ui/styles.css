@@ -921,6 +921,10 @@ button {
   gap: 10px;
 }
 
+.fan-topbar {
+  justify-content: flex-end;
+}
+
 .back-button {
   min-width: 28px;
   min-height: 32px;
@@ -1085,8 +1089,13 @@ button {
 }
 
 .creator-manager-stats {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px 8px;
+}
+
+.creator-manager-stats .creator-profile-stat strong {
+  font-size: 16px;
+  line-height: 1.2;
 }
 
 .creator-profile-stat strong {
@@ -1407,23 +1416,6 @@ button {
   font-weight: 700;
 }
 
-.fan-creator-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 44px;
-  margin-top: 14px;
-  padding: 0 16px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #1082c8 0%, #0a5b8c 100%);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  box-shadow: 0 16px 36px rgba(16, 130, 200, 0.2);
-}
-
 .creator-manager-alert-copy span {
   color: var(--text-body);
   font-size: 11px;
@@ -1477,6 +1469,60 @@ button {
 .creator-manager-alert-copy b {
   font-size: 13px;
   line-height: 1.35;
+}
+
+.creator-manager-top-performers {
+  margin-top: 18px;
+  border-top: 1px solid rgba(167, 220, 249, 0.48);
+  border-bottom: 1px solid rgba(167, 220, 249, 0.48);
+}
+
+.creator-manager-top-performer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 58px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.creator-manager-top-performer + .creator-manager-top-performer {
+  border-top: 1px solid rgba(167, 220, 249, 0.32);
+}
+
+.creator-manager-top-performer-label {
+  color: var(--text-body);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.creator-manager-top-performer-trailing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.creator-manager-top-performer-metric {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.creator-manager-top-performer-thumb {
+  display: block;
+  width: 30px;
+  height: 40px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  background: linear-gradient(180deg, var(--tile-top), var(--tile-mid) 42%, var(--tile-bottom) 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.56);
 }
 
 .creator-post-detail-screen {
@@ -1641,7 +1687,7 @@ button {
 
 .creator-post-detail-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 4px 0;
   border-top: 1px solid rgba(167, 220, 249, 0.48);
   border-bottom: 1px solid rgba(167, 220, 249, 0.48);
@@ -1650,18 +1696,23 @@ button {
 .creator-post-detail-metric {
   display: grid;
   gap: 4px;
-  padding: 12px 6px;
+  padding: 12px 8px;
   text-align: center;
 }
 
+.creator-post-detail-metric:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
 .creator-post-detail-metric strong {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
 }
 
 .creator-post-detail-metric span {
   color: var(--text-body);
   font-size: 11px;
+  line-height: 1.35;
 }
 
 .creator-post-detail-section {
@@ -2115,6 +2166,53 @@ button {
   stroke-width: 1.7;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+.fan-account-menu-panel {
+  right: 12px;
+  left: 12px;
+  bottom: 12px;
+  padding: 10px 10px 14px;
+  border-color: rgba(217, 226, 232, 0.94);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 42px rgba(6, 21, 33, 0.12);
+}
+
+.fan-account-menu-handle {
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 12px;
+  border-radius: 999px;
+  background: rgba(6, 21, 33, 0.16);
+}
+
+.fan-account-menu-group {
+  padding: 4px 0;
+  border-radius: 24px;
+  background: #f3f6f8;
+}
+
+.fan-account-menu-list {
+  display: grid;
+}
+
+.fan-account-menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 54px;
+  padding: 0 18px;
+  background: transparent;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.fan-account-menu-chevron {
+  color: var(--text-body);
+  font-size: 15px;
 }
 
 .fan-card-head,

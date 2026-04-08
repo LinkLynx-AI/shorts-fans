@@ -168,8 +168,11 @@ const creatorDashboardData = {
     profileStats: [
       { label: "revenue", value: "¥120K" },
       { label: "unlocks", value: "238" },
-      { label: "shorts", value: "14" },
-      { label: "followers", value: "24K" },
+      { label: "purchasers", value: "164" },
+    ],
+    topPerformers: [
+      { kind: "main", label: "Top main", metric: "¥84K", shortId: "rooftop" },
+      { kind: "shorts", label: "Top short", metric: "186 unlocks", shortId: "rooftop" },
     ],
     revisionNotice: {
       detail: "キャプション連携を確認してください",
@@ -227,36 +230,36 @@ const creatorManagerDetailData = {
     mirror: {
       kindLabel: "本編",
       metrics: [
-        { label: "視聴回数", value: "1.6K" },
-        { label: "unlock数", value: "143" },
-        { label: "売上", value: "¥36K" },
+        { label: "paywall views", value: "1.6K" },
+        { label: "unlocks", value: "143" },
+        { label: "conversion", value: "8.9%" },
+        { label: "revenue", value: "¥36K" },
       ],
       settings: [
         { label: "レビュー", value: "審査中" },
         { label: "価格", value: "¥2,400" },
-        { label: "紐づくショート", value: "1本" },
         { label: "最終更新", value: "今日 09:18" },
       ],
       statusLabel: "審査中",
       statusTone: "pending",
-      summary: "差し戻し対応を反映した後の再レビュー待ちです。",
+      summary: "paywall を開いたあとに unlock へつながる本編として再レビュー待ちです。",
     },
     rooftop: {
       kindLabel: "本編",
       metrics: [
-        { label: "視聴回数", value: "2.4K" },
-        { label: "unlock数", value: "238" },
-        { label: "売上", value: "¥84K" },
+        { label: "paywall views", value: "2.4K" },
+        { label: "unlocks", value: "238" },
+        { label: "conversion", value: "9.9%" },
+        { label: "revenue", value: "¥84K" },
       ],
       settings: [
         { label: "レビュー", value: "承認済み" },
         { label: "価格", value: "¥1,800" },
-        { label: "紐づくショート", value: "2本" },
         { label: "最終更新", value: "昨日 21:05" },
       ],
       statusLabel: "公開中",
       statusTone: "approved",
-      summary: "short から unlock されたあとに再生される main です。",
+      summary: "linked short からの流入を unlock に変えている本編です。",
     },
   },
   shorts: {
@@ -265,57 +268,60 @@ const creatorManagerDetailData = {
       linkedPublicShortCount: 1,
       mainKey: "mirror",
       metrics: [
-        { label: "視聴回数", value: "94K" },
-        { label: "unlock数", value: "143" },
-        { label: "売上", value: "¥36K" },
+        { label: "plays", value: "94K" },
+        { label: "handoff reach", value: "18K" },
+        { label: "paywall opens", value: "2.8K" },
+        { label: "unlocks", value: "143" },
+        { label: "revenue", value: "¥36K" },
       ],
       settings: [
         { label: "レビュー", value: "再確認待ち" },
-        { label: "公開範囲", value: "プロフィールのみ" },
-        { action: "open-linked-main", label: "リンク先本編", mainKey: "mirror", value: "本編へ" },
+        { label: "公開状態", value: "非公開" },
         { label: "最終更新", value: "今日 09:18" },
       ],
       statusLabel: "審査中",
       statusTone: "pending",
-      summary: "差し戻し対応が必要なショートです。",
+      summary: "main への handoff を調整中で、差し戻し対応が残っているショートです。",
     },
     rooftop: {
       kindLabel: "ショート",
       linkedPublicShortCount: 2,
       mainKey: "rooftop",
       metrics: [
-        { label: "視聴回数", value: "128K" },
-        { label: "unlock数", value: "186" },
-        { label: "売上", value: "¥48K" },
+        { label: "plays", value: "128K" },
+        { label: "handoff reach", value: "31K" },
+        { label: "paywall opens", value: "4.3K" },
+        { label: "unlocks", value: "186" },
+        { label: "revenue", value: "¥48K" },
       ],
       settings: [
         { label: "レビュー", value: "承認済み" },
-        { label: "公開範囲", value: "プロフィール / feed" },
-        { action: "open-linked-main", label: "リンク先本編", mainKey: "rooftop", value: "本編へ" },
+        { label: "公開状態", value: "公開" },
         { label: "最終更新", value: "今日 12:24" },
       ],
       statusLabel: "公開中",
       statusTone: "approved",
-      summary: "プロフィールの先頭で使っている導入ショートです。",
+      summary: "handoff と paywall open が強く、main unlock に最もつながっているショートです。",
     },
     rooftopside: {
       kindLabel: "ショート",
       linkedPublicShortCount: 2,
       mainKey: "rooftop",
       metrics: [
-        { label: "視聴回数", value: "62K" },
-        { label: "unlock数", value: "52" },
-        { label: "売上", value: "¥22K" },
+        { label: "plays", value: "62K" },
+        { label: "handoff reach", value: "12K" },
+        { label: "paywall opens", value: "1.4K" },
+        { label: "unlocks", value: "52" },
+        { label: "revenue", value: "¥22K" },
       ],
       settings: [
         { label: "レビュー", value: "承認済み" },
-        { label: "公開範囲", value: "プロフィール / feed" },
-        { action: "open-linked-main", label: "リンク先本編", mainKey: "rooftop", value: "本編へ" },
+        { label: "公開状態", value: "公開" },
         { label: "最終更新", value: "昨日 19:12" },
       ],
       statusLabel: "公開中",
       statusTone: "approved",
-      summary: "同じ rooftop main に流す別カットのショートです。",
+      summary: "同じ main に送る別導線として比較しているショートです。",
     },
   },
 };
@@ -397,6 +403,18 @@ document.addEventListener("click", (event) => {
 
   if (action === "confirm-creator-main-action") {
     confirmCreatorMainAction();
+    return;
+  }
+
+  if (action === "open-fan-account-menu") {
+    state.overlay = "fan-account-menu";
+    render();
+    return;
+  }
+
+  if (action === "open-creator-account-menu") {
+    state.overlay = "creator-account-menu";
+    render();
     return;
   }
 
@@ -722,6 +740,24 @@ function closeOverlay() {
 
 function createBackAction() {
   return `<button aria-label="Back" class="back-button" data-action="back" type="button">&lt;</button>`;
+}
+
+function createAccountMenuAction(action) {
+  return `
+    <button aria-label="Account menu" class="fan-settings-button" data-action="${action}" type="button">
+      <svg aria-hidden="true" class="fan-settings-icon" viewBox="0 0 20 20">
+        <line x1="10" y1="1.8" x2="10" y2="4.1"></line>
+        <line x1="10" y1="15.9" x2="10" y2="18.2"></line>
+        <line x1="1.8" y1="10" x2="4.1" y2="10"></line>
+        <line x1="15.9" y1="10" x2="18.2" y2="10"></line>
+        <line x1="4.2" y1="4.2" x2="5.9" y2="5.9"></line>
+        <line x1="14.1" y1="14.1" x2="15.8" y2="15.8"></line>
+        <line x1="14.1" y1="5.9" x2="15.8" y2="4.2"></line>
+        <line x1="4.2" y1="15.8" x2="5.9" y2="14.1"></line>
+        <circle cx="10" cy="10" r="3.1"></circle>
+      </svg>
+    </button>
+  `;
 }
 
 function createCreatorAddAction() {
@@ -1061,20 +1097,7 @@ function fanScreen() {
     <section class="screen screen-fan" data-theme="fan">
       <div class="fan-screen">
         <div class="fan-topbar">
-          ${createBackAction()}
-          <button aria-label="Settings" class="fan-settings-button" type="button">
-            <svg aria-hidden="true" class="fan-settings-icon" viewBox="0 0 20 20">
-              <line x1="10" y1="1.8" x2="10" y2="4.1"></line>
-              <line x1="10" y1="15.9" x2="10" y2="18.2"></line>
-              <line x1="1.8" y1="10" x2="4.1" y2="10"></line>
-              <line x1="15.9" y1="10" x2="18.2" y2="10"></line>
-              <line x1="4.2" y1="4.2" x2="5.9" y2="5.9"></line>
-              <line x1="14.1" y1="14.1" x2="15.8" y2="15.8"></line>
-              <line x1="14.1" y1="5.9" x2="15.8" y2="4.2"></line>
-              <line x1="4.2" y1="15.8" x2="5.9" y2="14.1"></line>
-              <circle cx="10" cy="10" r="3.1"></circle>
-            </svg>
-          </button>
+          ${createAccountMenuAction("open-fan-account-menu")}
         </div>
 
         <section class="fan-profile-shell">
@@ -1107,8 +1130,6 @@ function fanScreen() {
             <p class="fan-profile-name">My archive</p>
           </div>
 
-          <button class="fan-creator-button" data-action="open-creator-dashboard" type="button">creator管理画面へ</button>
-
           <div aria-label="Profile sections" class="fan-tabbar" role="tablist">
             ${tabs
               .map(
@@ -1135,6 +1156,7 @@ function fanScreen() {
           </div>
         </section>
       </div>
+      ${renderOverlay()}
     </section>
   `;
 }
@@ -1407,6 +1429,7 @@ function creatorDashboardScreen() {
   const dashboard = creatorDashboardData[viewerCreatorId];
   const activeTab = state.creatorManagerTab === "main" ? "main" : "shorts";
   const revisionNotice = dashboard.revisionNotice || null;
+  const topPerformers = dashboard.topPerformers || [];
   const visibleItems = (activeTab === "main" ? dashboard.mains : dashboard.shorts).map((item) =>
     resolveCreatorDashboardItem(item, activeTab),
   );
@@ -1415,8 +1438,8 @@ function creatorDashboardScreen() {
     <section class="screen" data-theme="profile">
       <div class="profile-screen creator-profile-screen creator-manager-screen">
         <div class="profile-topbar">
-          ${createBackAction()}
           ${createCreatorAddAction()}
+          ${createAccountMenuAction("open-creator-account-menu")}
         </div>
 
         <section class="creator-profile-shell">
@@ -1452,6 +1475,48 @@ function creatorDashboardScreen() {
                     <span>${revisionNotice.detail}</span>
                   </div>
                 </div>
+              `
+              : ""
+          }
+
+          ${
+            topPerformers.length
+              ? `
+                <section class="creator-manager-top-performers" aria-label="Top performers">
+                  ${topPerformers
+                    .map(
+                      (item) => {
+                        const previewShort = shorts[item.shortId];
+
+                        return `
+                          <button
+                            class="creator-manager-top-performer"
+                            data-action="open-creator-manager-detail"
+                            data-kind="${item.kind}"
+                            data-short-id="${item.shortId}"
+                            type="button"
+                          >
+                            <span class="creator-manager-top-performer-label">${item.label}</span>
+                            <span class="creator-manager-top-performer-trailing">
+                              <span class="creator-manager-top-performer-metric">${item.metric}</span>
+                              ${
+                                previewShort
+                                  ? `
+                                    <span
+                                      aria-hidden="true"
+                                      class="creator-manager-top-performer-thumb"
+                                      style="--tile-top: ${previewShort.tile.top}; --tile-mid: ${previewShort.tile.mid}; --tile-bottom: ${previewShort.tile.bottom};"
+                                    ></span>
+                                  `
+                                  : ""
+                              }
+                            </span>
+                          </button>
+                        `;
+                      },
+                    )
+                    .join("")}
+                </section>
               `
               : ""
           }
@@ -1579,7 +1644,7 @@ function currentCreatorManagerDetail() {
         ? `このショートを${hidden ? "非公開" : "削除"}にしたため、本編の新規公開も停止中です。`
         : `このショートは${hidden ? "公開面から外れています" : "公開面から削除されています"}。`;
     detail.settings = detail.settings.map((item) =>
-      item.label === "公開範囲" ? { ...item, value: hidden ? "非公開" : "削除済み" } : item,
+      item.label === "公開状態" ? { ...item, value: hidden ? "非公開" : "削除済み" } : item,
     );
   }
 
@@ -1676,7 +1741,7 @@ function creatorPostDetailScreen() {
     detailTab === "main" ? mainState === "active" || mainState === "paused" : shortVisibilityState === "live";
   const linkedShortItems = detailTab === "main" ? creatorLinkedShortItems(state.creatorManagerDetailShortId || state.currentShortId) : [];
   const linkedMainItem = detailTab === "shorts" ? creatorLinkedMainItem(state.creatorManagerDetailShortId || state.currentShortId) : null;
-  const visibleSettings = detail.settings.filter((item) => !(detailTab === "shorts" && item.action === "open-linked-main"));
+  const visibleSettings = detail.settings;
 
   return `
     <section class="screen" data-theme="profile">
@@ -1767,7 +1832,7 @@ function creatorPostDetailScreen() {
 
                         return `
                           <button
-                            aria-label="${linkedShort.title}"
+                            aria-label="紐づくショートを開く"
                             class="creator-post-detail-linked-tile creator-manager-tile is-${item.tone}"
                             data-action="open-creator-manager-detail"
                             data-kind="shorts"
@@ -1799,7 +1864,7 @@ function creatorPostDetailScreen() {
                   <h3 class="creator-post-detail-section-title">紐づく本編</h3>
                   <div class="creator-post-detail-linked-grid">
                     <button
-                      aria-label="${shorts[linkedMainItem.shortId].title}"
+                      aria-label="紐づく本編を開く"
                       class="creator-post-detail-linked-tile creator-manager-tile is-${linkedMainItem.tone}"
                       data-action="open-creator-manager-detail"
                       data-kind="main"
@@ -2116,8 +2181,8 @@ function creatorShortActionOverlay() {
           pendingAction.willStopMainFlow
             ? "この本編には他に公開中のショートがありません。既存購入者の視聴は維持されます。"
             : pendingAction.actionKind === "delete"
-              ? "プロフィールと feed から外れ、公開導線として使えなくなります。"
-              : "プロフィールと feed から外れ、公開導線として一時的に止まります。"
+              ? "公開面から削除され、公開導線として使えなくなります。"
+              : "公開面から外れ、公開導線として一時的に止まります。"
         }
       </p>
 
@@ -2157,8 +2222,8 @@ function creatorMainActionOverlay() {
       <p class="creator-short-action-copy">
         ${
           pendingAction.actionKind === "delete"
-            ? `この本編と紐づくショート${linkedShortCount}本がプロフィールと feed から削除され、公開導線として使えなくなります。`
-            : `この本編と紐づくショート${linkedShortCount}本がプロフィールと feed から外れます。既存購入者の視聴は維持されます。`
+            ? `この本編と紐づくショート${linkedShortCount}本が公開面から削除され、公開導線として使えなくなります。`
+            : `この本編と紐づくショート${linkedShortCount}本が公開面から外れます。既存購入者の視聴は維持されます。`
         }
       </p>
 
@@ -2250,7 +2315,6 @@ function creatorPostActionsOverlay() {
           { action: "request-creator-main-action", icon: "delete", kind: "delete", label: "この本編を削除する", tone: "danger" },
         ]
       : [
-          { action: "open-creator-linked-main", chevron: true, icon: "open-main", label: "紐づく本編を開く", shortId: detail.mainKey },
           { action: "request-creator-short-action", icon: "hide", kind: "hide", label: "このショートを非公開にする" },
           { action: "request-creator-short-action", icon: "delete", kind: "delete", label: "このショートを削除する", tone: "danger" },
         ];
@@ -2263,6 +2327,42 @@ function creatorPostActionsOverlay() {
       <div class="creator-post-actions-group">
         <div class="creator-post-actions-list">
           ${rows.map((item) => creatorPostActionRow(item)).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function fanAccountMenuOverlay() {
+  return `
+    <div class="overlay-backdrop" data-action="close-overlay"></div>
+    <div class="overlay-panel fan-account-menu-panel">
+      <div aria-hidden="true" class="fan-account-menu-handle"></div>
+
+      <div class="fan-account-menu-group">
+        <div class="fan-account-menu-list">
+          <button class="fan-account-menu-row" data-action="open-creator-dashboard" type="button">
+            <span>Creator mode に切り替え</span>
+            <span aria-hidden="true" class="fan-account-menu-chevron">&gt;</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function creatorAccountMenuOverlay() {
+  return `
+    <div class="overlay-backdrop" data-action="close-overlay"></div>
+    <div class="overlay-panel fan-account-menu-panel">
+      <div aria-hidden="true" class="fan-account-menu-handle"></div>
+
+      <div class="fan-account-menu-group">
+        <div class="fan-account-menu-list">
+          <button class="fan-account-menu-row" data-action="open-fan" type="button">
+            <span>Fan mode に切り替え</span>
+            <span aria-hidden="true" class="fan-account-menu-chevron">&gt;</span>
+          </button>
         </div>
       </div>
     </div>
@@ -2321,6 +2421,14 @@ function render() {
 }
 
 function renderOverlay() {
+  if (state.overlay === "fan-account-menu") {
+    return fanAccountMenuOverlay();
+  }
+
+  if (state.overlay === "creator-account-menu") {
+    return creatorAccountMenuOverlay();
+  }
+
   if (state.overlay === "creator-post-actions") {
     return creatorPostActionsOverlay();
   }
