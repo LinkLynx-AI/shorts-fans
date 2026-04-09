@@ -37,6 +37,41 @@ function getMockCreatorModeOwner(): CreatorSummary {
   return creator;
 }
 
+export function getCreatorModeUnauthenticatedState(): CreatorModeShellBlockedState {
+  return {
+    ctaHref: "/login",
+    ctaLabel: "ログインへ進む",
+    description: "creator mode は private workspace なので、まず同じ identity でログインしてください。",
+    eyebrow: "Creator access",
+    kind: "unauthenticated",
+    title: "creator mode を開くにはログインが必要です。",
+  };
+}
+
+export function getCreatorModeCapabilityRequiredState(): CreatorModeShellBlockedState {
+  return {
+    ctaHref: "/",
+    ctaLabel: "フィードへ戻る",
+    description:
+      "この viewer には creator capability がまだ付与されていません。creator onboarding 完了後に creator mode が解放されます。",
+    eyebrow: "Creator access",
+    kind: "capability_required",
+    title: "creator mode はまだ利用できません。",
+  };
+}
+
+export function getCreatorModeRequiredState(): CreatorModeShellBlockedState {
+  return {
+    ctaHref: "/",
+    ctaLabel: "フィードへ戻る",
+    description:
+      "この route は creator mode 前提です。mode switch 自体は別 PR の担当なので、profile / account menu から creator mode に入ってください。",
+    eyebrow: "Mode mismatch",
+    kind: "mode_required",
+    title: "creator mode に切り替えてから開いてください。",
+  };
+}
+
 /**
  * creator mode route 用の mock shell state を返す。
  */
@@ -61,38 +96,15 @@ export function resolveCreatorModeShellState(
   activeNavigation: CreatorModeNavigationKey = "dashboard",
 ): CreatorModeShellState {
   if (currentViewer === null) {
-    return {
-      ctaHref: "/login",
-      ctaLabel: "ログインへ進む",
-      description: "creator mode は private workspace なので、まず同じ identity でログインしてください。",
-      eyebrow: "Creator access",
-      kind: "unauthenticated",
-      title: "creator mode を開くにはログインが必要です。",
-    };
+    return getCreatorModeUnauthenticatedState();
   }
 
   if (!currentViewer.canAccessCreatorMode) {
-    return {
-      ctaHref: "/",
-      ctaLabel: "フィードへ戻る",
-      description:
-        "この viewer には creator capability がまだ付与されていません。creator onboarding 完了後に creator mode が解放されます。",
-      eyebrow: "Creator access",
-      kind: "capability_required",
-      title: "creator mode はまだ利用できません。",
-    };
+    return getCreatorModeCapabilityRequiredState();
   }
 
   if (currentViewer.activeMode !== "creator") {
-    return {
-      ctaHref: "/",
-      ctaLabel: "フィードへ戻る",
-      description:
-        "この route は creator mode 前提です。mode switch 自体は別 PR の担当なので、profile / account menu から creator mode に入ってください。",
-      eyebrow: "Mode mismatch",
-      kind: "mode_required",
-      title: "creator mode に切り替えてから開いてください。",
-    };
+    return getCreatorModeRequiredState();
   }
 
   return getMockCreatorModeShellState(activeNavigation);
