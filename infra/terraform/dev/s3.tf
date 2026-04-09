@@ -63,6 +63,18 @@ resource "aws_s3_bucket_policy" "raw" {
   ]
 }
 
+resource "aws_s3_bucket_cors_configuration" "raw" {
+  bucket = aws_s3_bucket.raw.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["PUT"]
+    allowed_origins = var.allowed_app_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 300
+  }
+}
+
 resource "aws_s3_bucket_lifecycle_configuration" "raw" {
   bucket = aws_s3_bucket.raw.id
 

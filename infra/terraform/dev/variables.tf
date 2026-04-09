@@ -9,7 +9,7 @@ variable "aws_region" {
 }
 
 variable "allowed_app_origins" {
-  description = "Origins allowed to access delivery buckets from local app environments."
+  description = "Origins allowed to access raw upload and delivery buckets from local app environments."
   type        = list(string)
   default = [
     "http://localhost:3000",
