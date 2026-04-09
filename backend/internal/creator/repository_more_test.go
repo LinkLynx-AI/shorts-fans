@@ -17,6 +17,8 @@ type repositoryStubQueries struct {
 	countFollowers       func(context.Context, pgtype.UUID) (int64, error)
 	createCapability     func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	getCapability        func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	getWorkspaceMetrics  func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
+	getRevisionSummary   func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	updateCapability     func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	countPublicShorts    func(context.Context, pgtype.UUID) (int64, error)
 	deleteCreatorFollow  func(context.Context, sqlc.DeleteCreatorFollowParams) error
@@ -52,6 +54,20 @@ func (s repositoryStubQueries) GetCreatorCapabilityByUserID(ctx context.Context,
 		return sqlc.AppCreatorCapability{}, nil
 	}
 	return s.getCapability(ctx, userID)
+}
+
+func (s repositoryStubQueries) GetCreatorWorkspaceOverviewMetrics(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error) {
+	if s.getWorkspaceMetrics == nil {
+		return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
+	}
+	return s.getWorkspaceMetrics(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {
+	if s.getRevisionSummary == nil {
+		return sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow{}, nil
+	}
+	return s.getRevisionSummary(ctx, creatorUserID)
 }
 
 func (s repositoryStubQueries) UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {

@@ -87,6 +87,7 @@ func main() {
 		httpserver.HandlerConfig{
 			AppEnv:               cfg.AppEnv,
 			CreatorSearch:        creatorRepository,
+			CreatorWorkspace:     creatorRepository,
 			CreatorUpload:        creatorUploadService,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
