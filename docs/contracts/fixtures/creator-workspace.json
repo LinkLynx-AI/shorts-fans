@@ -70,6 +70,33 @@
         "error": null
       }
     },
+    "workspace_without_custom_avatar": {
+      "status": 200,
+      "body": {
+        "data": {
+          "workspace": {
+            "creator": {
+              "id": "creator_noa_lune",
+              "displayName": "Noa Lune",
+              "handle": "@noalune",
+              "avatar": null,
+              "bio": "city haze の preview を中心に投稿。"
+            },
+            "overviewMetrics": {
+              "grossUnlockRevenueJpy": 15400,
+              "unlockCount": 18,
+              "uniquePurchaserCount": 14
+            },
+            "revisionRequestedSummary": null
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_003",
+          "page": null
+        },
+        "error": null
+      }
+    },
     "auth_required": {
       "status": 401,
       "body": {

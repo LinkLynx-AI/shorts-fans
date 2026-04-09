@@ -47,6 +47,7 @@
 
 - shape は `docs/contracts/fan-mvp-common-transport-contract.md` の `CreatorSummary` と同じです。
 - `id / displayName / handle / avatar / bio` を返します。
+- `avatar` は custom avatar がない場合 `null` を返し、client は既存の platform default avatar / initials fallback を描画します。
 - `/creator` では `bio` を本人紹介文として使い、workspace 固有の別説明文は持ちません。
 
 ### `WorkspaceOverviewMetrics`
@@ -117,6 +118,7 @@
 - caller は approved creator capability を持つ必要があります。
 - workspace creator は current viewer 自身に固定し、path parameter で他 creator の private workspace を読む形にはしません。
 - `handle` は `/creator` header での表示前提で必須とします。
+- `avatar = null` は error ではなく、creator registration 時に custom avatar を設定しなかったか、既存 avatar が未設定であることを表します。
 - ただし `handle` を creator registration 時にいつ確定させるかは別 PR の責務とし、この文書は approved creator workspace read に必要な shape だけを固定します。
 
 ## Error Contract
