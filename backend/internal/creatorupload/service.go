@@ -33,7 +33,7 @@ const (
 var (
 	// ErrPackageExpired は upload package が存在しない、または期限切れのことを表します。
 	ErrPackageExpired = errors.New("creator upload package has expired")
-	// ErrStorageFailure は S3 presign / verification 依存が失敗したことを表します。
+	// ErrStorageFailure は S3 や package store などの dependency が失敗したことを表します。
 	ErrStorageFailure = errors.New("creator upload storage failure")
 	// ErrUploadFailure は expected object が揃っていないか package と不整合なことを表します。
 	ErrUploadFailure = errors.New("creator upload package is incomplete")
@@ -248,7 +248,7 @@ func (s *Service) CreatePackage(ctx context.Context, input CreatePackageInput) (
 		Main:          mainEntry,
 		Shorts:        shortEntries,
 	}, s.packageTTL); err != nil {
-		return CreatePackageResult{}, fmt.Errorf("save upload package token=%s: %w", packageToken, err)
+		return CreatePackageResult{}, wrapPackageStoreFailure("save", packageToken, err)
 	}
 
 	return CreatePackageResult{
@@ -282,13 +282,16 @@ func (s *Service) CompletePackage(ctx context.Context, input CompletePackageInpu
 		if errors.Is(err, ErrPackageNotFound) {
 			return CompletePackageResult{}, ErrPackageExpired
 		}
-		return CompletePackageResult{}, fmt.Errorf("load upload package token=%s: %w", packageToken, err)
+		return CompletePackageResult{}, wrapPackageStoreFailure("load", packageToken, err)
 	}
 
 	now := s.now().UTC()
 	if now.After(pkg.ExpiresAt) {
 		_ = s.packageStore.DeletePackage(ctx, packageToken)
 		return CompletePackageResult{}, ErrPackageExpired
+	}
+	if pkg.ConsumedAt != nil {
+		return CompletePackageResult{}, ErrUploadFailure
 	}
 	if pkg.CreatorUserID != input.CreatorUserID.String() {
 		return CompletePackageResult{}, ErrUploadFailure
@@ -318,9 +321,35 @@ func (s *Service) CompletePackage(ctx context.Context, input CompletePackageInpu
 		return CompletePackageResult{}, fmt.Errorf("persist upload package token=%s: %w", packageToken, err)
 	}
 
-	_ = s.packageStore.DeletePackage(ctx, packageToken)
+	if err := s.consumePackage(ctx, packageToken, pkg); err != nil {
+		return CompletePackageResult{}, err
+	}
 
 	return result, nil
+}
+
+func (s *Service) consumePackage(ctx context.Context, packageToken string, pkg storedPackage) error {
+	if err := s.packageStore.DeletePackage(ctx, packageToken); err == nil {
+		return nil
+	} else {
+		consumedAt := s.now().UTC()
+		pkg.ConsumedAt = &consumedAt
+
+		remainingTTL := time.Until(pkg.ExpiresAt)
+		if remainingTTL <= 0 {
+			remainingTTL = time.Second
+		}
+
+		if saveErr := s.packageStore.SavePackage(ctx, packageToken, pkg, remainingTTL); saveErr != nil {
+			return fmt.Errorf("%w: consume upload package token=%s: delete: %v; mark consumed: %v", ErrStorageFailure, packageToken, err, saveErr)
+		}
+	}
+
+	return nil
+}
+
+func wrapPackageStoreFailure(operation string, packageToken string, err error) error {
+	return fmt.Errorf("%w: %s upload package token=%s: %v", ErrStorageFailure, operation, packageToken, err)
 }
 
 func (s *Service) buildEntry(

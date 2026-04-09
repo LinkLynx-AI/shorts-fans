@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -91,13 +90,7 @@ type creatorUploadCreatedMediaAssetPayload struct {
 	ProcessingState string `json:"processingState"`
 }
 
-// CreatorUploadService は creator-private upload initiation / completion を表します。
-type CreatorUploadService interface {
-	CompletePackage(ctx context.Context, input creatorupload.CompletePackageInput) (creatorupload.CompletePackageResult, error)
-	CreatePackage(ctx context.Context, input creatorupload.CreatePackageInput) (creatorupload.CreatePackageResult, error)
-}
-
-func registerCreatorUploadRoutes(router gin.IRouter, service CreatorUploadService, viewerBootstrap ViewerBootstrapReader) {
+func registerCreatorUploadRoutes(router gin.IRouter, service CreatorUploadHandler, viewerBootstrap ViewerBootstrapReader) {
 	if service == nil || viewerBootstrap == nil {
 		return
 	}
@@ -119,7 +112,7 @@ func registerCreatorUploadRoutes(router gin.IRouter, service CreatorUploadServic
 	)
 }
 
-func handleCreatorUploadCreate(c *gin.Context, service CreatorUploadService) {
+func handleCreatorUploadCreate(c *gin.Context, service CreatorUploadHandler) {
 	viewer, ok := authenticatedViewerFromContext(c)
 	if !ok {
 		writeInternalServerError(c, creatorUploadCreateRequestScope)
@@ -192,7 +185,7 @@ func handleCreatorUploadCreate(c *gin.Context, service CreatorUploadService) {
 	})
 }
 
-func handleCreatorUploadComplete(c *gin.Context, service CreatorUploadService) {
+func handleCreatorUploadComplete(c *gin.Context, service CreatorUploadHandler) {
 	viewer, ok := authenticatedViewerFromContext(c)
 	if !ok {
 		writeInternalServerError(c, creatorUploadCompleteRequestScope)

@@ -30,6 +30,7 @@ type storedEntry struct {
 
 type storedPackage struct {
 	CreatorUserID string        `json:"creatorUserId"`
+	ConsumedAt    *time.Time    `json:"consumedAt,omitempty"`
 	ExpiresAt     time.Time     `json:"expiresAt"`
 	Main          storedEntry   `json:"main"`
 	Shorts        []storedEntry `json:"shorts"`

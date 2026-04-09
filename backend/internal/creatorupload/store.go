@@ -37,6 +37,12 @@ func (s *RedisPackageStore) SavePackage(ctx context.Context, packageToken string
 	if s == nil || s.client == nil {
 		return fmt.Errorf("creator upload package store is not initialized")
 	}
+	if strings.TrimSpace(packageToken) == "" {
+		return fmt.Errorf("package token is required")
+	}
+	if ttl <= 0 {
+		return fmt.Errorf("ttl must be greater than zero")
+	}
 
 	payload, err := json.Marshal(pkg)
 	if err != nil {
@@ -54,6 +60,9 @@ func (s *RedisPackageStore) SavePackage(ctx context.Context, packageToken string
 func (s *RedisPackageStore) GetPackage(ctx context.Context, packageToken string) (storedPackage, error) {
 	if s == nil || s.client == nil {
 		return storedPackage{}, fmt.Errorf("creator upload package store is not initialized")
+	}
+	if strings.TrimSpace(packageToken) == "" {
+		return storedPackage{}, fmt.Errorf("package token is required")
 	}
 
 	payload, err := s.client.Get(ctx, redisPackageKey(packageToken)).Bytes()
@@ -76,6 +85,9 @@ func (s *RedisPackageStore) GetPackage(ctx context.Context, packageToken string)
 func (s *RedisPackageStore) DeletePackage(ctx context.Context, packageToken string) error {
 	if s == nil || s.client == nil {
 		return fmt.Errorf("creator upload package store is not initialized")
+	}
+	if strings.TrimSpace(packageToken) == "" {
+		return fmt.Errorf("package token is required")
 	}
 
 	if err := s.client.Del(ctx, redisPackageKey(packageToken)).Err(); err != nil {

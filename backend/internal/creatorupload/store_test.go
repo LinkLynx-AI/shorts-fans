@@ -127,6 +127,18 @@ func TestRedisPackageStoreErrors(t *testing.T) {
 	if err := (&RedisPackageStore{}).DeletePackage(context.Background(), "pkg-token"); err == nil {
 		t.Fatal("DeletePackage() error = nil, want error for uninitialized store")
 	}
+	if err := (&RedisPackageStore{client: redisClientStub{}}).SavePackage(context.Background(), "   ", storedPackage{}, time.Minute); err == nil {
+		t.Fatal("SavePackage() error = nil, want error for blank package token")
+	}
+	if err := (&RedisPackageStore{client: redisClientStub{}}).SavePackage(context.Background(), "pkg-token", storedPackage{}, 0); err == nil {
+		t.Fatal("SavePackage() error = nil, want error for non-positive ttl")
+	}
+	if _, err := (&RedisPackageStore{client: redisClientStub{}}).GetPackage(context.Background(), "   "); err == nil {
+		t.Fatal("GetPackage() error = nil, want error for blank package token")
+	}
+	if err := (&RedisPackageStore{client: redisClientStub{}}).DeletePackage(context.Background(), "   "); err == nil {
+		t.Fatal("DeletePackage() error = nil, want error for blank package token")
+	}
 
 	setErr := errors.New("set failed")
 	store := &RedisPackageStore{

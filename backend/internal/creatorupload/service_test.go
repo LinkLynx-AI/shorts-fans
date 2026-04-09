@@ -196,6 +196,58 @@ func TestCreatePackageValidation(t *testing.T) {
 	}
 }
 
+func TestCreatePackageMapsPackageStoreFailure(t *testing.T) {
+	t.Parallel()
+
+	storeErr := errors.New("redis unavailable")
+	service := &Service{
+		now:      func() time.Time { return time.Unix(1710000000, 0).UTC() },
+		newToken: func(prefix string) (string, error) { return prefix + "token", nil },
+		packageStore: packageStoreStub{
+			savePackage: func(context.Context, string, storedPackage, time.Duration) error { return storeErr },
+			getPackage:  func(context.Context, string) (storedPackage, error) { return storedPackage{}, nil },
+			deletePkg:   func(context.Context, string) error { return nil },
+		},
+		packageTTL:    15 * time.Minute,
+		rawBucketName: "raw-bucket",
+		repository: repositoryStub{
+			createDraftPackage: func(context.Context, createDraftPackageInput) (CompletePackageResult, error) {
+				return CompletePackageResult{}, nil
+			},
+		},
+		storage: storageStub{
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{
+					URL: "https://signed.example.com/upload",
+					Headers: map[string]string{
+						"Content-Type": "video/mp4",
+					},
+				}, nil
+			},
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{}, nil
+			},
+		},
+	}
+
+	_, err := service.CreatePackage(context.Background(), CreatePackageInput{
+		CreatorUserID: uuid.New(),
+		Main: &FileMetadata{
+			FileName:      "main.mp4",
+			FileSizeBytes: 100,
+			MimeType:      "video/mp4",
+		},
+		Shorts: []FileMetadata{{
+			FileName:      "short.mp4",
+			FileSizeBytes: 10,
+			MimeType:      "video/mp4",
+		}},
+	})
+	if !errors.Is(err, ErrStorageFailure) {
+		t.Fatalf("CreatePackage() error got %v want %v", err, ErrStorageFailure)
+	}
+}
+
 func TestCompletePackageSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -469,5 +521,183 @@ func TestCompletePackageMapsHeadObjectFailures(t *testing.T) {
 		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
 	}); !errors.Is(err, ErrStorageFailure) {
 		t.Fatalf("CompletePackage() dependency error got %v want %v", err, ErrStorageFailure)
+	}
+}
+
+func TestCompletePackageMapsPackageStoreLoadFailure(t *testing.T) {
+	t.Parallel()
+
+	storeErr := errors.New("redis unavailable")
+	service := &Service{
+		now:           func() time.Time { return time.Unix(1710000000, 0).UTC() },
+		rawBucketName: "raw-bucket",
+		packageStore: packageStoreStub{
+			savePackage: func(context.Context, string, storedPackage, time.Duration) error { return nil },
+			getPackage:  func(context.Context, string) (storedPackage, error) { return storedPackage{}, storeErr },
+			deletePkg:   func(context.Context, string) error { return nil },
+		},
+		repository: repositoryStub{
+			createDraftPackage: func(context.Context, createDraftPackageInput) (CompletePackageResult, error) {
+				return CompletePackageResult{}, nil
+			},
+		},
+		storage: storageStub{
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, nil
+			},
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{}, nil
+			},
+		},
+	}
+
+	_, err := service.CompletePackage(context.Background(), CompletePackageInput{
+		CreatorUserID: uuid.New(),
+		PackageToken:  "pkg-token",
+		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
+		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
+	})
+	if !errors.Is(err, ErrStorageFailure) {
+		t.Fatalf("CompletePackage() error got %v want %v", err, ErrStorageFailure)
+	}
+}
+
+func TestCompletePackageConsumesPackageWhenDeleteFails(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.New()
+	deleteErr := errors.New("delete failed")
+	var savedAfterDeleteFailure storedPackage
+	var savedTTL time.Duration
+
+	service := &Service{
+		now:           func() time.Time { return now },
+		rawBucketName: "raw-bucket",
+		packageStore: packageStoreStub{
+			savePackage: func(_ context.Context, packageToken string, pkg storedPackage, ttl time.Duration) error {
+				if packageToken != "pkg-token" {
+					t.Fatalf("SavePackage() token got %q want %q", packageToken, "pkg-token")
+				}
+				savedAfterDeleteFailure = pkg
+				savedTTL = ttl
+				return nil
+			},
+			getPackage: func(context.Context, string) (storedPackage, error) {
+				return storedPackage{
+					CreatorUserID: creatorID.String(),
+					ExpiresAt:     now.Add(2 * time.Minute),
+					Main: storedEntry{
+						UploadEntryID: "main-entry",
+						Role:          roleMain,
+						MimeType:      "video/mp4",
+						FileSizeBytes: 100,
+						StorageKey:    "main-key",
+					},
+					Shorts: []storedEntry{{
+						UploadEntryID: "short-entry",
+						Role:          roleShort,
+						MimeType:      "video/mp4",
+						FileSizeBytes: 10,
+						StorageKey:    "short-key",
+					}},
+				}, nil
+			},
+			deletePkg: func(context.Context, string) error {
+				return deleteErr
+			},
+		},
+		repository: repositoryStub{
+			createDraftPackage: func(context.Context, createDraftPackageInput) (CompletePackageResult, error) {
+				return CompletePackageResult{
+					Main: CreatedMain{ID: uuid.New()},
+				}, nil
+			},
+		},
+		storage: storageStub{
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, nil
+			},
+			headObject: func(_ context.Context, _ string, key string) (medias3.ObjectMetadata, error) {
+				switch key {
+				case "main-key":
+					return medias3.ObjectMetadata{ContentLength: 100, ContentType: "video/mp4"}, nil
+				case "short-key":
+					return medias3.ObjectMetadata{ContentLength: 10, ContentType: "video/mp4"}, nil
+				default:
+					t.Fatalf("HeadObject() unexpected key %q", key)
+					return medias3.ObjectMetadata{}, nil
+				}
+			},
+		},
+	}
+
+	if _, err := service.CompletePackage(context.Background(), CompletePackageInput{
+		CreatorUserID: creatorID,
+		PackageToken:  "pkg-token",
+		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
+		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
+	}); err != nil {
+		t.Fatalf("CompletePackage() error = %v, want nil", err)
+	}
+	if savedAfterDeleteFailure.ConsumedAt == nil {
+		t.Fatal("CompletePackage() consumedAt = nil, want non-nil fallback marker")
+	}
+	if savedTTL <= 0 {
+		t.Fatalf("CompletePackage() saved ttl got %s want positive duration", savedTTL)
+	}
+}
+
+func TestCompletePackageRejectsConsumedPackage(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.New()
+	consumedAt := now.Add(-time.Minute)
+
+	service := &Service{
+		now:           func() time.Time { return now },
+		rawBucketName: "raw-bucket",
+		packageStore: packageStoreStub{
+			savePackage: func(context.Context, string, storedPackage, time.Duration) error { return nil },
+			getPackage: func(context.Context, string) (storedPackage, error) {
+				return storedPackage{
+					CreatorUserID: creatorID.String(),
+					ConsumedAt:    &consumedAt,
+					ExpiresAt:     now.Add(time.Minute),
+					Main: storedEntry{
+						UploadEntryID: "main-entry",
+						Role:          roleMain,
+					},
+					Shorts: []storedEntry{{
+						UploadEntryID: "short-entry",
+						Role:          roleShort,
+					}},
+				}, nil
+			},
+			deletePkg: func(context.Context, string) error { return nil },
+		},
+		repository: repositoryStub{
+			createDraftPackage: func(context.Context, createDraftPackageInput) (CompletePackageResult, error) {
+				return CompletePackageResult{}, errors.New("should not persist")
+			},
+		},
+		storage: storageStub{
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, nil
+			},
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{}, nil
+			},
+		},
+	}
+
+	if _, err := service.CompletePackage(context.Background(), CompletePackageInput{
+		CreatorUserID: creatorID,
+		PackageToken:  "pkg-token",
+		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
+		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
+	}); !errors.Is(err, ErrUploadFailure) {
+		t.Fatalf("CompletePackage() error got %v want %v", err, ErrUploadFailure)
 	}
 }
