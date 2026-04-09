@@ -38,13 +38,15 @@ function getMockCreatorModeOwner(): CreatorSummary {
 }
 
 /**
- * `/creator` 用の mock shell state を返す。
+ * creator mode route 用の mock shell state を返す。
  */
-export function getMockCreatorModeShellState(): CreatorModeShellReadyState {
+export function getMockCreatorModeShellState(
+  activeNavigation: CreatorModeNavigationKey = "dashboard",
+): CreatorModeShellReadyState {
   const creator = getMockCreatorModeOwner();
 
   return {
-    activeNavigation: "dashboard",
+    activeNavigation,
     creator,
     kind: "ready",
     workspace: getMockApprovedCreatorWorkspaceState(creator.id),
@@ -52,9 +54,12 @@ export function getMockCreatorModeShellState(): CreatorModeShellReadyState {
 }
 
 /**
- * current viewer bootstrap から `/creator` の shell state を解決する。
+ * current viewer bootstrap から creator mode route の shell state を解決する。
  */
-export function resolveCreatorModeShellState(currentViewer: CurrentViewer | null): CreatorModeShellState {
+export function resolveCreatorModeShellState(
+  currentViewer: CurrentViewer | null,
+  activeNavigation: CreatorModeNavigationKey = "dashboard",
+): CreatorModeShellState {
   if (currentViewer === null) {
     return {
       ctaHref: "/login",
@@ -90,5 +95,5 @@ export function resolveCreatorModeShellState(currentViewer: CurrentViewer | null
     };
   }
 
-  return getMockCreatorModeShellState();
+  return getMockCreatorModeShellState(activeNavigation);
 }

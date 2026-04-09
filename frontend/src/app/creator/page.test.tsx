@@ -85,7 +85,7 @@ describe("CreatorPage", () => {
 
     render(await CreatorPage());
 
-    expect(screen.getByRole("button", { name: "動画を追加" })).toBeDisabled();
+    expect(screen.getByRole("link", { name: "動画を追加" })).toHaveAttribute("href", "/creator/upload");
     expect(screen.getByRole("button", { name: "Account menu" })).toBeEnabled();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
     expect(screen.getByText("@minarei")).toBeInTheDocument();

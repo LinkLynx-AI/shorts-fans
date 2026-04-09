@@ -30,9 +30,9 @@ describe("creator mode navigation", () => {
     ]);
   });
 
-  it("marks only the dashboard route as available in this run", () => {
+  it("marks the dashboard and upload routes as available in this run", () => {
     expect(isCreatorModeNavigationAvailable("dashboard")).toBe(true);
-    expect(isCreatorModeNavigationAvailable("upload")).toBe(false);
+    expect(isCreatorModeNavigationAvailable("upload")).toBe(true);
     expect(isCreatorModeNavigationAvailable("linkage")).toBe(false);
     expect(isCreatorModeNavigationAvailable("review")).toBe(false);
   });
