@@ -12,19 +12,26 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-import { CreatorAvatar } from "@/entities/creator";
+import {
+  CreatorAvatar,
+  type CreatorSummary,
+} from "@/entities/creator";
 import { useFanModeEntry } from "@/features/creator-entry";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
+  ApprovedCreatorWorkspaceOverviewMetrics,
   ApprovedCreatorWorkspaceDetailState,
   ApprovedCreatorWorkspaceManagedItem,
   ApprovedCreatorWorkspaceManagedItemTone,
   ApprovedCreatorWorkspaceManagedTab,
   ApprovedCreatorWorkspacePoster,
+  ApprovedCreatorWorkspaceRevisionRequestedSummary,
   ApprovedCreatorWorkspaceState,
 } from "../model/approved-creator-workspace";
+import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
 import type { CreatorModeShellState } from "../model/creator-mode-shell";
+import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 
 type CreatorWorkspaceDetailSelection = {
   shortId: string;
@@ -222,19 +229,23 @@ function CreatorWorkspaceTopBar() {
   );
 }
 
-function CreatorWorkspaceMetricStrip({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
+function CreatorWorkspaceMetricStrip({
+  overviewMetrics,
+}: {
+  overviewMetrics: ApprovedCreatorWorkspaceOverviewMetrics;
+}) {
   const metrics = [
     {
       label: "revenue",
-      value: formatJpy(workspace.overviewMetrics.grossUnlockRevenueJpy),
+      value: formatJpy(overviewMetrics.grossUnlockRevenueJpy),
     },
     {
       label: "unlocks",
-      value: formatCount(workspace.overviewMetrics.unlockCount),
+      value: formatCount(overviewMetrics.unlockCount),
     },
     {
       label: "purchasers",
-      value: formatCount(workspace.overviewMetrics.uniquePurchaserCount),
+      value: formatCount(overviewMetrics.uniquePurchaserCount),
     },
   ] as const;
 
@@ -252,31 +263,40 @@ function CreatorWorkspaceMetricStrip({ workspace }: { workspace: ApprovedCreator
   );
 }
 
-function CreatorWorkspaceHeader({ state }: { state: Extract<CreatorModeShellState, { kind: "ready" }> }) {
+function CreatorWorkspaceHeader({
+  creator,
+  overviewMetrics,
+}: {
+  creator: CreatorSummary;
+  overviewMetrics: ApprovedCreatorWorkspaceOverviewMetrics;
+}) {
   return (
     <section className="mt-[18px] text-foreground">
       <div className="flex items-center gap-[18px]">
         <CreatorAvatar
           className="size-[86px] rounded-full border-white/70 shadow-[0_10px_24px_rgba(36,92,129,0.16)]"
-          creator={state.creator}
+          creator={creator}
         />
-        <CreatorWorkspaceMetricStrip workspace={state.workspace} />
+        <CreatorWorkspaceMetricStrip overviewMetrics={overviewMetrics} />
       </div>
 
       <div className="mt-[14px]">
-        <p className="m-0 text-[15px] font-bold text-foreground">{state.creator.handle}</p>
-        <p className="mt-1 text-[13px] font-bold text-foreground">{state.creator.displayName}</p>
-        {state.creator.bio.trim().length > 0 ? (
-          <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{state.creator.bio}</p>
+        <p className="m-0 text-[15px] font-bold text-foreground">{creator.handle}</p>
+        <p className="mt-1 text-[13px] font-bold text-foreground">{creator.displayName}</p>
+        {creator.bio.trim().length > 0 ? (
+          <p className="mt-[6px] text-[13px] leading-[1.55] text-muted">{creator.bio}</p>
         ) : null}
       </div>
     </section>
   );
 }
 
-function CreatorWorkspaceRevisionNotice({ workspace }: { workspace: ApprovedCreatorWorkspaceState }) {
-  const summary = workspace.revisionRequestedSummary;
-
+function CreatorWorkspaceRevisionNotice({
+  revisionRequestedSummary,
+}: {
+  revisionRequestedSummary: ApprovedCreatorWorkspaceRevisionRequestedSummary | null;
+}) {
+  const summary = revisionRequestedSummary;
   if (summary === null) {
     return null;
   }
@@ -296,6 +316,89 @@ function CreatorWorkspaceRevisionNotice({ workspace }: { workspace: ApprovedCrea
         </span>
       </div>
     </div>
+  );
+}
+
+function CreatorWorkspaceSummaryLoading() {
+  return (
+    <section className="mt-[18px] grid gap-[14px] text-foreground">
+      <p className="sr-only" role="status">
+        workspace summary を読み込んでいます...
+      </p>
+
+      <div className="flex items-center gap-[18px]">
+        <div
+          aria-hidden="true"
+          className="size-[86px] animate-pulse rounded-full bg-[rgba(167,220,249,0.34)]"
+        />
+        <div className="grid flex-1 grid-cols-3 gap-x-2 gap-y-2">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <div className="grid gap-2 text-center" key={index}>
+              <div aria-hidden="true" className="mx-auto h-5 w-14 animate-pulse rounded-full bg-[rgba(167,220,249,0.34)]" />
+              <div aria-hidden="true" className="mx-auto h-3 w-12 animate-pulse rounded-full bg-[rgba(167,220,249,0.24)]" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <div aria-hidden="true" className="h-4 w-24 animate-pulse rounded-full bg-[rgba(167,220,249,0.32)]" />
+        <div aria-hidden="true" className="h-4 w-36 animate-pulse rounded-full bg-[rgba(167,220,249,0.28)]" />
+        <div aria-hidden="true" className="h-4 w-full animate-pulse rounded-full bg-[rgba(167,220,249,0.22)]" />
+      </div>
+    </section>
+  );
+}
+
+function CreatorWorkspaceSummaryError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="mt-[18px]">
+      <div
+        className="rounded-[22px] border border-[rgba(255,184,189,0.84)] bg-[linear-gradient(180deg,rgba(255,247,248,0.98),rgba(255,241,243,0.96))] px-4 py-4 text-foreground"
+        role="alert"
+      >
+        <p className="m-0 text-[13px] leading-6 text-muted">{message}</p>
+        <button
+          className="mt-3 inline-flex min-h-10 items-center rounded-[12px] bg-[#1082c8] px-4 text-[13px] font-bold text-white transition hover:opacity-90"
+          onClick={onRetry}
+          type="button"
+        >
+          再読み込み
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function CreatorWorkspaceSummarySection({
+  onRetry,
+  state,
+}: {
+  onRetry: () => void;
+  state: CreatorWorkspaceSummaryState;
+}) {
+  if (state.kind === "loading") {
+    return <CreatorWorkspaceSummaryLoading />;
+  }
+
+  if (state.kind === "error") {
+    return <CreatorWorkspaceSummaryError message={state.message} onRetry={onRetry} />;
+  }
+
+  return (
+    <>
+      <CreatorWorkspaceHeader
+        creator={state.summary.creator}
+        overviewMetrics={state.summary.overviewMetrics}
+      />
+      <CreatorWorkspaceRevisionNotice revisionRequestedSummary={state.summary.revisionRequestedSummary} />
+    </>
   );
 }
 
@@ -639,11 +742,13 @@ function CreatorWorkspaceDetailLinkedGrid({
 }
 
 function CreatorWorkspaceDetailView({
+  creator,
   detailSelection,
   onBack,
   onOpenDetail,
   state,
 }: {
+  creator: CreatorSummary;
   detailSelection: CreatorWorkspaceDetailSelection;
   onBack: () => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
@@ -677,10 +782,10 @@ function CreatorWorkspaceDetailView({
         <div className="flex items-center gap-3">
           <CreatorAvatar
             className="size-[42px] rounded-full border-white/70 shadow-[0_10px_24px_rgba(36,92,129,0.16)]"
-            creator={state.creator}
+            creator={creator}
           />
           <div className="min-w-0">
-            <p className="m-0 text-[13px] font-bold text-muted">{state.creator.handle}</p>
+            <p className="m-0 text-[13px] font-bold text-muted">{creator.handle}</p>
           </div>
         </div>
 
@@ -724,21 +829,26 @@ function CreatorWorkspaceDetailView({
 
 function CreatorWorkspaceDashboard({
   activeTab,
+  creator,
   onChangeTab,
   onOpenDetail,
+  onRetrySummary,
+  summaryState,
   state,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
+  creator: CreatorSummary;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onRetrySummary: () => void;
+  summaryState: CreatorWorkspaceSummaryState;
   state: Extract<CreatorModeShellState, { kind: "ready" }>;
 }) {
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-24 pt-[14px] text-foreground">
-      <h1 className="sr-only">{state.creator.displayName} creator workspace</h1>
+      <h1 className="sr-only">{creator.displayName} creator workspace</h1>
       <CreatorWorkspaceTopBar />
-      <CreatorWorkspaceHeader state={state} />
-      <CreatorWorkspaceRevisionNotice workspace={state.workspace} />
+      <CreatorWorkspaceSummarySection onRetry={onRetrySummary} state={summaryState} />
       <CreatorWorkspaceTopPerformers onOpenDetail={onOpenDetail} workspace={state.workspace} />
       <CreatorWorkspaceManagedPosts
         activeTab={activeTab}
@@ -751,13 +861,24 @@ function CreatorWorkspaceDashboard({
 }
 
 function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShellState, { kind: "ready" }> }) {
+  const {
+    blockedState,
+    retry,
+    state: summaryState,
+  } = useCreatorWorkspaceSummary();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailSelection | null>(null);
+  const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
+
+  if (blockedState) {
+    return <CreatorShellBlockedState state={blockedState} />;
+  }
 
   return (
     <CreatorModeWorkspaceFrame>
       {detailSelection ? (
         <CreatorWorkspaceDetailView
+          creator={creator}
           detailSelection={detailSelection}
           onBack={() => {
             setDetailSelection(null);
@@ -768,11 +889,14 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
       ) : (
         <CreatorWorkspaceDashboard
           activeTab={activeTab}
+          creator={creator}
           onChangeTab={setActiveTab}
           onOpenDetail={(selection) => {
             setActiveTab(selection.tab);
             setDetailSelection(selection);
           }}
+          onRetrySummary={retry}
+          summaryState={summaryState}
           state={state}
         />
       )}

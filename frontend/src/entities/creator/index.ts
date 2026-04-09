@@ -4,6 +4,7 @@ export {
 export type {
   CreatorProfileHeader,
 } from "./api/get-creator-profile-header";
+export { creatorSummarySchema } from "./api/contracts";
 export {
   CreatorFollowApiError,
   updateCreatorFollow,
