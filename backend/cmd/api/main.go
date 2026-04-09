@@ -13,10 +13,12 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
+	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 )
 
 func main() {
@@ -50,12 +52,31 @@ func main() {
 		}
 	}()
 
+	s3Client, err := medias3.NewClient(ctx, medias3.Config{Region: cfg.AWSRegion})
+	if err != nil {
+		logger.Error("failed to initialize s3 client", "error", err)
+		os.Exit(1)
+	}
+
 	creatorRepository := creator.NewRepository(pool)
+	creatorUploadRepository := creatorupload.NewRepository(pool)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
 	modeSwitcher := auth.NewModeSwitcher(authRepository)
+	creatorUploadService, err := creatorupload.NewService(
+		creatorupload.ServiceConfig{
+			RawBucketName: cfg.MediaRawBucketName,
+		},
+		s3Client,
+		creatorupload.NewRedisPackageStore(redisClient),
+		creatorUploadRepository,
+	)
+	if err != nil {
+		logger.Error("failed to initialize creator upload service", "error", err)
+		os.Exit(1)
+	}
 
 	server := httpserver.New(
 		httpserver.Config{
@@ -66,6 +87,7 @@ func main() {
 		httpserver.HandlerConfig{
 			AppEnv:               cfg.AppEnv,
 			CreatorSearch:        creatorRepository,
+			CreatorUpload:        creatorUploadService,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
 			CreatorFollow:        creatorRepository,

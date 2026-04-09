@@ -12,6 +12,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 )
 
@@ -60,6 +61,12 @@ type ViewerActiveModeSwitcher interface {
 	SwitchActiveMode(ctx context.Context, rawSessionToken string, activeMode auth.ActiveMode) error
 }
 
+// CreatorUploadHandler は creator-private upload initiation / completion を表します。
+type CreatorUploadHandler interface {
+	CompletePackage(ctx context.Context, input creatorupload.CompletePackageInput) (creatorupload.CompletePackageResult, error)
+	CreatePackage(ctx context.Context, input creatorupload.CreatePackageInput) (creatorupload.CreatePackageResult, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -74,6 +81,7 @@ type FanProfileFollowingReader interface {
 type HandlerConfig struct {
 	AppEnv               string
 	CreatorSearch        CreatorSearchReader
+	CreatorUpload        CreatorUploadHandler
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
 	CreatorFollow        CreatorFollowWriter
@@ -142,6 +150,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
+	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.ViewerActiveMode, config.ViewerBootstrap)

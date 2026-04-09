@@ -21,8 +21,15 @@ func TestValidateAPI(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		PostgresDSN: "postgres://example",
-		RedisAddr:   "localhost:6379",
+		PostgresDSN:                "postgres://example",
+		RedisAddr:                  "localhost:6379",
+		AWSRegion:                  "ap-northeast-1",
+		MediaJobsQueueURL:          "https://example.com/queue",
+		MediaRawBucketName:         "raw-bucket",
+		MediaShortPublicBucketName: "short-bucket",
+		MediaShortPublicBaseURL:    "https://example.com/shorts",
+		MediaMainPrivateBucketName: "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
 	}
 
 	if err := cfg.ValidateAPI(); err != nil {
@@ -35,6 +42,19 @@ func TestValidateAPIRequiresDependencies(t *testing.T) {
 
 	err := (Config{}).ValidateAPI()
 	if err == nil {
+		t.Fatal("ValidateAPI() error = nil, want error")
+	}
+}
+
+func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		PostgresDSN: "postgres://example",
+		RedisAddr:   "localhost:6379",
+	}
+
+	if err := cfg.ValidateAPI(); err == nil {
 		t.Fatal("ValidateAPI() error = nil, want error")
 	}
 }
