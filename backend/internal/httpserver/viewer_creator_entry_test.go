@@ -57,7 +57,7 @@ func TestViewerCreatorRegistrationRequiresAuth(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -96,7 +96,7 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()
@@ -111,6 +111,9 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 	}
 	if gotInput.DisplayName != "Mina" {
 		t.Fatalf("POST /api/viewer/creator-registration display name got %q want %q", gotInput.DisplayName, "Mina")
+	}
+	if gotInput.Handle != "mina" {
+		t.Fatalf("POST /api/viewer/creator-registration handle got %q want %q", gotInput.Handle, "mina")
 	}
 	if gotInput.Bio != "bio" {
 		t.Fatalf("POST /api/viewer/creator-registration bio got %q want %q", gotInput.Bio, "bio")
@@ -138,7 +141,7 @@ func TestViewerCreatorRegistrationInvalidDisplayName(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":" ","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":" ","handle":"mina","bio":"bio"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()
@@ -150,6 +153,78 @@ func TestViewerCreatorRegistrationInvalidDisplayName(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"invalid_display_name"`) {
 		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_display_name", rec.Body.String())
+	}
+}
+
+func TestViewerCreatorRegistrationInvalidHandle(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         uuid.New(),
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				return creator.SelfServeRegistrationResult{}, creator.ErrInvalidHandle
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"@","bio":"bio"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_handle"`) {
+		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_handle", rec.Body.String())
+	}
+}
+
+func TestViewerCreatorRegistrationHandleAlreadyTaken(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         uuid.New(),
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				return creator.SelfServeRegistrationResult{}, creator.ErrHandleAlreadyTaken
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusConflict)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"handle_already_taken"`) {
+		t.Fatalf("POST /api/viewer/creator-registration body got %q want handle_already_taken", rec.Body.String())
 	}
 }
 
@@ -272,7 +347,7 @@ func TestViewerCreatorRegistrationRejectsInvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina"}{"bio":"bio"}`),
+		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina"}{"bio":"bio"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -317,7 +392,7 @@ func TestViewerCreatorRegistrationRejectsUnknownField(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina","bio":"bio","unexpected":true}`),
+		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","unexpected":true}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -357,7 +432,7 @@ func TestViewerCreatorRegistrationReturnsInternalErrorWhenWriterFails(t *testing
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()

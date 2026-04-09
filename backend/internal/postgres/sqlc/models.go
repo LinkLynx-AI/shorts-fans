@@ -78,7 +78,7 @@ type AppCreatorProfile struct {
 	PublishedAt pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
-	Handle      pgtype.Text
+	Handle      string
 }
 
 type AppMain struct {
@@ -145,7 +145,7 @@ type AppPublicCreatorProfile struct {
 	PublishedAt pgtype.Timestamptz
 	CreatedAt   pgtype.Timestamptz
 	UpdatedAt   pgtype.Timestamptz
-	Handle      pgtype.Text
+	Handle      string
 }
 
 type AppPublicShort struct {

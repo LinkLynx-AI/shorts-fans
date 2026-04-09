@@ -129,7 +129,7 @@ func mapFollowingItem(row sqlc.ListFanProfileFollowingItemsRow) (FollowingItem, 
 	if !row.DisplayName.Valid || strings.TrimSpace(row.DisplayName.String) == "" {
 		return FollowingItem{}, fmt.Errorf("followed creator display_name がありません")
 	}
-	if !row.Handle.Valid || strings.TrimSpace(row.Handle.String) == "" {
+	if strings.TrimSpace(row.Handle) == "" {
 		return FollowingItem{}, fmt.Errorf("followed creator handle がありません")
 	}
 
@@ -139,6 +139,6 @@ func mapFollowingItem(row sqlc.ListFanProfileFollowingItemsRow) (FollowingItem, 
 		CreatorUserID: creatorUserID,
 		DisplayName:   strings.TrimSpace(row.DisplayName.String),
 		FollowedAt:    followedAt,
-		Handle:        strings.TrimSpace(row.Handle.String),
+		Handle:        strings.TrimSpace(row.Handle),
 	}, nil
 }

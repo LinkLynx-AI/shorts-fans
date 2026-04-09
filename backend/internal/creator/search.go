@@ -29,7 +29,7 @@ func (r *Repository) GetPublicProfileByHandle(ctx context.Context, handle string
 		return Profile{}, fmt.Errorf("公開 creator profile 取得 handle 正規化: %w", err)
 	}
 
-	row, err := r.queries.GetPublicCreatorProfileByHandle(ctx, postgres.TextToPG(&normalizedHandle))
+	row, err := r.queries.GetPublicCreatorProfileByHandle(ctx, normalizedHandle)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, fmt.Errorf("公開 creator profile 取得 handle=%s: %w", normalizedHandle, ErrProfileNotFound)
@@ -126,19 +126,6 @@ func mapPublicProfilePage(rows []sqlc.AppPublicCreatorProfile, limit int, label 
 		PublishedAt: *lastProfile.PublishedAt,
 		Handle:      *lastProfile.Handle,
 	}, nil
-}
-
-func normalizeStoredHandle(handle *string) (*string, error) {
-	if handle == nil {
-		return nil, nil
-	}
-
-	normalized, err := normalizeRequiredHandle(*handle)
-	if err != nil {
-		return nil, err
-	}
-
-	return &normalized, nil
 }
 
 func normalizeRequiredHandle(handle string) (string, error) {

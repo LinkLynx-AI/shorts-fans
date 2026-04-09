@@ -10,6 +10,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -23,6 +24,11 @@ var ErrProfileNotFound = errors.New("creator profile が見つかりません")
 // ErrInvalidHandle は creator handle の形式が不正なことを表します。
 var ErrInvalidHandle = errors.New("creator handle が不正です")
 
+// ErrHandleAlreadyTaken は creator handle が既に使われていることを表します。
+var ErrHandleAlreadyTaken = errors.New("creator handle は既に使われています")
+
+const creatorProfilesHandleUniqueConstraint = "creator_profiles_handle_unique_idx"
+
 type queries interface {
 	CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
@@ -34,7 +40,7 @@ type queries interface {
 	GetViewerCreatorFollowState(ctx context.Context, arg sqlc.GetViewerCreatorFollowStateParams) (bool, error)
 	GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	GetPublicCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
-	GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
+	GetPublicCreatorProfileByHandle(ctx context.Context, handle string) (sqlc.AppPublicCreatorProfile, error)
 	ListCreatorProfileShortGridItems(ctx context.Context, arg sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
 	ListRecentPublicCreatorProfiles(ctx context.Context, arg sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
 	PutCreatorFollow(ctx context.Context, arg sqlc.PutCreatorFollowParams) error
@@ -232,7 +238,7 @@ func (r *Repository) UpdateCapability(ctx context.Context, input UpdateCapabilit
 
 // CreateProfile は creator profile を作成します。
 func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput) (Profile, error) {
-	handle, err := normalizeStoredHandle(input.Handle)
+	handle, err := normalizeRequiredHandleInput(input.Handle)
 	if err != nil {
 		return Profile{}, fmt.Errorf("creator profile 作成 handle 正規化: %w", err)
 	}
@@ -240,12 +246,13 @@ func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput
 	row, err := r.queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      postgres.UUIDToPG(input.UserID),
 		DisplayName: postgres.TextToPG(input.DisplayName),
-		Handle:      postgres.TextToPG(handle),
+		Handle:      handle,
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		PublishedAt: postgres.TimeToPG(input.PublishedAt),
 	})
 	if err != nil {
+		err = mapProfileWriteError(err)
 		return Profile{}, fmt.Errorf("creator profile 作成: %w", err)
 	}
 
@@ -297,19 +304,20 @@ func (r *Repository) GetPublicProfile(ctx context.Context, userID uuid.UUID) (Pr
 
 // UpdateProfile は creator profile を更新します。
 func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput) (Profile, error) {
-	handle, err := normalizeStoredHandle(input.Handle)
+	handle, err := normalizeRequiredHandleInput(input.Handle)
 	if err != nil {
 		return Profile{}, fmt.Errorf("creator profile 更新 handle 正規化: %w", err)
 	}
 
 	row, err := r.queries.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(input.DisplayName),
-		Handle:      postgres.TextToPG(handle),
+		Handle:      handle,
 		AvatarUrl:   postgres.TextToPG(input.AvatarURL),
 		Bio:         input.Bio,
 		UserID:      postgres.UUIDToPG(input.UserID),
 	})
 	if err != nil {
+		err = mapProfileWriteError(err)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return Profile{}, fmt.Errorf("creator profile 更新 user=%s: %w", input.UserID, ErrProfileNotFound)
 		}
@@ -323,6 +331,27 @@ func (r *Repository) UpdateProfile(ctx context.Context, input UpdateProfileInput
 	}
 
 	return profile, nil
+}
+
+func normalizeRequiredHandleInput(handle *string) (string, error) {
+	if handle == nil {
+		return "", ErrInvalidHandle
+	}
+
+	return normalizeRequiredHandle(*handle)
+}
+
+func mapProfileWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == creatorProfilesHandleUniqueConstraint {
+		return ErrHandleAlreadyTaken
+	}
+
+	return err
+}
+
+func requiredStringPointer(value string) *string {
+	return &value
 }
 
 // PublishProfile は creator profile を公開状態にします。
@@ -393,7 +422,7 @@ func mapProfile(row sqlc.AppCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
-		Handle:      postgres.OptionalTextFromPG(row.Handle),
+		Handle:      requiredStringPointer(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),
@@ -419,7 +448,7 @@ func mapPublicProfile(row sqlc.AppPublicCreatorProfile) (Profile, error) {
 	return Profile{
 		UserID:      userID,
 		DisplayName: postgres.OptionalTextFromPG(row.DisplayName),
-		Handle:      postgres.OptionalTextFromPG(row.Handle),
+		Handle:      requiredStringPointer(row.Handle),
 		AvatarURL:   postgres.OptionalTextFromPG(row.AvatarUrl),
 		Bio:         row.Bio,
 		PublishedAt: postgres.OptionalTimeFromPG(row.PublishedAt),

@@ -20,6 +20,7 @@ var ErrInvalidDisplayName = errors.New("creator display name が不正です")
 type SelfServeRegistrationInput struct {
 	Bio         string
 	DisplayName string
+	Handle      string
 	UserID      uuid.UUID
 }
 
@@ -45,12 +46,16 @@ func (r *Repository) RegisterApprovedCreator(
 	if displayName == "" {
 		return SelfServeRegistrationResult{}, ErrInvalidDisplayName
 	}
+	handle, err := normalizeRequiredHandle(input.Handle)
+	if err != nil {
+		return SelfServeRegistrationResult{}, err
+	}
 
 	bio := strings.TrimSpace(input.Bio)
 	now := time.Now().UTC()
 	var result SelfServeRegistrationResult
 
-	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
+	err = postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
 
 		capability, err := upsertApprovedCapability(ctx, q, input.UserID, now)
@@ -58,7 +63,7 @@ func (r *Repository) RegisterApprovedCreator(
 			return err
 		}
 
-		profile, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, bio)
+		profile, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, handle, bio)
 		if err != nil {
 			return err
 		}
@@ -144,7 +149,7 @@ func upsertApprovedCapability(ctx context.Context, q queries, userID uuid.UUID, 
 	return capability, nil
 }
 
-func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, displayName string, bio string) (Profile, error) {
+func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, displayName string, handle string, bio string) (Profile, error) {
 	existingRow, err := q.GetCreatorProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -154,12 +159,13 @@ func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, disp
 		createdRow, createErr := q.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 			UserID:      postgres.UUIDToPG(userID),
 			DisplayName: postgres.TextToPG(&displayName),
-			Handle:      postgres.TextToPG(nil),
+			Handle:      handle,
 			AvatarUrl:   postgres.TextToPG(nil),
 			Bio:         bio,
 			PublishedAt: postgres.TimeToPG(nil),
 		})
 		if createErr != nil {
+			createErr = mapProfileWriteError(createErr)
 			return Profile{}, fmt.Errorf("creator profile 作成 user=%s: %w", userID, createErr)
 		}
 
@@ -178,12 +184,13 @@ func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, disp
 
 	updatedRow, err := q.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(&displayName),
-		Handle:      postgres.TextToPG(existingProfile.Handle),
+		Handle:      handle,
 		AvatarUrl:   postgres.TextToPG(existingProfile.AvatarURL),
 		Bio:         bio,
 		UserID:      postgres.UUIDToPG(userID),
 	})
 	if err != nil {
+		err = mapProfileWriteError(err)
 		return Profile{}, fmt.Errorf("creator profile 更新 user=%s: %w", userID, err)
 	}
 

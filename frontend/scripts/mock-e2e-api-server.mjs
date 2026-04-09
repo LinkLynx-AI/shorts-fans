@@ -250,6 +250,19 @@ function buildViewerBootstrapResponse(sessionToken) {
   return bootstrapBody;
 }
 
+function normalizeCreatorHandleInput(value) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().replace(/^@/, "").toLowerCase();
+  if (normalized === "" || !/^[a-z0-9._]+$/.test(normalized)) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function getFollowedCreatorIds(sessionToken) {
   if (!isAuthenticatedSessionToken(sessionToken)) {
     return null;
@@ -697,6 +710,20 @@ const server = http.createServer((request, response) => {
           meta: {
             page: null,
             requestId: "req_e2e_creator_registration_invalid_display_name_001",
+          },
+        });
+        return;
+      }
+      if (normalizeCreatorHandleInput(body?.handle) === null) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_handle",
+            message: "handle is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_creator_registration_invalid_handle_001",
           },
         });
         return;

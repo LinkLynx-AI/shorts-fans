@@ -24,7 +24,7 @@ type repositoryStubQueries struct {
 	getProfile           func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	getViewerFollowState func(context.Context, sqlc.GetViewerCreatorFollowStateParams) (bool, error)
 	getPublicProfile     func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
-	getPublicByHandle    func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error)
+	getPublicByHandle    func(context.Context, string) (sqlc.AppPublicCreatorProfile, error)
 	listProfileShortGrid func(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
 	listRecentPublic     func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
 	putCreatorFollow     func(context.Context, sqlc.PutCreatorFollowParams) error
@@ -103,7 +103,7 @@ func (s repositoryStubQueries) GetPublicCreatorProfileByUserID(ctx context.Conte
 	return s.getPublicProfile(ctx, userID)
 }
 
-func (s repositoryStubQueries) GetPublicCreatorProfileByHandle(ctx context.Context, handle pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+func (s repositoryStubQueries) GetPublicCreatorProfileByHandle(ctx context.Context, handle string) (sqlc.AppPublicCreatorProfile, error) {
 	if s.getPublicByHandle == nil {
 		return sqlc.AppPublicCreatorProfile{}, nil
 	}
@@ -285,8 +285,8 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	if createProfileArg.UserID != pgUUID(userID) {
 		t.Fatalf("CreateProfile() user arg got %v want %v", createProfileArg.UserID, pgUUID(userID))
 	}
-	if createProfileArg.Handle != pgText(handle) {
-		t.Fatalf("CreateProfile() handle arg got %v want %v", createProfileArg.Handle, pgText(handle))
+	if createProfileArg.Handle != *handle {
+		t.Fatalf("CreateProfile() handle arg got %v want %v", createProfileArg.Handle, *handle)
 	}
 
 	gotProfile, err := repo.GetProfile(context.Background(), userID)
@@ -321,8 +321,8 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	if updateProfileArg.UserID != pgUUID(userID) {
 		t.Fatalf("UpdateProfile() user arg got %v want %v", updateProfileArg.UserID, pgUUID(userID))
 	}
-	if updateProfileArg.Handle != pgText(handle) {
-		t.Fatalf("UpdateProfile() handle arg got %v want %v", updateProfileArg.Handle, pgText(handle))
+	if updateProfileArg.Handle != *handle {
+		t.Fatalf("UpdateProfile() handle arg got %v want %v", updateProfileArg.Handle, *handle)
 	}
 
 	publishedProfile, err := repo.PublishProfile(context.Background(), userID)
@@ -367,13 +367,13 @@ func TestRepositoryErrorPaths(t *testing.T) {
 	if _, err := repo.UpdateCapability(context.Background(), UpdateCapabilityInput{UserID: userID}); !errors.Is(err, ErrCapabilityNotFound) {
 		t.Fatalf("UpdateCapability() error got %v want %v", err, ErrCapabilityNotFound)
 	}
-	if _, err := repo.CreateProfile(context.Background(), CreateProfileInput{}); !errors.Is(err, genericErr) {
+	if _, err := repo.CreateProfile(context.Background(), CreateProfileInput{Handle: stringPtr("mina")}); !errors.Is(err, genericErr) {
 		t.Fatalf("CreateProfile() error got %v want wrapped %v", err, genericErr)
 	}
 	if _, err := repo.GetPublicProfile(context.Background(), userID); !errors.Is(err, ErrProfileNotFound) {
 		t.Fatalf("GetPublicProfile() error got %v want %v", err, ErrProfileNotFound)
 	}
-	if _, err := repo.UpdateProfile(context.Background(), UpdateProfileInput{UserID: userID}); !errors.Is(err, ErrProfileNotFound) {
+	if _, err := repo.UpdateProfile(context.Background(), UpdateProfileInput{UserID: userID, Handle: stringPtr("mina")}); !errors.Is(err, ErrProfileNotFound) {
 		t.Fatalf("UpdateProfile() error got %v want %v", err, ErrProfileNotFound)
 	}
 	if _, err := repo.PublishProfile(context.Background(), userID); !errors.Is(err, ErrProfileNotFound) {
@@ -410,11 +410,29 @@ func TestRepositoryConversionErrors(t *testing.T) {
 	if _, err := repo.CreateCapability(context.Background(), CreateCapabilityInput{}); err == nil {
 		t.Fatal("CreateCapability() error = nil, want conversion error")
 	}
-	if _, err := repo.CreateProfile(context.Background(), CreateProfileInput{}); err == nil {
+	if _, err := repo.CreateProfile(context.Background(), CreateProfileInput{Handle: stringPtr("mina")}); err == nil {
 		t.Fatal("CreateProfile() error = nil, want conversion error")
 	}
 	if _, err := repo.GetPublicProfile(context.Background(), userID); err == nil {
 		t.Fatal("GetPublicProfile() error = nil, want conversion error")
+	}
+}
+
+func TestCreateProfileRejectsMissingHandle(t *testing.T) {
+	t.Parallel()
+
+	repo := newRepository(repositoryStubQueries{})
+	if _, err := repo.CreateProfile(context.Background(), CreateProfileInput{}); !errors.Is(err, ErrInvalidHandle) {
+		t.Fatalf("CreateProfile() error got %v want %v", err, ErrInvalidHandle)
+	}
+}
+
+func TestUpdateProfileRejectsMissingHandle(t *testing.T) {
+	t.Parallel()
+
+	repo := newRepository(repositoryStubQueries{})
+	if _, err := repo.UpdateProfile(context.Background(), UpdateProfileInput{UserID: uuid.New()}); !errors.Is(err, ErrInvalidHandle) {
+		t.Fatalf("UpdateProfile() error got %v want %v", err, ErrInvalidHandle)
 	}
 }
 
@@ -466,7 +484,7 @@ func testProfileRow(userID uuid.UUID, now time.Time, displayName *string, handle
 	return sqlc.AppCreatorProfile{
 		UserID:      pgUUID(userID),
 		DisplayName: pgText(displayName),
-		Handle:      pgText(handle),
+		Handle:      derefString(handle),
 		AvatarUrl:   pgText(avatarURL),
 		Bio:         "bio",
 		PublishedAt: pgTime(publishedAt),
@@ -479,7 +497,7 @@ func testPublicProfileRow(userID uuid.UUID, now time.Time, displayName *string, 
 	return sqlc.AppPublicCreatorProfile{
 		UserID:      pgUUID(userID),
 		DisplayName: pgText(displayName),
-		Handle:      pgText(handle),
+		Handle:      derefString(handle),
 		AvatarUrl:   pgText(avatarURL),
 		Bio:         "bio",
 		PublishedAt: pgTime(publishedAt),
@@ -544,4 +562,12 @@ func stringPtr(value string) *string {
 
 func timePtr(value time.Time) *time.Time {
 	return &value
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+
+	return *value
 }

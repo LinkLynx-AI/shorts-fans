@@ -161,7 +161,7 @@ func testFollowingRow(
 	return sqlc.ListFanProfileFollowingItemsRow{
 		CreatorUserID: uuidToPG(creatorUserID),
 		DisplayName:   textToPG(displayName),
-		Handle:        textToPG(handle),
+		Handle:        handle,
 		AvatarUrl:     postgres.TextToPG(avatarURL),
 		Bio:           bio,
 		FollowedAt:    timeToPG(&followedAt),

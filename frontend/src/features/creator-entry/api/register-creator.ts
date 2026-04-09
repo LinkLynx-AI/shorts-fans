@@ -10,6 +10,7 @@ type RegisterCreatorOptions = {
 type RegisterCreatorInput = {
   bio: string;
   displayName: string;
+  handle: string;
 };
 
 /**

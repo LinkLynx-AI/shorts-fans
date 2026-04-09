@@ -9,7 +9,7 @@ INSERT INTO app.creator_profiles (
 ) VALUES (
     sqlc.arg(user_id),
     sqlc.narg(display_name),
-    sqlc.narg(handle),
+    sqlc.arg(handle),
     sqlc.narg(avatar_url),
     sqlc.arg(bio),
     sqlc.narg(published_at)
@@ -26,7 +26,7 @@ LIMIT 1;
 UPDATE app.creator_profiles
 SET
     display_name = sqlc.narg(display_name),
-    handle = sqlc.narg(handle),
+    handle = sqlc.arg(handle),
     avatar_url = sqlc.narg(avatar_url),
     bio = sqlc.arg(bio),
     updated_at = CURRENT_TIMESTAMP

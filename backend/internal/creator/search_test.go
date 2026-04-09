@@ -9,7 +9,6 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func TestNormalizeRequiredHandle(t *testing.T) {
@@ -60,10 +59,10 @@ func TestGetPublicProfileByHandle(t *testing.T) {
 	now := time.Unix(1710000000, 0).UTC()
 	userID := uuid.New()
 	row := testPublicProfileRow(userID, now, stringPtr("Alice"), stringPtr("alice"), stringPtr("https://cdn.example.com/alice.jpg"), timePtr(now))
-	var gotHandle pgtype.Text
+	var gotHandle string
 
 	repo := newRepository(repositoryStubQueries{
-		getPublicByHandle: func(_ context.Context, handle pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+		getPublicByHandle: func(_ context.Context, handle string) (sqlc.AppPublicCreatorProfile, error) {
 			gotHandle = handle
 			return row, nil
 		},
@@ -73,8 +72,8 @@ func TestGetPublicProfileByHandle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPublicProfileByHandle() error = %v, want nil", err)
 	}
-	if gotHandle != pgText(stringPtr("alice")) {
-		t.Fatalf("GetPublicProfileByHandle() handle arg got %v want %v", gotHandle, pgText(stringPtr("alice")))
+	if gotHandle != "alice" {
+		t.Fatalf("GetPublicProfileByHandle() handle arg got %v want %v", gotHandle, "alice")
 	}
 	if profile.Handle == nil || *profile.Handle != "alice" {
 		t.Fatalf("GetPublicProfileByHandle() handle got %#v want %q", profile.Handle, "alice")
@@ -85,7 +84,7 @@ func TestGetPublicProfileByHandleNotFound(t *testing.T) {
 	t.Parallel()
 
 	repo := newRepository(repositoryStubQueries{
-		getPublicByHandle: func(context.Context, pgtype.Text) (sqlc.AppPublicCreatorProfile, error) {
+		getPublicByHandle: func(context.Context, string) (sqlc.AppPublicCreatorProfile, error) {
 			return sqlc.AppPublicCreatorProfile{}, pgx.ErrNoRows
 		},
 	})

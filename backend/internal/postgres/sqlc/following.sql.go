@@ -48,7 +48,7 @@ type ListFanProfileFollowingItemsParams struct {
 type ListFanProfileFollowingItemsRow struct {
 	CreatorUserID pgtype.UUID
 	DisplayName   pgtype.Text
-	Handle        pgtype.Text
+	Handle        string
 	AvatarUrl     pgtype.Text
 	Bio           string
 	FollowedAt    pgtype.Timestamptz

@@ -9,6 +9,8 @@ sql:
       - "db/migrations/000005_add_auth_tables.up.sql"
       - "db/migrations/000006_require_unique_email_identity.up.sql"
       - "db/migrations/000007_add_creator_profile_handle.up.sql"
+      - "db/migrations/000008_add_creator_follows_following_index.up.sql"
+      - "db/migrations/000009_require_creator_profile_handle.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

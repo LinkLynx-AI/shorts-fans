@@ -114,7 +114,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 9)
 
 	queries := sqlc.New(conn)
 	now := time.Now().UTC()
@@ -345,7 +345,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 9)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
@@ -373,7 +373,7 @@ func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 9)
 
 	queries := sqlc.New(conn)
 	now := time.Unix(1710000000, 0).UTC()
@@ -401,7 +401,7 @@ func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	_, err = queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      creatorUser.ID,
 		DisplayName: pgText("creator"),
-		Handle:      pgText("creator"),
+		Handle:      "creator",
 		Bio:         "public bio",
 		PublishedAt: pgTime(now),
 	})
@@ -591,8 +591,12 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateUser(creatorB) error = %v, want nil", err)
 	}
+	creatorPrivate, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creatorPrivate) error = %v, want nil", err)
+	}
 
-	for _, creatorID := range []pgtype.UUID{creatorA.ID, creatorB.ID} {
+	for _, creatorID := range []pgtype.UUID{creatorA.ID, creatorB.ID, creatorPrivate.ID} {
 		if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
 			UserID:                  creatorID,
 			State:                   "approved",
@@ -608,7 +612,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if _, err := conn.Exec(
 		ctx,
 		`INSERT INTO app.creator_profiles (user_id, display_name, avatar_url, bio, published_at)
-		VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10)`,
+		VALUES ($1, $2, $3, $4, $5), ($6, $7, $8, $9, $10), ($11, $12, $13, $14, $15)`,
 		creatorA.ID,
 		"Mina Rei",
 		"https://cdn.example.com/creator/mina-a/avatar.jpg",
@@ -619,6 +623,11 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 		"https://cdn.example.com/creator/mina-b/avatar.jpg",
 		"bio-b",
 		pgTime(now.Add(-time.Hour)),
+		creatorPrivate.ID,
+		"Private Mina",
+		"https://cdn.example.com/creator/mina-private/avatar.jpg",
+		"bio-private",
+		pgtype.Timestamptz{},
 	); err != nil {
 		t.Fatalf("INSERT creator_profiles(version3) error = %v, want nil", err)
 	}
@@ -626,7 +635,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() to latest error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 7)
+	assertMigrationVersion(t, migrator, 9)
 
 	profileA, err := queries.GetCreatorProfileByUserID(ctx, creatorA.ID)
 	if err != nil {
@@ -636,25 +645,33 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCreatorProfileByUserID(creatorB) error = %v, want nil", err)
 	}
-	if !profileA.Handle.Valid || !profileB.Handle.Valid {
-		t.Fatalf("backfilled handle valid got [%t %t] want [true true]", profileA.Handle.Valid, profileB.Handle.Valid)
+	if profileA.Handle != "minarei" {
+		t.Fatalf("creatorA handle got %q want %q", profileA.Handle, "minarei")
 	}
-	if profileA.Handle.String != "minarei" {
-		t.Fatalf("creatorA handle got %q want %q", profileA.Handle.String, "minarei")
+	if !strings.HasPrefix(profileB.Handle, "minarei_") {
+		t.Fatalf("creatorB handle got %q want prefix %q", profileB.Handle, "minarei_")
 	}
-	if !strings.HasPrefix(profileB.Handle.String, "minarei_") {
-		t.Fatalf("creatorB handle got %q want prefix %q", profileB.Handle.String, "minarei_")
-	}
-	if profileA.Handle.String == profileB.Handle.String {
-		t.Fatalf("backfilled handles got duplicate %q want unique handles", profileA.Handle.String)
+	if profileA.Handle == profileB.Handle {
+		t.Fatalf("backfilled handles got duplicate %q want unique handles", profileA.Handle)
 	}
 
-	gotByHandle, err := queries.GetPublicCreatorProfileByHandle(ctx, pgText(profileA.Handle.String))
+	gotByHandle, err := queries.GetPublicCreatorProfileByHandle(ctx, profileA.Handle)
 	if err != nil {
 		t.Fatalf("GetPublicCreatorProfileByHandle() error = %v, want nil", err)
 	}
 	if gotByHandle.UserID != creatorA.ID {
 		t.Fatalf("GetPublicCreatorProfileByHandle() user got %v want %v", gotByHandle.UserID, creatorA.ID)
+	}
+
+	privateProfile, err := queries.GetCreatorProfileByUserID(ctx, creatorPrivate.ID)
+	if err != nil {
+		t.Fatalf("GetCreatorProfileByUserID(creatorPrivate) error = %v, want nil", err)
+	}
+	if !strings.HasPrefix(privateProfile.Handle, "privatemina") {
+		t.Fatalf("creatorPrivate handle got %q want prefix %q", privateProfile.Handle, "privatemina")
+	}
+	if privateProfile.PublishedAt.Valid {
+		t.Fatalf("creatorPrivate published_at valid got %t want false", privateProfile.PublishedAt.Valid)
 	}
 
 	recentProfiles, err := queries.ListRecentPublicCreatorProfiles(ctx, sqlc.ListRecentPublicCreatorProfilesParams{
@@ -682,41 +699,6 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 		t.Fatalf("SearchPublicCreatorProfiles() len got %d want %d", len(filteredProfiles), 2)
 	}
 
-	creatorMissingHandle, err := queries.CreateUser(ctx)
-	if err != nil {
-		t.Fatalf("CreateUser(creatorMissingHandle) error = %v, want nil", err)
-	}
-	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
-		UserID:                  creatorMissingHandle.ID,
-		State:                   "approved",
-		IsResubmitEligible:      false,
-		IsSupportReviewRequired: false,
-		SelfServeResubmitCount:  0,
-		ApprovedAt:              pgTime(now),
-	}); err != nil {
-		t.Fatalf("CreateCreatorCapability(creatorMissingHandle) error = %v, want nil", err)
-	}
-	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
-		UserID:      creatorMissingHandle.ID,
-		DisplayName: pgText("No Handle"),
-		Bio:         "draft before handle assignment",
-	}); err != nil {
-		t.Fatalf("CreateCreatorProfile(creatorMissingHandle) error = %v, want nil", err)
-	}
-
-	_, err = queries.PublishCreatorProfile(ctx, creatorMissingHandle.ID)
-	if err == nil {
-		t.Fatal("PublishCreatorProfile(creatorMissingHandle) error = nil, want constraint error")
-	}
-
-	var pgErr *pgconn.PgError
-	if !errors.As(err, &pgErr) {
-		t.Fatalf("PublishCreatorProfile(creatorMissingHandle) error got %T want *pgconn.PgError", err)
-	}
-	if pgErr.ConstraintName != "creator_profiles_public_fields_check" {
-		t.Fatalf("PublishCreatorProfile(creatorMissingHandle) constraint got %q want %q", pgErr.ConstraintName, "creator_profiles_public_fields_check")
-	}
-
 	creatorC, err := queries.CreateUser(ctx)
 	if err != nil {
 		t.Fatalf("CreateUser(creatorC) error = %v, want nil", err)
@@ -740,7 +722,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      creatorC.ID,
 		DisplayName: pgText("A Under"),
-		Handle:      pgText("a_b"),
+		Handle:      "a_b",
 		Bio:         "bio-c",
 		PublishedAt: pgTime(now.Add(-2 * time.Hour)),
 	}); err != nil {
@@ -749,7 +731,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if _, err := queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
 		UserID:      creatorD.ID,
 		DisplayName: pgText("AB Plain"),
-		Handle:      pgText("ab"),
+		Handle:      "ab",
 		Bio:         "bio-d",
 		PublishedAt: pgTime(now.Add(-3 * time.Hour)),
 	}); err != nil {

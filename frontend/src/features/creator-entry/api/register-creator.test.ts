@@ -9,6 +9,7 @@ describe("registerCreator", () => {
         {
           bio: "quiet rooftop の continuation を中心に投稿します。",
           displayName: "Mina Rei",
+          handle: "@mina.rei",
         },
         {
           baseUrl: "https://api.example.com",
@@ -23,6 +24,7 @@ describe("registerCreator", () => {
         body: JSON.stringify({
           bio: "quiet rooftop の continuation を中心に投稿します。",
           displayName: "Mina Rei",
+          handle: "@mina.rei",
         }),
         credentials: "include",
         method: "POST",
