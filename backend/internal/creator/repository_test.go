@@ -28,6 +28,14 @@ func (s stubQueries) GetCreatorCapabilityByUserID(ctx context.Context, userID pg
 	return s.getCapability(ctx, userID)
 }
 
+func (s stubQueries) GetCreatorWorkspaceOverviewMetrics(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error) {
+	return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
+}
+
+func (s stubQueries) GetCreatorWorkspaceRevisionRequestedSummary(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {
+	return sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow{}, nil
+}
+
 func (s stubQueries) UpdateCreatorCapabilityState(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
 	return sqlc.AppCreatorCapability{}, nil
 }

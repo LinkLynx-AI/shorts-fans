@@ -33,6 +33,8 @@ type queries interface {
 	CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	GetCreatorWorkspaceOverviewMetrics(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
+	GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	DeleteCreatorFollow(ctx context.Context, arg sqlc.DeleteCreatorFollowParams) error
