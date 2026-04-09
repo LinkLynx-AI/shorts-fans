@@ -18,6 +18,7 @@
 - private raw upload bucket
   - creator upload の受け口
   - public access は全面 block
+  - `allowed_app_origins` からの browser direct `PUT` だけ CORS で許可
   - `14` 日で expire
 - short public origin bucket
   - `CloudFront` の S3 origin
@@ -45,7 +46,7 @@
 - `allowed_app_origins`
   - 任意
   - default は `http://localhost:3000` と `http://127.0.0.1:3000`
-  - `main` の private S3 delivery bucket CORS に使います
+  - raw upload bucket の direct `PUT` と `main` の private S3 delivery bucket CORS に使います
 
 ## 使い方
 
@@ -135,5 +136,5 @@ backend から読む env 名は次に揃えます。
   - cycle1 は default queue 前提に留めます。
 - `short` の custom domain、TLS 証明書、WAF、invalidation 運用は未対応です。
 - `main` の CloudFront 化は未対応です。
-- browser から raw bucket へ直接 upload する CORS / presigned upload flow は未定義です。
-  - 必要なら後続 task で追加します。
+- raw upload bucket の CORS は local app origin からの direct `PUT` に限定します。
+  - custom origin や追加 method が必要なら `allowed_app_origins` と CORS rule を後続 task で拡張します。

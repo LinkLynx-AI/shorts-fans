@@ -1,5 +1,8 @@
 SHELL := /bin/bash
 
+-include .env
+-include .env.local
+
 .DEFAULT_GOAL := help
 
 .PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-media-smoke backend-dev-seed backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt
@@ -9,6 +12,7 @@ BACKEND_APP_ENV ?= development
 BACKEND_API_ADDR ?= :8080
 BACKEND_POSTGRES_DSN ?= postgres://shorts_fans:shorts_fans@localhost:5432/shorts_fans?sslmode=disable
 BACKEND_REDIS_ADDR ?= localhost:6379
+AWS_PROFILE ?=
 BACKEND_AWS_REGION ?=
 BACKEND_SQS_QUEUE_URL ?=
 BACKEND_MEDIA_JOBS_QUEUE_URL ?= $(BACKEND_SQS_QUEUE_URL)
@@ -67,6 +71,7 @@ backend-run:
 		API_ADDR='$(BACKEND_API_ADDR)' \
 		POSTGRES_DSN='$(BACKEND_POSTGRES_DSN)' \
 		REDIS_ADDR='$(BACKEND_REDIS_ADDR)' \
+		AWS_PROFILE='$(AWS_PROFILE)' \
 		AWS_REGION='$(BACKEND_AWS_REGION)' \
 		MEDIA_JOBS_QUEUE_URL='$(BACKEND_MEDIA_JOBS_QUEUE_URL)' \
 		MEDIA_RAW_BUCKET_NAME='$(BACKEND_MEDIA_RAW_BUCKET_NAME)' \
@@ -82,6 +87,7 @@ backend-worker:
 		API_ADDR='$(BACKEND_API_ADDR)' \
 		POSTGRES_DSN='$(BACKEND_POSTGRES_DSN)' \
 		REDIS_ADDR='$(BACKEND_REDIS_ADDR)' \
+		AWS_PROFILE='$(AWS_PROFILE)' \
 		AWS_REGION='$(BACKEND_AWS_REGION)' \
 		MEDIA_JOBS_QUEUE_URL='$(BACKEND_MEDIA_JOBS_QUEUE_URL)' \
 		MEDIA_RAW_BUCKET_NAME='$(BACKEND_MEDIA_RAW_BUCKET_NAME)' \
@@ -93,6 +99,7 @@ backend-worker:
 
 backend-media-smoke:
 	cd $(BACKEND_DIR) && \
+		AWS_PROFILE='$(AWS_PROFILE)' \
 		AWS_REGION='$(BACKEND_AWS_REGION)' \
 		MEDIA_JOBS_QUEUE_URL='$(BACKEND_MEDIA_JOBS_QUEUE_URL)' \
 		MEDIA_RAW_BUCKET_NAME='$(BACKEND_MEDIA_RAW_BUCKET_NAME)' \
