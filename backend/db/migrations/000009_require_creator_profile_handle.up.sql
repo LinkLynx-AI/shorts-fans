@@ -1,3 +1,7 @@
+-- Keep the backfill and subsequent constraint promotion in one serialized write window
+-- so concurrent profile writes cannot race the generated handles.
+LOCK TABLE app.creator_profiles IN ACCESS EXCLUSIVE MODE;
+
 DO $$
 DECLARE
     profile_row RECORD;
