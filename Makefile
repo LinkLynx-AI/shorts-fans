@@ -24,8 +24,8 @@ SQLC_VERSION := v1.27.0
 help:
 	@printf '%s\n' \
 		'Usage:' \
-		'  make codex branch=<branch-name> [ARGS="..."]' \
-		'  make codex-worktree branch=<branch-name> [ARGS="..."]' \
+		'  make codex branch=<branch-name> [ARGS="..."]   # creates/switches codex/<branch-name>' \
+		'  make codex-worktree branch=<branch-name> [ARGS="..."]   # creates/switches codex/<branch-name>' \
 		'  make backend-dev-up' \
 		'  make backend-dev-seed' \
 		'  make backend-run' \
@@ -35,8 +35,8 @@ help:
 		'  make backend-coverage-check [BACKEND_COVERAGE_MIN=<min-percent>]' \
 		'' \
 		'Examples:' \
-		'  make codex branch=feat/frontend-shell' \
-		'  make codex branch=feat/frontend-shell ARGS="exec"' \
+		'  make codex branch=frontend-shell          # branch: codex/frontend-shell' \
+		'  make codex branch=frontend-shell ARGS="exec"' \
 		'  make backend-run' \
 		'  make backend-dev-seed' \
 		'  make backend-media-smoke' \
@@ -49,10 +49,14 @@ codex-worktree:
 		echo 'error: branch is required. Usage: make codex branch=<branch-name> [ARGS="..."]' >&2; \
 		exit 1; \
 	fi
-	@if [[ -n "$(strip $(ARGS))" ]]; then \
-		./scripts/codex-worktree.sh "$(branch)" -- $(ARGS); \
+	@normalized_branch='$(strip $(branch))'; \
+	if [[ "$$normalized_branch" != codex/* ]]; then \
+		normalized_branch="codex/$$normalized_branch"; \
+	fi; \
+	if [[ -n "$(strip $(ARGS))" ]]; then \
+		./scripts/codex-worktree.sh "$$normalized_branch" -- $(ARGS); \
 	else \
-		./scripts/codex-worktree.sh "$(branch)"; \
+		./scripts/codex-worktree.sh "$$normalized_branch"; \
 	fi
 
 backend-dev-up:
