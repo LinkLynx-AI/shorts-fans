@@ -9,6 +9,7 @@ import {
 import { cn } from "@/shared/lib";
 
 import {
+  type CreatorUploadTransferState,
   getCreatorUploadPendingMessage,
   getCreatorUploadSelectedShortCount,
   getCreatorUploadSubmitLabel,
@@ -41,7 +42,7 @@ function getPickerButtonClassName(disabled: boolean): string {
 
 function getTransferStateLabel(
   file: File | null,
-  transferState: { kind: string },
+  transferState: CreatorUploadTransferState,
 ): { label: string; tone: "default" | "error" | "success" } {
   if (transferState.kind === "uploaded") {
     return { label: "完了", tone: "success" };

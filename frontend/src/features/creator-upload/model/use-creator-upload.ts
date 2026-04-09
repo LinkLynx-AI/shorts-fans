@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useRef,
+  useState,
+} from "react";
 
 import { ApiError } from "@/shared/api";
 
@@ -82,6 +85,7 @@ function getCreatorUploadFileErrorMessage(error: unknown, fileLabel: string): st
  */
 export function useCreatorUpload(): UseCreatorUploadResult {
   const [draft, setDraft] = useState(createInitialCreatorUploadDraft);
+  const submitLockRef = useRef(false);
 
   const selectMainFile = (file: File | null) => {
     setDraft((currentDraft) => setCreatorUploadMainFile(currentDraft, file));
@@ -100,16 +104,18 @@ export function useCreatorUpload(): UseCreatorUploadResult {
   };
 
   const submit = async () => {
-    if (!isCreatorUploadReady(draft) || isCreatorUploadSubmitting(draft) || draft.mainFile === null) {
+    if (submitLockRef.current || !isCreatorUploadReady(draft) || isCreatorUploadSubmitting(draft) || draft.mainFile === null) {
       return;
     }
+
+    submitLockRef.current = true;
 
     const mainFile = draft.mainFile;
     const selectedShorts = getCreatorUploadSelectedShorts(draft);
 
-    setDraft((currentDraft) => startCreatorUploadInitiation(currentDraft));
-
     try {
+      setDraft((currentDraft) => startCreatorUploadInitiation(currentDraft));
+
       const createResult = await createCreatorUploadPackage({
         mainFile,
         shortFiles: selectedShorts.map((short) => short.file),
@@ -198,6 +204,8 @@ export function useCreatorUpload(): UseCreatorUploadResult {
       );
     } catch (error) {
       setDraft((currentDraft) => setCreatorUploadSubmissionError(currentDraft, getCreatorUploadUnknownErrorMessage(error)));
+    } finally {
+      submitLockRef.current = false;
     }
   };
 

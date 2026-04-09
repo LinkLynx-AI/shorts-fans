@@ -28,6 +28,22 @@ function createVideoFile(name: string): File {
   return new File(["video"], name, { type: "video/mp4" });
 }
 
+function createDeferredPromise<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+
+  const promise = new Promise<T>((innerResolve, innerReject) => {
+    resolve = innerResolve;
+    reject = innerReject;
+  });
+
+  return {
+    promise,
+    reject,
+    resolve,
+  };
+}
+
 describe("CreatorUploadForm", () => {
   beforeEach(() => {
     vi.mocked(createCreatorUploadPackage).mockReset();
@@ -243,6 +259,92 @@ describe("CreatorUploadForm", () => {
 
     expect(await screen.findByText("ドラフトの作成まで完了しました。")).toBeInTheDocument();
     expect(uploadCreatorUploadTarget).toHaveBeenCalledTimes(4);
+    expect(completeCreatorUploadPackage).toHaveBeenCalledTimes(1);
+  });
+
+  it("prevents submit re-entry while an upload request is in flight", async () => {
+    const user = userEvent.setup();
+    const createDeferred = createDeferredPromise<Awaited<ReturnType<typeof createCreatorUploadPackage>>>();
+
+    vi.mocked(createCreatorUploadPackage).mockReturnValue(createDeferred.promise);
+    vi.mocked(uploadCreatorUploadTarget).mockResolvedValue(undefined);
+    vi.mocked(completeCreatorUploadPackage).mockResolvedValue({
+      main: {
+        id: "main_001",
+        mediaAsset: {
+          id: "asset_main_001",
+          mimeType: "video/mp4",
+          processingState: "uploaded",
+        },
+        state: "draft",
+      },
+      shorts: [
+        {
+          canonicalMainId: "main_001",
+          id: "short_001",
+          mediaAsset: {
+            id: "asset_short_001",
+            mimeType: "video/mp4",
+            processingState: "uploaded",
+          },
+          state: "draft",
+        },
+      ],
+    });
+
+    render(<CreatorUploadForm />);
+
+    await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
+    await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+
+    const submitButton = screen.getByRole("button", { name: "アップロード" });
+
+    await Promise.all([
+      user.click(submitButton),
+      user.click(submitButton),
+    ]);
+
+    await waitFor(() => {
+      expect(createCreatorUploadPackage).toHaveBeenCalledTimes(1);
+    });
+
+    createDeferred.resolve({
+      expiresAt: "2026-04-08T12:15:00Z",
+      packageToken: "cupkg_123",
+      uploadTargets: {
+        main: {
+          fileName: "main.mp4",
+          mimeType: "video/mp4",
+          role: "main",
+          upload: {
+            headers: {
+              "Content-Type": "video/mp4",
+            },
+            method: "PUT",
+            url: "https://raw-bucket.example.com/main",
+          },
+          uploadEntryId: "main-entry",
+        },
+        shorts: [
+          {
+            fileName: "short-1.mp4",
+            mimeType: "video/mp4",
+            role: "short",
+            upload: {
+              headers: {
+                "Content-Type": "video/mp4",
+              },
+              method: "PUT",
+              url: "https://raw-bucket.example.com/short-1",
+            },
+            uploadEntryId: "short-entry-1",
+          },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("ドラフトの作成まで完了しました。")).toBeInTheDocument();
+    expect(uploadCreatorUploadTarget).toHaveBeenCalledTimes(2);
     expect(completeCreatorUploadPackage).toHaveBeenCalledTimes(1);
   });
 
