@@ -26,11 +26,17 @@ type CreateCreatorUploadPackageOptions = {
 
 type CompleteCreatorUploadPackageOptions = {
   baseUrl?: string;
+  consentConfirmed: boolean;
   credentials?: RequestCredentials;
   fetcher?: typeof fetch;
   mainUploadEntryId: string;
+  ownershipConfirmed: boolean;
   packageToken: string;
-  shortUploadEntryIds: readonly string[];
+  priceJpy: number;
+  shorts: readonly {
+    caption: string | null;
+    uploadEntryId: string;
+  }[];
 };
 
 type UploadCreatorUploadTargetOptions = {
@@ -173,11 +179,14 @@ export async function createCreatorUploadPackage({
  */
 export async function completeCreatorUploadPackage({
   baseUrl,
+  consentConfirmed,
   credentials = "include",
   fetcher = fetch,
   mainUploadEntryId,
+  ownershipConfirmed,
   packageToken,
-  shortUploadEntryIds,
+  priceJpy,
+  shorts,
 }: CompleteCreatorUploadPackageOptions): Promise<CreatorUploadCompleteResponse["data"]> {
   let response: Response;
 
@@ -185,11 +194,15 @@ export async function completeCreatorUploadPackage({
     response = await fetcher(createApiUrl(getCreatorUploadBaseUrl(baseUrl), "/api/creator/upload-packages/complete"), {
       body: JSON.stringify({
         main: {
+          consentConfirmed,
+          ownershipConfirmed,
+          priceJpy,
           uploadEntryId: mainUploadEntryId,
         },
         packageToken,
-        shorts: shortUploadEntryIds.map((uploadEntryId) => ({
-          uploadEntryId,
+        shorts: shorts.map((short) => ({
+          caption: short.caption,
+          uploadEntryId: short.uploadEntryId,
         })),
       }),
       credentials,

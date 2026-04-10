@@ -315,7 +315,7 @@ func TestCreatorUploadCompleteMapsContractErrors(t *testing.T) {
 				},
 			})
 
-			req := httptest.NewRequest(http.MethodPost, "/api/creator/upload-packages/complete", bytes.NewBufferString(`{"packageToken":"pkg-token","main":{"uploadEntryId":"main-entry"},"shorts":[{"uploadEntryId":"short-entry"}]}`))
+			req := httptest.NewRequest(http.MethodPost, "/api/creator/upload-packages/complete", bytes.NewBufferString(`{"packageToken":"pkg-token","main":{"uploadEntryId":"main-entry","priceJpy":1800,"ownershipConfirmed":true,"consentConfirmed":true},"shorts":[{"uploadEntryId":"short-entry","caption":null}]}`))
 			req.Header.Set("Content-Type", "application/json")
 			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 			rec := httptest.NewRecorder()
@@ -335,17 +335,19 @@ func TestCreatorUploadCompleteMapsContractErrors(t *testing.T) {
 func TestCreatorUploadCompleteSuccess(t *testing.T) {
 	t.Parallel()
 
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	mainID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
 	mainAssetID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
 	shortID := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
 	shortAssetID := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
+	var gotInput creatorupload.CompletePackageInput
 
 	router := NewHandler(HandlerConfig{
 		ViewerBootstrap: viewerBootstrapReaderStub{
 			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
 				return auth.Bootstrap{
 					CurrentViewer: &auth.CurrentViewer{
-						ID:                   uuid.New(),
+						ID:                   viewerID,
 						CanAccessCreatorMode: true,
 					},
 				}, nil
@@ -355,7 +357,8 @@ func TestCreatorUploadCompleteSuccess(t *testing.T) {
 			createPackage: func(context.Context, creatorupload.CreatePackageInput) (creatorupload.CreatePackageResult, error) {
 				return creatorupload.CreatePackageResult{}, nil
 			},
-			completePackage: func(context.Context, creatorupload.CompletePackageInput) (creatorupload.CompletePackageResult, error) {
+			completePackage: func(_ context.Context, input creatorupload.CompletePackageInput) (creatorupload.CompletePackageResult, error) {
+				gotInput = input
 				return creatorupload.CompletePackageResult{
 					Main: creatorupload.CreatedMain{
 						ID:    mainID,
@@ -381,7 +384,7 @@ func TestCreatorUploadCompleteSuccess(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/creator/upload-packages/complete", bytes.NewBufferString(`{"packageToken":"pkg-token","main":{"uploadEntryId":"main-entry"},"shorts":[{"uploadEntryId":"short-entry"}]}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/creator/upload-packages/complete", bytes.NewBufferString(`{"packageToken":"pkg-token","main":{"uploadEntryId":"main-entry","priceJpy":1800,"ownershipConfirmed":true,"consentConfirmed":true},"shorts":[{"uploadEntryId":"short-entry","caption":"preview"}]}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()
@@ -390,6 +393,15 @@ func TestCreatorUploadCompleteSuccess(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("POST /api/creator/upload-packages/complete status got %d want %d", rec.Code, http.StatusOK)
+	}
+	if gotInput.CreatorUserID != viewerID {
+		t.Fatalf("POST /api/creator/upload-packages/complete creator id got %s want %s", gotInput.CreatorUserID, viewerID)
+	}
+	if gotInput.Main == nil || gotInput.Main.PriceJpy != 1800 || !gotInput.Main.OwnershipConfirmed || !gotInput.Main.ConsentConfirmed {
+		t.Fatalf("POST /api/creator/upload-packages/complete main input got %#v want metadata", gotInput.Main)
+	}
+	if len(gotInput.Shorts) != 1 || gotInput.Shorts[0].Caption == nil || *gotInput.Shorts[0].Caption != "preview" {
+		t.Fatalf("POST /api/creator/upload-packages/complete shorts input got %#v want caption", gotInput.Shorts)
 	}
 	if !strings.Contains(rec.Body.String(), mainID.String()) {
 		t.Fatalf("POST /api/creator/upload-packages/complete body got %q want main id", rec.Body.String())

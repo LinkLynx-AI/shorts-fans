@@ -16,12 +16,17 @@ import {
 import {
   addCreatorUploadShortSlot,
   createInitialCreatorUploadDraft,
+  getCreatorUploadMainPriceJpy,
   getCreatorUploadSelectedShorts,
   isCreatorUploadReady,
   isCreatorUploadSubmitting,
   removeCreatorUploadShortSlot,
+  setCreatorUploadMainConsentConfirmed,
   setCreatorUploadMainFile,
+  setCreatorUploadMainOwnershipConfirmed,
+  setCreatorUploadMainPriceJpyInput,
   setCreatorUploadMainTransferState,
+  setCreatorUploadShortCaption,
   setCreatorUploadShortFile,
   setCreatorUploadShortTransferState,
   setCreatorUploadSubmissionError,
@@ -34,9 +39,13 @@ import {
 
 type UseCreatorUploadResult = {
   addShortSlot: () => void;
+  setMainConsentConfirmed: (checked: boolean) => void;
   draft: CreatorUploadDraft;
   removeShortSlot: (index: number) => void;
+  setMainOwnershipConfirmed: (checked: boolean) => void;
+  setMainPriceJpyInput: (value: string) => void;
   selectMainFile: (file: File | null) => void;
+  setShortCaption: (index: number, caption: string) => void;
   selectShortFile: (index: number, file: File | null) => void;
   submit: () => Promise<void>;
 };
@@ -95,6 +104,22 @@ export function useCreatorUpload(): UseCreatorUploadResult {
     setDraft((currentDraft) => setCreatorUploadShortFile(currentDraft, index, file));
   };
 
+  const setMainPriceJpyInput = (value: string) => {
+    setDraft((currentDraft) => setCreatorUploadMainPriceJpyInput(currentDraft, value));
+  };
+
+  const setMainOwnershipConfirmed = (checked: boolean) => {
+    setDraft((currentDraft) => setCreatorUploadMainOwnershipConfirmed(currentDraft, checked));
+  };
+
+  const setMainConsentConfirmed = (checked: boolean) => {
+    setDraft((currentDraft) => setCreatorUploadMainConsentConfirmed(currentDraft, checked));
+  };
+
+  const setShortCaption = (index: number, caption: string) => {
+    setDraft((currentDraft) => setCreatorUploadShortCaption(currentDraft, index, caption));
+  };
+
   const addShortSlot = () => {
     setDraft((currentDraft) => addCreatorUploadShortSlot(currentDraft));
   };
@@ -111,7 +136,12 @@ export function useCreatorUpload(): UseCreatorUploadResult {
     submitLockRef.current = true;
 
     const mainFile = draft.mainFile;
+    const mainPriceJpy = getCreatorUploadMainPriceJpy(draft);
     const selectedShorts = getCreatorUploadSelectedShorts(draft);
+
+    if (mainPriceJpy === null) {
+      return;
+    }
 
     try {
       setDraft((currentDraft) => startCreatorUploadInitiation(currentDraft));
@@ -190,9 +220,15 @@ export function useCreatorUpload(): UseCreatorUploadResult {
       setDraft((currentDraft) => startCreatorUploadCompletion(currentDraft));
 
       const completionResult = await completeCreatorUploadPackage({
+        consentConfirmed: draft.mainConsentConfirmed,
         mainUploadEntryId: createResult.uploadTargets.main.uploadEntryId,
         packageToken: createResult.packageToken,
-        shortUploadEntryIds,
+        ownershipConfirmed: draft.mainOwnershipConfirmed,
+        priceJpy: mainPriceJpy,
+        shorts: selectedShorts.map((selectedShort, selectedIndex) => ({
+          caption: selectedShort.caption,
+          uploadEntryId: shortUploadEntryIds[selectedIndex] ?? "",
+        })),
       });
 
       setDraft((currentDraft) =>
@@ -213,6 +249,10 @@ export function useCreatorUpload(): UseCreatorUploadResult {
     addShortSlot,
     draft,
     removeShortSlot,
+    setMainConsentConfirmed,
+    setMainOwnershipConfirmed,
+    setMainPriceJpyInput,
+    setShortCaption,
     selectMainFile,
     selectShortFile,
     submit,

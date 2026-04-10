@@ -130,6 +130,23 @@ type AppMediaAsset struct {
 	UpdatedAt         pgtype.Timestamptz
 }
 
+type AppMediaProcessingJob struct {
+	ID               pgtype.UUID
+	CreatorUserID    pgtype.UUID
+	MediaAssetID     pgtype.UUID
+	AssetRole        string
+	Status           string
+	AttemptCount     int32
+	LastErrorCode    pgtype.Text
+	LastErrorMessage pgtype.Text
+	QueuedAt         pgtype.Timestamptz
+	StartedAt        pgtype.Timestamptz
+	CompletedAt      pgtype.Timestamptz
+	FailedAt         pgtype.Timestamptz
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type AppPinnedShort struct {
 	UserID    pgtype.UUID
 	ShortID   pgtype.UUID
@@ -153,6 +170,7 @@ type AppPublicShort struct {
 	CreatorUserID        pgtype.UUID
 	CanonicalMainID      pgtype.UUID
 	MediaAssetID         pgtype.UUID
+	Caption              pgtype.Text
 	State                string
 	ReviewReasonCode     pgtype.Text
 	PostReportState      pgtype.Text
@@ -174,6 +192,7 @@ type AppShort struct {
 	PublishedAt          pgtype.Timestamptz
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
+	Caption              pgtype.Text
 }
 
 type AppUnlockableMain struct {

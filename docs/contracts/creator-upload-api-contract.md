@@ -215,14 +215,19 @@
 {
   "packageToken": "cupkg_01hrp6wjkq7mh6f3d2f6c5j8rz",
   "main": {
-    "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf"
+    "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf",
+    "priceJpy": 1800,
+    "ownershipConfirmed": true,
+    "consentConfirmed": true
   },
   "shorts": [
     {
-      "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55"
+      "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55",
+      "caption": "quiet rooftop preview。"
     },
     {
-      "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne"
+      "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne",
+      "caption": null
     }
   ]
 }
@@ -232,7 +237,11 @@
 | --- | --- | --- | --- |
 | `packageToken` | `string` | yes | opaque package identifier |
 | `main.uploadEntryId` | `string` | yes | initiation response の main target を指す |
+| `main.priceJpy` | `number` | yes | `> 0` の JPY integer |
+| `main.ownershipConfirmed` | `boolean` | yes | `true` 固定。権利確認が完了していること |
+| `main.consentConfirmed` | `boolean` | yes | `true` 固定。同意確認が完了していること |
 | `shorts[].uploadEntryId` | `string` | yes | initiation response の short target を指す |
+| `shorts[].caption` | `string \| null` | yes | blank caption は client / server で `null` に正規化 |
 
 ### Success
 
@@ -287,8 +296,10 @@
 - completion 成功時に、draft `main` 1 件と draft `shorts` 1 件以上を同一 transaction で作成します。
 - `main` / `shorts` / `media_assets` の `creator_user_id` は request user で一致していなければなりません。
 - `media_assets` は各 upload entry ごとに 1 件作成し、`processing_state = uploaded`、`storage_provider = s3`、`external_upload_ref = uploadEntryId` を持ちます。
-- draft `main` は `state = draft`、draft `shorts` も `state = draft` で作成します。
+- draft `main` は `state = draft` で作成し、`price_minor = priceJpy`、`currency_code = JPY`、`ownership_confirmed = true`、`consent_confirmed = true` を保存します。
+- draft `shorts` も `state = draft` で作成し、`caption` は `null` または trim 後 non-empty string を保存します。
 - draft `shorts` はすべて、同じ completion で作った draft `main` の `canonical_main_id` に紐づきます。
+- completion 成功時は `media_asset_id` ごとに durable な processing job を 1 件作成します。upload completion 直後の response では `mediaAsset.processingState = uploaded` のままとし、worker 側の claim 以降で processing state を進めます。
 - object 検証に失敗した場合は package 全体を失敗扱いにし、`main` / `shorts` / `media_assets` の新規 row は 1 件も作りません。
 - completion 成功は `submission package ready` を意味しません。processing / linkage / review は後続 boundary の責務です。
 
