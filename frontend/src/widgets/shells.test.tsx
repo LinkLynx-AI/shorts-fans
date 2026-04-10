@@ -1,6 +1,10 @@
 import { render, screen } from "@testing-library/react";
 
 import { getFanHubState } from "@/entities/fan-profile";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
 import type { CreatorSearchState } from "@/features/creator-search";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
@@ -24,6 +28,22 @@ vi.mock("next/navigation", async () => {
     useRouter: () => mockedRouter,
   };
 });
+
+function renderFanHubShell(activeTab: "library" | "pinned") {
+  return render(
+    <ViewerSessionProvider hasSession>
+      <CurrentViewerProvider
+        currentViewer={{
+          activeMode: "fan",
+          canAccessCreatorMode: false,
+          id: "viewer_123",
+        }}
+      >
+        <FanHubShell state={getFanHubState(activeTab)} />
+      </CurrentViewerProvider>
+    </ViewerSessionProvider>,
+  );
+}
 
 describe("widgets", () => {
   it("renders the feed shell", () => {
@@ -96,14 +116,26 @@ describe("widgets", () => {
   });
 
   it("renders fan hub content and active tabs", () => {
-    const { rerender } = render(<FanHubShell state={getFanHubState("library")} />);
+    const { rerender } = renderFanHubShell("library");
 
     expect(screen.getByRole("heading", { name: "My archive" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/fan/following");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
 
-    rerender(<FanHubShell state={getFanHubState("pinned")} />);
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider
+          currentViewer={{
+            activeMode: "fan",
+            canAccessCreatorMode: false,
+            id: "viewer_123",
+          }}
+        >
+          <FanHubShell state={getFanHubState("pinned")} />
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
 
     expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /after rain preview/i })).toHaveAttribute("href", "/shorts/afterrain");

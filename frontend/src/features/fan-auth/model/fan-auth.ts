@@ -116,3 +116,14 @@ export function getFanAuthModeHint(mode: FanAuthMode): string {
 export function getFanAuthErrorMessage(code: FanAuthErrorCode): string {
   return fanAuthErrorMessages[code];
 }
+
+/**
+ * fan logout failure を UI 表示用メッセージへ変換する。
+ */
+export function getFanLogoutErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    return "ログアウトできませんでした。通信状態を確認してから再度お試しください。";
+  }
+
+  return "ログアウトできませんでした。少し時間を置いてからやり直してください。";
+}
