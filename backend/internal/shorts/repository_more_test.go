@@ -868,7 +868,6 @@ func stringPtr(value string) *string {
 	return &value
 }
 
-
 func timePtr(value time.Time) *time.Time {
 	return &value
 }
