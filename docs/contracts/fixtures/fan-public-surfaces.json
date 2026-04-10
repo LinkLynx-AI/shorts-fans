@@ -57,7 +57,7 @@
         "error": null
       }
     },
-    "recommended_purchased": {
+    "recommended_unlocked": {
       "status": 200,
       "body": {
         "data": {
@@ -105,7 +105,7 @@
           ]
         },
         "meta": {
-          "requestId": "req_feed_recommended_purchased_001",
+          "requestId": "req_feed_recommended_unlocked_001",
           "page": {
             "nextCursor": null,
             "hasNext": false
@@ -199,7 +199,7 @@
         "error": null
       }
     },
-    "short_detail_purchased": {
+    "short_detail_unlocked": {
       "status": 200,
       "body": {
         "data": {
@@ -245,7 +245,7 @@
           }
         },
         "meta": {
-          "requestId": "req_short_detail_purchased_001",
+          "requestId": "req_short_detail_unlocked_001",
           "page": null
         },
         "error": null
@@ -465,7 +465,7 @@
                 "id": "asset_short_mina_rooftop",
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
-                "posterUrl": null,
+                "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
                 "durationSeconds": 16
               },
               "previewDurationSeconds": 16
@@ -478,7 +478,7 @@
                 "id": "asset_short_mina_hotel_mirror",
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-hotel-mirror.mp4",
-                "posterUrl": null,
+                "posterUrl": "https://cdn.example.com/shorts/mina-hotel-mirror-poster.jpg",
                 "durationSeconds": 14
               },
               "previewDurationSeconds": 14
@@ -508,7 +508,7 @@
                 "id": "asset_short_mina_rooftop",
                 "kind": "video",
                 "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
-                "posterUrl": null,
+                "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
                 "durationSeconds": 16
               },
               "previewDurationSeconds": 16

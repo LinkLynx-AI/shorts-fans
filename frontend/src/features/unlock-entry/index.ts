@@ -15,7 +15,6 @@ export type {
   MainAccessEntry,
   MainAccessState,
   MainPlaybackGrantKind,
-  PurchaseState,
   UnlockEntryAction,
   UnlockSetupState,
   UnlockSurfaceModel,

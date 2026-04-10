@@ -40,6 +40,7 @@
 - `data.tab`: request と同じ tab
 - `data.items`: `FeedItem[]`
 - `meta.page`: `CursorPageInfo`
+- `recommended` / `following` ともに返却順は cursor contract だけを固定し、ranking や recommendation algorithm はこの leaf で定義しません。
 
 ### `FeedItem`
 
@@ -77,7 +78,7 @@
 | case | status |
 | --- | --- |
 | normal `public` | `200` |
-| `purchased` | `200` |
+| `unlocked` | `200` |
 | `owner` | `200` |
 | `not_found` | `404` + `not_found` |
 
@@ -187,7 +188,7 @@
 
 ## State Matrix
 
-| endpoint | public | purchased | owner | empty | not_found |
+| endpoint | public | unlocked | owner | empty | not_found |
 | --- | --- | --- | --- | --- | --- |
 | `GET /api/fan/feed` | yes | yes | no | yes | no |
 | `GET /api/fan/shorts/{shortId}` | yes | yes | yes | no | yes |

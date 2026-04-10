@@ -33,10 +33,12 @@
 - [docs/infra/dev-media-smoke.md](docs/infra/dev-media-smoke.md): dev media smoke の再現手順、切り分け、manual recovery、quota/cost 注意点
 - [docs/contracts/mvp-core-domain-contract.md](docs/contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
 - [docs/contracts/mvp-media-workflow-contract.md](docs/contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
+- [docs/contracts/media-display-access-contract.md](docs/contracts/media-display-access-contract.md): delivery-ready asset を public short / main playback / owner preview に出す display/access 境界契約
 - [docs/contracts/fan-auth-api-contract.md](docs/contracts/fan-auth-api-contract.md): fan sign in / sign up / session start / logout の transport 契約
 - [docs/contracts/viewer-bootstrap-api-contract.md](docs/contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [docs/contracts/viewer-creator-entry-api-contract.md](docs/contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [docs/contracts/creator-workspace-api-contract.md](docs/contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
+- [docs/contracts/creator-workspace-owner-preview-api-contract.md](docs/contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail の read 契約
 - [docs/contracts/creator-upload-api-contract.md](docs/contracts/creator-upload-api-contract.md): creator-private な new-package upload の initiation / completion 契約
 - [docs/contracts/fan-mvp-common-transport-contract.md](docs/contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [docs/contracts/fan-public-surface-api-contract.md](docs/contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約

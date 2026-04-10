@@ -42,7 +42,7 @@
 | `main.durationSeconds` | `number` | main length |
 | `creator` | `CreatorSummary` | owner |
 | `entryShort` | `ShortSummary` | main へ戻るときの entry context として使う linked short |
-| `access` | `MainAccessState` | `purchased` または `owner` |
+| `access` | `MainAccessState` | `unlocked` または `owner` |
 
 ### `FollowingItem`
 
@@ -115,6 +115,11 @@
 
 - `data.items`: `LibraryItem[]`
 - `meta.page`: `CursorPageInfo`
+
+#### Interpretation Rules
+
+- `library` は current phase では `session_unlocked` または `owner_preview` で main へ戻れる item の read surface として扱います。
+- 実購買や unlock 永続化は別 leaf の責務とし、この contract では access 語彙だけを固定します。
 
 ### `GET /api/fan/profile/settings`
 

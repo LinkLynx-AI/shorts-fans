@@ -12,26 +12,34 @@ import {
 } from "@/features/unlock-entry";
 import { issueMockSignedToken, verifyMockSignedToken } from "@/shared/lib/mock-signed-token";
 
-const mainAccessRequestSchema = z.object({
+const accessEntryParamsSchema = z.object({
+  mainId: z.string().min(1),
+});
+
+const accessEntryRequestSchema = z.object({
   acceptedAge: z.boolean(),
   acceptedTerms: z.boolean(),
   entryToken: z.string().min(1),
   fromShortId: z.string().min(1),
-  mainId: z.string().min(1),
 });
 
-function buildFallbackHref(fromShortId?: string): string {
-  if (fromShortId && getShortById(fromShortId)) {
-    return `/shorts/${fromShortId}`;
-  }
-
-  return "/";
-}
-
-function buildDeniedResponse(fromShortId?: string, status = 403) {
+function buildErrorResponse(
+  status: number,
+  requestId: string,
+  code: string,
+  message: string,
+) {
   return NextResponse.json(
     {
-      fallbackHref: buildFallbackHref(fromShortId),
+      data: null,
+      meta: {
+        page: null,
+        requestId,
+      },
+      error: {
+        code,
+        message,
+      },
     },
     {
       status,
@@ -39,23 +47,17 @@ function buildDeniedResponse(fromShortId?: string, status = 403) {
   );
 }
 
-function buildAuthRequiredResponse() {
-  return NextResponse.json(
-    {
-      data: null,
-      meta: {
-        page: null,
-        requestId: "req_mock_main_access_auth_required_001",
-      },
-      error: {
-        code: "auth_required",
-        message: "main playback requires authentication",
-      },
+function buildSuccessResponse(href: string) {
+  return NextResponse.json({
+    data: {
+      href,
     },
-    {
-      status: 401,
+    meta: {
+      page: null,
+      requestId: "req_main_access_entry_issued_001",
     },
-  );
+    error: null,
+  });
 }
 
 function resolveGrantKind(
@@ -74,13 +76,13 @@ function resolveGrantKind(
       return "owner";
     case "continue_main":
     case "unlock_available":
-      return "purchased";
+      return "unlocked";
     case "setup_required":
       if (
         (!unlock.setup.requiresAgeConfirmation || acceptedAge) &&
         (!unlock.setup.requiresTermsAcceptance || acceptedTerms)
       ) {
-        return "purchased";
+        return "unlocked";
       }
 
       return null;
@@ -92,31 +94,65 @@ function resolveGrantKind(
 /**
  * main 再生用の signed grant を発行する。
  */
-export async function POST(request: NextRequest) {
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ mainId: string }> },
+) {
   const sessionToken = request.cookies.get(viewerSessionCookieName)?.value;
 
   if (!sessionToken) {
-    return buildAuthRequiredResponse();
+    return buildErrorResponse(
+      401,
+      "req_main_access_entry_auth_required_001",
+      "auth_required",
+      "main playback requires authentication",
+    );
   }
 
   const currentViewer = await getCurrentViewerBootstrap({ sessionToken }).catch(() => null);
 
   if (!currentViewer) {
-    return buildAuthRequiredResponse();
+    return buildErrorResponse(
+      401,
+      "req_main_access_entry_auth_required_001",
+      "auth_required",
+      "main playback requires authentication",
+    );
   }
 
-  const parsedBody = mainAccessRequestSchema.safeParse(await request.json().catch(() => null));
+  const parsedParams = accessEntryParamsSchema.safeParse(await context.params);
+
+  if (!parsedParams.success) {
+    return buildErrorResponse(
+      404,
+      "req_main_access_entry_not_found_001",
+      "not_found",
+      "main or short was not found",
+    );
+  }
+
+  const parsedBody = accessEntryRequestSchema.safeParse(await request.json().catch(() => null));
 
   if (!parsedBody.success) {
-    return buildDeniedResponse(undefined, 400);
+    return buildErrorResponse(
+      400,
+      "req_main_access_entry_invalid_request_001",
+      "invalid_request",
+      "main access entry request was invalid",
+    );
   }
 
-  const { acceptedAge, acceptedTerms, entryToken, fromShortId, mainId } = parsedBody.data;
-
+  const { mainId } = parsedParams.data;
+  const { acceptedAge, acceptedTerms, entryToken, fromShortId } = parsedBody.data;
   const entryShort = getShortById(fromShortId);
 
   if (!entryShort || entryShort.canonicalMainId !== mainId) {
-    return buildDeniedResponse(fromShortId, 404);
+    return buildErrorResponse(
+      404,
+      "req_main_access_entry_not_found_001",
+      "not_found",
+      "main or short was not found",
+    );
   }
 
   const hasValidEntryToken = verifyMockSignedToken(
@@ -125,20 +161,28 @@ export async function POST(request: NextRequest) {
   );
 
   if (!hasValidEntryToken) {
-    return buildDeniedResponse(fromShortId);
+    return buildErrorResponse(
+      403,
+      "req_main_access_entry_locked_001",
+      "main_locked",
+      "main access entry could not be issued",
+    );
   }
 
   const grantKind = resolveGrantKind(fromShortId, acceptedAge, acceptedTerms);
 
   if (!grantKind) {
-    return buildDeniedResponse(fromShortId);
+    return buildErrorResponse(
+      403,
+      "req_main_access_entry_locked_001",
+      "main_locked",
+      "main access entry could not be issued",
+    );
   }
 
   const grantToken = issueMockSignedToken(
     buildMockMainPlaybackGrantContext(mainId, fromShortId, grantKind),
   );
 
-  return NextResponse.json({
-    href: getMainPlaybackHref(mainId, fromShortId, grantToken),
-  });
+  return buildSuccessResponse(getMainPlaybackHref(mainId, fromShortId, grantToken));
 }

@@ -1,0 +1,178 @@
+{
+  "GET /api/creator/workspace/shorts": {
+    "list_populated": {
+      "status": 200,
+      "body": {
+        "data": {
+          "items": [
+            {
+              "id": "short_aoi_balcony_cut",
+              "canonicalMainId": "main_aoi_blue_balcony",
+              "title": "balcony cut preview",
+              "media": {
+                "id": "asset_short_aoi_balcony_cut",
+                "kind": "video",
+                "url": "https://cdn.example.com/creator/preview/shorts/aoi-balcony.mp4",
+                "posterUrl": "https://cdn.example.com/creator/preview/shorts/aoi-balcony-poster.jpg",
+                "durationSeconds": 15
+              },
+              "previewDurationSeconds": 15
+            }
+          ]
+        },
+        "meta": {
+          "requestId": "req_creator_owner_preview_shorts_001",
+          "page": {
+            "nextCursor": null,
+            "hasNext": false
+          }
+        },
+        "error": null
+      }
+    }
+  },
+  "GET /api/creator/workspace/mains": {
+    "list_populated": {
+      "status": 200,
+      "body": {
+        "data": {
+          "items": [
+            {
+              "id": "main_aoi_blue_balcony",
+              "leadShortId": "short_aoi_balcony_cut",
+              "title": "blue balcony main",
+              "media": {
+                "id": "asset_main_aoi_blue_balcony_preview",
+                "kind": "video",
+                "url": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony.mp4",
+                "posterUrl": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony-poster.jpg",
+                "durationSeconds": 720
+              },
+              "durationSeconds": 720,
+              "priceJpy": 2200
+            }
+          ]
+        },
+        "meta": {
+          "requestId": "req_creator_owner_preview_mains_001",
+          "page": {
+            "nextCursor": null,
+            "hasNext": false
+          }
+        },
+        "error": null
+      }
+    }
+  },
+  "GET /api/creator/workspace/shorts/{shortId}/preview": {
+    "preview_normal": {
+      "status": 200,
+      "body": {
+        "data": {
+          "preview": {
+            "short": {
+              "id": "short_aoi_balcony_cut",
+              "canonicalMainId": "main_aoi_blue_balcony",
+              "creatorId": "creator_aoi_n",
+              "title": "balcony cut preview",
+              "caption": "blue tone の balcony preview。",
+              "media": {
+                "id": "asset_short_aoi_balcony_cut",
+                "kind": "video",
+                "url": "https://cdn.example.com/creator/preview/shorts/aoi-balcony.mp4",
+                "posterUrl": "https://cdn.example.com/creator/preview/shorts/aoi-balcony-poster.jpg",
+                "durationSeconds": 15
+              },
+              "previewDurationSeconds": 15
+            },
+            "creator": {
+              "id": "creator_aoi_n",
+              "displayName": "Aoi N",
+              "handle": "@aoina",
+              "avatar": {
+                "id": "asset_creator_aoi_avatar",
+                "kind": "image",
+                "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "bio": "soft light と close framing の short を中心に更新中。"
+            },
+            "access": {
+              "mainId": "main_aoi_blue_balcony",
+              "status": "owner",
+              "reason": "owner_preview"
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_owner_preview_short_detail_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "GET /api/creator/workspace/mains/{mainId}/preview": {
+    "preview_normal": {
+      "status": 200,
+      "body": {
+        "data": {
+          "preview": {
+            "main": {
+              "id": "main_aoi_blue_balcony",
+              "title": "blue balcony main",
+              "media": {
+                "id": "asset_main_aoi_blue_balcony_preview",
+                "kind": "video",
+                "url": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony.mp4",
+                "posterUrl": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony-poster.jpg",
+                "durationSeconds": 720
+              },
+              "durationSeconds": 720,
+              "priceJpy": 2200
+            },
+            "creator": {
+              "id": "creator_aoi_n",
+              "displayName": "Aoi N",
+              "handle": "@aoina",
+              "avatar": {
+                "id": "asset_creator_aoi_avatar",
+                "kind": "image",
+                "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "bio": "soft light と close framing の short を中心に更新中。"
+            },
+            "access": {
+              "mainId": "main_aoi_blue_balcony",
+              "status": "owner",
+              "reason": "owner_preview"
+            },
+            "entryShort": {
+              "id": "short_aoi_balcony_cut",
+              "canonicalMainId": "main_aoi_blue_balcony",
+              "creatorId": "creator_aoi_n",
+              "title": "balcony cut preview",
+              "caption": "blue tone の balcony preview。",
+              "media": {
+                "id": "asset_short_aoi_balcony_cut",
+                "kind": "video",
+                "url": "https://cdn.example.com/creator/preview/shorts/aoi-balcony.mp4",
+                "posterUrl": "https://cdn.example.com/creator/preview/shorts/aoi-balcony-poster.jpg",
+                "durationSeconds": 15
+              },
+              "previewDurationSeconds": 15
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_owner_preview_main_detail_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  }
+}

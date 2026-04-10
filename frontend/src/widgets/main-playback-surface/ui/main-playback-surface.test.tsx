@@ -22,7 +22,7 @@ describe("MainPlaybackSurface", () => {
   });
 
   it("renders playback status and falls back to the provided short when there is no browser history", async () => {
-    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "purchased");
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
 
     expect(surface).toBeDefined();
 
@@ -36,7 +36,7 @@ describe("MainPlaybackSurface", () => {
 
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.getByText("Playing main")).toBeInTheDocument();
-    expect(screen.getByText("resume without another confirmation")).toBeInTheDocument();
+    expect(screen.getByText("resume without another unlock step")).toBeInTheDocument();
     expect(screen.getByText("3:18")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pin short" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute(
@@ -68,7 +68,7 @@ describe("MainPlaybackSurface", () => {
     render(<MainPlaybackSurface fallbackHref="/shorts/balcony" surface={surface} />);
 
     expect(screen.getAllByText("Owner preview")).toHaveLength(2);
-    expect(screen.getByText("purchase confirmation is skipped for your own main")).toBeInTheDocument();
+    expect(screen.getByText("unlock confirmation is skipped for your own main")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));

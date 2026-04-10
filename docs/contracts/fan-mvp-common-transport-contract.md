@@ -9,8 +9,8 @@
 ## Goals
 
 - fan MVP surface で共通に使う DTO と response envelope を固定する。
-- `public / locked / purchased / owner / empty / not_found` の scenario vocabulary を統一する。
-- frontend が UI copy を組み立てやすい raw 値を返し、backend が UI 固有文字列を持ち込まない境界を作る。
+- `public / locked / unlocked / owner / empty / not_found` の scenario vocabulary を統一する。
+- frontend が UI copy を組み立てやすい raw 値を返し、backend が UI 固有文字列や billing 実行結果を持ち込まない境界を作る。
 
 ## Non-goals
 
@@ -18,6 +18,7 @@
 - mutation API
 - DB schema や storage 都合の field
 - ranking、recommendation、payment provider 固有の metadata
+- actual billing 実行や unlock 永続化
 - 認証 viewer 自身の profile / session / active mode のような app shell global state
 
 ## Viewer State Boundary
@@ -28,6 +29,7 @@
 
 ## Canonical Sources
 
+- `docs/contracts/media-display-access-contract.md`
 - `docs/contracts/mvp-core-domain-contract.md`
 - `docs/ssot/product/fan/fan-journey.md`
 - `docs/ssot/product/ui/fan-surfaces.md`
@@ -89,22 +91,32 @@
 | --- | --- |
 | `public` | public surface をそのまま閲覧できる正常系 |
 | `locked` | canonical main は存在するが viewer は再生できない |
-| `purchased` | viewer が canonical main の paid access を持つ |
+| `unlocked` | viewer が current session で canonical main へ進める |
 | `owner` | viewer が creator owner として preview access を持つ |
 | `empty` | request 自体は成功したが items が 0 件 |
 | `not_found` | 対象 resource が存在しない、または見せるべきではない |
 
 ## Common DTOs
 
-### `MediaAsset`
+### `ImageAsset`
 
 | field | type | notes |
 | --- | --- | --- |
 | `id` | `string` | asset identifier |
-| `kind` | `"image" \| "video"` | MVP では avatar は `image`、short / main は `video` |
-| `url` | `string` | public または signed URL。client は opaque に扱う |
-| `posterUrl` | `string \| null` | `video` の preview poster。`image` では `null` |
-| `durationSeconds` | `number \| null` | `video` だけ値を持つ |
+| `kind` | `"image"` | avatar などの image asset |
+| `url` | `string` | display URL。client は opaque に扱う |
+| `posterUrl` | `null` | image asset では常に `null` |
+| `durationSeconds` | `null` | image asset では常に `null` |
+
+### `VideoDisplayAsset`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | asset identifier |
+| `kind` | `"video"` | short / main display asset |
+| `url` | `string` | public または signed playback URL。client は opaque に扱う |
+| `posterUrl` | `string` | preview poster URL |
+| `durationSeconds` | `number` | delivery-ready 後の確定秒数 |
 
 - fan-facing surface は SSOT 上 `縦型固定` なので、layout 計算用の `width / height` は transport contract に含めません。
 
@@ -115,7 +127,7 @@
 | `id` | `string` | creator identifier |
 | `displayName` | `string` | public display name |
 | `handle` | `string` | creator search 用の public identifier。core domain minimum を広げる目的ではなく transport 用にだけ持つ |
-| `avatar` | `MediaAsset \| null` | custom avatar がある場合は `kind = "image"`。ない場合は `null` を返し、client が platform default avatar を描画する |
+| `avatar` | `ImageAsset \| null` | custom avatar がある場合だけ返す |
 | `bio` | `string` | public creator bio |
 
 ### `ShortSummary`
@@ -127,7 +139,7 @@
 | `creatorId` | `string` | short owner |
 | `title` | `string` | short title |
 | `caption` | `string` | public caption |
-| `media` | `MediaAsset` | `kind = "video"` |
+| `media` | `VideoDisplayAsset` | public short playback asset |
 | `previewDurationSeconds` | `number` | short 自身の長さ |
 
 ### `ShortDetail`
@@ -140,27 +152,20 @@
 | `viewer.isFollowingCreator` | `boolean` | follow state |
 | `unlockCta` | `UnlockCtaState` | short detail から見える CTA 状態 |
 
-### `PurchaseState`
-
-| field | type | notes |
-| --- | --- | --- |
-| `mainId` | `string` | canonical main identifier |
-| `status` | `"not_purchased" \| "purchased"` | creator ownership はここに混ぜない |
-
 ### `MainAccessState`
 
 | field | type | notes |
 | --- | --- | --- |
 | `mainId` | `string` | canonical main identifier |
-| `status` | `"locked" \| "purchased" \| "owner"` | playback 可否に使う state |
-| `reason` | `"purchase_required" \| "purchased_access" \| "owner_preview"` | `status` の解釈を固定する最小 field |
+| `status` | `"locked" \| "unlocked" \| "owner"` | playback 可否に使う state |
+| `reason` | `"unlock_required" \| "session_unlocked" \| "owner_preview"` | `status` の解釈を固定する最小 field |
 
 ### `UnlockCtaState`
 
 | field | type | notes |
 | --- | --- | --- |
 | `state` | `"unlock_available" \| "setup_required" \| "continue_main" \| "owner_preview" \| "unavailable"` | frontend はこの state から CTA label を組み立てる |
-| `priceJpy` | `number \| null` | `setup_required` と `unlock_available` で必須 |
+| `priceJpy` | `number \| null` | `setup_required` と `unlock_available` で必須。現段階では reference price としてだけ使う |
 | `mainDurationSeconds` | `number \| null` | `setup_required` と `unlock_available` で必須 |
 | `resumePositionSeconds` | `number \| null` | `continue_main` で使う。その他は `null` |
 
@@ -176,6 +181,7 @@
 - 金額は `priceJpy` の整数値で返し、`¥2,200` のような UI copy は frontend が組み立てます。
 - 長さや進捗は `number` 秒で返し、`12分` や `5:12 left` のような表示文字列は frontend が組み立てます。
 - backend は `Unlock` や `Continue main` のような UI 固有文言を返しません。
+- asset URL は storage layer や CDN 実装を隠蔽する opaque value として扱い、client は path 推測や書き換えをしません。
 
 ## Fixture Reference
 
