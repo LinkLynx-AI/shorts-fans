@@ -51,6 +51,7 @@ func (c Config) Validate() error {
 
 type objectAPI interface {
 	PutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.Options)) (*awss3.PutObjectOutput, error)
+	CopyObject(ctx context.Context, params *awss3.CopyObjectInput, optFns ...func(*awss3.Options)) (*awss3.CopyObjectOutput, error)
 	DeleteObject(ctx context.Context, params *awss3.DeleteObjectInput, optFns ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error)
 	GetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.Options)) (*awss3.GetObjectOutput, error)
 	HeadObject(ctx context.Context, params *awss3.HeadObjectInput, optFns ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error)
@@ -110,6 +111,38 @@ func (c *Client) PutObject(ctx context.Context, bucket string, key string, body 
 	})
 	if err != nil {
 		return fmt.Errorf("put object bucket=%s key=%s: %w", bucket, key, err)
+	}
+
+	return nil
+}
+
+// CopyObject は object を別 key へ複製します。
+func (c *Client) CopyObject(ctx context.Context, sourceBucket string, sourceKey string, destinationBucket string, destinationKey string) error {
+	if c == nil {
+		return fmt.Errorf("s3 client is nil")
+	}
+	if err := validateBucketAndKey(sourceBucket, sourceKey); err != nil {
+		return fmt.Errorf("source: %w", err)
+	}
+	if err := validateBucketAndKey(destinationBucket, destinationKey); err != nil {
+		return fmt.Errorf("destination: %w", err)
+	}
+
+	copySource := strings.TrimLeft(strings.TrimSpace(sourceBucket)+"/"+strings.TrimLeft(strings.TrimSpace(sourceKey), "/"), "/")
+	_, err := c.api.CopyObject(ctx, &awss3.CopyObjectInput{
+		Bucket:     aws.String(destinationBucket),
+		Key:        aws.String(destinationKey),
+		CopySource: aws.String(copySource),
+	})
+	if err != nil {
+		return fmt.Errorf(
+			"copy object source_bucket=%s source_key=%s destination_bucket=%s destination_key=%s: %w",
+			sourceBucket,
+			sourceKey,
+			destinationBucket,
+			destinationKey,
+			err,
+		)
 	}
 
 	return nil

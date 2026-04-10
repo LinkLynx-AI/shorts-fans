@@ -22,6 +22,14 @@ func (s stubQueueLister) ListQueues(context.Context, *awsmc.ListQueuesInput, ...
 	return s.output, nil
 }
 
+func (stubQueueLister) CreateJob(context.Context, *awsmc.CreateJobInput, ...func(*awsmc.Options)) (*awsmc.CreateJobOutput, error) {
+	return &awsmc.CreateJobOutput{}, nil
+}
+
+func (stubQueueLister) GetJob(context.Context, *awsmc.GetJobInput, ...func(*awsmc.Options)) (*awsmc.GetJobOutput, error) {
+	return &awsmc.GetJobOutput{}, nil
+}
+
 func TestConfigValidate(t *testing.T) {
 	t.Parallel()
 

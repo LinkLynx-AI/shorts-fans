@@ -145,6 +145,33 @@ func (q *Queries) GetShortByID(ctx context.Context, id pgtype.UUID) (AppShort, e
 	return i, err
 }
 
+const getShortByMediaAssetID = `-- name: GetShortByMediaAssetID :one
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+FROM app.shorts
+WHERE media_asset_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetShortByMediaAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (AppShort, error) {
+	row := q.db.QueryRow(ctx, getShortByMediaAssetID, mediaAssetID)
+	var i AppShort
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.CanonicalMainID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.ApprovedForPublishAt,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Caption,
+	)
+	return i, err
+}
+
 const listCreatorProfileShortGridItems = `-- name: ListCreatorProfileShortGridItems :many
 SELECT
     s.id,

@@ -28,6 +28,12 @@ FROM app.shorts
 WHERE id = $1
 LIMIT 1;
 
+-- name: GetShortByMediaAssetID :one
+SELECT *
+FROM app.shorts
+WHERE media_asset_id = $1
+LIMIT 1;
+
 -- name: ListShortsByCreatorUserID :many
 SELECT *
 FROM app.shorts

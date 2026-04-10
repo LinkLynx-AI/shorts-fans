@@ -18,6 +18,8 @@ import (
 type stubObjectAPI struct {
 	putInput    *awss3.PutObjectInput
 	putErr      error
+	copyInput   *awss3.CopyObjectInput
+	copyErr     error
 	deleteInput *awss3.DeleteObjectInput
 	deleteErr   error
 	getInput    *awss3.GetObjectInput
@@ -31,6 +33,11 @@ type stubObjectAPI struct {
 func (s *stubObjectAPI) PutObject(_ context.Context, params *awss3.PutObjectInput, _ ...func(*awss3.Options)) (*awss3.PutObjectOutput, error) {
 	s.putInput = params
 	return &awss3.PutObjectOutput{}, s.putErr
+}
+
+func (s *stubObjectAPI) CopyObject(_ context.Context, params *awss3.CopyObjectInput, _ ...func(*awss3.Options)) (*awss3.CopyObjectOutput, error) {
+	s.copyInput = params
+	return &awss3.CopyObjectOutput{}, s.copyErr
 }
 
 func (s *stubObjectAPI) DeleteObject(_ context.Context, params *awss3.DeleteObjectInput, _ ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error) {
@@ -143,6 +150,27 @@ func TestDeleteObject(t *testing.T) {
 	}
 	if got, want := *api.deleteInput.Key, "probe/main.m3u8"; got != want {
 		t.Fatalf("DeleteObject() key got %q want %q", got, want)
+	}
+}
+
+func TestCopyObject(t *testing.T) {
+	t.Parallel()
+
+	api := &stubObjectAPI{}
+	client := newClient(api, &stubPresignAPI{})
+
+	if err := client.CopyObject(context.Background(), "main-bucket", "mains/source.jpg", "main-bucket", "mains/target.jpg"); err != nil {
+		t.Fatalf("CopyObject() error = %v, want nil", err)
+	}
+
+	if got, want := aws.ToString(api.copyInput.Bucket), "main-bucket"; got != want {
+		t.Fatalf("CopyObject() destination bucket got %q want %q", got, want)
+	}
+	if got, want := aws.ToString(api.copyInput.Key), "mains/target.jpg"; got != want {
+		t.Fatalf("CopyObject() destination key got %q want %q", got, want)
+	}
+	if got, want := aws.ToString(api.copyInput.CopySource), "main-bucket/mains/source.jpg"; got != want {
+		t.Fatalf("CopyObject() copy source got %q want %q", got, want)
 	}
 }
 
