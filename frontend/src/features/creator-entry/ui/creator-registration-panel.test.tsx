@@ -1,3 +1,5 @@
+import type { ComponentProps } from "react";
+
 import userEvent from "@testing-library/user-event";
 import {
   render,
@@ -66,17 +68,25 @@ function createAvatarFile(name: string, type = "image/png", body = "avatar"): Fi
   return new File([body], name, { type });
 }
 
-function renderPanel() {
+function renderPanel({
+  currentViewer = {
+    activeMode: "fan" as const,
+    canAccessCreatorMode: false,
+    id: "viewer_123",
+  },
+  panelProps,
+}: {
+  currentViewer?: {
+    activeMode: "creator" | "fan";
+    canAccessCreatorMode: boolean;
+    id: string;
+  };
+  panelProps?: ComponentProps<typeof CreatorRegistrationPanel>;
+} = {}) {
   return render(
     <ViewerSessionProvider hasSession>
-      <CurrentViewerProvider
-        currentViewer={{
-          activeMode: "fan",
-          canAccessCreatorMode: false,
-          id: "viewer_123",
-        }}
-      >
-        <CreatorRegistrationPanel />
+      <CurrentViewerProvider currentViewer={currentViewer}>
+        <CreatorRegistrationPanel {...panelProps} />
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
@@ -156,6 +166,52 @@ describe("CreatorRegistrationPanel", () => {
         credentials: "include",
       });
       expect(mockedRouter.push).toHaveBeenCalledWith("/fan/creator/success");
+    });
+    expect(createCreatorRegistrationAvatarUpload).not.toHaveBeenCalled();
+  });
+
+  it("prefills edit mode values and returns to workspace after saving", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(registerCreator).mockResolvedValue(undefined);
+
+    renderPanel({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      panelProps: {
+        initialValues: {
+          avatarUrl: "https://cdn.example.com/creator/mina/avatar.jpg",
+          bio: "contract-backed creator bio",
+          displayName: "Contract Mina",
+          handle: "@contractmina",
+        },
+        mode: "edit",
+      },
+    });
+
+    expect(screen.getByRole("heading", { name: "プロフィールを編集" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Display name" })).toHaveValue("Contract Mina");
+    expect(screen.getByRole("textbox", { name: "Handle" })).toHaveValue("@contractmina");
+    expect(screen.getByRole("textbox", { name: "Bio" })).toHaveValue("contract-backed creator bio");
+    expect(screen.getByRole("img", { name: "選択した avatar プレビュー" })).toHaveStyle({
+      backgroundImage: 'url("https://cdn.example.com/creator/mina/avatar.jpg")',
+    });
+
+    await user.clear(screen.getByRole("textbox", { name: "Bio" }));
+    await user.type(screen.getByRole("textbox", { name: "Bio" }), "updated creator bio");
+    await user.click(screen.getByRole("button", { name: "保存する" }));
+
+    await waitFor(() => {
+      expect(registerCreator).toHaveBeenCalledWith({
+        bio: "updated creator bio",
+        displayName: "Contract Mina",
+        handle: "@contractmina",
+      });
+      expect(getCurrentViewerBootstrap).not.toHaveBeenCalled();
+      expect(mockedRouter.replace).toHaveBeenCalledWith("/creator");
     });
     expect(createCreatorRegistrationAvatarUpload).not.toHaveBeenCalled();
   });

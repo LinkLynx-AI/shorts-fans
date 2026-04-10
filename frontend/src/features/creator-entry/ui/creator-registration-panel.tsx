@@ -19,7 +19,16 @@ import {
   SurfacePanel,
 } from "@/shared/ui";
 
-import { useCreatorRegistration } from "../model/use-creator-registration";
+import {
+  useCreatorRegistration,
+  type CreatorRegistrationFormMode,
+  type CreatorRegistrationInitialValues,
+} from "../model/use-creator-registration";
+
+type CreatorRegistrationPanelProps = {
+  initialValues?: CreatorRegistrationInitialValues;
+  mode?: CreatorRegistrationFormMode;
+};
 
 function buildAvatarSurfaceClasses(kind: "empty" | "invalid" | "selected" | "uploading" | "completed" | "failed") {
   switch (kind) {
@@ -79,7 +88,31 @@ function buildAvatarTitle(fileName: string | null) {
 /**
  * fan profile から始める creator registration form を表示する。
  */
-export function CreatorRegistrationPanel() {
+export function CreatorRegistrationPanel({
+  initialValues,
+  mode = "register",
+}: CreatorRegistrationPanelProps = {}) {
+  const content = mode === "edit"
+    ? {
+        backHref: "/creator",
+        backLabel: "ワークスペースへ戻る",
+        description:
+          "workspace に表示する名前、handle、自己紹介、avatar を更新できます。avatar を変更しない場合は現在の画像を維持します。",
+        eyebrow: "creator settings",
+        submitLabel: "保存する",
+        submittingLabel: "保存中...",
+        title: "プロフィールを編集",
+      }
+    : {
+        backHref: "/fan",
+        backLabel: "あとで戻る",
+        description:
+          "この最小実装では申込完了後すぐに creator mode を使えます。ここでは表示名、unique な handle、自己紹介に加えて、任意で avatar を登録時にアップロードできます。",
+        eyebrow: "creator entry",
+        submitLabel: "申し込む",
+        submittingLabel: "登録中...",
+        title: "Creator登録を始める",
+      };
   const {
     avatar,
     avatarInputKey,
@@ -94,21 +127,23 @@ export function CreatorRegistrationPanel() {
     setDisplayName,
     setHandle,
     submit,
-  } = useCreatorRegistration();
+  } = useCreatorRegistration({
+    ...(initialValues ? { initialValues } : {}),
+    mode,
+  });
   const avatarMonogram = displayName.trim() === "" ? "ME" : getCreatorInitials(displayName);
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-[408px] flex-col px-4 pb-28 pt-5">
       <SurfacePanel className="w-full px-5 py-6 text-foreground">
         <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">
-          creator entry
+          {content.eyebrow}
         </p>
         <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
-          Creator登録を始める
+          {content.title}
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          この最小実装では申込完了後すぐに creator mode を使えます。ここでは表示名、unique な handle、
-          自己紹介に加えて、任意で avatar を登録時にアップロードできます。
+          {content.description}
         </p>
 
         <form
@@ -276,13 +311,13 @@ export function CreatorRegistrationPanel() {
           ) : null}
 
           <Button className="w-full" disabled={isSubmitting} type="submit">
-            {isSubmitting ? "登録中..." : "申し込む"}
+            {isSubmitting ? content.submittingLabel : content.submitLabel}
           </Button>
         </form>
 
         <div className="mt-3">
           <Button asChild className="w-full" disabled={isSubmitting} variant="secondary">
-            <Link href="/fan">あとで戻る</Link>
+            <Link href={content.backHref}>{content.backLabel}</Link>
           </Button>
         </div>
       </SurfacePanel>

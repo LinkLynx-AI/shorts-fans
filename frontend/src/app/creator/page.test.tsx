@@ -198,6 +198,10 @@ describe("CreatorPage", () => {
 
     await screen.findByText("@minarei");
     await user.click(screen.getByRole("button", { name: "Account menu" }));
+    expect(screen.getByRole("link", { name: "プロフィールを編集" })).toHaveAttribute(
+      "href",
+      "/creator/settings/profile",
+    );
     await user.click(screen.getByRole("button", { name: "Fan mode に切り替え" }));
 
     expect(switchViewerActiveMode).toHaveBeenCalledWith("fan");

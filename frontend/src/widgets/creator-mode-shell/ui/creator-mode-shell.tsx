@@ -184,8 +184,17 @@ function CreatorWorkspaceAccountMenu() {
           />
 
           <div className="rounded-[24px] bg-[#f3f6f8] py-1">
+            <Dialog.Close asChild>
+              <Link
+                className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
+                href="/creator/settings/profile"
+              >
+                <span>プロフィールを編集</span>
+                <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+              </Link>
+            </Dialog.Close>
             <button
-              className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
+              className="flex min-h-[54px] w-full items-center justify-between border-t border-[rgba(167,220,249,0.24)] px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
               disabled={isSubmitting}
               onClick={() => {
                 void enterFanMode();

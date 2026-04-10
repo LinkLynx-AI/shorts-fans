@@ -32,6 +32,15 @@ const creatorRegistrationAvatarMaxFileSizeBytes = 5_242_880;
 const creatorRegistrationInvalidCompletedAvatarMessage =
   "avatar upload の有効期限が切れました。再度申し込むともう一度アップロードします。";
 
+export type CreatorRegistrationFormMode = "edit" | "register";
+
+export type CreatorRegistrationInitialValues = {
+  avatarUrl: string | null;
+  bio: string;
+  displayName: string;
+  handle: string;
+};
+
 type CompletedAvatarUpload = {
   avatarAssetID: string;
   avatarUploadToken: string;
@@ -70,6 +79,18 @@ type UseCreatorRegistrationResult = {
   setDisplayName: (displayName: string) => void;
   setHandle: (handle: string) => void;
   submit: () => Promise<void>;
+};
+
+type UseCreatorRegistrationOptions = {
+  initialValues?: CreatorRegistrationInitialValues;
+  mode?: CreatorRegistrationFormMode;
+};
+
+const defaultCreatorRegistrationInitialValues: CreatorRegistrationInitialValues = {
+  avatarUrl: null,
+  bio: "",
+  displayName: "",
+  handle: "",
 };
 
 function validateAvatarFile(file: File): string | null {
@@ -118,17 +139,31 @@ function getAvatarPreviewFile(state: CreatorRegistrationAvatarState): File | nul
 function buildAvatarField(
   state: CreatorRegistrationAvatarState,
   previewUrl: string | null,
+  {
+    mode,
+    persistedAvatarUrl,
+  }: {
+    mode: CreatorRegistrationFormMode;
+    persistedAvatarUrl: string | null;
+  },
 ): CreatorRegistrationAvatarField {
+  const hasPersistedAvatar = mode === "edit" && persistedAvatarUrl !== null;
+  const resolvedPreviewUrl = previewUrl ?? (hasPersistedAvatar ? persistedAvatarUrl : null);
+
   switch (state.kind) {
     case "empty":
       return {
         canClear: false,
-        fileName: null,
+        fileName: hasPersistedAvatar ? "現在の avatar" : null,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
-        kind: "empty",
-        message: "未設定でも登録できます。",
-        previewUrl,
+        kind: hasPersistedAvatar ? "completed" : "empty",
+        message: hasPersistedAvatar
+          ? "現在の avatar を使用します。"
+          : mode === "edit"
+            ? "未設定のまま保存できます。"
+            : "未設定でも登録できます。",
+        previewUrl: resolvedPreviewUrl,
       };
     case "invalid":
       return {
@@ -138,7 +173,7 @@ function buildAvatarField(
         isError: true,
         kind: "invalid",
         message: state.message,
-        previewUrl,
+        previewUrl: resolvedPreviewUrl,
       };
     case "selected":
       return {
@@ -147,8 +182,8 @@ function buildAvatarField(
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
         kind: "selected",
-        message: "登録時にアップロードします。",
-        previewUrl,
+        message: mode === "edit" ? "保存時にアップロードします。" : "登録時にアップロードします。",
+        previewUrl: resolvedPreviewUrl,
       };
     case "uploading":
       return {
@@ -158,7 +193,7 @@ function buildAvatarField(
         isError: false,
         kind: "uploading",
         message: "アップロードしています。",
-        previewUrl,
+        previewUrl: resolvedPreviewUrl,
       };
     case "completed":
       return {
@@ -168,7 +203,7 @@ function buildAvatarField(
         isError: false,
         kind: "completed",
         message: "アップロード済みです。",
-        previewUrl,
+        previewUrl: resolvedPreviewUrl,
       };
     case "failed":
       return {
@@ -178,7 +213,7 @@ function buildAvatarField(
         isError: true,
         kind: "failed",
         message: state.message,
-        previewUrl,
+        previewUrl: resolvedPreviewUrl,
       };
   }
 }
@@ -186,13 +221,16 @@ function buildAvatarField(
 /**
  * creator registration form の入力状態と submit を管理する。
  */
-export function useCreatorRegistration(): UseCreatorRegistrationResult {
+export function useCreatorRegistration({
+  initialValues = defaultCreatorRegistrationInitialValues,
+  mode = "register",
+}: UseCreatorRegistrationOptions = {}): UseCreatorRegistrationResult {
   const router = useRouter();
   const setCurrentViewer = useSetCurrentViewer();
   const setViewerSession = useSetViewerSession();
-  const [bio, setBioState] = useState("");
-  const [displayName, setDisplayNameState] = useState("");
-  const [handle, setHandleState] = useState("");
+  const [bio, setBioState] = useState(initialValues.bio);
+  const [displayName, setDisplayNameState] = useState(initialValues.displayName);
+  const [handle, setHandleState] = useState(initialValues.handle);
   const [avatarState, setAvatarState] = useState<CreatorRegistrationAvatarState>({ kind: "empty" });
   const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarInputKey, setAvatarInputKey] = useState(0);
@@ -381,6 +419,13 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
         handle,
       });
 
+      if (mode === "edit") {
+        startTransition(() => {
+          router.replace("/creator");
+        });
+        return;
+      }
+
       const currentViewer = await getCurrentViewerBootstrap({
         credentials: "include",
       }).catch(() => null);
@@ -407,7 +452,10 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   };
 
   return {
-    avatar: buildAvatarField(avatarState, avatarPreviewUrl),
+    avatar: buildAvatarField(avatarState, avatarPreviewUrl, {
+      mode,
+      persistedAvatarUrl: initialValues.avatarUrl,
+    }),
     avatarInputKey,
     bio,
     clearAvatarSelection,
