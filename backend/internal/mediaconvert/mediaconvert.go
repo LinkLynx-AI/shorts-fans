@@ -2,6 +2,7 @@ package mediaconvert
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 
 const (
 	defaultPollInterval              = 5 * time.Second
+	defaultMaterializeTimeout        = 30 * time.Minute
 	defaultPosterFrameSequence       = ".0000000.jpg"
 	defaultH264MaxBitrate      int32 = 5_000_000
 	defaultAACBitrate          int32 = 96_000
@@ -46,6 +48,7 @@ type api interface {
 type Client struct {
 	api          api
 	pollInterval time.Duration
+	maxJobWait   time.Duration
 }
 
 // MaterializeRequest は raw video を delivery-ready asset へ変換する入力です。
@@ -103,6 +106,7 @@ func newClient(api api) *Client {
 	return &Client{
 		api:          api,
 		pollInterval: defaultPollInterval,
+		maxJobWait:   defaultMaterializeTimeout,
 	}
 }
 
@@ -157,8 +161,18 @@ func (c *Client) MaterializeVideo(ctx context.Context, req MaterializeRequest) (
 		return MaterializeResult{}, fmt.Errorf("mediaconvert create job returned empty job id")
 	}
 
-	job, err := c.waitForJob(ctx, jobID)
+	waitCtx, cancel, deadlineAdded := materializeContext(ctx, c.maxJobWait)
+	defer cancel()
+
+	job, err := c.waitForJob(waitCtx, jobID)
 	if err != nil {
+		if deadlineAdded && errors.Is(err, context.DeadlineExceeded) {
+			return MaterializeResult{}, &JobError{
+				Code:      "mediaconvert_wait_timeout",
+				Message:   fmt.Sprintf("job %s did not complete within %s", jobID, c.maxJobWait),
+				Retryable: true,
+			}
+		}
 		return MaterializeResult{}, err
 	}
 
@@ -226,6 +240,18 @@ func buildCreateJobInput(req MaterializeRequest) *awsmc.CreateJobInput {
 			},
 		},
 	}
+}
+
+func materializeContext(ctx context.Context, maxWait time.Duration) (context.Context, context.CancelFunc, bool) {
+	if maxWait <= 0 {
+		return ctx, func() {}, false
+	}
+	if _, ok := ctx.Deadline(); ok {
+		return ctx, func() {}, false
+	}
+
+	derived, cancel := context.WithTimeout(ctx, maxWait)
+	return derived, cancel, true
 }
 
 func buildMP4OutputGroup(req MaterializeRequest) awsmctypes.OutputGroup {

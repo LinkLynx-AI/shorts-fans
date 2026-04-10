@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -128,7 +129,7 @@ func (c *Client) CopyObject(ctx context.Context, sourceBucket string, sourceKey 
 		return fmt.Errorf("destination: %w", err)
 	}
 
-	copySource := strings.TrimLeft(strings.TrimSpace(sourceBucket)+"/"+strings.TrimLeft(strings.TrimSpace(sourceKey), "/"), "/")
+	copySource := formatCopySource(sourceBucket, sourceKey)
 	_, err := c.api.CopyObject(ctx, &awss3.CopyObjectInput{
 		Bucket:     aws.String(destinationBucket),
 		Key:        aws.String(destinationKey),
@@ -146,6 +147,20 @@ func (c *Client) CopyObject(ctx context.Context, sourceBucket string, sourceKey 
 	}
 
 	return nil
+}
+
+func formatCopySource(bucket string, key string) string {
+	trimmedBucket := strings.TrimSpace(bucket)
+	segments := strings.Split(strings.TrimLeft(strings.TrimSpace(key), "/"), "/")
+	escapedSegments := make([]string, 0, len(segments))
+	for _, segment := range segments {
+		if segment == "" {
+			continue
+		}
+		escapedSegments = append(escapedSegments, url.PathEscape(segment))
+	}
+
+	return strings.TrimLeft(trimmedBucket+"/"+strings.Join(escapedSegments, "/"), "/")
 }
 
 // DeleteObject は指定 bucket/key の object を削除します。

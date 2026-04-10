@@ -174,6 +174,21 @@ func TestCopyObject(t *testing.T) {
 	}
 }
 
+func TestCopyObjectEscapesCopySourceKey(t *testing.T) {
+	t.Parallel()
+
+	api := &stubObjectAPI{}
+	client := newClient(api, &stubPresignAPI{})
+
+	if err := client.CopyObject(context.Background(), "main-bucket", "mains/source poster+#1.jpg", "main-bucket", "mains/target.jpg"); err != nil {
+		t.Fatalf("CopyObject() error = %v, want nil", err)
+	}
+
+	if got, want := aws.ToString(api.copyInput.CopySource), "main-bucket/mains/source%20poster+%231.jpg"; got != want {
+		t.Fatalf("CopyObject() copy source got %q want %q", got, want)
+	}
+}
+
 func TestPresignGetObject(t *testing.T) {
 	t.Parallel()
 

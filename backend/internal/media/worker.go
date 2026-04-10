@@ -64,7 +64,7 @@ func (w *Worker) Run(ctx context.Context) error {
 		return fmt.Errorf("media worker is nil")
 	}
 
-	if err := w.reconcileOnce(ctx); err != nil {
+	if _, err := w.reconcileUntilIdle(ctx); err != nil {
 		return err
 	}
 
@@ -84,8 +84,12 @@ func (w *Worker) Run(ctx context.Context) error {
 			return fmt.Errorf("receive wake messages: %w", err)
 		}
 		if len(messages) == 0 {
-			if err := w.reconcileOnce(ctx); err != nil {
+			reconciled, err := w.reconcileUntilIdle(ctx)
+			if err != nil {
 				return err
+			}
+			if reconciled {
+				continue
 			}
 			if err := waitForIdle(ctx, w.idleDelay); err != nil {
 				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
@@ -101,19 +105,28 @@ func (w *Worker) Run(ctx context.Context) error {
 				return fmt.Errorf("process media asset id=%s: %w", message.MediaAssetID, err)
 			}
 			if err := w.queue.DeleteMessage(ctx, message.ReceiptHandle); err != nil {
-				return fmt.Errorf("delete wake message media_asset_id=%s: %w", message.MediaAssetID, err)
+				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
+				// Wake-up delivery is best-effort; DB queued jobs remain the source of truth.
+				continue
 			}
 		}
 	}
 }
 
-func (w *Worker) reconcileOnce(ctx context.Context) error {
-	_, err := w.processor.ProcessNextQueued(ctx)
-	if err != nil {
-		return fmt.Errorf("reconcile queued media processing job: %w", err)
+func (w *Worker) reconcileUntilIdle(ctx context.Context) (bool, error) {
+	processedAny := false
+	for {
+		processed, err := w.processor.ProcessNextQueued(ctx)
+		if err != nil {
+			return false, fmt.Errorf("reconcile queued media processing job: %w", err)
+		}
+		if !processed {
+			return processedAny, nil
+		}
+		processedAny = true
 	}
-
-	return nil
 }
 
 func waitForIdle(ctx context.Context, delay time.Duration) error {

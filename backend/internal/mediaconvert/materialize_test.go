@@ -140,6 +140,41 @@ func TestMaterializeVideoSubmitFailure(t *testing.T) {
 	}
 }
 
+func TestMaterializeVideoTimesOutWithoutCallerDeadline(t *testing.T) {
+	t.Parallel()
+
+	client := newClient(&materializeAPIStub{
+		createOutput: &awsmc.CreateJobOutput{
+			Job: &awsmctypes.Job{Id: aws.String("job-123")},
+		},
+		getOutputs: []*awsmc.GetJobOutput{{
+			Job: &awsmctypes.Job{Status: awsmctypes.JobStatusProgressing},
+		}},
+	})
+	client.pollInterval = time.Hour
+	client.maxJobWait = time.Nanosecond
+
+	_, err := client.MaterializeVideo(context.Background(), MaterializeRequest{
+		InputBucket:    "raw-bucket",
+		InputKey:       "raw/input.mp4",
+		OutputBucket:   "delivery-bucket",
+		PlaybackKey:    "shorts/abc/playback.mp4",
+		PosterBaseKey:  "shorts/abc/poster-temp",
+		ServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	})
+
+	var jobErr *JobError
+	if !errors.As(err, &jobErr) {
+		t.Fatalf("MaterializeVideo() error got %T want *JobError", err)
+	}
+	if got, want := jobErr.Code, "mediaconvert_wait_timeout"; got != want {
+		t.Fatalf("MaterializeVideo() code got %q want %q", got, want)
+	}
+	if !jobErr.Retryable {
+		t.Fatal("MaterializeVideo() retryable = false, want true")
+	}
+}
+
 func TestWaitForJobErrorStatus(t *testing.T) {
 	t.Parallel()
 
@@ -212,5 +247,27 @@ func TestHelpers(t *testing.T) {
 	}
 	if got, want := s3URL("bucket", "/key"), "s3://bucket/key"; got != want {
 		t.Fatalf("s3URL() got %q want %q", got, want)
+	}
+
+	derived, cancel, added := materializeContext(context.Background(), time.Minute)
+	defer cancel()
+	if !added {
+		t.Fatal("materializeContext() added got false want true")
+	}
+	if _, ok := derived.Deadline(); !ok {
+		t.Fatal("materializeContext() deadline missing, want derived deadline")
+	}
+
+	parent, parentCancel := context.WithTimeout(context.Background(), time.Minute)
+	defer parentCancel()
+	preserved, stop, added := materializeContext(parent, time.Second)
+	defer stop()
+	if added {
+		t.Fatal("materializeContext() added got true want false when parent already has deadline")
+	}
+	parentDeadline, _ := parent.Deadline()
+	preservedDeadline, _ := preserved.Deadline()
+	if !preservedDeadline.Equal(parentDeadline) {
+		t.Fatalf("materializeContext() deadline got %v want %v", preservedDeadline, parentDeadline)
 	}
 }
