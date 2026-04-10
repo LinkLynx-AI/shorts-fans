@@ -5,7 +5,10 @@ import {
 } from "@testing-library/react";
 
 import { getFanHubState } from "@/entities/fan-profile";
-import { CurrentViewerProvider } from "@/entities/viewer";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
 import { useFanLogoutEntry } from "@/features/fan-auth";
 
 import { FanHubShell } from "./fan-hub-shell";
@@ -43,9 +46,11 @@ function renderFanHubShell(currentViewer: {
   id: string;
 } | null) {
   return render(
-    <CurrentViewerProvider currentViewer={currentViewer}>
-      <FanHubShell state={getFanHubState("library")} />
-    </CurrentViewerProvider>,
+    <ViewerSessionProvider hasSession>
+      <CurrentViewerProvider currentViewer={currentViewer}>
+        <FanHubShell state={getFanHubState("library")} />
+      </CurrentViewerProvider>
+    </ViewerSessionProvider>,
   );
 }
 
