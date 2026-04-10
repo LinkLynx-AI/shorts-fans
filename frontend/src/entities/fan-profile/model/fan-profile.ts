@@ -27,8 +27,8 @@ export type FanPinnedShortItem = {
 export type FanLibraryItem = {
   access: {
     mainId: string;
-    reason: "owner_access" | "purchased_access";
-    status: "owner" | "purchased";
+    reason: "owner_preview" | "session_unlocked";
+    status: "owner" | "unlocked";
   };
   creator: CreatorSummary;
   entryShort: ShortPreviewMeta;
@@ -133,8 +133,8 @@ const libraryItems: readonly FanLibraryItem[] = libraryDefinitions.map((definiti
   return {
     access: {
       mainId: definition.main.id,
-      reason: "purchased_access" as const,
-      status: "purchased" as const,
+      reason: "session_unlocked" as const,
+      status: "unlocked" as const,
     },
     creator: requireCreator(entryShort.creatorId),
     entryShort,

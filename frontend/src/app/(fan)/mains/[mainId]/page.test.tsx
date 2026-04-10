@@ -23,7 +23,7 @@ describe("MainPlaybackPage", () => {
     });
 
     const mismatchedGrant = issueMockSignedToken(
-      buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "mirror", "purchased"),
+      buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "mirror", "unlocked"),
     );
 
     render(

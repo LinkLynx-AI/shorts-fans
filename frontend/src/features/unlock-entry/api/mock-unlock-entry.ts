@@ -11,15 +11,10 @@ import {
   type UnlockSurfaceModel,
 } from "../model/unlock-entry";
 
-const purchaseSchema = z.object({
-  mainId: z.string().min(1),
-  status: z.enum(["not_purchased", "purchased"]),
-});
-
 const accessSchema = z.object({
   mainId: z.string().min(1),
-  reason: z.enum(["owner_preview", "purchase_required", "purchased_access"]),
-  status: z.enum(["locked", "owner", "purchased"]),
+  reason: z.enum(["owner_preview", "session_unlocked", "unlock_required"]),
+  status: z.enum(["locked", "owner", "unlocked"]),
 });
 
 const unlockCtaSchema = z.object({
@@ -84,7 +79,6 @@ const unlockSurfaceSchema = z.object({
     token: z.string().min(1),
   }),
   main: mainSummarySchema,
-  purchase: purchaseSchema,
   setup: setupSchema,
   short: shortSchema,
   unlockCta: unlockCtaSchema,
@@ -92,7 +86,6 @@ const unlockSurfaceSchema = z.object({
 
 type RawUnlockState = {
   access: UnlockSurfaceModel["access"];
-  purchase: UnlockSurfaceModel["purchase"];
   setup: UnlockSurfaceModel["setup"];
   unlockCta: UnlockSurfaceModel["unlockCta"];
 };
@@ -101,12 +94,8 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   afterrain: {
     access: {
       mainId: "main_sora_after_rain",
-      reason: "purchase_required",
+      reason: "unlock_required",
       status: "locked",
-    },
-    purchase: {
-      mainId: "main_sora_after_rain",
-      status: "not_purchased",
     },
     setup: {
       required: false,
@@ -126,10 +115,6 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "owner_preview",
       status: "owner",
     },
-    purchase: {
-      mainId: "main_aoi_blue_balcony",
-      status: "not_purchased",
-    },
     setup: {
       required: false,
       requiresAgeConfirmation: false,
@@ -145,12 +130,8 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   mirror: {
     access: {
       mainId: "main_mina_hotel_mirror",
-      reason: "purchase_required",
+      reason: "unlock_required",
       status: "locked",
-    },
-    purchase: {
-      mainId: "main_mina_hotel_mirror",
-      status: "not_purchased",
     },
     setup: {
       required: true,
@@ -167,12 +148,8 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   poolcut: {
     access: {
       mainId: "main_sora_poolside_cut",
-      reason: "purchase_required",
+      reason: "unlock_required",
       status: "locked",
-    },
-    purchase: {
-      mainId: "main_sora_poolside_cut",
-      status: "not_purchased",
     },
     setup: {
       required: false,
@@ -189,12 +166,8 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   rooftop: {
     access: {
       mainId: "main_mina_quiet_rooftop",
-      reason: "purchase_required",
+      reason: "unlock_required",
       status: "locked",
-    },
-    purchase: {
-      mainId: "main_mina_quiet_rooftop",
-      status: "not_purchased",
     },
     setup: {
       required: true,
@@ -211,12 +184,8 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   softlight: {
     access: {
       mainId: "main_aoi_blue_balcony",
-      reason: "purchased_access",
-      status: "purchased",
-    },
-    purchase: {
-      mainId: "main_aoi_blue_balcony",
-      status: "purchased",
+      reason: "session_unlocked",
+      status: "unlocked",
     },
     setup: {
       required: false,
@@ -264,7 +233,7 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
     access: rawState.access,
     creator,
     mainAccessEntry: {
-      routePath: getMockMainAccessRoutePath(),
+      routePath: getMockMainAccessRoutePath(main.id),
       token: issueMockSignedToken(buildMockMainAccessEntryContext(main.id, short.id)),
     },
     main: {
@@ -273,7 +242,6 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
       priceJpy: main.priceJpy,
       title: main.title,
     },
-    purchase: rawState.purchase,
     setup: rawState.setup,
     short,
     unlockCta: rawState.unlockCta,

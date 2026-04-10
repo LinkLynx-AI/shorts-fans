@@ -135,6 +135,7 @@
 - `topPerformers`、`managedCollections`、`posters`、detail view 用 state は返しません。
 - `activeMode` や mode switch CTA 情報は返しません。
 - review detail list や analytics breakdown は返しません。
+- owner preview list/detail は `docs/contracts/creator-workspace-owner-preview-api-contract.md` に分離します。
 - public creator profile をこの endpoint で代替しません。
 
 ## Fixture Reference

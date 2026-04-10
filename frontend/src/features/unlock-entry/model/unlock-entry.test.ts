@@ -14,7 +14,7 @@ function createUnlockSurfaceModel(
   return {
     access: {
       mainId: "main_rooftop",
-      reason: "purchase_required",
+      reason: "unlock_required",
       status: "locked",
     },
     creator: {
@@ -31,7 +31,7 @@ function createUnlockSurfaceModel(
       id: "mina",
     },
     mainAccessEntry: {
-      routePath: "/api/mock-main-access",
+      routePath: "/api/fan/mains/main_rooftop/access-entry",
       token: "entry_token",
     },
     main: {
@@ -39,10 +39,6 @@ function createUnlockSurfaceModel(
       id: "main_rooftop",
       priceJpy: 1800,
       title: "quiet rooftop main",
-    },
-    purchase: {
-      mainId: "main_rooftop",
-      status: "not_purchased",
     },
     setup: {
       required: state === "setup_required",
@@ -95,15 +91,18 @@ describe("unlock-entry model", () => {
       "main-access-entry::main_mina_quiet_rooftop::rooftop",
     );
     expect(
-      buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "rooftop", "purchased"),
-    ).toBe("main-playback-grant::main_mina_quiet_rooftop::rooftop::purchased");
-    expect(parseMockMainPlaybackGrantContext("main-playback-grant::main_mina_quiet_rooftop::rooftop::owner"))
-      .toEqual({
-        fromShortId: "rooftop",
-        grantKind: "owner",
-        mainId: "main_mina_quiet_rooftop",
-      });
-    expect(getMockMainAccessRoutePath()).toBe("/api/mock-main-access");
+      buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "rooftop", "unlocked"),
+    ).toBe("main-playback-grant::main_mina_quiet_rooftop::rooftop::unlocked");
+    expect(
+      parseMockMainPlaybackGrantContext("main-playback-grant::main_mina_quiet_rooftop::rooftop::owner"),
+    ).toEqual({
+      fromShortId: "rooftop",
+      grantKind: "owner",
+      mainId: "main_mina_quiet_rooftop",
+    });
+    expect(getMockMainAccessRoutePath("main_mina_quiet_rooftop")).toBe(
+      "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+    );
     expect(parseMockMainPlaybackGrantContext("main_mina_quiet_rooftop::rooftop")).toBeNull();
   });
 

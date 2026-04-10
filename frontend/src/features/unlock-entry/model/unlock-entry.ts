@@ -4,14 +4,8 @@ import type { ShortSummary } from "@/entities/short";
 
 import type { UnlockCtaState } from "./unlock-cta";
 
-export type PurchaseStatus = "not_purchased" | "purchased";
-export type MainAccessStatus = "locked" | "owner" | "purchased";
-export type MainAccessReason = "owner_preview" | "purchase_required" | "purchased_access";
-
-export type PurchaseState = {
-  mainId: string;
-  status: PurchaseStatus;
-};
+export type MainAccessStatus = "locked" | "owner" | "unlocked";
+export type MainAccessReason = "owner_preview" | "session_unlocked" | "unlock_required";
 
 export type MainAccessState = {
   mainId: string;
@@ -30,14 +24,13 @@ export type MainAccessEntry = {
   token: string;
 };
 
-export type MainPlaybackGrantKind = "owner" | "purchased";
+export type MainPlaybackGrantKind = "owner" | "unlocked";
 
 export type UnlockSurfaceModel = {
   access: MainAccessState;
   creator: CreatorSummary;
   mainAccessEntry: MainAccessEntry;
   main: MainSummary;
-  purchase: PurchaseState;
   setup: UnlockSetupState;
   short: ShortSummary;
   unlockCta: UnlockCtaState;
@@ -79,7 +72,7 @@ export function parseMockMainPlaybackGrantContext(
     prefix !== "main-playback-grant" ||
     !mainId ||
     !fromShortId ||
-    (grantKind !== "owner" && grantKind !== "purchased")
+    (grantKind !== "owner" && grantKind !== "unlocked")
   ) {
     return null;
   }
@@ -120,8 +113,8 @@ export function getMainPlaybackHref(mainId: string, fromShortId: string, grantTo
 }
 
 /**
- * server grant 発行 endpoint の href を組み立てる。
+ * server access-entry endpoint の href を組み立てる。
  */
-export function getMockMainAccessRoutePath(): string {
-  return "/api/mock-main-access";
+export function getMockMainAccessRoutePath(mainId: string): string {
+  return `/api/fan/mains/${mainId}/access-entry`;
 }

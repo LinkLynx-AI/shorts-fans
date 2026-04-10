@@ -2,7 +2,7 @@
   "surfaceStateVocabulary": [
     "public",
     "locked",
-    "purchased",
+    "unlocked",
     "owner",
     "empty",
     "not_found"
@@ -32,14 +32,14 @@
     }
   },
   "dtoExamples": {
-    "mediaAssetImage": {
+    "imageAsset": {
       "id": "asset_creator_aoi_avatar",
       "kind": "image",
       "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
       "posterUrl": null,
       "durationSeconds": null
     },
-    "mediaAssetVideo": {
+    "videoDisplayAsset": {
       "id": "asset_short_aoi_softlight",
       "kind": "video",
       "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
@@ -114,14 +114,10 @@
         "resumePositionSeconds": null
       }
     },
-    "purchaseState": {
-      "mainId": "main_aoi_blue_balcony",
-      "status": "not_purchased"
-    },
     "mainAccessState": {
       "mainId": "main_aoi_blue_balcony",
       "status": "locked",
-      "reason": "purchase_required"
+      "reason": "unlock_required"
     },
     "unlockCtaState": {
       "state": "unlock_available",

@@ -26,7 +26,7 @@ function getUnlockButtonLabel(unlock: UnlockSurfaceModel): string {
 }
 
 /**
- * 初回購入用の mini paywall dialog を表示する。
+ * 初回視聴用の unlock setup dialog を表示する。
  */
 export function UnlockPaywallDialog({
   acceptAge,
@@ -64,7 +64,7 @@ export function UnlockPaywallDialog({
                 {title}
               </Dialog.Title>
               <Dialog.Description className="sr-only">
-                この short の続きを unlock するための mini paywall
+                この short の続きを見るための setup dialog
               </Dialog.Description>
             </div>
             <span className="inline-flex min-h-10 items-center rounded-full bg-accent/12 px-3 text-[11px] font-bold uppercase tracking-[0.14em] text-accent">
@@ -74,11 +74,11 @@ export function UnlockPaywallDialog({
 
           <div className="mt-4 flex items-center gap-3 rounded-[20px] border border-[#bae7ff]/90 bg-white/86 px-3.5 py-3.5">
             <span className="inline-flex size-[38px] shrink-0 items-center justify-center rounded-full bg-accent-strong text-[11px] font-bold uppercase tracking-[0.14em] text-white">
-              Card
+              Setup
             </span>
             <span className="min-w-0">
-              <p className="truncate text-sm font-bold">Visa ending in 4242</p>
-              <p className="mt-0.5 text-xs text-muted">支払い方法は保存済みです。</p>
+              <p className="truncate text-sm font-bold">この段階では購入はまだ実行しません。</p>
+              <p className="mt-0.5 text-xs text-muted">年齢確認と利用規約の同意だけで main 再生へ進みます。</p>
             </span>
           </div>
 
@@ -102,7 +102,7 @@ export function UnlockPaywallDialog({
                   onChange={(event) => onAcceptTermsChange(event.target.checked)}
                   type="checkbox"
                 />
-                <span>利用規約とポリシーに同意し、確認面なしで main 再生へ進む</span>
+                <span>利用規約とポリシーに同意し、main 再生へ進む</span>
               </label>
             ) : null}
           </div>
@@ -117,16 +117,16 @@ export function UnlockPaywallDialog({
                 閉じる
               </button>
             </Dialog.Close>
-          {confirmEnabled && !isSubmitting ? (
-            <button
-              className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent-strong px-4 text-[13px] font-bold text-white"
-              onClick={onConfirm}
-              type="button"
-            >
-              {buttonLabel}
-            </button>
-          ) : (
-            <button
+            {confirmEnabled && !isSubmitting ? (
+              <button
+                className="flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent-strong px-4 text-[13px] font-bold text-white"
+                onClick={onConfirm}
+                type="button"
+              >
+                {buttonLabel}
+              </button>
+            ) : (
+              <button
                 className={cn(
                   "flex min-h-[46px] flex-1 items-center justify-center rounded-full bg-accent-strong px-4 text-[13px] font-bold text-white",
                   "cursor-not-allowed opacity-40",

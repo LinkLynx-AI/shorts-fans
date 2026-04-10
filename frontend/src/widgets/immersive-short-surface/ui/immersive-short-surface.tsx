@@ -207,7 +207,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   }, []);
 
   /**
-   * setup-required main の paywall dialog を開く前に確認状態を初期化する。
+   * setup-required main の setup dialog を開く前に確認状態を初期化する。
    */
   const handleOpenPaywall = () => {
     if (!hasViewerSession) {
@@ -220,7 +220,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   /**
-   * paywall dialog を閉じる。送信中は多重操作を防ぐ。
+   * setup dialog を閉じる。送信中は多重操作を防ぐ。
    */
   const handleClosePaywall = () => {
     if (isSubmittingMainAccess) {
@@ -252,7 +252,6 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           acceptedTerms: acceptTerms,
           entryToken: unlock.mainAccessEntry.token,
           fromShortId: short.id,
-          mainId: unlock.main.id,
         }),
         headers: {
           "Content-Type": "application/json",
@@ -261,12 +260,13 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       });
       const payload = (await response.json().catch(() => null)) as
         | {
+            data?: {
+              href?: string;
+            } | null;
             error?: {
               code: string;
               message: string;
             };
-            fallbackHref?: string;
-            href?: string;
           }
         | null;
 
@@ -276,13 +276,13 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         return;
       }
 
-      if (response.ok && payload?.href) {
+      if (response.ok && payload?.data?.href) {
         resetPaywallState();
-        router.push(payload.href);
+        router.push(payload.data.href);
         return;
       }
 
-      router.push(payload?.fallbackHref ?? `/shorts/${short.id}`);
+      router.push(`/shorts/${short.id}`);
     } finally {
       setIsSubmittingMainAccess(false);
     }

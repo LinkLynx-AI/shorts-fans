@@ -44,14 +44,14 @@ export function getMainPlaybackStatusTitle(surface: MainPlaybackSurface): string
  */
 export function getMainPlaybackStatusCopy(surface: MainPlaybackSurface): string {
   if (surface.access.status === "owner") {
-    return "purchase confirmation is skipped for your own main";
+    return "unlock confirmation is skipped for your own main";
   }
 
   if (surface.resumePositionSeconds !== null) {
-    return "resume without another confirmation";
+    return "resume without another unlock step";
   }
 
-  return "continue from this short without another confirmation";
+  return "continue from this short without another unlock step";
 }
 
 /**

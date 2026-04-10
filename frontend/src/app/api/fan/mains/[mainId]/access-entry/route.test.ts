@@ -1,3 +1,5 @@
+import { NextRequest } from "next/server";
+
 import {
   buildMockMainAccessEntryContext,
   parseMockMainPlaybackGrantContext,
@@ -6,7 +8,6 @@ import {
   getCurrentViewerBootstrap,
   viewerSessionCookieName,
 } from "@/entities/viewer";
-import { NextRequest } from "next/server";
 import { issueMockSignedToken, readMockSignedToken } from "@/shared/lib/mock-signed-token";
 
 import { POST } from "./route";
@@ -20,7 +21,11 @@ vi.mock("@/entities/viewer", async () => {
   };
 });
 
-async function postMainAccess(body: object, sessionToken?: string) {
+async function postMainAccessEntry(
+  mainId: string,
+  body: object,
+  sessionToken?: string,
+) {
   const request = {
     cookies: {
       get(name: string) {
@@ -37,21 +42,24 @@ async function postMainAccess(body: object, sessionToken?: string) {
     json: async () => body,
   } as unknown as NextRequest;
 
-  return POST(
-    request,
-  );
+  return POST(request, {
+    params: Promise.resolve({
+      mainId,
+    }),
+  });
 }
 
 async function expectPlaybackGrantResponse(
   response: Response,
   expected: {
     fromShortId: string;
-    grantKind: "owner" | "purchased";
+    grantKind: "owner" | "unlocked";
     mainId: string;
   },
 ) {
   const body = await response.json();
-  const playbackUrl = new URL(body.href, "http://localhost");
+  const href = body.data?.href;
+  const playbackUrl = new URL(href, "http://localhost");
   const grant = playbackUrl.searchParams.get("grant");
 
   expect(response.status).toBe(200);
@@ -70,7 +78,7 @@ async function expectPlaybackGrantResponse(
   expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual(expected);
 }
 
-describe("POST /api/mock-main-access", () => {
+describe("POST /api/fan/mains/[mainId]/access-entry", () => {
   beforeEach(() => {
     vi.mocked(getCurrentViewerBootstrap).mockResolvedValue({
       activeMode: "fan",
@@ -80,14 +88,13 @@ describe("POST /api/mock-main-access", () => {
   });
 
   it("returns auth_required when no fan session exists", async () => {
-    const response = await postMainAccess({
+    const response = await postMainAccessEntry("main_mina_quiet_rooftop", {
       acceptedAge: true,
       acceptedTerms: true,
       entryToken: issueMockSignedToken(
         buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
       ),
       fromShortId: "rooftop",
-      mainId: "main_mina_quiet_rooftop",
     });
 
     expect(response.status).toBe(401);
@@ -99,73 +106,94 @@ describe("POST /api/mock-main-access", () => {
       },
       meta: {
         page: null,
-        requestId: "req_mock_main_access_auth_required_001",
+        requestId: "req_main_access_entry_auth_required_001",
       },
     });
   });
 
   it("rejects setup-required access without the required confirmations", async () => {
-    const response = await postMainAccess({
-      acceptedAge: false,
-      acceptedTerms: false,
-      entryToken: issueMockSignedToken(
-        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
-      ),
-      fromShortId: "rooftop",
-      mainId: "main_mina_quiet_rooftop",
-    }, "viewer-session");
+    const response = await postMainAccessEntry(
+      "main_mina_quiet_rooftop",
+      {
+        acceptedAge: false,
+        acceptedTerms: false,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+        ),
+        fromShortId: "rooftop",
+      },
+      "viewer-session",
+    );
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      fallbackHref: "/shorts/rooftop",
+      data: null,
+      error: {
+        code: "main_locked",
+        message: "main access entry could not be issued",
+      },
+      meta: {
+        page: null,
+        requestId: "req_main_access_entry_locked_001",
+      },
     });
   });
 
-  it("issues a purchased playback grant after setup confirmation", async () => {
-    const response = await postMainAccess({
-      acceptedAge: true,
-      acceptedTerms: true,
-      entryToken: issueMockSignedToken(
-        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
-      ),
-      fromShortId: "rooftop",
-      mainId: "main_mina_quiet_rooftop",
-    }, "viewer-session");
+  it("issues an unlocked playback grant after setup confirmation", async () => {
+    const response = await postMainAccessEntry(
+      "main_mina_quiet_rooftop",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+        ),
+        fromShortId: "rooftop",
+      },
+      "viewer-session",
+    );
+
     await expectPlaybackGrantResponse(response, {
       fromShortId: "rooftop",
-      grantKind: "purchased",
+      grantKind: "unlocked",
       mainId: "main_mina_quiet_rooftop",
     });
   });
 
-  it("issues a purchased playback grant for continue_main entries", async () => {
-    const response = await postMainAccess({
-      acceptedAge: true,
-      acceptedTerms: true,
-      entryToken: issueMockSignedToken(
-        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "softlight"),
-      ),
-      fromShortId: "softlight",
-      mainId: "main_aoi_blue_balcony",
-    }, "viewer-session");
+  it("issues an unlocked playback grant for continue_main entries", async () => {
+    const response = await postMainAccessEntry(
+      "main_aoi_blue_balcony",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_aoi_blue_balcony", "softlight"),
+        ),
+        fromShortId: "softlight",
+      },
+      "viewer-session",
+    );
 
     await expectPlaybackGrantResponse(response, {
       fromShortId: "softlight",
-      grantKind: "purchased",
+      grantKind: "unlocked",
       mainId: "main_aoi_blue_balcony",
     });
   });
 
   it("issues an owner playback grant for owner_preview entries", async () => {
-    const response = await postMainAccess({
-      acceptedAge: true,
-      acceptedTerms: true,
-      entryToken: issueMockSignedToken(
-        buildMockMainAccessEntryContext("main_aoi_blue_balcony", "balcony"),
-      ),
-      fromShortId: "balcony",
-      mainId: "main_aoi_blue_balcony",
-    }, "viewer-session");
+    const response = await postMainAccessEntry(
+      "main_aoi_blue_balcony",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_aoi_blue_balcony", "balcony"),
+        ),
+        fromShortId: "balcony",
+      },
+      "viewer-session",
+    );
 
     await expectPlaybackGrantResponse(response, {
       fromShortId: "balcony",
@@ -175,32 +203,46 @@ describe("POST /api/mock-main-access", () => {
   });
 
   it("rejects requests without a valid server-issued entry token", async () => {
-    const response = await postMainAccess({
-      acceptedAge: true,
-      acceptedTerms: true,
-      entryToken: "invalid",
-      fromShortId: "rooftop",
-      mainId: "main_mina_quiet_rooftop",
-    }, "viewer-session");
+    const response = await postMainAccessEntry(
+      "main_mina_quiet_rooftop",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: "invalid",
+        fromShortId: "rooftop",
+      },
+      "viewer-session",
+    );
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({
-      fallbackHref: "/shorts/rooftop",
+      data: null,
+      error: {
+        code: "main_locked",
+        message: "main access entry could not be issued",
+      },
+      meta: {
+        page: null,
+        requestId: "req_main_access_entry_locked_001",
+      },
     });
   });
 
   it("returns auth_required when bootstrap cannot resolve the session cookie", async () => {
     vi.mocked(getCurrentViewerBootstrap).mockResolvedValueOnce(null);
 
-    const response = await postMainAccess({
-      acceptedAge: true,
-      acceptedTerms: true,
-      entryToken: issueMockSignedToken(
-        buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
-      ),
-      fromShortId: "rooftop",
-      mainId: "main_mina_quiet_rooftop",
-    }, "stale-session");
+    const response = await postMainAccessEntry(
+      "main_mina_quiet_rooftop",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "rooftop"),
+        ),
+        fromShortId: "rooftop",
+      },
+      "stale-session",
+    );
 
     expect(response.status).toBe(401);
     await expect(response.json()).resolves.toEqual({
@@ -211,7 +253,7 @@ describe("POST /api/mock-main-access", () => {
       },
       meta: {
         page: null,
-        requestId: "req_mock_main_access_auth_required_001",
+        requestId: "req_main_access_entry_auth_required_001",
       },
     });
   });

@@ -3,11 +3,13 @@
 ## 位置づけ
 
 - この文書は `SHO-18 unlock / main player の API 契約とモックデータを定義する` の成果物です。
-- `short -> unlock -> main` の read contract を固定し、初回 setup 要否、direct unlock、purchased、owner の差分を揃えます。
+- `short -> unlock -> main` の display/access contract を固定し、初回 setup 要否、session unlock、owner preview の差分を揃えます。
+- この leaf では実購買を行わず、unlock は non-billing / non-persistent の access entry として扱います。
 - DTO と response envelope は `docs/contracts/fan-mvp-common-transport-contract.md` を参照します。
 
 ## Canonical Sources
 
+- `docs/contracts/media-display-access-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/ssot/product/monetization/billing-and-access.md`
 - `docs/ssot/product/ui/fan-surfaces.md`
@@ -18,8 +20,9 @@
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/fan/shorts/{shortId}/unlock` | required | mini paywall / direct unlock 判定用 |
-| `GET` | `/api/fan/mains/{mainId}/playback` | required | main player 開始用 |
+| `GET` | `/api/fan/shorts/{shortId}/unlock` | required | main access entry 前の setup / unlock state 読み出し |
+| `POST` | `/api/fan/mains/{mainId}/access-entry` | required | short-lived な main entry href を発行する |
+| `GET` | `/api/fan/mains/{mainId}/playback` | required | grant 済み main player 開始用 |
 
 ## Request Contract
 
@@ -39,7 +42,8 @@
 - `data.main.title`: `string`
 - `data.main.durationSeconds`: `number`
 - `data.main.priceJpy`: `number`
-- `data.purchase`: `PurchaseState`
+- `data.mainAccessEntry.routePath`: `string`
+- `data.mainAccessEntry.token`: `string`
 - `data.access`: `MainAccessState`
 - `data.unlockCta`: `UnlockCtaState`
 - `data.setup.required`: `boolean`
@@ -48,11 +52,12 @@
 
 #### Interpretation Rules
 
-- `setup.required = true` のときだけ mini paywall setup を出します。
-- `unlockCta.state = "setup_required"` のとき、frontend は `Unlock` CTA から mini paywall を開きます。
-- `unlockCta.state = "unlock_available"` のとき、frontend は full paywall を挟まず unlock mutation に進めます。
-- `unlockCta.state = "continue_main"` のとき、frontend は再購入ではなく main 再開導線を出します。
+- `setup.required = true` のときだけ unlock setup dialog を出します。
+- `unlockCta.state = "setup_required"` のとき、frontend は `Unlock` CTA から setup dialog を開きます。
+- `unlockCta.state = "unlock_available"` のとき、frontend は billing を挟まず `POST /api/fan/mains/{mainId}/access-entry` に進めます。
+- `unlockCta.state = "continue_main"` のとき、frontend は current session の unlock を前提に main 再開導線を出します。
 - `unlockCta.state = "owner_preview"` のとき、purchase 導線ではなく creator owner preview 導線を出します。
+- `priceJpy` は reference price 表示用に残しますが、この leaf では決済実行を意味しません。
 
 #### HTTP States
 
@@ -60,10 +65,49 @@
 | --- | --- |
 | initial setup required | `200` |
 | setup complete, unlock available | `200` |
-| `purchased` | `200` |
+| `unlocked` | `200` |
 | `owner` | `200` |
 | `locked` | `403` + `main_locked` |
 | `not_found` | `404` + `not_found` |
+
+### `POST /api/fan/mains/{mainId}/access-entry`
+
+#### Path
+
+| field | type | required |
+| --- | --- | --- |
+| `mainId` | `string` | yes |
+
+#### Body
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `fromShortId` | `string` | yes | entry context を作った short |
+| `entryToken` | `string` | yes | `GET /api/fan/shorts/{shortId}/unlock` で返した signed token |
+| `acceptedAge` | `boolean` | yes | setup で年齢確認が必要な時だけ true 必須 |
+| `acceptedTerms` | `boolean` | yes | setup で利用規約同意が必要な時だけ true 必須 |
+
+#### Response
+
+- `data.href`: `string`
+- `data.href` は `/mains/{mainId}?fromShortId=...&grant=...` のような app route を返します。
+- `meta.page = null`
+
+#### Interpretation Rules
+
+- この endpoint は実購買や unlock 永続化を行わず、setup 条件と access entry token を検証して short-lived な main entry だけを発行します。
+- `grant` は current session に閉じた temporary proof として扱い、library 永続化や billing ledger には書き込みません。
+- `fromShortId` が `mainId` に連結されない、または token が無効な場合は access entry を発行しません。
+
+#### HTTP States
+
+| case | status |
+| --- | --- |
+| entry issued | `200` |
+| invalid payload | `400` |
+| unauthenticated | `401` + `auth_required` |
+| setup incomplete / invalid token | `403` + `main_locked` |
+| linked short not found | `404` + `not_found` |
 
 ### `GET /api/fan/mains/{mainId}/playback`
 
@@ -77,13 +121,14 @@
 
 | field | type | required | notes |
 | --- | --- | --- | --- |
-| `fromShortId` | `string` | no | short 起点で入るときの context 保持用。未指定時は `entryShort = null` |
+| `fromShortId` | `string` | yes | short 起点で入るときの context 保持用 |
+| `grant` | `string` | yes | `POST /api/fan/mains/{mainId}/access-entry` が発行した short-lived grant |
 
 #### Response
 
 - `data.main.id`: `string`
 - `data.main.title`: `string`
-- `data.main.media`: `MediaAsset`
+- `data.main.media`: `VideoDisplayAsset`
 - `data.main.durationSeconds`: `number`
 - `data.creator`: `CreatorSummary`
 - `data.access`: `MainAccessState`
@@ -94,23 +139,25 @@
 
 | case | status |
 | --- | --- |
-| `purchased` playback | `200` |
+| `unlocked` playback | `200` |
 | `owner` playback | `200` |
 | `locked` | `403` + `main_locked` |
 | `not_found` | `404` + `not_found` |
 
 ## State Matrix
 
-| endpoint | locked | purchased | owner | not_found |
+| endpoint | locked | unlocked | owner | not_found |
 | --- | --- | --- | --- | --- |
 | `GET /api/fan/shorts/{shortId}/unlock` | yes | yes | yes | yes |
+| `POST /api/fan/mains/{mainId}/access-entry` | yes | yes | yes | yes |
 | `GET /api/fan/mains/{mainId}/playback` | yes | yes | yes | yes |
 
 ## Out-of-scope Guardrails
 
-- unlock mutation はこの文書に含めない
+- 実課金 mutation はこの文書に含めない
 - payment provider 固有 payload は返さない
 - `subscription` や bundle 由来 access は返さない
+- unlock 永続化、library 反映、ledger 記録はこの leaf に含めない
 - explicit preview、thumbnail gallery、related content は返さない
 
 ## Fixture Reference

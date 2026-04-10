@@ -64,8 +64,8 @@ const creatorSchema = z.object({
 
 const accessSchema = z.object({
   mainId: z.string().min(1),
-  reason: z.enum(["owner_preview", "purchase_required", "purchased_access"]),
-  status: z.enum(["locked", "owner", "purchased"]),
+  reason: z.enum(["owner_preview", "session_unlocked", "unlock_required"]),
+  status: z.enum(["locked", "owner", "unlocked"]),
 });
 
 const playbackSurfaceSchema = z.object({
@@ -112,8 +112,8 @@ function buildPlaybackAccess(
   return {
     access: {
       mainId,
-      reason: "purchased_access",
-      status: "purchased",
+      reason: "session_unlocked",
+      status: "unlocked",
     },
     resumePositionSeconds: unlock.unlockCta.resumePositionSeconds,
   };

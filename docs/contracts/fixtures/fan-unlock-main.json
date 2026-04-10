@@ -38,14 +38,14 @@
             "durationSeconds": 480,
             "priceJpy": 1800
           },
-          "purchase": {
-            "mainId": "main_mina_quiet_rooftop",
-            "status": "not_purchased"
+          "mainAccessEntry": {
+            "routePath": "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+            "token": "signed_entry_token_rooftop"
           },
           "access": {
             "mainId": "main_mina_quiet_rooftop",
             "status": "locked",
-            "reason": "purchase_required"
+            "reason": "unlock_required"
           },
           "unlockCta": {
             "state": "setup_required",
@@ -104,14 +104,14 @@
             "durationSeconds": 540,
             "priceJpy": 2100
           },
-          "purchase": {
-            "mainId": "main_sora_after_rain",
-            "status": "not_purchased"
+          "mainAccessEntry": {
+            "routePath": "/api/fan/mains/main_sora_after_rain/access-entry",
+            "token": "signed_entry_token_afterrain"
           },
           "access": {
             "mainId": "main_sora_after_rain",
             "status": "locked",
-            "reason": "purchase_required"
+            "reason": "unlock_required"
           },
           "unlockCta": {
             "state": "unlock_available",
@@ -132,7 +132,7 @@
         "error": null
       }
     },
-    "purchased": {
+    "unlocked": {
       "status": 200,
       "body": {
         "data": {
@@ -170,14 +170,14 @@
             "durationSeconds": 720,
             "priceJpy": 2200
           },
-          "purchase": {
-            "mainId": "main_aoi_blue_balcony",
-            "status": "purchased"
+          "mainAccessEntry": {
+            "routePath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_token_softlight"
           },
           "access": {
             "mainId": "main_aoi_blue_balcony",
-            "status": "purchased",
-            "reason": "purchased_access"
+            "status": "unlocked",
+            "reason": "session_unlocked"
           },
           "unlockCta": {
             "state": "continue_main",
@@ -192,7 +192,7 @@
           }
         },
         "meta": {
-          "requestId": "req_unlock_purchased_001",
+          "requestId": "req_unlock_unlocked_001",
           "page": null
         },
         "error": null
@@ -236,9 +236,9 @@
             "durationSeconds": 720,
             "priceJpy": 2200
           },
-          "purchase": {
-            "mainId": "main_aoi_blue_balcony",
-            "status": "not_purchased"
+          "mainAccessEntry": {
+            "routePath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_token_balcony"
           },
           "access": {
             "mainId": "main_aoi_blue_balcony",
@@ -293,8 +293,65 @@
       }
     }
   },
+  "POST /api/fan/mains/{mainId}/access-entry": {
+    "access_entry_issued": {
+      "status": 200,
+      "body": {
+        "data": {
+          "href": "/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=signed_grant_token_rooftop"
+        },
+        "meta": {
+          "requestId": "req_main_access_entry_issued_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_access_entry_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "main playback requires authentication"
+        }
+      }
+    },
+    "locked": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_access_entry_locked_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main access entry could not be issued"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_access_entry_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "main or short was not found"
+        }
+      }
+    }
+  },
   "GET /api/fan/mains/{mainId}/playback": {
-    "playback_purchased": {
+    "playback_unlocked": {
       "status": 200,
       "body": {
         "data": {
@@ -325,8 +382,8 @@
           },
           "access": {
             "mainId": "main_aoi_blue_balcony",
-            "status": "purchased",
-            "reason": "purchased_access"
+            "status": "unlocked",
+            "reason": "session_unlocked"
           },
           "resumePositionSeconds": 198,
           "entryShort": {
@@ -346,7 +403,7 @@
           }
         },
         "meta": {
-          "requestId": "req_playback_purchased_001",
+          "requestId": "req_playback_unlocked_001",
           "page": null
         },
         "error": null
