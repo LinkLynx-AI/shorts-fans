@@ -157,11 +157,11 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 					if arg.State != stateDraft {
 						t.Fatalf("CreateMain() state got %q want %q", arg.State, stateDraft)
 					}
-					if arg.PriceMinor != postgres.Int64ToPG(pointerToInt64(1800)) {
-						t.Fatalf("CreateMain() price minor got %#v want %#v", arg.PriceMinor, postgres.Int64ToPG(pointerToInt64(1800)))
+					if arg.PriceMinor != 1800 {
+						t.Fatalf("CreateMain() price minor got %d want %d", arg.PriceMinor, 1800)
 					}
-					if arg.CurrencyCode != postgres.TextToPG(pointerTo(currencyJPY)) {
-						t.Fatalf("CreateMain() currency code got %#v want %#v", arg.CurrencyCode, postgres.TextToPG(pointerTo(currencyJPY)))
+					if arg.CurrencyCode != currencyJPY {
+						t.Fatalf("CreateMain() currency code got %q want %q", arg.CurrencyCode, currencyJPY)
 					}
 					if !arg.OwnershipConfirmed {
 						t.Fatal("CreateMain() ownership confirmed = false, want true")
@@ -390,8 +390,4 @@ func TestRepositoryMappersRejectInvalidUUIDs(t *testing.T) {
 	if _, err := mapCreatedShort(sqlc.AppShort{ID: pgtype.UUID{}}, assetRow); err == nil {
 		t.Fatal("mapCreatedShort() error = nil, want error")
 	}
-}
-
-func pointerToInt64(value int64) *int64 {
-	return &value
 }

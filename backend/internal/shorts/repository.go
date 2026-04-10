@@ -58,8 +58,8 @@ type Main struct {
 	State               string
 	ReviewReasonCode    *string
 	PostReportState     *string
-	PriceMinor          *int64
-	CurrencyCode        *string
+	PriceMinor          int64
+	CurrencyCode        string
 	OwnershipConfirmed  bool
 	ConsentConfirmed    bool
 	ApprovedForUnlockAt *time.Time
@@ -89,8 +89,8 @@ type CreateMainInput struct {
 	State               string
 	ReviewReasonCode    *string
 	PostReportState     *string
-	PriceMinor          *int64
-	CurrencyCode        *string
+	PriceMinor          int64
+	CurrencyCode        string
 	OwnershipConfirmed  bool
 	ConsentConfirmed    bool
 	ApprovedForUnlockAt *time.Time
@@ -102,8 +102,8 @@ type UpdateMainInput struct {
 	State               string
 	ReviewReasonCode    *string
 	PostReportState     *string
-	PriceMinor          *int64
-	CurrencyCode        *string
+	PriceMinor          int64
+	CurrencyCode        string
 	OwnershipConfirmed  bool
 	ConsentConfirmed    bool
 	ApprovedForUnlockAt *time.Time
@@ -249,8 +249,8 @@ func (r *Repository) UpdateMain(ctx context.Context, input UpdateMainInput) (Mai
 		State:               input.State,
 		ReviewReasonCode:    postgres.TextToPG(input.ReviewReasonCode),
 		PostReportState:     postgres.TextToPG(input.PostReportState),
-		PriceMinor:          postgres.Int64ToPG(input.PriceMinor),
-		CurrencyCode:        postgres.TextToPG(input.CurrencyCode),
+		PriceMinor:          input.PriceMinor,
+		CurrencyCode:        input.CurrencyCode,
 		OwnershipConfirmed:  input.OwnershipConfirmed,
 		ConsentConfirmed:    input.ConsentConfirmed,
 		ApprovedForUnlockAt: postgres.TimeToPG(input.ApprovedForUnlockAt),
@@ -513,8 +513,8 @@ func buildCreateMainParams(input CreateMainInput) sqlc.CreateMainParams {
 		State:               input.State,
 		ReviewReasonCode:    postgres.TextToPG(input.ReviewReasonCode),
 		PostReportState:     postgres.TextToPG(input.PostReportState),
-		PriceMinor:          postgres.Int64ToPG(input.PriceMinor),
-		CurrencyCode:        postgres.TextToPG(input.CurrencyCode),
+		PriceMinor:          input.PriceMinor,
+		CurrencyCode:        input.CurrencyCode,
 		OwnershipConfirmed:  input.OwnershipConfirmed,
 		ConsentConfirmed:    input.ConsentConfirmed,
 		ApprovedForUnlockAt: postgres.TimeToPG(input.ApprovedForUnlockAt),
@@ -563,8 +563,8 @@ func mapMain(row sqlc.AppMain) (Main, error) {
 		State:               row.State,
 		ReviewReasonCode:    postgres.OptionalTextFromPG(row.ReviewReasonCode),
 		PostReportState:     postgres.OptionalTextFromPG(row.PostReportState),
-		PriceMinor:          postgres.OptionalInt64FromPG(row.PriceMinor),
-		CurrencyCode:        postgres.OptionalTextFromPG(row.CurrencyCode),
+		PriceMinor:          row.PriceMinor,
+		CurrencyCode:        row.CurrencyCode,
 		OwnershipConfirmed:  row.OwnershipConfirmed,
 		ConsentConfirmed:    row.ConsentConfirmed,
 		ApprovedForUnlockAt: postgres.OptionalTimeFromPG(row.ApprovedForUnlockAt),
@@ -594,6 +594,12 @@ func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 	if err != nil {
 		return Main{}, fmt.Errorf("unlockable main の updated_at 変換: %w", err)
 	}
+	if !row.PriceMinor.Valid {
+		return Main{}, fmt.Errorf("unlockable main の price_minor 変換: price_minor が null です")
+	}
+	if !row.CurrencyCode.Valid {
+		return Main{}, fmt.Errorf("unlockable main の currency_code 変換: currency_code が null です")
+	}
 
 	return Main{
 		ID:                  id,
@@ -602,8 +608,8 @@ func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 		State:               row.State,
 		ReviewReasonCode:    postgres.OptionalTextFromPG(row.ReviewReasonCode),
 		PostReportState:     postgres.OptionalTextFromPG(row.PostReportState),
-		PriceMinor:          postgres.OptionalInt64FromPG(row.PriceMinor),
-		CurrencyCode:        postgres.OptionalTextFromPG(row.CurrencyCode),
+		PriceMinor:          row.PriceMinor.Int64,
+		CurrencyCode:        row.CurrencyCode.String,
 		OwnershipConfirmed:  row.OwnershipConfirmed,
 		ConsentConfirmed:    row.ConsentConfirmed,
 		ApprovedForUnlockAt: postgres.OptionalTimeFromPG(row.ApprovedForUnlockAt),

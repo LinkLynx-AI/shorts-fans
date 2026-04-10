@@ -13,6 +13,8 @@ source:
         - 000007_add_creator_profile_handle.up.sql
         - 000008_add_creator_follows_following_index.up.sql
         - 000009_require_creator_profile_handle.up.sql
+        - 000010_add_short_caption_and_processing_jobs.up.sql
+        - 000011_require_main_price_metadata.up.sql
 schemas:
     - name: app
       tables:
@@ -558,10 +560,10 @@ schemas:
               nullable: true
             - name: price_minor
               type: bigint
-              nullable: true
+              nullable: false
             - name: currency_code
               type: text
-              nullable: true
+              nullable: false
             - name: ownership_confirmed
               type: boolean
               nullable: false
@@ -611,8 +613,6 @@ schemas:
               columns:
                 - media_asset_id
           check_constraints:
-            - name: mains_check
-              expression: CHECK (price_minor IS NULL AND currency_code IS NULL OR price_minor IS NOT NULL AND currency_code IS NOT NULL)
             - name: mains_check1
               expression: CHECK (approved_for_unlock_at IS NULL OR (state = ANY (ARRAY['approved_for_unlock'::text, 'suspended'::text, 'removed'::text])))
             - name: mains_check2
@@ -622,7 +622,7 @@ schemas:
             - name: mains_post_report_state_check
               expression: CHECK (post_report_state IS NULL OR (post_report_state = ANY (ARRAY['under_review'::text, 'temporarily_limited'::text, 'removed'::text, 'restored'::text])))
             - name: mains_price_minor_check
-              expression: CHECK (price_minor IS NULL OR price_minor >= 0)
+              expression: CHECK (price_minor > 0)
             - name: mains_state_check
               expression: CHECK (state = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved_for_unlock'::text, 'revision_requested'::text, 'rejected'::text, 'suspended'::text, 'removed'::text]))
           indexes:
@@ -706,6 +706,98 @@ schemas:
               columns:
                 - creator_user_id
               definition: CREATE INDEX idx_media_assets_creator_user_id ON app.media_assets USING btree (creator_user_id)
+        - name: media_processing_jobs
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: media_asset_id
+              type: uuid
+              nullable: false
+            - name: asset_role
+              type: text
+              nullable: false
+            - name: status
+              type: text
+              nullable: false
+            - name: attempt_count
+              type: integer
+              nullable: false
+              default: "0"
+            - name: last_error_code
+              type: text
+              nullable: true
+            - name: last_error_message
+              type: text
+              nullable: true
+            - name: queued_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: started_at
+              type: timestamp with time zone
+              nullable: true
+            - name: completed_at
+              type: timestamp with time zone
+              nullable: true
+            - name: failed_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: media_processing_jobs_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+            - name: media_processing_jobs_media_asset_id_creator_user_id_fkey
+              columns:
+                - media_asset_id
+                - creator_user_id
+              references:
+                schema: app
+                table: media_assets
+                columns:
+                    - id
+                    - creator_user_id
+          unique_constraints:
+            - name: media_processing_jobs_media_asset_id_key
+              columns:
+                - media_asset_id
+          check_constraints:
+            - name: media_processing_jobs_asset_role_check
+              expression: CHECK (asset_role = ANY (ARRAY['main'::text, 'short'::text]))
+            - name: media_processing_jobs_attempt_count_check
+              expression: CHECK (attempt_count >= 0)
+            - name: media_processing_jobs_status_check
+              expression: CHECK (status = ANY (ARRAY['queued'::text, 'processing'::text, 'succeeded'::text, 'failed'::text]))
+          indexes:
+            - name: idx_media_processing_jobs_creator_user_id
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX idx_media_processing_jobs_creator_user_id ON app.media_processing_jobs USING btree (creator_user_id)
+            - name: idx_media_processing_jobs_status
+              columns:
+                - status
+                - queued_at
+                - id
+              definition: CREATE INDEX idx_media_processing_jobs_status ON app.media_processing_jobs USING btree (status, queued_at, id)
         - name: pinned_shorts
           columns:
             - name: user_id
@@ -785,6 +877,9 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: caption
+              type: text
+              nullable: true
           primary_key:
             - id
           foreign_keys:
@@ -917,6 +1012,9 @@ schemas:
             - name: media_asset_id
               type: uuid
               nullable: true
+            - name: caption
+              type: text
+              nullable: true
             - name: state
               type: text
               nullable: true
@@ -943,6 +1041,7 @@ schemas:
                 s.creator_user_id,
                 s.canonical_main_id,
                 s.media_asset_id,
+                s.caption,
                 s.state,
                 s.review_reason_code,
                 s.post_report_state,

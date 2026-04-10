@@ -12,6 +12,7 @@ sql:
       - "db/migrations/000008_add_creator_follows_following_index.up.sql"
       - "db/migrations/000009_require_creator_profile_handle.up.sql"
       - "db/migrations/000010_add_short_caption_and_processing_jobs.up.sql"
+      - "db/migrations/000011_require_main_price_metadata.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"
