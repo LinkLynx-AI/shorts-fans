@@ -456,9 +456,6 @@ func TestCompleteUploadPromotesObjectAndReturnsCompletedAvatar(t *testing.T) {
 	service.now = func() time.Time {
 		return time.Unix(1710000000, 0).UTC()
 	}
-	service.newOpaqueID = func(prefix string) (string, error) {
-		return prefix + "fixed", nil
-	}
 
 	got, err := service.CompleteUpload(context.Background(), CompleteUploadInput{
 		AvatarUploadToken: "token",
@@ -467,17 +464,92 @@ func TestCompleteUploadPromotesObjectAndReturnsCompletedAvatar(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CompleteUpload() error = %v, want nil", err)
 	}
-	if got.Avatar.AvatarAssetID != avatarAssetIDPrefix+"fixed" {
-		t.Fatalf("CompleteUpload() avatar asset id got %q want %q", got.Avatar.AvatarAssetID, avatarAssetIDPrefix+"fixed")
+	if got.Avatar.AvatarAssetID != avatarAssetIDPrefix+"token" {
+		t.Fatalf("CompleteUpload() avatar asset id got %q want %q", got.Avatar.AvatarAssetID, avatarAssetIDPrefix+"token")
 	}
 	if got.Avatar.AvatarUploadToken != "token" {
 		t.Fatalf("CompleteUpload() avatar upload token got %q want %q", got.Avatar.AvatarUploadToken, "token")
+	}
+	if savedUpload.AvatarAssetID != avatarAssetIDPrefix+"token" {
+		t.Fatalf("CompleteUpload() saved avatar asset id got %q want %q", savedUpload.AvatarAssetID, avatarAssetIDPrefix+"token")
 	}
 	if savedUpload.State != uploadStateComplete {
 		t.Fatalf("CompleteUpload() saved state got %q want %q", savedUpload.State, uploadStateComplete)
 	}
 	if savedUpload.AvatarURL == "" {
 		t.Fatal("CompleteUpload() saved avatar url = empty, want value")
+	}
+}
+
+func TestCompleteUploadReturnsExpiredBeforePromotingDeliveryObject(t *testing.T) {
+	t.Parallel()
+
+	viewerUserID := uuid.MustParse("13222222-1111-1111-1111-111111111111")
+	putCalled := false
+
+	service, err := NewService(
+		ServiceConfig{
+			DeliveryBaseURL:    "https://cdn.example.com",
+			DeliveryBucketName: "delivery-bucket",
+			UploadBucketName:   "upload-bucket",
+		},
+		storageStub{
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{
+					ContentLength: 68,
+					ContentType:   "image/png",
+				}, nil
+			},
+			getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+				return medias3.ObjectData{
+					Body:        validPNGData,
+					ContentType: "image/png",
+				}, nil
+			},
+			putObject: func(context.Context, string, string, []byte, string) error {
+				putCalled = true
+				return nil
+			},
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, errors.New("should not be called")
+			},
+		},
+		uploadStoreStub{
+			getUpload: func(context.Context, string) (storedUpload, error) {
+				return storedUpload{
+					ExpiresAt:     time.Unix(1710000000, 0).UTC(),
+					FileName:      "avatar.png",
+					FileSizeBytes: 68,
+					MimeType:      "image/png",
+					State:         uploadStateCreated,
+					UploadKey:     "creator-avatar-upload/viewer/token/avatar.png",
+					ViewerUserID:  viewerUserID.String(),
+				}, nil
+			},
+			saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+				return errors.New("should not be called")
+			},
+			deleteUpload: func(context.Context, string) error {
+				return errors.New("should not be called")
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v, want nil", err)
+	}
+	service.now = func() time.Time {
+		return time.Unix(1710000001, 0).UTC()
+	}
+
+	_, err = service.CompleteUpload(context.Background(), CompleteUploadInput{
+		AvatarUploadToken: "token",
+		ViewerUserID:      viewerUserID,
+	})
+	if !errors.Is(err, ErrUploadExpired) {
+		t.Fatalf("CompleteUpload() error got %v want %v", err, ErrUploadExpired)
+	}
+	if putCalled {
+		t.Fatal("CompleteUpload() putCalled = true, want false")
 	}
 }
 
@@ -922,6 +994,38 @@ func TestConsumeCompletedUploadReturnsStorageFailureWhenDeleteAndSaveFail(t *tes
 	err = service.ConsumeCompletedUpload(context.Background(), viewerUserID, "token")
 	if !errors.Is(err, ErrStorageFailure) {
 		t.Fatalf("ConsumeCompletedUpload() error got %v want wrapped %v", err, ErrStorageFailure)
+	}
+}
+
+func TestBuildAvatarAssetIDUsesDeterministicTokenSuffix(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		avatarUploadToken string
+		want              string
+	}{
+		{
+			name:              "token with prefix",
+			avatarUploadToken: "vcupl_tokenfixed",
+			want:              avatarAssetIDPrefix + "tokenfixed",
+		},
+		{
+			name:              "token without prefix",
+			avatarUploadToken: "tokenfixed",
+			want:              avatarAssetIDPrefix + "tokenfixed",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := buildAvatarAssetID(tt.avatarUploadToken); got != tt.want {
+				t.Fatalf("buildAvatarAssetID() got %q want %q", got, tt.want)
+			}
+		})
 	}
 }
 

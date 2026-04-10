@@ -295,11 +295,13 @@ func (s *Service) CompleteUpload(ctx context.Context, input CompleteUploadInput)
 		return CompleteUploadResult{}, ErrUploadIncomplete
 	}
 
-	avatarAssetID, err := s.newOpaqueID(avatarAssetIDPrefix)
-	if err != nil {
-		return CompleteUploadResult{}, fmt.Errorf("generate avatar asset id: %w", err)
+	remainingTTL := upload.ExpiresAt.Sub(s.now().UTC())
+	if remainingTTL <= 0 {
+		return CompleteUploadResult{}, ErrUploadExpired
 	}
 
+	// Reuse a deterministic delivery key so repeated completion requests stay idempotent.
+	avatarAssetID := buildAvatarAssetID(avatarUploadToken)
 	deliveryKey := buildDeliveryObjectKey(input.ViewerUserID, avatarAssetID, upload.FileName)
 	if err := s.storage.PutObject(ctx, s.deliveryBucketName, deliveryKey, objectData.Body, expectedMimeType); err != nil {
 		return CompleteUploadResult{}, fmt.Errorf("%w: store delivery avatar token=%s: %v", ErrStorageFailure, avatarUploadToken, err)
@@ -310,7 +312,7 @@ func (s *Service) CompleteUpload(ctx context.Context, input CompleteUploadInput)
 	upload.DeliveryKey = deliveryKey
 	upload.State = uploadStateComplete
 
-	remainingTTL := upload.ExpiresAt.Sub(s.now().UTC())
+	remainingTTL = upload.ExpiresAt.Sub(s.now().UTC())
 	if remainingTTL <= 0 {
 		return CompleteUploadResult{}, ErrUploadExpired
 	}
@@ -501,6 +503,15 @@ func buildDeliveryURL(baseURL string, objectKey string) string {
 	trimmedBaseURL := strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	trimmedKey := strings.TrimLeft(strings.TrimSpace(objectKey), "/")
 	return trimmedBaseURL + "/" + trimmedKey
+}
+
+func buildAvatarAssetID(avatarUploadToken string) string {
+	normalizedToken := strings.TrimSpace(avatarUploadToken)
+	if strings.HasPrefix(normalizedToken, avatarUploadTokenPrefix) {
+		return avatarAssetIDPrefix + strings.TrimPrefix(normalizedToken, avatarUploadTokenPrefix)
+	}
+
+	return avatarAssetIDPrefix + normalizedToken
 }
 
 func sanitizeStorageSegment(fileName string) string {

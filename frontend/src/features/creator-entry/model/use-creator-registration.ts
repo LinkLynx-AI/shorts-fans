@@ -24,7 +24,9 @@ import {
   getCreatorRegistrationErrorMessage,
 } from "./creator-entry";
 
-const creatorRegistrationAvatarAccept = "image/jpeg,image/png,image/webp";
+const creatorRegistrationAvatarMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+const creatorRegistrationAvatarAccept = creatorRegistrationAvatarMimeTypes.join(",");
+const creatorRegistrationAvatarMimeTypeSet = new Set<string>(creatorRegistrationAvatarMimeTypes);
 const creatorRegistrationAvatarMaxFileSizeBytes = 5_242_880;
 const creatorRegistrationInvalidCompletedAvatarMessage =
   "avatar upload の有効期限が切れました。再度申し込むともう一度アップロードします。";
@@ -74,7 +76,7 @@ function validateAvatarFile(file: File): string | null {
   if (file.size > creatorRegistrationAvatarMaxFileSizeBytes) {
     return "avatar は 5MB 以下の画像を選択してください。";
   }
-  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+  if (!creatorRegistrationAvatarMimeTypeSet.has(file.type)) {
     return "avatar は JPEG / PNG / WebP のみ選択できます。";
   }
 
