@@ -5,7 +5,11 @@ import {
 } from "@testing-library/react";
 
 import { getFanHubState } from "@/entities/fan-profile";
-import { CurrentViewerProvider } from "@/entities/viewer";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
+import { useFanLogoutEntry } from "@/features/fan-auth";
 
 import { FanHubShell } from "./fan-hub-shell";
 
@@ -27,21 +31,54 @@ vi.mock("next/navigation", async () => {
   };
 });
 
+vi.mock("@/features/fan-auth", async () => {
+  const actual = await vi.importActual<typeof import("@/features/fan-auth")>("@/features/fan-auth");
+
+  return {
+    ...actual,
+    useFanLogoutEntry: vi.fn(),
+  };
+});
+
+function renderFanHubShell(currentViewer: {
+  activeMode: "fan" | "creator";
+  canAccessCreatorMode: boolean;
+  id: string;
+} | null) {
+  return render(
+    <ViewerSessionProvider hasSession>
+      <CurrentViewerProvider currentViewer={currentViewer}>
+        <FanHubShell state={getFanHubState("library")} />
+      </CurrentViewerProvider>
+    </ViewerSessionProvider>,
+  );
+}
+
 describe("FanHubShell account menu", () => {
+  beforeEach(() => {
+    mockedRouter.back.mockReset();
+    mockedRouter.forward.mockReset();
+    mockedRouter.prefetch.mockReset();
+    mockedRouter.push.mockReset();
+    mockedRouter.refresh.mockReset();
+    mockedRouter.replace.mockReset();
+    vi.mocked(useFanLogoutEntry).mockReset();
+    vi.mocked(useFanLogoutEntry).mockReturnValue({
+      clearError: vi.fn(),
+      errorMessage: null,
+      isSubmitting: false,
+      logout: vi.fn().mockResolvedValue(true),
+    });
+  });
+
   it("shows the registration entry for viewers without creator access", async () => {
     const user = userEvent.setup();
 
-    render(
-      <CurrentViewerProvider
-        currentViewer={{
-          activeMode: "fan",
-          canAccessCreatorMode: false,
-          id: "viewer_123",
-        }}
-      >
-        <FanHubShell state={getFanHubState("library")} />
-      </CurrentViewerProvider>,
-    );
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
 
@@ -49,25 +86,91 @@ describe("FanHubShell account menu", () => {
       "href",
       "/fan/creator/register",
     );
+    expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
   });
 
   it("shows the creator switch entry for creator-capable viewers", async () => {
     const user = userEvent.setup();
 
-    render(
-      <CurrentViewerProvider
-        currentViewer={{
-          activeMode: "fan",
-          canAccessCreatorMode: true,
-          id: "viewer_123",
-        }}
-      >
-        <FanHubShell state={getFanHubState("library")} />
-      </CurrentViewerProvider>,
-    );
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: true,
+      id: "viewer_123",
+    });
 
     await user.click(screen.getByRole("button", { name: "Settings" }));
 
     expect(screen.getByRole("button", { name: "Creator mode に切り替え" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
+  });
+
+  it("shows a pending logout label while the action is in flight", async () => {
+    const user = userEvent.setup();
+    const logout = vi.fn().mockResolvedValue(true);
+
+    vi.mocked(useFanLogoutEntry).mockReturnValue({
+      clearError: vi.fn(),
+      errorMessage: null,
+      isSubmitting: true,
+      logout,
+    });
+
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: true,
+      id: "viewer_123",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByRole("button", { name: "ログアウトしています..." })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Creator mode に切り替え" })).toBeDisabled();
+    expect(logout).not.toHaveBeenCalled();
+  });
+
+  it("shows a retryable error when logout fails", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(useFanLogoutEntry).mockReturnValue({
+      clearError: vi.fn(),
+      errorMessage: "ログアウトできませんでした。少し時間を置いてからやり直してください。",
+      isSubmitting: false,
+      logout: vi.fn().mockResolvedValue(false),
+    });
+
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "ログアウトできませんでした。少し時間を置いてからやり直してください。",
+    );
+  });
+
+  it("invokes logout from the account menu action", async () => {
+    const user = userEvent.setup();
+    const logout = vi.fn().mockResolvedValue(true);
+
+    vi.mocked(useFanLogoutEntry).mockReturnValue({
+      clearError: vi.fn(),
+      errorMessage: null,
+      isSubmitting: false,
+      logout,
+    });
+
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "ログアウト" }));
+
+    expect(logout).toHaveBeenCalledTimes(1);
   });
 });
