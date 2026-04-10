@@ -82,6 +82,203 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw" {
   }
 }
 
+resource "aws_s3_bucket" "creator_avatar_upload" {
+  bucket = local.creator_avatar_upload_bucket_name
+}
+
+resource "aws_s3_bucket_ownership_controls" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "creator_avatar_upload_access" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.creator_avatar_upload.arn,
+      "${aws_s3_bucket.creator_avatar_upload.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+  policy = data.aws_iam_policy_document.creator_avatar_upload_access.json
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.creator_avatar_upload,
+    aws_s3_bucket_public_access_block.creator_avatar_upload,
+  ]
+}
+
+resource "aws_s3_bucket_cors_configuration" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["HEAD", "PUT"]
+    allowed_origins = var.allowed_app_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 300
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "creator_avatar_upload" {
+  bucket = aws_s3_bucket.creator_avatar_upload.id
+
+  rule {
+    id     = "expire-avatar-upload-after-1-day"
+    status = "Enabled"
+
+    filter {}
+
+    expiration {
+      days = 1
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
+resource "aws_s3_bucket" "creator_avatar_delivery" {
+  bucket = local.creator_avatar_delivery_bucket_name
+}
+
+resource "aws_s3_bucket_ownership_controls" "creator_avatar_delivery" {
+  bucket = aws_s3_bucket.creator_avatar_delivery.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "creator_avatar_delivery" {
+  bucket = aws_s3_bucket.creator_avatar_delivery.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "creator_avatar_delivery" {
+  bucket = aws_s3_bucket.creator_avatar_delivery.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "creator_avatar_delivery_access" {
+  statement {
+    sid    = "AllowCloudFrontReadOfCreatorAvatarObjects"
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudfront.amazonaws.com"]
+    }
+
+    actions = ["s3:GetObject"]
+    resources = [
+      "${aws_s3_bucket.creator_avatar_delivery.arn}/*",
+    ]
+
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceArn"
+      values   = [aws_cloudfront_distribution.creator_avatar.arn]
+    }
+  }
+
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.creator_avatar_delivery.arn,
+      "${aws_s3_bucket.creator_avatar_delivery.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "creator_avatar_delivery" {
+  bucket = aws_s3_bucket.creator_avatar_delivery.id
+  policy = data.aws_iam_policy_document.creator_avatar_delivery_access.json
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.creator_avatar_delivery,
+    aws_s3_bucket_public_access_block.creator_avatar_delivery,
+  ]
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "creator_avatar_delivery" {
+  bucket = aws_s3_bucket.creator_avatar_delivery.id
+
+  rule {
+    id     = "abort-incomplete-multipart-uploads"
+    status = "Enabled"
+
+    filter {}
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
 resource "aws_s3_bucket" "short_public" {
   bucket = local.short_public_bucket_name
 }
