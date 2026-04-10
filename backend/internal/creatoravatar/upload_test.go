@@ -3,13 +3,35 @@ package creatoravatar
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
 
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 )
+
+type smithyAPIErrorStub struct {
+	code string
+}
+
+func (e smithyAPIErrorStub) Error() string {
+	return e.code
+}
+
+func (e smithyAPIErrorStub) ErrorCode() string {
+	return e.code
+}
+
+func (e smithyAPIErrorStub) ErrorFault() smithy.ErrorFault {
+	return smithy.FaultClient
+}
+
+func (e smithyAPIErrorStub) ErrorMessage() string {
+	return e.code
+}
 
 type uploadStoreStub struct {
 	deleteUpload func(context.Context, string) error
@@ -236,6 +258,116 @@ func TestCreateUploadValidatesFileMetadata(t *testing.T) {
 	}
 }
 
+func TestNewServiceValidatesRequiredConfigAndDefaultsTTL(t *testing.T) {
+	t.Parallel()
+
+	validStorage := storageStub{
+		headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+			return medias3.ObjectMetadata{}, nil
+		},
+		getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+			return medias3.ObjectData{}, nil
+		},
+		putObject: func(context.Context, string, string, []byte, string) error {
+			return nil
+		},
+		presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+			return medias3.PresignedUpload{}, nil
+		},
+	}
+	validStore := uploadStoreStub{
+		saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+			return nil
+		},
+		getUpload: func(context.Context, string) (storedUpload, error) {
+			return storedUpload{}, nil
+		},
+		deleteUpload: func(context.Context, string) error {
+			return nil
+		},
+	}
+
+	tests := []struct {
+		name    string
+		cfg     ServiceConfig
+		storage Storage
+		store   uploadStore
+	}{
+		{
+			name: "missing storage",
+			cfg: ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			store: validStore,
+		},
+		{
+			name: "missing store",
+			cfg: ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storage: validStorage,
+		},
+		{
+			name: "missing upload bucket",
+			cfg: ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+			},
+			storage: validStorage,
+			store:   validStore,
+		},
+		{
+			name: "missing delivery bucket",
+			cfg: ServiceConfig{
+				DeliveryBaseURL:  "https://cdn.example.com",
+				UploadBucketName: "upload-bucket",
+			},
+			storage: validStorage,
+			store:   validStore,
+		},
+		{
+			name: "missing delivery base url",
+			cfg: ServiceConfig{
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storage: validStorage,
+			store:   validStore,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := NewService(tt.cfg, tt.storage, tt.store); err == nil {
+				t.Fatalf("NewService() error = nil for %s", tt.name)
+			}
+		})
+	}
+
+	service, err := NewService(
+		ServiceConfig{
+			DeliveryBaseURL:    "https://cdn.example.com",
+			DeliveryBucketName: "delivery-bucket",
+			UploadBucketName:   "upload-bucket",
+		},
+		validStorage,
+		validStore,
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v, want nil", err)
+	}
+	if service.uploadTTL != defaultUploadTTL {
+		t.Fatalf("NewService() uploadTTL got %s want %s", service.uploadTTL, defaultUploadTTL)
+	}
+}
+
 func TestCompleteUploadPromotesObjectAndReturnsCompletedAvatar(t *testing.T) {
 	t.Parallel()
 
@@ -349,6 +481,66 @@ func TestCompleteUploadPromotesObjectAndReturnsCompletedAvatar(t *testing.T) {
 	}
 }
 
+func TestCompleteUploadReturnsIncompleteWhenUploadObjectIsMissing(t *testing.T) {
+	t.Parallel()
+
+	viewerUserID := uuid.MustParse("13111111-1111-1111-1111-111111111111")
+	service, err := NewService(
+		ServiceConfig{
+			DeliveryBaseURL:    "https://cdn.example.com",
+			DeliveryBucketName: "delivery-bucket",
+			UploadBucketName:   "upload-bucket",
+		},
+		storageStub{
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{}, fmt.Errorf("wrapped missing: %w", smithyAPIErrorStub{code: "NotFound"})
+			},
+			getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+				return medias3.ObjectData{}, errors.New("should not be called")
+			},
+			putObject: func(context.Context, string, string, []byte, string) error {
+				return errors.New("should not be called")
+			},
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, errors.New("should not be called")
+			},
+		},
+		uploadStoreStub{
+			getUpload: func(context.Context, string) (storedUpload, error) {
+				return storedUpload{
+					ExpiresAt:     time.Unix(1710000900, 0).UTC(),
+					FileName:      "avatar.png",
+					FileSizeBytes: 68,
+					MimeType:      "image/png",
+					State:         uploadStateCreated,
+					UploadKey:     "creator-avatar-upload/viewer/token/avatar.png",
+					ViewerUserID:  viewerUserID.String(),
+				}, nil
+			},
+			saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+				return errors.New("should not be called")
+			},
+			deleteUpload: func(context.Context, string) error {
+				return errors.New("should not be called")
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v, want nil", err)
+	}
+	service.now = func() time.Time {
+		return time.Unix(1710000000, 0).UTC()
+	}
+
+	_, err = service.CompleteUpload(context.Background(), CompleteUploadInput{
+		AvatarUploadToken: "token",
+		ViewerUserID:      viewerUserID,
+	})
+	if !errors.Is(err, ErrUploadIncomplete) {
+		t.Fatalf("CompleteUpload() error got %v want %v", err, ErrUploadIncomplete)
+	}
+}
+
 func TestResolveCompletedUploadRejectsConsumedOrIncompleteUpload(t *testing.T) {
 	t.Parallel()
 
@@ -400,6 +592,218 @@ func TestResolveCompletedUploadRejectsConsumedOrIncompleteUpload(t *testing.T) {
 	if !errors.Is(err, ErrUploadConsumed) {
 		t.Fatalf("ResolveCompletedUpload() error got %v want %v", err, ErrUploadConsumed)
 	}
+}
+
+func TestResolveCompletedUploadHandlesTokenOwnershipAndState(t *testing.T) {
+	t.Parallel()
+
+	viewerUserID := uuid.MustParse("14111111-1111-1111-1111-111111111111")
+
+	t.Run("empty token", func(t *testing.T) {
+		t.Parallel()
+
+		service, err := NewService(
+			ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storageStub{
+				headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+					return medias3.ObjectMetadata{}, errors.New("should not be called")
+				},
+				getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+					return medias3.ObjectData{}, errors.New("should not be called")
+				},
+				putObject: func(context.Context, string, string, []byte, string) error {
+					return errors.New("should not be called")
+				},
+				presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+					return medias3.PresignedUpload{}, errors.New("should not be called")
+				},
+			},
+			uploadStoreStub{
+				getUpload: func(context.Context, string) (storedUpload, error) {
+					return storedUpload{}, errors.New("should not be called")
+				},
+				saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+					return errors.New("should not be called")
+				},
+				deleteUpload: func(context.Context, string) error {
+					return errors.New("should not be called")
+				},
+			},
+		)
+		if err != nil {
+			t.Fatalf("NewService() error = %v, want nil", err)
+		}
+
+		_, err = service.ResolveCompletedUpload(context.Background(), viewerUserID, "   ")
+		if !errors.Is(err, ErrUploadNotFound) {
+			t.Fatalf("ResolveCompletedUpload() error got %v want %v", err, ErrUploadNotFound)
+		}
+	})
+
+	t.Run("expired token deletes upload", func(t *testing.T) {
+		t.Parallel()
+
+		deleteCalled := false
+		service, err := NewService(
+			ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storageStub{
+				headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+					return medias3.ObjectMetadata{}, errors.New("should not be called")
+				},
+				getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+					return medias3.ObjectData{}, errors.New("should not be called")
+				},
+				putObject: func(context.Context, string, string, []byte, string) error {
+					return errors.New("should not be called")
+				},
+				presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+					return medias3.PresignedUpload{}, errors.New("should not be called")
+				},
+			},
+			uploadStoreStub{
+				getUpload: func(context.Context, string) (storedUpload, error) {
+					return storedUpload{
+						ExpiresAt:    time.Unix(1710000000, 0).UTC(),
+						State:        uploadStateComplete,
+						ViewerUserID: viewerUserID.String(),
+					}, nil
+				},
+				saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+					return errors.New("should not be called")
+				},
+				deleteUpload: func(context.Context, string) error {
+					deleteCalled = true
+					return nil
+				},
+			},
+		)
+		if err != nil {
+			t.Fatalf("NewService() error = %v, want nil", err)
+		}
+		service.now = func() time.Time {
+			return time.Unix(1710000001, 0).UTC()
+		}
+
+		_, err = service.ResolveCompletedUpload(context.Background(), viewerUserID, "token")
+		if !errors.Is(err, ErrUploadExpired) {
+			t.Fatalf("ResolveCompletedUpload() error got %v want %v", err, ErrUploadExpired)
+		}
+		if !deleteCalled {
+			t.Fatal("ResolveCompletedUpload() deleteCalled = false, want true")
+		}
+	})
+
+	t.Run("wrong viewer is hidden as not found", func(t *testing.T) {
+		t.Parallel()
+
+		service, err := NewService(
+			ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storageStub{
+				headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+					return medias3.ObjectMetadata{}, errors.New("should not be called")
+				},
+				getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+					return medias3.ObjectData{}, errors.New("should not be called")
+				},
+				putObject: func(context.Context, string, string, []byte, string) error {
+					return errors.New("should not be called")
+				},
+				presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+					return medias3.PresignedUpload{}, errors.New("should not be called")
+				},
+			},
+			uploadStoreStub{
+				getUpload: func(context.Context, string) (storedUpload, error) {
+					return storedUpload{
+						ExpiresAt:    time.Unix(1710000900, 0).UTC(),
+						State:        uploadStateComplete,
+						ViewerUserID: uuid.New().String(),
+					}, nil
+				},
+				saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+					return errors.New("should not be called")
+				},
+				deleteUpload: func(context.Context, string) error {
+					return errors.New("should not be called")
+				},
+			},
+		)
+		if err != nil {
+			t.Fatalf("NewService() error = %v, want nil", err)
+		}
+		service.now = func() time.Time {
+			return time.Unix(1710000000, 0).UTC()
+		}
+
+		_, err = service.ResolveCompletedUpload(context.Background(), viewerUserID, "token")
+		if !errors.Is(err, ErrUploadNotFound) {
+			t.Fatalf("ResolveCompletedUpload() error got %v want %v", err, ErrUploadNotFound)
+		}
+	})
+
+	t.Run("created upload is incomplete", func(t *testing.T) {
+		t.Parallel()
+
+		service, err := NewService(
+			ServiceConfig{
+				DeliveryBaseURL:    "https://cdn.example.com",
+				DeliveryBucketName: "delivery-bucket",
+				UploadBucketName:   "upload-bucket",
+			},
+			storageStub{
+				headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+					return medias3.ObjectMetadata{}, errors.New("should not be called")
+				},
+				getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+					return medias3.ObjectData{}, errors.New("should not be called")
+				},
+				putObject: func(context.Context, string, string, []byte, string) error {
+					return errors.New("should not be called")
+				},
+				presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+					return medias3.PresignedUpload{}, errors.New("should not be called")
+				},
+			},
+			uploadStoreStub{
+				getUpload: func(context.Context, string) (storedUpload, error) {
+					return storedUpload{
+						ExpiresAt:    time.Unix(1710000900, 0).UTC(),
+						State:        uploadStateCreated,
+						ViewerUserID: viewerUserID.String(),
+					}, nil
+				},
+				saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+					return errors.New("should not be called")
+				},
+				deleteUpload: func(context.Context, string) error {
+					return errors.New("should not be called")
+				},
+			},
+		)
+		if err != nil {
+			t.Fatalf("NewService() error = %v, want nil", err)
+		}
+		service.now = func() time.Time {
+			return time.Unix(1710000000, 0).UTC()
+		}
+
+		_, err = service.ResolveCompletedUpload(context.Background(), viewerUserID, "token")
+		if !errors.Is(err, ErrUploadIncomplete) {
+			t.Fatalf("ResolveCompletedUpload() error got %v want %v", err, ErrUploadIncomplete)
+		}
+	})
 }
 
 func TestConsumeCompletedUploadMarksConsumedWhenDeleteFails(t *testing.T) {
@@ -463,6 +867,61 @@ func TestConsumeCompletedUploadMarksConsumedWhenDeleteFails(t *testing.T) {
 	}
 	if savedState != uploadStateConsumed {
 		t.Fatalf("ConsumeCompletedUpload() saved state got %q want %q", savedState, uploadStateConsumed)
+	}
+}
+
+func TestConsumeCompletedUploadReturnsStorageFailureWhenDeleteAndSaveFail(t *testing.T) {
+	t.Parallel()
+
+	viewerUserID := uuid.New()
+	service, err := NewService(
+		ServiceConfig{
+			DeliveryBaseURL:    "https://cdn.example.com",
+			DeliveryBucketName: "delivery-bucket",
+			UploadBucketName:   "upload-bucket",
+		},
+		storageStub{
+			headObject: func(context.Context, string, string) (medias3.ObjectMetadata, error) {
+				return medias3.ObjectMetadata{}, errors.New("should not be called")
+			},
+			getObject: func(context.Context, string, string) (medias3.ObjectData, error) {
+				return medias3.ObjectData{}, errors.New("should not be called")
+			},
+			putObject: func(context.Context, string, string, []byte, string) error {
+				return errors.New("should not be called")
+			},
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, errors.New("should not be called")
+			},
+		},
+		uploadStoreStub{
+			getUpload: func(context.Context, string) (storedUpload, error) {
+				return storedUpload{
+					AvatarAssetID: "asset",
+					AvatarURL:     "https://cdn.example.com/avatar.png",
+					ExpiresAt:     time.Unix(1710000900, 0).UTC(),
+					State:         uploadStateComplete,
+					ViewerUserID:  viewerUserID.String(),
+				}, nil
+			},
+			deleteUpload: func(context.Context, string) error {
+				return errors.New("delete failed")
+			},
+			saveUpload: func(context.Context, string, storedUpload, time.Duration) error {
+				return errors.New("save failed")
+			},
+		},
+	)
+	if err != nil {
+		t.Fatalf("NewService() error = %v, want nil", err)
+	}
+	service.now = func() time.Time {
+		return time.Unix(1710000000, 0).UTC()
+	}
+
+	err = service.ConsumeCompletedUpload(context.Background(), viewerUserID, "token")
+	if !errors.Is(err, ErrStorageFailure) {
+		t.Fatalf("ConsumeCompletedUpload() error got %v want wrapped %v", err, ErrStorageFailure)
 	}
 }
 
