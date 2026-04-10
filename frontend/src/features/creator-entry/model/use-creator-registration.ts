@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
+  useEffect,
   startTransition,
   useState,
 } from "react";
@@ -50,7 +51,9 @@ type CreatorRegistrationAvatarField = {
   fileName: string | null;
   inputAccept: string;
   isError: boolean;
+  kind: CreatorRegistrationAvatarState["kind"];
   message: string;
+  previewUrl: string | null;
 };
 
 type UseCreatorRegistrationResult = {
@@ -99,7 +102,23 @@ function getAvatarUploadErrorMessage(error: unknown): string {
   return "avatar のアップロードに失敗しました。少し時間を置いてから再度お試しください。";
 }
 
-function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistrationAvatarField {
+function getAvatarPreviewFile(state: CreatorRegistrationAvatarState): File | null {
+  switch (state.kind) {
+    case "selected":
+    case "uploading":
+    case "completed":
+    case "failed":
+      return state.file;
+    case "empty":
+    case "invalid":
+      return null;
+  }
+}
+
+function buildAvatarField(
+  state: CreatorRegistrationAvatarState,
+  previewUrl: string | null,
+): CreatorRegistrationAvatarField {
   switch (state.kind) {
     case "empty":
       return {
@@ -107,7 +126,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: null,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
-        message: "未選択です。JPEG / PNG / WebP の 5MB 以下の画像を登録時にアップロードできます。",
+        kind: "empty",
+        message: "未設定でも登録できます。",
+        previewUrl,
       };
     case "invalid":
       return {
@@ -115,7 +136,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: state.fileName,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: true,
+        kind: "invalid",
         message: state.message,
+        previewUrl,
       };
     case "selected":
       return {
@@ -123,7 +146,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: state.file.name,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
-        message: `${state.file.name} を登録時にアップロードします。`,
+        kind: "selected",
+        message: "登録時にアップロードします。",
+        previewUrl,
       };
     case "uploading":
       return {
@@ -131,7 +156,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: state.file.name,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
-        message: `${state.file.name} をアップロードしています。`,
+        kind: "uploading",
+        message: "アップロードしています。",
+        previewUrl,
       };
     case "completed":
       return {
@@ -139,7 +166,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: state.file.name,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: false,
-        message: `${state.file.name} はアップロード済みです。`,
+        kind: "completed",
+        message: "アップロード済みです。",
+        previewUrl,
       };
     case "failed":
       return {
@@ -147,7 +176,9 @@ function buildAvatarField(state: CreatorRegistrationAvatarState): CreatorRegistr
         fileName: state.file.name,
         inputAccept: creatorRegistrationAvatarAccept,
         isError: true,
+        kind: "failed",
         message: state.message,
+        previewUrl,
       };
   }
 }
@@ -163,9 +194,25 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   const [displayName, setDisplayNameState] = useState("");
   const [handle, setHandleState] = useState("");
   const [avatarState, setAvatarState] = useState<CreatorRegistrationAvatarState>({ kind: "empty" });
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
   const [avatarInputKey, setAvatarInputKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const previewFile = getAvatarPreviewFile(avatarState);
+    if (previewFile === null) {
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(previewFile);
+    setAvatarPreviewUrl(nextPreviewUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextPreviewUrl);
+    };
+  }, [avatarState]);
 
   const clearErrorMessage = () => {
     if (errorMessage !== null) {
@@ -360,7 +407,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   };
 
   return {
-    avatar: buildAvatarField(avatarState),
+    avatar: buildAvatarField(avatarState, avatarPreviewUrl),
     avatarInputKey,
     bio,
     clearAvatarSelection,

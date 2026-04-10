@@ -29,6 +29,10 @@ const mockedRouter = vi.hoisted(() => ({
   refresh: vi.fn(),
   replace: vi.fn(),
 }));
+const mockedCreateObjectURL = vi.fn(() => "blob:avatar-preview");
+const mockedRevokeObjectURL = vi.fn();
+const originalCreateObjectURL = URL.createObjectURL;
+const originalRevokeObjectURL = URL.revokeObjectURL;
 
 vi.mock("next/navigation", async () => {
   const actual = await vi.importActual<typeof import("next/navigation")>("next/navigation");
@@ -91,6 +95,15 @@ describe("CreatorRegistrationPanel", () => {
     vi.mocked(createCreatorRegistrationAvatarUpload).mockReset();
     vi.mocked(uploadCreatorRegistrationAvatarTarget).mockReset();
     vi.mocked(completeCreatorRegistrationAvatarUpload).mockReset();
+    mockedCreateObjectURL.mockClear();
+    mockedRevokeObjectURL.mockClear();
+    URL.createObjectURL = mockedCreateObjectURL;
+    URL.revokeObjectURL = mockedRevokeObjectURL;
+  });
+
+  afterAll(() => {
+    URL.createObjectURL = originalCreateObjectURL;
+    URL.revokeObjectURL = originalRevokeObjectURL;
   });
 
   it("validates display name before sending the request", async () => {
@@ -199,6 +212,22 @@ describe("CreatorRegistrationPanel", () => {
         bio: "",
         displayName: "Mina Rei",
         handle: "@mina.rei",
+      });
+    });
+  });
+
+  it("shows the selected avatar in the preview", async () => {
+    const user = userEvent.setup();
+    const avatarFile = createAvatarFile("avatar.png");
+
+    renderPanel();
+
+    await user.upload(screen.getByLabelText("Avatar image"), avatarFile);
+
+    await waitFor(() => {
+      expect(mockedCreateObjectURL).toHaveBeenCalledWith(avatarFile);
+      expect(screen.getByRole("img", { name: "選択した avatar プレビュー" })).toHaveStyle({
+        backgroundImage: 'url("blob:avatar-preview")',
       });
     });
   });
