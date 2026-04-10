@@ -69,33 +69,33 @@ function formatPreviewDuration(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
-function normalizeViewerIDForSelfComparison(viewerID: string | undefined): string | null {
-  if (!viewerID) {
+function normalizeViewerIdForSelfComparison(viewerId: string | undefined): string | null {
+  if (!viewerId) {
     return null;
   }
 
-  const normalizedViewerID = viewerID.trim().toLowerCase().replaceAll("-", "");
+  const normalizedViewerId = viewerId.trim().toLowerCase().replaceAll("-", "");
 
-  return /^[0-9a-f]{32}$/.test(normalizedViewerID) ? normalizedViewerID : null;
+  return /^[0-9a-f]{32}$/.test(normalizedViewerId) ? normalizedViewerId : null;
 }
 
-function normalizeCreatorIDForSelfComparison(creatorID: string): string | null {
-  const normalizedCreatorID = creatorID.trim().toLowerCase();
+function normalizeCreatorIdForSelfComparison(creatorId: string): string | null {
+  const normalizedCreatorId = creatorId.trim().toLowerCase();
 
-  if (!normalizedCreatorID.startsWith("creator_")) {
+  if (!normalizedCreatorId.startsWith("creator_")) {
     return null;
   }
 
-  const viewerID = normalizedCreatorID.slice("creator_".length);
+  const creatorUserId = normalizedCreatorId.slice("creator_".length);
 
-  return /^[0-9a-f]{32}$/.test(viewerID) ? viewerID : null;
+  return /^[0-9a-f]{32}$/.test(creatorUserId) ? creatorUserId : null;
 }
 
-function isSelfCreatorProfile(currentViewerID: string | undefined, creatorID: string): boolean {
-  const normalizedViewerID = normalizeViewerIDForSelfComparison(currentViewerID);
-  const normalizedCreatorViewerID = normalizeCreatorIDForSelfComparison(creatorID);
+function isSelfCreatorProfile(currentViewerId: string | undefined, creatorId: string): boolean {
+  const normalizedViewerId = normalizeViewerIdForSelfComparison(currentViewerId);
+  const normalizedCreatorUserId = normalizeCreatorIdForSelfComparison(creatorId);
 
-  return normalizedViewerID !== null && normalizedCreatorViewerID !== null && normalizedViewerID === normalizedCreatorViewerID;
+  return normalizedViewerId !== null && normalizedCreatorUserId !== null && normalizedViewerId === normalizedCreatorUserId;
 }
 
 function CreatorProfileShortGridTile({
