@@ -178,6 +178,8 @@ func TestCreateMainWithShortsRollsBackOnShortFailure(t *testing.T) {
 			CreatorUserID:      creatorID,
 			MediaAssetID:       mainMediaID,
 			State:              "draft",
+			PriceMinor:         1200,
+			CurrencyCode:       "JPY",
 			OwnershipConfirmed: true,
 			ConsentConfirmed:   true,
 		},

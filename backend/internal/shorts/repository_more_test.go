@@ -134,8 +134,8 @@ func TestBuildCreateParams(t *testing.T) {
 	now := time.Unix(1710000000, 0).UTC()
 	reviewReason := stringPtr("needs_review")
 	postReportState := stringPtr("clean")
-	priceMinor := int64Ptr(1200)
-	currencyCode := stringPtr("JPY")
+	priceMinor := int64(1200)
+	currencyCode := "JPY"
 
 	gotMain := buildCreateMainParams(CreateMainInput{
 		CreatorUserID:       uuid.MustParse("00000000-0000-0000-0000-000000000001"),
@@ -155,8 +155,8 @@ func TestBuildCreateParams(t *testing.T) {
 		State:               "draft",
 		ReviewReasonCode:    textValue(reviewReason),
 		PostReportState:     textValue(postReportState),
-		PriceMinor:          int64Value(priceMinor),
-		CurrencyCode:        textValue(currencyCode),
+		PriceMinor:          priceMinor,
+		CurrencyCode:        currencyCode,
 		OwnershipConfirmed:  true,
 		ConsentConfirmed:    true,
 		ApprovedForUnlockAt: timestamp(now),
@@ -201,8 +201,8 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	shortMediaID := uuid.New()
 	reviewReason := stringPtr("needs_review")
 	postReportState := stringPtr("clean")
-	priceMinor := int64Ptr(1200)
-	currencyCode := stringPtr("JPY")
+	priceMinor := int64(1200)
+	currencyCode := "JPY"
 	approvedForUnlockAt := timePtr(now.Add(time.Hour))
 	approvedForPublishAt := timePtr(now.Add(2 * time.Hour))
 	publishedAt := timePtr(now.Add(3 * time.Hour))
@@ -645,9 +645,9 @@ func TestRepositoryConversionErrors(t *testing.T) {
 	shortID := uuid.New()
 	shortMediaID := uuid.New()
 
-	invalidMain := testMainRow(mainID, creatorID, mainMediaID, now, nil, nil, nil, nil, nil)
+	invalidMain := testMainRow(mainID, creatorID, mainMediaID, now, nil, nil, 1200, "JPY", nil)
 	invalidMain.ID = pgtype.UUID{}
-	invalidUnlockableMain := testUnlockableMainRow(mainID, creatorID, mainMediaID, now, nil, nil, nil, nil, nil)
+	invalidUnlockableMain := testUnlockableMainRow(mainID, creatorID, mainMediaID, now, nil, nil, 1200, "JPY", nil)
 	invalidUnlockableMain.ID = pgtype.UUID{}
 	invalidShort := testShortRow(shortID, creatorID, mainID, shortMediaID, now, nil, nil, nil, nil)
 	invalidShort.ID = pgtype.UUID{}
@@ -723,13 +723,13 @@ func TestMapFunctionsRejectInvalidRows(t *testing.T) {
 	shortID := uuid.New()
 	shortMediaID := uuid.New()
 
-	invalidMain := testMainRow(mainID, creatorID, mainMediaID, now, nil, nil, nil, nil, nil)
+	invalidMain := testMainRow(mainID, creatorID, mainMediaID, now, nil, nil, 1200, "JPY", nil)
 	invalidMain.CreatedAt = pgtype.Timestamptz{}
 	if _, err := mapMain(invalidMain); err == nil {
 		t.Fatal("mapMain() error = nil, want conversion error")
 	}
 
-	invalidUnlockableMain := testUnlockableMainRow(mainID, creatorID, mainMediaID, now, nil, nil, nil, nil, nil)
+	invalidUnlockableMain := testUnlockableMainRow(mainID, creatorID, mainMediaID, now, nil, nil, 1200, "JPY", nil)
 	invalidUnlockableMain.CreatedAt = pgtype.Timestamptz{}
 	if _, err := mapUnlockableMain(invalidUnlockableMain); err == nil {
 		t.Fatal("mapUnlockableMain() error = nil, want conversion error")
@@ -748,7 +748,7 @@ func TestMapFunctionsRejectInvalidRows(t *testing.T) {
 	}
 }
 
-func testMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor *int64, currencyCode *string, approvedForUnlockAt *time.Time) sqlc.AppMain {
+func testMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor int64, currencyCode string, approvedForUnlockAt *time.Time) sqlc.AppMain {
 	return sqlc.AppMain{
 		ID:                  postgresUUID(id),
 		CreatorUserID:       postgresUUID(creatorID),
@@ -756,8 +756,8 @@ func testMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now 
 		State:               "draft",
 		ReviewReasonCode:    textValue(reviewReason),
 		PostReportState:     textValue(postReportState),
-		PriceMinor:          int64Value(priceMinor),
-		CurrencyCode:        textValue(currencyCode),
+		PriceMinor:          priceMinor,
+		CurrencyCode:        currencyCode,
 		OwnershipConfirmed:  true,
 		ConsentConfirmed:    true,
 		ApprovedForUnlockAt: optionalTimestamp(approvedForUnlockAt),
@@ -766,7 +766,7 @@ func testMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now 
 	}
 }
 
-func testUnlockableMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor *int64, currencyCode *string, approvedForUnlockAt *time.Time) sqlc.AppUnlockableMain {
+func testUnlockableMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor int64, currencyCode string, approvedForUnlockAt *time.Time) sqlc.AppUnlockableMain {
 	return sqlc.AppUnlockableMain{
 		ID:                  postgresUUID(id),
 		CreatorUserID:       postgresUUID(creatorID),
@@ -774,8 +774,8 @@ func testUnlockableMainRow(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.
 		State:               "draft",
 		ReviewReasonCode:    textValue(reviewReason),
 		PostReportState:     textValue(postReportState),
-		PriceMinor:          int64Value(priceMinor),
-		CurrencyCode:        textValue(currencyCode),
+		PriceMinor:          pgtype.Int8{Int64: priceMinor, Valid: true},
+		CurrencyCode:        pgtype.Text{String: currencyCode, Valid: true},
 		OwnershipConfirmed:  true,
 		ConsentConfirmed:    true,
 		ApprovedForUnlockAt: optionalTimestamp(approvedForUnlockAt),
@@ -816,7 +816,7 @@ func testPublicShortRow(id uuid.UUID, creatorID uuid.UUID, canonicalMainID uuid.
 	}
 }
 
-func wantMain(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor *int64, currencyCode *string, approvedForUnlockAt *time.Time) Main {
+func wantMain(id uuid.UUID, creatorID uuid.UUID, mediaAssetID uuid.UUID, now time.Time, reviewReason *string, postReportState *string, priceMinor int64, currencyCode string, approvedForUnlockAt *time.Time) Main {
 	return Main{
 		ID:                  id,
 		CreatorUserID:       creatorID,
@@ -857,13 +857,6 @@ func textValue(value *string) pgtype.Text {
 	return pgtype.Text{String: *value, Valid: true}
 }
 
-func int64Value(value *int64) pgtype.Int8 {
-	if value == nil {
-		return pgtype.Int8{}
-	}
-	return pgtype.Int8{Int64: *value, Valid: true}
-}
-
 func optionalTimestamp(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
 		return pgtype.Timestamptz{}
@@ -875,9 +868,6 @@ func stringPtr(value string) *string {
 	return &value
 }
 
-func int64Ptr(value int64) *int64 {
-	return &value
-}
 
 func timePtr(value time.Time) *time.Time {
 	return &value

@@ -88,8 +88,8 @@ type AppMain struct {
 	State               string
 	ReviewReasonCode    pgtype.Text
 	PostReportState     pgtype.Text
-	PriceMinor          pgtype.Int8
-	CurrencyCode        pgtype.Text
+	PriceMinor          int64
+	CurrencyCode        string
 	OwnershipConfirmed  bool
 	ConsentConfirmed    bool
 	ApprovedForUnlockAt pgtype.Timestamptz
