@@ -32,13 +32,21 @@ type creatorUploadFileRequest struct {
 }
 
 type creatorUploadCompleteRequest struct {
-	Main         *creatorUploadEntryRequest  `json:"main"`
-	PackageToken string                      `json:"packageToken"`
-	Shorts       []creatorUploadEntryRequest `json:"shorts"`
+	Main         *creatorUploadCompleteMainRequest   `json:"main"`
+	PackageToken string                              `json:"packageToken"`
+	Shorts       []creatorUploadCompleteShortRequest `json:"shorts"`
 }
 
-type creatorUploadEntryRequest struct {
-	UploadEntryID string `json:"uploadEntryId"`
+type creatorUploadCompleteMainRequest struct {
+	ConsentConfirmed   bool   `json:"consentConfirmed"`
+	OwnershipConfirmed bool   `json:"ownershipConfirmed"`
+	PriceJpy           int64  `json:"priceJpy"`
+	UploadEntryID      string `json:"uploadEntryId"`
+}
+
+type creatorUploadCompleteShortRequest struct {
+	Caption       *string `json:"caption"`
+	UploadEntryID string  `json:"uploadEntryId"`
 }
 
 type creatorUploadCreateResponseData struct {
@@ -204,13 +212,21 @@ func handleCreatorUploadComplete(c *gin.Context, service CreatorUploadHandler) {
 	input := creatorupload.CompletePackageInput{
 		CreatorUserID: viewer.ID,
 		PackageToken:  request.PackageToken,
-		Shorts:        make([]creatorupload.UploadEntryReference, 0, len(request.Shorts)),
+		Shorts:        make([]creatorupload.CompletePackageShort, 0, len(request.Shorts)),
 	}
 	if request.Main != nil {
-		input.Main = &creatorupload.UploadEntryReference{UploadEntryID: request.Main.UploadEntryID}
+		input.Main = &creatorupload.CompletePackageMain{
+			ConsentConfirmed:   request.Main.ConsentConfirmed,
+			OwnershipConfirmed: request.Main.OwnershipConfirmed,
+			PriceJpy:           request.Main.PriceJpy,
+			UploadEntryID:      request.Main.UploadEntryID,
+		}
 	}
 	for _, short := range request.Shorts {
-		input.Shorts = append(input.Shorts, creatorupload.UploadEntryReference{UploadEntryID: short.UploadEntryID})
+		input.Shorts = append(input.Shorts, creatorupload.CompletePackageShort{
+			Caption:       short.Caption,
+			UploadEntryID: short.UploadEntryID,
+		})
 	}
 
 	result, err := service.CompletePackage(c.Request.Context(), input)

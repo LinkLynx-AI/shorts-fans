@@ -15,9 +15,10 @@ import (
 )
 
 type repositoryQueriesStub struct {
-	createMain       func(context.Context, sqlc.CreateMainParams) (sqlc.AppMain, error)
-	createMediaAsset func(context.Context, sqlc.CreateMediaAssetParams) (sqlc.AppMediaAsset, error)
-	createShort      func(context.Context, sqlc.CreateShortParams) (sqlc.AppShort, error)
+	createMain               func(context.Context, sqlc.CreateMainParams) (sqlc.AppMain, error)
+	createMediaAsset         func(context.Context, sqlc.CreateMediaAssetParams) (sqlc.AppMediaAsset, error)
+	createMediaProcessingJob func(context.Context, sqlc.CreateMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error)
+	createShort              func(context.Context, sqlc.CreateShortParams) (sqlc.AppShort, error)
 }
 
 func (s repositoryQueriesStub) CreateMain(ctx context.Context, arg sqlc.CreateMainParams) (sqlc.AppMain, error) {
@@ -26,6 +27,10 @@ func (s repositoryQueriesStub) CreateMain(ctx context.Context, arg sqlc.CreateMa
 
 func (s repositoryQueriesStub) CreateMediaAsset(ctx context.Context, arg sqlc.CreateMediaAssetParams) (sqlc.AppMediaAsset, error) {
 	return s.createMediaAsset(ctx, arg)
+}
+
+func (s repositoryQueriesStub) CreateMediaProcessingJob(ctx context.Context, arg sqlc.CreateMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
+	return s.createMediaProcessingJob(ctx, arg)
 }
 
 func (s repositoryQueriesStub) CreateShort(ctx context.Context, arg sqlc.CreateShortParams) (sqlc.AppShort, error) {
@@ -91,9 +96,11 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
 	shortAssetID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
 	shortID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	shortCaption := "preview caption"
 
 	tx := &repositoryTxStub{}
 	createMediaAssetCalls := 0
+	createMediaProcessingJobCalls := 0
 	repository := &Repository{
 		beginner: repositoryTxBeginnerStub{
 			begin: func(context.Context) (pgx.Tx, error) {
@@ -150,16 +157,54 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 					if arg.State != stateDraft {
 						t.Fatalf("CreateMain() state got %q want %q", arg.State, stateDraft)
 					}
-					if arg.OwnershipConfirmed {
-						t.Fatal("CreateMain() ownership confirmed = true, want false")
+					if arg.PriceMinor != postgres.Int64ToPG(pointerToInt64(1800)) {
+						t.Fatalf("CreateMain() price minor got %#v want %#v", arg.PriceMinor, postgres.Int64ToPG(pointerToInt64(1800)))
 					}
-					if arg.ConsentConfirmed {
-						t.Fatal("CreateMain() consent confirmed = true, want false")
+					if arg.CurrencyCode != postgres.TextToPG(pointerTo(currencyJPY)) {
+						t.Fatalf("CreateMain() currency code got %#v want %#v", arg.CurrencyCode, postgres.TextToPG(pointerTo(currencyJPY)))
+					}
+					if !arg.OwnershipConfirmed {
+						t.Fatal("CreateMain() ownership confirmed = false, want true")
+					}
+					if !arg.ConsentConfirmed {
+						t.Fatal("CreateMain() consent confirmed = false, want true")
 					}
 					return sqlc.AppMain{
 						ID:    postgres.UUIDToPG(mainID),
 						State: stateDraft,
 					}, nil
+				},
+				createMediaProcessingJob: func(_ context.Context, arg sqlc.CreateMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
+					createMediaProcessingJobCalls++
+					if arg.CreatorUserID != postgres.UUIDToPG(creatorID) {
+						t.Fatalf("CreateMediaProcessingJob() creator id got %v want %v", arg.CreatorUserID, postgres.UUIDToPG(creatorID))
+					}
+					if arg.Status != processingJobStatusQueued {
+						t.Fatalf("CreateMediaProcessingJob() status got %q want %q", arg.Status, processingJobStatusQueued)
+					}
+					if arg.AttemptCount != 0 {
+						t.Fatalf("CreateMediaProcessingJob() attempt count got %d want 0", arg.AttemptCount)
+					}
+					switch createMediaProcessingJobCalls {
+					case 1:
+						if arg.MediaAssetID != postgres.UUIDToPG(mainAssetID) {
+							t.Fatalf("CreateMediaProcessingJob() main asset id got %v want %v", arg.MediaAssetID, postgres.UUIDToPG(mainAssetID))
+						}
+						if arg.AssetRole != roleMain {
+							t.Fatalf("CreateMediaProcessingJob() main asset role got %q want %q", arg.AssetRole, roleMain)
+						}
+					case 2:
+						if arg.MediaAssetID != postgres.UUIDToPG(shortAssetID) {
+							t.Fatalf("CreateMediaProcessingJob() short asset id got %v want %v", arg.MediaAssetID, postgres.UUIDToPG(shortAssetID))
+						}
+						if arg.AssetRole != roleShort {
+							t.Fatalf("CreateMediaProcessingJob() short asset role got %q want %q", arg.AssetRole, roleShort)
+						}
+					default:
+						t.Fatalf("CreateMediaProcessingJob() unexpected call count %d", createMediaProcessingJobCalls)
+					}
+
+					return sqlc.AppMediaProcessingJob{}, nil
 				},
 				createShort: func(_ context.Context, arg sqlc.CreateShortParams) (sqlc.AppShort, error) {
 					if arg.CanonicalMainID != postgres.UUIDToPG(mainID) {
@@ -167,6 +212,9 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 					}
 					if arg.MediaAssetID != postgres.UUIDToPG(shortAssetID) {
 						t.Fatalf("CreateShort() media asset id got %v want %v", arg.MediaAssetID, postgres.UUIDToPG(shortAssetID))
+					}
+					if arg.Caption != postgres.TextToPG(&shortCaption) {
+						t.Fatalf("CreateShort() caption got %#v want %#v", arg.Caption, postgres.TextToPG(&shortCaption))
 					}
 					if arg.State != stateDraft {
 						t.Fatalf("CreateShort() state got %q want %q", arg.State, stateDraft)
@@ -189,10 +237,16 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 			MimeType:      "video/mp4",
 			UploadEntryID: "main-entry",
 		},
-		Shorts: []storedEntry{{
-			StorageKey:    "short-key",
-			MimeType:      "video/mp4",
-			UploadEntryID: "short-entry",
+		MainConsent:   true,
+		MainOwnership: true,
+		MainPriceJpy:  1800,
+		Shorts: []createDraftShortInput{{
+			Caption: &shortCaption,
+			Entry: storedEntry{
+				StorageKey:    "short-key",
+				MimeType:      "video/mp4",
+				UploadEntryID: "short-entry",
+			},
 		}},
 	})
 	if err != nil {
@@ -209,6 +263,9 @@ func TestRepositoryCreateDraftPackageSuccess(t *testing.T) {
 	}
 	if tx.rolledBack {
 		t.Fatal("CreateDraftPackage() rolledBack = true, want false")
+	}
+	if createMediaProcessingJobCalls != 2 {
+		t.Fatalf("CreateDraftPackage() processing job calls got %d want 2", createMediaProcessingJobCalls)
 	}
 }
 
@@ -235,6 +292,9 @@ func TestRepositoryCreateDraftPackageErrors(t *testing.T) {
 				createMain: func(context.Context, sqlc.CreateMainParams) (sqlc.AppMain, error) {
 					return sqlc.AppMain{}, nil
 				},
+				createMediaProcessingJob: func(context.Context, sqlc.CreateMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
+					return sqlc.AppMediaProcessingJob{}, nil
+				},
 				createShort: func(context.Context, sqlc.CreateShortParams) (sqlc.AppShort, error) {
 					return sqlc.AppShort{}, nil
 				},
@@ -248,6 +308,60 @@ func TestRepositoryCreateDraftPackageErrors(t *testing.T) {
 		Main: storedEntry{
 			UploadEntryID: "main-entry",
 		},
+	})
+	if !errors.Is(err, createErr) {
+		t.Fatalf("CreateDraftPackage() error got %v want wrapped %v", err, createErr)
+	}
+	if !tx.rolledBack {
+		t.Fatal("CreateDraftPackage() rolledBack = false, want true")
+	}
+}
+
+func TestRepositoryCreateDraftPackageRollsBackWhenProcessingJobInsertFails(t *testing.T) {
+	t.Parallel()
+
+	createErr := errors.New("processing job insert failed")
+	tx := &repositoryTxStub{}
+	repository := &Repository{
+		beginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) {
+				return tx, nil
+			},
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				createMediaAsset: func(_ context.Context, arg sqlc.CreateMediaAssetParams) (sqlc.AppMediaAsset, error) {
+					return sqlc.AppMediaAsset{
+						ID:              postgres.UUIDToPG(uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")),
+						MimeType:        arg.MimeType,
+						ProcessingState: arg.ProcessingState,
+					}, nil
+				},
+				createMain: func(context.Context, sqlc.CreateMainParams) (sqlc.AppMain, error) {
+					return sqlc.AppMain{
+						ID:    postgres.UUIDToPG(uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")),
+						State: stateDraft,
+					}, nil
+				},
+				createMediaProcessingJob: func(context.Context, sqlc.CreateMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
+					return sqlc.AppMediaProcessingJob{}, createErr
+				},
+				createShort: func(context.Context, sqlc.CreateShortParams) (sqlc.AppShort, error) {
+					return sqlc.AppShort{}, nil
+				},
+			}
+		},
+	}
+
+	_, err := repository.CreateDraftPackage(context.Background(), createDraftPackageInput{
+		CreatorUserID: uuid.New(),
+		RawBucketName: "raw-bucket",
+		Main: storedEntry{
+			UploadEntryID: "main-entry",
+		},
+		MainConsent:   true,
+		MainOwnership: true,
+		MainPriceJpy:  1800,
 	})
 	if !errors.Is(err, createErr) {
 		t.Fatalf("CreateDraftPackage() error got %v want wrapped %v", err, createErr)
@@ -276,4 +390,8 @@ func TestRepositoryMappersRejectInvalidUUIDs(t *testing.T) {
 	if _, err := mapCreatedShort(sqlc.AppShort{ID: pgtype.UUID{}}, assetRow); err == nil {
 		t.Fatal("mapCreatedShort() error = nil, want error")
 	}
+}
+
+func pointerToInt64(value int64) *int64 {
+	return &value
 }

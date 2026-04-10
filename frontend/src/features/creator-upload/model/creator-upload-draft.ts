@@ -13,6 +13,7 @@ export type CreatorUploadSubmissionState =
   | { kind: "success"; mainId: string; shortIds: readonly string[] };
 
 export type CreatorUploadShortSlot = {
+  caption: string;
   file: File | null;
   id: number;
   transferState: CreatorUploadTransferState;
@@ -20,6 +21,9 @@ export type CreatorUploadShortSlot = {
 
 export type CreatorUploadDraft = {
   mainFile: File | null;
+  mainConsentConfirmed: boolean;
+  mainOwnershipConfirmed: boolean;
+  mainPriceJpyInput: string;
   mainTransferState: CreatorUploadTransferState;
   nextShortSlotId: number;
   shortSlots: readonly CreatorUploadShortSlot[];
@@ -27,12 +31,19 @@ export type CreatorUploadDraft = {
 };
 
 export type CreatorUploadSelectedShort = {
+  caption: string | null;
   file: File;
   slotIndex: number;
 };
 
 function createIdleTransferState(): CreatorUploadTransferState {
   return { kind: "idle" };
+}
+
+function normalizeCaption(caption: string): string | null {
+  const normalizedCaption = caption.trim();
+
+  return normalizedCaption === "" ? null : normalizedCaption;
 }
 
 function resetTransferProgress(draft: CreatorUploadDraft): CreatorUploadDraft {
@@ -53,10 +64,14 @@ function resetTransferProgress(draft: CreatorUploadDraft): CreatorUploadDraft {
 export function createInitialCreatorUploadDraft(): CreatorUploadDraft {
   return {
     mainFile: null,
+    mainConsentConfirmed: false,
+    mainOwnershipConfirmed: false,
+    mainPriceJpyInput: "",
     mainTransferState: createIdleTransferState(),
     nextShortSlotId: 2,
     shortSlots: [
       {
+        caption: "",
         file: null,
         id: 1,
         transferState: createIdleTransferState(),
@@ -77,14 +92,43 @@ export function getCreatorUploadSelectedShortCount(draft: CreatorUploadDraft): n
  * upload 送信に使う short 選択一覧を返す。
  */
 export function getCreatorUploadSelectedShorts(draft: CreatorUploadDraft): readonly CreatorUploadSelectedShort[] {
-  return draft.shortSlots.flatMap((slot, slotIndex) => (slot.file ? [{ file: slot.file, slotIndex }] : []));
+  return draft.shortSlots.flatMap((slot, slotIndex) =>
+    slot.file
+      ? [
+          {
+            caption: normalizeCaption(slot.caption),
+            file: slot.file,
+            slotIndex,
+          },
+        ]
+      : [],
+  );
+}
+
+/**
+ * 本編の価格入力値を数値化して返す。
+ */
+export function getCreatorUploadMainPriceJpy(draft: CreatorUploadDraft): number | null {
+  const normalizedPrice = draft.mainPriceJpyInput.trim();
+
+  if (!/^[1-9]\d*$/.test(normalizedPrice)) {
+    return null;
+  }
+
+  return Number.parseInt(normalizedPrice, 10);
 }
 
 /**
  * upload 送信条件を満たしているかを判定する。
  */
 export function isCreatorUploadReady(draft: CreatorUploadDraft): boolean {
-  return draft.mainFile !== null && getCreatorUploadSelectedShortCount(draft) > 0;
+  return (
+    draft.mainFile !== null &&
+    getCreatorUploadSelectedShortCount(draft) > 0 &&
+    getCreatorUploadMainPriceJpy(draft) !== null &&
+    draft.mainOwnershipConfirmed &&
+    draft.mainConsentConfirmed
+  );
 }
 
 /**
@@ -108,9 +152,9 @@ export function getCreatorUploadSubmitLabel(draft: CreatorUploadDraft): string {
     case "uploading":
       return "アップロード中...";
     case "completing":
-      return "保存中...";
+      return "処理開始中...";
     case "success":
-      return "アップロード完了";
+      return "処理開始完了";
     case "error":
       return "再試行";
     default:
@@ -128,10 +172,40 @@ export function getCreatorUploadPendingMessage(draft: CreatorUploadDraft): strin
     case "uploading":
       return "動画ファイルをアップロードしています...";
     case "completing":
-      return "アップロード結果を保存しています...";
+      return "処理開始を受け付けています...";
     default:
       return null;
   }
+}
+
+/**
+ * main の価格入力値を更新する。
+ */
+export function setCreatorUploadMainPriceJpyInput(draft: CreatorUploadDraft, value: string): CreatorUploadDraft {
+  return {
+    ...resetTransferProgress(draft),
+    mainPriceJpyInput: value,
+  };
+}
+
+/**
+ * main の権利確認状態を更新する。
+ */
+export function setCreatorUploadMainOwnershipConfirmed(draft: CreatorUploadDraft, checked: boolean): CreatorUploadDraft {
+  return {
+    ...resetTransferProgress(draft),
+    mainOwnershipConfirmed: checked,
+  };
+}
+
+/**
+ * main の同意確認状態を更新する。
+ */
+export function setCreatorUploadMainConsentConfirmed(draft: CreatorUploadDraft, checked: boolean): CreatorUploadDraft {
+  return {
+    ...resetTransferProgress(draft),
+    mainConsentConfirmed: checked,
+  };
 }
 
 /**
@@ -168,6 +242,29 @@ export function setCreatorUploadShortFile(draft: CreatorUploadDraft, index: numb
 }
 
 /**
+ * short caption を更新する。
+ */
+export function setCreatorUploadShortCaption(draft: CreatorUploadDraft, index: number, caption: string): CreatorUploadDraft {
+  if (!Number.isInteger(index) || index < 0 || index >= draft.shortSlots.length) {
+    return draft;
+  }
+
+  const resetDraft = resetTransferProgress(draft);
+
+  return {
+    ...resetDraft,
+    shortSlots: resetDraft.shortSlots.map((slot, currentIndex) =>
+      currentIndex === index
+        ? {
+            ...slot,
+            caption,
+          }
+        : slot,
+    ),
+  };
+}
+
+/**
  * short 動画の入力欄を追加する。
  */
 export function addCreatorUploadShortSlot(draft: CreatorUploadDraft): CreatorUploadDraft {
@@ -179,6 +276,7 @@ export function addCreatorUploadShortSlot(draft: CreatorUploadDraft): CreatorUpl
     shortSlots: [
       ...resetDraft.shortSlots,
       {
+        caption: "",
         file: null,
         id: resetDraft.nextShortSlotId,
         transferState: createIdleTransferState(),

@@ -182,7 +182,7 @@ describe("request creator upload", () => {
     ).rejects.toBeInstanceOf(ApiError);
   });
 
-  it("completes the upload package with the uploaded entry ids", async () => {
+  it("completes the upload package with metadata and uploaded entry ids", async () => {
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       createJsonResponse(
         {
@@ -221,10 +221,18 @@ describe("request creator upload", () => {
 
     const result = await completeCreatorUploadPackage({
       baseUrl: "https://api.example.com",
+      consentConfirmed: true,
       fetcher,
       mainUploadEntryId: "main-entry",
+      ownershipConfirmed: true,
       packageToken: "cupkg_123",
-      shortUploadEntryIds: ["short-entry"],
+      priceJpy: 1800,
+      shorts: [
+        {
+          caption: null,
+          uploadEntryId: "short-entry",
+        },
+      ],
     });
 
     expect(result.main.id).toBe("main_001");
@@ -233,10 +241,13 @@ describe("request creator upload", () => {
       expect.objectContaining({
         body: JSON.stringify({
           main: {
+            consentConfirmed: true,
+            ownershipConfirmed: true,
+            priceJpy: 1800,
             uploadEntryId: "main-entry",
           },
           packageToken: "cupkg_123",
-          shorts: [{ uploadEntryId: "short-entry" }],
+          shorts: [{ caption: null, uploadEntryId: "short-entry" }],
         }),
       }),
     );
@@ -271,10 +282,18 @@ describe("request creator upload", () => {
     await expect(
       completeCreatorUploadPackage({
         baseUrl: "https://api.example.com",
+        consentConfirmed: true,
         fetcher,
         mainUploadEntryId: "main-entry",
+        ownershipConfirmed: true,
         packageToken: "cupkg_123",
-        shortUploadEntryIds: ["short-entry"],
+        priceJpy: 1800,
+        shorts: [
+          {
+            caption: "preview",
+            uploadEntryId: "short-entry",
+          },
+        ],
       }),
     ).rejects.toBeInstanceOf(ApiError);
   });

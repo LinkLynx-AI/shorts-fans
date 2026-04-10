@@ -18,12 +18,14 @@ import (
 )
 
 const (
-	defaultPackageTTL = 15 * time.Minute
-	roleMain          = "main"
-	roleShort         = "short"
-	stateDraft        = "draft"
-	stateUploaded     = "uploaded"
-	storageProviderS3 = "s3"
+	defaultPackageTTL         = 15 * time.Minute
+	roleMain                  = "main"
+	roleShort                 = "short"
+	stateDraft                = "draft"
+	stateUploaded             = "uploaded"
+	storageProviderS3         = "s3"
+	currencyJPY               = "JPY"
+	processingJobStatusQueued = "queued"
 
 	packageTokenPrefix = "cupkg_"
 	mainEntryPrefix    = "cu_main_"
@@ -70,6 +72,20 @@ type UploadEntryReference struct {
 	UploadEntryID string
 }
 
+// CompletePackageMain は completion request の main metadata を表します。
+type CompletePackageMain struct {
+	ConsentConfirmed   bool
+	OwnershipConfirmed bool
+	PriceJpy           int64
+	UploadEntryID      string
+}
+
+// CompletePackageShort は completion request の short metadata を表します。
+type CompletePackageShort struct {
+	Caption       *string
+	UploadEntryID string
+}
+
 // CreatePackageInput は initiation request を表します。
 type CreatePackageInput struct {
 	CreatorUserID uuid.UUID
@@ -81,8 +97,8 @@ type CreatePackageInput struct {
 type CompletePackageInput struct {
 	CreatorUserID uuid.UUID
 	PackageToken  string
-	Main          *UploadEntryReference
-	Shorts        []UploadEntryReference
+	Main          *CompletePackageMain
+	Shorts        []CompletePackageShort
 }
 
 // UploadTarget は client が raw bucket へ直接 upload する target を表します。
@@ -297,7 +313,7 @@ func (s *Service) CompletePackage(ctx context.Context, input CompletePackageInpu
 		return CompletePackageResult{}, ErrUploadFailure
 	}
 
-	mainEntry, orderedShortEntries, err := matchPackageEntries(pkg, mainSelection, shortSelections)
+	mainEntry, orderedShorts, err := matchPackageEntries(pkg, mainSelection, shortSelections)
 	if err != nil {
 		return CompletePackageResult{}, err
 	}
@@ -305,17 +321,20 @@ func (s *Service) CompletePackage(ctx context.Context, input CompletePackageInpu
 	if err := s.verifyObject(ctx, mainEntry); err != nil {
 		return CompletePackageResult{}, err
 	}
-	for _, entry := range orderedShortEntries {
-		if err := s.verifyObject(ctx, entry); err != nil {
+	for _, short := range orderedShorts {
+		if err := s.verifyObject(ctx, short.Entry); err != nil {
 			return CompletePackageResult{}, err
 		}
 	}
 
 	result, err := s.repository.CreateDraftPackage(ctx, createDraftPackageInput{
 		CreatorUserID: input.CreatorUserID,
-		RawBucketName: s.rawBucketName,
 		Main:          mainEntry,
-		Shorts:        orderedShortEntries,
+		MainConsent:   mainSelection.ConsentConfirmed,
+		MainOwnership: mainSelection.OwnershipConfirmed,
+		MainPriceJpy:  mainSelection.PriceJpy,
+		RawBucketName: s.rawBucketName,
+		Shorts:        orderedShorts,
 	})
 	if err != nil {
 		return CompletePackageResult{}, fmt.Errorf("persist upload package token=%s: %w", packageToken, err)
@@ -453,24 +472,42 @@ func validateShortMetadata(shorts []FileMetadata) ([]FileMetadata, error) {
 	return normalized, nil
 }
 
-func validateCompletionSelections(main *UploadEntryReference, shorts []UploadEntryReference) (UploadEntryReference, []UploadEntryReference, error) {
+func validateCompletionSelections(main *CompletePackageMain, shorts []CompletePackageShort) (CompletePackageMain, []CompletePackageShort, error) {
 	if main == nil || strings.TrimSpace(main.UploadEntryID) == "" {
-		return UploadEntryReference{}, nil, &ValidationError{message: "main uploadEntryId is required"}
+		return CompletePackageMain{}, nil, &ValidationError{message: "main uploadEntryId is required"}
+	}
+	if main.PriceJpy <= 0 {
+		return CompletePackageMain{}, nil, &ValidationError{message: "main priceJpy must be greater than zero"}
+	}
+	if !main.OwnershipConfirmed {
+		return CompletePackageMain{}, nil, &ValidationError{message: "main ownershipConfirmed must be true"}
+	}
+	if !main.ConsentConfirmed {
+		return CompletePackageMain{}, nil, &ValidationError{message: "main consentConfirmed must be true"}
 	}
 	if len(shorts) == 0 {
-		return UploadEntryReference{}, nil, &ValidationError{message: "at least one short is required"}
+		return CompletePackageMain{}, nil, &ValidationError{message: "at least one short is required"}
 	}
 
-	normalized := make([]UploadEntryReference, 0, len(shorts))
+	normalizedShorts := make([]CompletePackageShort, 0, len(shorts))
 	for _, short := range shorts {
 		uploadEntryID := strings.TrimSpace(short.UploadEntryID)
 		if uploadEntryID == "" {
-			return UploadEntryReference{}, nil, &ValidationError{message: "short uploadEntryId is required"}
+			return CompletePackageMain{}, nil, &ValidationError{message: "short uploadEntryId is required"}
 		}
-		normalized = append(normalized, UploadEntryReference{UploadEntryID: uploadEntryID})
+
+		normalizedShorts = append(normalizedShorts, CompletePackageShort{
+			Caption:       normalizeOptionalCaption(short.Caption),
+			UploadEntryID: uploadEntryID,
+		})
 	}
 
-	return UploadEntryReference{UploadEntryID: strings.TrimSpace(main.UploadEntryID)}, normalized, nil
+	return CompletePackageMain{
+		ConsentConfirmed:   main.ConsentConfirmed,
+		OwnershipConfirmed: main.OwnershipConfirmed,
+		PriceJpy:           main.PriceJpy,
+		UploadEntryID:      strings.TrimSpace(main.UploadEntryID),
+	}, normalizedShorts, nil
 }
 
 func normalizeFileMetadata(metadata FileMetadata, label string) (FileMetadata, error) {
@@ -508,7 +545,7 @@ func normalizeVideoMimeType(value string) (string, error) {
 	return normalized, nil
 }
 
-func matchPackageEntries(pkg storedPackage, main UploadEntryReference, shorts []UploadEntryReference) (storedEntry, []storedEntry, error) {
+func matchPackageEntries(pkg storedPackage, main CompletePackageMain, shorts []CompletePackageShort) (storedEntry, []createDraftShortInput, error) {
 	if pkg.Main.Role != roleMain {
 		return storedEntry{}, nil, ErrUploadFailure
 	}
@@ -527,7 +564,7 @@ func matchPackageEntries(pkg storedPackage, main UploadEntryReference, shorts []
 		indexByID[entry.UploadEntryID] = entry
 	}
 
-	ordered := make([]storedEntry, 0, len(shorts))
+	ordered := make([]createDraftShortInput, 0, len(shorts))
 	seen := make(map[string]struct{}, len(shorts))
 	for _, selection := range shorts {
 		entry, ok := indexByID[selection.UploadEntryID]
@@ -538,10 +575,26 @@ func matchPackageEntries(pkg storedPackage, main UploadEntryReference, shorts []
 			return storedEntry{}, nil, ErrUploadFailure
 		}
 		seen[selection.UploadEntryID] = struct{}{}
-		ordered = append(ordered, entry)
+		ordered = append(ordered, createDraftShortInput{
+			Caption: selection.Caption,
+			Entry:   entry,
+		})
 	}
 
 	return pkg.Main, ordered, nil
+}
+
+func normalizeOptionalCaption(value *string) *string {
+	if value == nil {
+		return nil
+	}
+
+	normalized := strings.TrimSpace(*value)
+	if normalized == "" {
+		return nil
+	}
+
+	return &normalized
 }
 
 func buildStorageKey(creatorUserID uuid.UUID, packageToken string, role string, uploadEntryID string, fileName string) string {

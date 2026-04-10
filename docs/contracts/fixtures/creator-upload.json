@@ -151,14 +151,19 @@
     "request": {
       "packageToken": "cupkg_01hrp6wjkq7mh6f3d2f6c5j8rz",
       "main": {
-        "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf"
+        "uploadEntryId": "cu_main_01hrp6wjv9h2k4g1b8s0k5e3pf",
+        "priceJpy": 1800,
+        "ownershipConfirmed": true,
+        "consentConfirmed": true
       },
       "shorts": [
         {
-          "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55"
+          "uploadEntryId": "cu_short_01hrp6wk4m2q7cxnq0fxsy2f55",
+          "caption": "quiet rooftop preview。"
         },
         {
-          "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne"
+          "uploadEntryId": "cu_short_01hrp6wkcw3j04s6f5r0f5t2ne",
+          "caption": null
         }
       ]
     },

@@ -28,6 +28,12 @@ function createVideoFile(name: string): File {
   return new File(["video"], name, { type: "video/mp4" });
 }
 
+async function fillRequiredMetadata(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText("価格（円）"), "1800");
+  await user.click(screen.getByLabelText("本編の権利確認"));
+  await user.click(screen.getByLabelText("本編の同意確認"));
+}
+
 function createDeferredPromise<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
   let reject!: (reason?: unknown) => void;
@@ -51,7 +57,7 @@ describe("CreatorUploadForm", () => {
     vi.mocked(completeCreatorUploadPackage).mockReset();
   });
 
-  it("keeps completion disabled until both a main and a short are selected", async () => {
+  it("keeps completion disabled until files, price, and confirmations are filled", async () => {
     const user = userEvent.setup();
 
     render(<CreatorUploadForm />);
@@ -70,8 +76,17 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
 
     expect(screen.getByText("short-1.mp4")).toBeInTheDocument();
-    expect(submitButton).toBeEnabled();
+    expect(submitButton).toBeDisabled();
     expect(screen.getByText("1本")).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("価格（円）"), "1800");
+    expect(submitButton).toBeDisabled();
+
+    await user.click(screen.getByLabelText("本編の権利確認"));
+    expect(submitButton).toBeDisabled();
+
+    await user.click(screen.getByLabelText("本編の同意確認"));
+    expect(submitButton).toBeEnabled();
   });
 
   it("adds and removes short slots while preserving selected files", async () => {
@@ -164,6 +179,8 @@ describe("CreatorUploadForm", () => {
 
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+    await fillRequiredMetadata(user);
+    await user.type(screen.getByLabelText("ショート動画 1 の caption"), "quiet rooftop preview。");
     await user.click(screen.getByRole("button", { name: "アップロード" }));
 
     await waitFor(() => {
@@ -172,9 +189,22 @@ describe("CreatorUploadForm", () => {
       expect(completeCreatorUploadPackage).toHaveBeenCalledTimes(1);
     });
 
-    expect(await screen.findByText("ドラフトの作成まで完了しました。")).toBeInTheDocument();
-    expect(screen.getByText("main 1本 / short 1本 を保存しました。公開や審査提出はまだ行われていません。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "アップロード完了" })).toBeDisabled();
+    expect(completeCreatorUploadPackage).toHaveBeenCalledWith({
+      consentConfirmed: true,
+      mainUploadEntryId: "main-entry",
+      ownershipConfirmed: true,
+      packageToken: "cupkg_123",
+      priceJpy: 1800,
+      shorts: [
+        {
+          caption: "quiet rooftop preview。",
+          uploadEntryId: "short-entry-1",
+        },
+      ],
+    });
+    expect(await screen.findByText("処理開始を受け付けました。")).toBeInTheDocument();
+    expect(screen.getByText("main 1本 / short 1本 の処理を開始しました。公開や審査提出はまだ行われていません。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "処理開始完了" })).toBeDisabled();
   });
 
   it("shows a recoverable upload error and allows retry", async () => {
@@ -247,6 +277,7 @@ describe("CreatorUploadForm", () => {
 
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+    await fillRequiredMetadata(user);
     await user.click(screen.getByRole("button", { name: "アップロード" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
@@ -257,7 +288,7 @@ describe("CreatorUploadForm", () => {
 
     await user.click(screen.getByRole("button", { name: "再試行" }));
 
-    expect(await screen.findByText("ドラフトの作成まで完了しました。")).toBeInTheDocument();
+    expect(await screen.findByText("処理開始を受け付けました。")).toBeInTheDocument();
     expect(uploadCreatorUploadTarget).toHaveBeenCalledTimes(4);
     expect(completeCreatorUploadPackage).toHaveBeenCalledTimes(1);
   });
@@ -296,6 +327,7 @@ describe("CreatorUploadForm", () => {
 
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+    await fillRequiredMetadata(user);
 
     const submitButton = screen.getByRole("button", { name: "アップロード" });
 
@@ -343,7 +375,7 @@ describe("CreatorUploadForm", () => {
       },
     });
 
-    expect(await screen.findByText("ドラフトの作成まで完了しました。")).toBeInTheDocument();
+    expect(await screen.findByText("処理開始を受け付けました。")).toBeInTheDocument();
     expect(uploadCreatorUploadTarget).toHaveBeenCalledTimes(2);
     expect(completeCreatorUploadPackage).toHaveBeenCalledTimes(1);
   });
@@ -397,11 +429,98 @@ describe("CreatorUploadForm", () => {
 
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+    await fillRequiredMetadata(user);
     await user.click(screen.getByRole("button", { name: "アップロード" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "アップロード準備の有効期限が切れました。再試行してください。 再試行するか、ファイルを選び直してください。",
     );
     expect(screen.getByRole("button", { name: "再試行" })).toBeEnabled();
+  });
+
+  it("allows optional caption to remain empty and sends null on completion", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(createCreatorUploadPackage).mockResolvedValue({
+      expiresAt: "2026-04-08T12:15:00Z",
+      packageToken: "cupkg_123",
+      uploadTargets: {
+        main: {
+          fileName: "main.mp4",
+          mimeType: "video/mp4",
+          role: "main",
+          upload: {
+            headers: {
+              "Content-Type": "video/mp4",
+            },
+            method: "PUT",
+            url: "https://raw-bucket.example.com/main",
+          },
+          uploadEntryId: "main-entry",
+        },
+        shorts: [
+          {
+            fileName: "short-1.mp4",
+            mimeType: "video/mp4",
+            role: "short",
+            upload: {
+              headers: {
+                "Content-Type": "video/mp4",
+              },
+              method: "PUT",
+              url: "https://raw-bucket.example.com/short-1",
+            },
+            uploadEntryId: "short-entry-1",
+          },
+        ],
+      },
+    });
+    vi.mocked(uploadCreatorUploadTarget).mockResolvedValue(undefined);
+    vi.mocked(completeCreatorUploadPackage).mockResolvedValue({
+      main: {
+        id: "main_001",
+        mediaAsset: {
+          id: "asset_main_001",
+          mimeType: "video/mp4",
+          processingState: "uploaded",
+        },
+        state: "draft",
+      },
+      shorts: [
+        {
+          canonicalMainId: "main_001",
+          id: "short_001",
+          mediaAsset: {
+            id: "asset_short_001",
+            mimeType: "video/mp4",
+            processingState: "uploaded",
+          },
+          state: "draft",
+        },
+      ],
+    });
+
+    render(<CreatorUploadForm />);
+
+    await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
+    await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
+    await fillRequiredMetadata(user);
+    await user.click(screen.getByRole("button", { name: "アップロード" }));
+
+    await waitFor(() => {
+      expect(completeCreatorUploadPackage).toHaveBeenCalledWith({
+        consentConfirmed: true,
+        mainUploadEntryId: "main-entry",
+        ownershipConfirmed: true,
+        packageToken: "cupkg_123",
+        priceJpy: 1800,
+        shorts: [
+          {
+            caption: null,
+            uploadEntryId: "short-entry-1",
+          },
+        ],
+      });
+    });
   });
 });

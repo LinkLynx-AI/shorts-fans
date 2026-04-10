@@ -72,6 +72,23 @@ func (s repositoryStub) CreateDraftPackage(ctx context.Context, input createDraf
 	return s.createDraftPackage(ctx, input)
 }
 
+func newValidCompletePackageInput(creatorID uuid.UUID) CompletePackageInput {
+	return CompletePackageInput{
+		CreatorUserID: creatorID,
+		PackageToken:  "pkg-token",
+		Main: &CompletePackageMain{
+			ConsentConfirmed:   true,
+			OwnershipConfirmed: true,
+			PriceJpy:           1800,
+			UploadEntryID:      "main-entry",
+		},
+		Shorts: []CompletePackageShort{{
+			Caption:       nil,
+			UploadEntryID: "short-entry",
+		}},
+	}
+}
+
 func TestCreatePackageSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -194,6 +211,86 @@ func TestCreatePackageValidation(t *testing.T) {
 	}); err == nil {
 		t.Fatal("CreatePackage() non-video error = nil, want validation error")
 	}
+}
+
+func TestValidateCompletionSelections(t *testing.T) {
+	t.Parallel()
+
+	validMain := &CompletePackageMain{
+		ConsentConfirmed:   true,
+		OwnershipConfirmed: true,
+		PriceJpy:           1800,
+		UploadEntryID:      " main-entry ",
+	}
+	validShorts := []CompletePackageShort{{
+		Caption:       pointerTo("  quiet rooftop preview。  "),
+		UploadEntryID: " short-entry ",
+	}}
+
+	t.Run("normalizes trimmed values", func(t *testing.T) {
+		t.Parallel()
+
+		mainSelection, shortSelections, err := validateCompletionSelections(validMain, validShorts)
+		if err != nil {
+			t.Fatalf("validateCompletionSelections() error = %v, want nil", err)
+		}
+		if mainSelection.UploadEntryID != "main-entry" {
+			t.Fatalf("validateCompletionSelections() main uploadEntryId got %q want %q", mainSelection.UploadEntryID, "main-entry")
+		}
+		if len(shortSelections) != 1 || shortSelections[0].UploadEntryID != "short-entry" {
+			t.Fatalf("validateCompletionSelections() shorts got %#v want trimmed uploadEntryId", shortSelections)
+		}
+		if shortSelections[0].Caption == nil || *shortSelections[0].Caption != "quiet rooftop preview。" {
+			t.Fatalf("validateCompletionSelections() caption got %#v want trimmed caption", shortSelections[0].Caption)
+		}
+	})
+
+	t.Run("rejects non-positive price", func(t *testing.T) {
+		t.Parallel()
+
+		invalidMain := *validMain
+		invalidMain.PriceJpy = 0
+		if _, _, err := validateCompletionSelections(&invalidMain, validShorts); err == nil || err.Error() != "main priceJpy must be greater than zero" {
+			t.Fatalf("validateCompletionSelections() error got %v want price validation", err)
+		}
+	})
+
+	t.Run("rejects missing ownership confirmation", func(t *testing.T) {
+		t.Parallel()
+
+		invalidMain := *validMain
+		invalidMain.OwnershipConfirmed = false
+		if _, _, err := validateCompletionSelections(&invalidMain, validShorts); err == nil || err.Error() != "main ownershipConfirmed must be true" {
+			t.Fatalf("validateCompletionSelections() error got %v want ownership validation", err)
+		}
+	})
+
+	t.Run("rejects missing consent confirmation", func(t *testing.T) {
+		t.Parallel()
+
+		invalidMain := *validMain
+		invalidMain.ConsentConfirmed = false
+		if _, _, err := validateCompletionSelections(&invalidMain, validShorts); err == nil || err.Error() != "main consentConfirmed must be true" {
+			t.Fatalf("validateCompletionSelections() error got %v want consent validation", err)
+		}
+	})
+
+	t.Run("normalizes blank caption to nil", func(t *testing.T) {
+		t.Parallel()
+
+		shortSelections := []CompletePackageShort{{
+			Caption:       pointerTo("   "),
+			UploadEntryID: "short-entry",
+		}}
+
+		_, normalizedShorts, err := validateCompletionSelections(validMain, shortSelections)
+		if err != nil {
+			t.Fatalf("validateCompletionSelections() error = %v, want nil", err)
+		}
+		if len(normalizedShorts) != 1 || normalizedShorts[0].Caption != nil {
+			t.Fatalf("validateCompletionSelections() shorts got %#v want nil caption", normalizedShorts)
+		}
+	})
 }
 
 func TestCreatePackageMapsPackageStoreFailure(t *testing.T) {
@@ -347,12 +444,7 @@ func TestCompletePackageSuccess(t *testing.T) {
 		},
 	}
 
-	result, err := service.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	})
+	result, err := service.CompletePackage(context.Background(), newValidCompletePackageInput(creatorID))
 	if err != nil {
 		t.Fatalf("CompletePackage() error = %v, want nil", err)
 	}
@@ -361,6 +453,12 @@ func TestCompletePackageSuccess(t *testing.T) {
 	}
 	if gotRepositoryInput.RawBucketName != "raw-bucket" {
 		t.Fatalf("CompletePackage() raw bucket got %q want %q", gotRepositoryInput.RawBucketName, "raw-bucket")
+	}
+	if gotRepositoryInput.MainPriceJpy != 1800 || !gotRepositoryInput.MainConsent || !gotRepositoryInput.MainOwnership {
+		t.Fatalf("CompletePackage() main metadata got %#v want saved metadata", gotRepositoryInput)
+	}
+	if len(gotRepositoryInput.Shorts) != 1 || gotRepositoryInput.Shorts[0].Caption != nil {
+		t.Fatalf("CompletePackage() short metadata got %#v want nil caption", gotRepositoryInput.Shorts)
 	}
 	if !deleteCalled {
 		t.Fatal("CompletePackage() deleteCalled = false, want true")
@@ -395,12 +493,11 @@ func TestCompletePackageExpiredAndUploadFailure(t *testing.T) {
 		},
 	}
 
-	if _, err := expiredService.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "missing",
-		Main:          &UploadEntryReference{UploadEntryID: "main"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short"}},
-	}); !errors.Is(err, ErrPackageExpired) {
+	missingInput := newValidCompletePackageInput(creatorID)
+	missingInput.PackageToken = "missing"
+	missingInput.Main.UploadEntryID = "main"
+	missingInput.Shorts[0].UploadEntryID = "short"
+	if _, err := expiredService.CompletePackage(context.Background(), missingInput); !errors.Is(err, ErrPackageExpired) {
 		t.Fatalf("CompletePackage() missing package error got %v want %v", err, ErrPackageExpired)
 	}
 
@@ -444,12 +541,7 @@ func TestCompletePackageExpiredAndUploadFailure(t *testing.T) {
 		},
 	}
 
-	if _, err := mismatchService.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	}); !errors.Is(err, ErrUploadFailure) {
+	if _, err := mismatchService.CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); !errors.Is(err, ErrUploadFailure) {
 		t.Fatalf("CompletePackage() mismatch error got %v want %v", err, ErrUploadFailure)
 	}
 }
@@ -505,21 +597,11 @@ func TestCompletePackageMapsHeadObjectFailures(t *testing.T) {
 		}
 	}
 
-	if _, err := newService(fmt.Errorf("wrapped missing: %w", smithyAPIErrorStub{code: "NotFound"})).CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	}); !errors.Is(err, ErrUploadFailure) {
+	if _, err := newService(fmt.Errorf("wrapped missing: %w", smithyAPIErrorStub{code: "NotFound"})).CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); !errors.Is(err, ErrUploadFailure) {
 		t.Fatalf("CompletePackage() missing object error got %v want %v", err, ErrUploadFailure)
 	}
 
-	if _, err := newService(errors.New("s3 unavailable")).CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	}); !errors.Is(err, ErrStorageFailure) {
+	if _, err := newService(errors.New("s3 unavailable")).CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); !errors.Is(err, ErrStorageFailure) {
 		t.Fatalf("CompletePackage() dependency error got %v want %v", err, ErrStorageFailure)
 	}
 }
@@ -551,12 +633,7 @@ func TestCompletePackageMapsPackageStoreLoadFailure(t *testing.T) {
 		},
 	}
 
-	_, err := service.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: uuid.New(),
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	})
+	_, err := service.CompletePackage(context.Background(), newValidCompletePackageInput(uuid.New()))
 	if !errors.Is(err, ErrStorageFailure) {
 		t.Fatalf("CompletePackage() error got %v want %v", err, ErrStorageFailure)
 	}
@@ -632,12 +709,7 @@ func TestCompletePackageConsumesPackageWhenDeleteFails(t *testing.T) {
 		},
 	}
 
-	if _, err := service.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	}); err != nil {
+	if _, err := service.CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); err != nil {
 		t.Fatalf("CompletePackage() error = %v, want nil", err)
 	}
 	if savedAfterDeleteFailure.ConsumedAt == nil {
@@ -692,12 +764,7 @@ func TestCompletePackageRejectsConsumedPackage(t *testing.T) {
 		},
 	}
 
-	if _, err := service.CompletePackage(context.Background(), CompletePackageInput{
-		CreatorUserID: creatorID,
-		PackageToken:  "pkg-token",
-		Main:          &UploadEntryReference{UploadEntryID: "main-entry"},
-		Shorts:        []UploadEntryReference{{UploadEntryID: "short-entry"}},
-	}); !errors.Is(err, ErrUploadFailure) {
+	if _, err := service.CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); !errors.Is(err, ErrUploadFailure) {
 		t.Fatalf("CompletePackage() error got %v want %v", err, ErrUploadFailure)
 	}
 }

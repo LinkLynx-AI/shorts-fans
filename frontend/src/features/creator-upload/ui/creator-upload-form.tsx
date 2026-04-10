@@ -40,6 +40,13 @@ function getPickerButtonClassName(disabled: boolean): string {
   );
 }
 
+function getInputClassName(disabled: boolean): string {
+  return cn(
+    "min-h-[46px] w-full rounded-[14px] border border-[#d7e7ee] bg-white px-4 text-[14px] text-foreground outline-none transition placeholder:text-muted",
+    disabled ? "cursor-not-allowed opacity-60" : "focus:border-[#0a5b8c]",
+  );
+}
+
 function getTransferStateLabel(
   file: File | null,
   transferState: CreatorUploadTransferState,
@@ -71,6 +78,10 @@ export function CreatorUploadForm() {
     addShortSlot,
     draft,
     removeShortSlot,
+    setMainConsentConfirmed,
+    setMainOwnershipConfirmed,
+    setMainPriceJpyInput,
+    setShortCaption,
     selectMainFile,
     selectShortFile,
     submit,
@@ -97,6 +108,14 @@ export function CreatorUploadForm() {
 
     selectShortFile(index, file);
     event.target.value = "";
+  }
+
+  function handleMainPriceJpyInputChange(event: ChangeEvent<HTMLInputElement>) {
+    setMainPriceJpyInput(event.target.value);
+  }
+
+  function handleShortCaptionChange(index: number, event: ChangeEvent<HTMLInputElement>) {
+    setShortCaption(index, event.target.value);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -143,6 +162,59 @@ export function CreatorUploadForm() {
           <label className={getPickerButtonClassName(isSubmitting)} htmlFor={`${inputIdBase}-main`}>
             {draft.mainFile ? "本編を選び直す" : "本編を追加"}
           </label>
+
+          <div className="grid gap-3 border-t border-[#e7f2f8] pt-[14px]">
+            <div className="grid gap-1.5">
+              <label className="text-[12px] font-semibold text-foreground" htmlFor={`${inputIdBase}-price-jpy`}>
+                価格（円）
+              </label>
+              <input
+                aria-label="価格（円）"
+                className={getInputClassName(isSubmitting)}
+                disabled={isSubmitting}
+                id={`${inputIdBase}-price-jpy`}
+                inputMode="numeric"
+                min="1"
+                onChange={handleMainPriceJpyInputChange}
+                placeholder="1800"
+                step="1"
+                type="number"
+                value={draft.mainPriceJpyInput}
+              />
+            </div>
+
+            <label className="flex items-start gap-3 rounded-[14px] border border-[#d7e7ee] bg-[#f8fcfe] px-4 py-3">
+              <input
+                aria-label="本編の権利確認"
+                checked={draft.mainOwnershipConfirmed}
+                className="mt-1 size-4 accent-[#0a5b8c]"
+                disabled={isSubmitting}
+                onChange={(event) => {
+                  setMainOwnershipConfirmed(event.target.checked);
+                }}
+                type="checkbox"
+              />
+              <span className="text-[13px] leading-[1.5] text-foreground">
+                本編の販売に必要な権利を自分が保有していることを確認しました。
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 rounded-[14px] border border-[#d7e7ee] bg-[#f8fcfe] px-4 py-3">
+              <input
+                aria-label="本編の同意確認"
+                checked={draft.mainConsentConfirmed}
+                className="mt-1 size-4 accent-[#0a5b8c]"
+                disabled={isSubmitting}
+                onChange={(event) => {
+                  setMainConsentConfirmed(event.target.checked);
+                }}
+                type="checkbox"
+              />
+              <span className="text-[13px] leading-[1.5] text-foreground">
+                出演者全員の公開・販売同意が取得済みであることを確認しました。
+              </span>
+            </label>
+          </div>
         </section>
 
         <section className="grid gap-[14px]">
@@ -228,6 +300,24 @@ export function CreatorUploadForm() {
                     <label className={getPickerButtonClassName(isSubmitting)} htmlFor={shortInputId}>
                       {slot.file ? "ショートを選び直す" : "ショートを追加"}
                     </label>
+
+                    <div className="grid gap-1.5 border-t border-[#e7f2f8] pt-[14px]">
+                      <label className="text-[12px] font-semibold text-foreground" htmlFor={`${shortInputId}-caption`}>
+                        {`ショート動画 ${index + 1} の caption（任意）`}
+                      </label>
+                      <input
+                        aria-label={`ショート動画 ${index + 1} の caption`}
+                        className={getInputClassName(isSubmitting)}
+                        disabled={isSubmitting}
+                        id={`${shortInputId}-caption`}
+                        onChange={(event) => {
+                          handleShortCaptionChange(index, event);
+                        }}
+                        placeholder="quiet rooftop preview。"
+                        type="text"
+                        value={slot.caption}
+                      />
+                    </div>
                   </section>
                 );
               })
@@ -250,10 +340,10 @@ export function CreatorUploadForm() {
       {successState ? (
         <section className="grid gap-2 rounded-[18px] border border-[rgba(26,152,80,0.22)] bg-[rgba(245,255,249,0.95)] px-4 py-3 text-sm leading-6 text-[#197040]">
           <p aria-live="polite" className="m-0 font-semibold">
-            ドラフトの作成まで完了しました。
+            処理開始を受け付けました。
           </p>
           <p className="m-0">
-            {`main 1本 / short ${successState.shortIds.length}本 を保存しました。公開や審査提出はまだ行われていません。`}
+            {`main 1本 / short ${successState.shortIds.length}本 の処理を開始しました。公開や審査提出はまだ行われていません。`}
           </p>
         </section>
       ) : null}
