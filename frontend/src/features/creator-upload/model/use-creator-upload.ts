@@ -133,8 +133,6 @@ export function useCreatorUpload(): UseCreatorUploadResult {
       return;
     }
 
-    submitLockRef.current = true;
-
     const mainFile = draft.mainFile;
     const mainPriceJpy = getCreatorUploadMainPriceJpy(draft);
     const selectedShorts = getCreatorUploadSelectedShorts(draft);
@@ -142,6 +140,8 @@ export function useCreatorUpload(): UseCreatorUploadResult {
     if (mainPriceJpy === null) {
       return;
     }
+
+    submitLockRef.current = true;
 
     try {
       setDraft((currentDraft) => startCreatorUploadInitiation(currentDraft));
