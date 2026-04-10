@@ -12,7 +12,7 @@ const creatorEntryErrorResponseSchema = z.object({
   }),
 });
 
-function getCreatorEntryErrorCode(error: unknown): string | null {
+export function getCreatorEntryErrorCode(error: unknown): string | null {
   if (!(error instanceof ApiError) || !error.details) {
     return null;
   }
@@ -37,6 +37,9 @@ function getCreatorEntryErrorCode(error: unknown): string | null {
 export function getCreatorRegistrationErrorMessage(error: unknown): string {
   const code = getCreatorEntryErrorCode(error);
 
+  if (code === "auth_required") {
+    return "ログイン状態を確認してから再度お試しください。";
+  }
   if (code === "invalid_display_name") {
     return "表示名を入力してください。";
   }
@@ -45,6 +48,21 @@ export function getCreatorRegistrationErrorMessage(error: unknown): string {
   }
   if (code === "handle_already_taken") {
     return "そのhandleは既に使われています。別のhandleを入力してください。";
+  }
+  if (code === "invalid_avatar_mime_type") {
+    return "avatar は JPEG / PNG / WebP のみ選択できます。";
+  }
+  if (code === "invalid_avatar_file_size") {
+    return "avatar file を読み取れませんでした。別の画像を選択してください。";
+  }
+  if (code === "avatar_file_too_large") {
+    return "avatar は 5MB 以下の画像を選択してください。";
+  }
+  if (code === "avatar_upload_not_found" || code === "avatar_upload_incomplete") {
+    return "avatar のアップロードを確認できませんでした。もう一度お試しください。";
+  }
+  if (code === "avatar_upload_expired" || code === "invalid_avatar_upload_token") {
+    return "avatar upload の有効期限が切れました。もう一度申し込んでください。";
   }
 
   if (error instanceof ApiError && error.code === "network") {

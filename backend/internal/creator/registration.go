@@ -18,6 +18,7 @@ var ErrInvalidDisplayName = errors.New("creator display name が不正です")
 
 // SelfServeRegistrationInput は self-serve creator registration の入力です。
 type SelfServeRegistrationInput struct {
+	AvatarURL   *string
 	Bio         string
 	DisplayName string
 	Handle      string
@@ -63,7 +64,7 @@ func (r *Repository) RegisterApprovedCreator(
 			return err
 		}
 
-		profile, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, handle, bio)
+		profile, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, handle, input.AvatarURL, bio)
 		if err != nil {
 			return err
 		}
@@ -149,7 +150,15 @@ func upsertApprovedCapability(ctx context.Context, q queries, userID uuid.UUID, 
 	return capability, nil
 }
 
-func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, displayName string, handle string, bio string) (Profile, error) {
+func upsertPrivateProfile(
+	ctx context.Context,
+	q queries,
+	userID uuid.UUID,
+	displayName string,
+	handle string,
+	avatarURL *string,
+	bio string,
+) (Profile, error) {
 	existingRow, err := q.GetCreatorProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
@@ -160,7 +169,7 @@ func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, disp
 			UserID:      postgres.UUIDToPG(userID),
 			DisplayName: postgres.TextToPG(&displayName),
 			Handle:      handle,
-			AvatarUrl:   postgres.TextToPG(nil),
+			AvatarUrl:   postgres.TextToPG(avatarURL),
 			Bio:         bio,
 			PublishedAt: postgres.TimeToPG(nil),
 		})
@@ -185,7 +194,7 @@ func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, disp
 	updatedRow, err := q.UpdateCreatorProfile(ctx, sqlc.UpdateCreatorProfileParams{
 		DisplayName: postgres.TextToPG(&displayName),
 		Handle:      handle,
-		AvatarUrl:   postgres.TextToPG(existingProfile.AvatarURL),
+		AvatarUrl:   postgres.TextToPG(resolveUpdatedAvatarURL(existingProfile.AvatarURL, avatarURL)),
 		Bio:         bio,
 		UserID:      postgres.UUIDToPG(userID),
 	})
@@ -200,4 +209,12 @@ func upsertPrivateProfile(ctx context.Context, q queries, userID uuid.UUID, disp
 	}
 
 	return profile, nil
+}
+
+func resolveUpdatedAvatarURL(existingAvatarURL *string, nextAvatarURL *string) *string {
+	if nextAvatarURL != nil {
+		return nextAvatarURL
+	}
+
+	return existingAvatarURL
 }

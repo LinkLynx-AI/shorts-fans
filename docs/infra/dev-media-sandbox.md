@@ -146,7 +146,7 @@ creator avatar 後続 task から読む env 名は次に揃えます。
 | `creator_avatar_delivery_bucket_name` | `CREATOR_AVATAR_DELIVERY_BUCKET_NAME` |
 | `creator_avatar_base_url` | `CREATOR_AVATAR_BASE_URL` |
 
-現時点の `cmd/api` / `cmd/worker` は上記 avatar env をまだ必須化していません。`SHO-149` / `SHO-150` 以降の consume 側実装で使用します。
+`SHO-149` 以降の `cmd/api` は上記 avatar env を必須にし、creator registration avatar upload endpoint の S3 / delivery 設定として使用します。`cmd/worker` は引き続き avatar env を要求しません。
 
 ## Guardrail
 

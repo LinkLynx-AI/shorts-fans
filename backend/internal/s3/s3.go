@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -28,6 +29,12 @@ type ObjectMetadata struct {
 	ContentType   string
 }
 
+// ObjectData は object body 読み出しに必要なデータを表します。
+type ObjectData struct {
+	Body        []byte
+	ContentType string
+}
+
 // Config は S3 client の最小設定を表します。
 type Config struct {
 	Region string
@@ -45,6 +52,7 @@ func (c Config) Validate() error {
 type objectAPI interface {
 	PutObject(ctx context.Context, params *awss3.PutObjectInput, optFns ...func(*awss3.Options)) (*awss3.PutObjectOutput, error)
 	DeleteObject(ctx context.Context, params *awss3.DeleteObjectInput, optFns ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error)
+	GetObject(ctx context.Context, params *awss3.GetObjectInput, optFns ...func(*awss3.Options)) (*awss3.GetObjectOutput, error)
 	HeadObject(ctx context.Context, params *awss3.HeadObjectInput, optFns ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error)
 }
 
@@ -212,6 +220,37 @@ func (c *Client) HeadObject(ctx context.Context, bucket string, key string) (Obj
 	return ObjectMetadata{
 		ContentLength: contentLength,
 		ContentType:   strings.TrimSpace(aws.ToString(output.ContentType)),
+	}, nil
+}
+
+// GetObject は object body を読み出します。
+func (c *Client) GetObject(ctx context.Context, bucket string, key string) (ObjectData, error) {
+	if c == nil {
+		return ObjectData{}, fmt.Errorf("s3 client is nil")
+	}
+	if err := validateBucketAndKey(bucket, key); err != nil {
+		return ObjectData{}, err
+	}
+
+	output, err := c.api.GetObject(ctx, &awss3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return ObjectData{}, fmt.Errorf("get object bucket=%s key=%s: %w", bucket, key, err)
+	}
+	defer func() {
+		_ = output.Body.Close()
+	}()
+
+	body, err := io.ReadAll(output.Body)
+	if err != nil {
+		return ObjectData{}, fmt.Errorf("read object bucket=%s key=%s: %w", bucket, key, err)
+	}
+
+	return ObjectData{
+		Body:        body,
+		ContentType: strings.TrimSpace(aws.ToString(output.ContentType)),
 	}, nil
 }
 

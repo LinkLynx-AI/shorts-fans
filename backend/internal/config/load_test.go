@@ -14,6 +14,9 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	t.Setenv("MEDIA_SHORT_PUBLIC_BASE_URL", "https://example.com/shorts")
 	t.Setenv("MEDIA_MAIN_PRIVATE_BUCKET_NAME", "main-bucket")
 	t.Setenv("MEDIACONVERT_SERVICE_ROLE_ARN", "arn:aws:iam::123456789012:role/media-role")
+	t.Setenv("CREATOR_AVATAR_UPLOAD_BUCKET_NAME", "avatar-upload-bucket")
+	t.Setenv("CREATOR_AVATAR_DELIVERY_BUCKET_NAME", "avatar-delivery-bucket")
+	t.Setenv("CREATOR_AVATAR_BASE_URL", "https://example.com/avatar")
 
 	cfg := Load()
 
@@ -49,6 +52,15 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	}
 	if cfg.MediaConvertServiceRoleARN != "arn:aws:iam::123456789012:role/media-role" {
 		t.Fatalf("Load() mediaconvert role arn got %q want %q", cfg.MediaConvertServiceRoleARN, "arn:aws:iam::123456789012:role/media-role")
+	}
+	if cfg.CreatorAvatarUploadBucketName != "avatar-upload-bucket" {
+		t.Fatalf("Load() creator avatar upload bucket got %q want %q", cfg.CreatorAvatarUploadBucketName, "avatar-upload-bucket")
+	}
+	if cfg.CreatorAvatarDeliveryBucketName != "avatar-delivery-bucket" {
+		t.Fatalf("Load() creator avatar delivery bucket got %q want %q", cfg.CreatorAvatarDeliveryBucketName, "avatar-delivery-bucket")
+	}
+	if cfg.CreatorAvatarBaseURL != "https://example.com/avatar" {
+		t.Fatalf("Load() creator avatar base url got %q want %q", cfg.CreatorAvatarBaseURL, "https://example.com/avatar")
 	}
 }
 

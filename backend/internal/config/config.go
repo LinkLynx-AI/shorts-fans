@@ -16,21 +16,27 @@ const (
 	mediaShortBaseURLEnv    = "MEDIA_SHORT_PUBLIC_BASE_URL"
 	mediaMainBucketNameEnv  = "MEDIA_MAIN_PRIVATE_BUCKET_NAME"
 	mediaRoleARNEnv         = "MEDIACONVERT_SERVICE_ROLE_ARN"
+	avatarUploadBucketEnv   = "CREATOR_AVATAR_UPLOAD_BUCKET_NAME"
+	avatarDeliveryBucketEnv = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
+	avatarBaseURLEnv        = "CREATOR_AVATAR_BASE_URL"
 )
 
 // Config は backend コマンドの実行時設定を保持します。
 type Config struct {
-	AppEnv                     string
-	APIAddr                    string
-	PostgresDSN                string
-	RedisAddr                  string
-	AWSRegion                  string
-	MediaJobsQueueURL          string
-	MediaRawBucketName         string
-	MediaShortPublicBucketName string
-	MediaShortPublicBaseURL    string
-	MediaMainPrivateBucketName string
-	MediaConvertServiceRoleARN string
+	AppEnv                          string
+	APIAddr                         string
+	PostgresDSN                     string
+	RedisAddr                       string
+	AWSRegion                       string
+	MediaJobsQueueURL               string
+	MediaRawBucketName              string
+	MediaShortPublicBucketName      string
+	MediaShortPublicBaseURL         string
+	MediaMainPrivateBucketName      string
+	MediaConvertServiceRoleARN      string
+	CreatorAvatarUploadBucketName   string
+	CreatorAvatarDeliveryBucketName string
+	CreatorAvatarBaseURL            string
 }
 
 // Load はプロセス環境変数から設定を読み込み、既定値を適用します。
@@ -41,17 +47,20 @@ func Load() Config {
 // LoadFromEnv は任意の lookup 関数から Config を構築します。
 func LoadFromEnv(lookup func(string) string) Config {
 	cfg := Config{
-		AppEnv:                     trimmedLookup(lookup, "APP_ENV"),
-		APIAddr:                    trimmedLookup(lookup, "API_ADDR"),
-		PostgresDSN:                trimmedLookup(lookup, "POSTGRES_DSN"),
-		RedisAddr:                  trimmedLookup(lookup, "REDIS_ADDR"),
-		AWSRegion:                  trimmedLookup(lookup, "AWS_REGION"),
-		MediaJobsQueueURL:          firstNonEmpty(trimmedLookup(lookup, mediaJobsQueueURLEnv), trimmedLookup(lookup, legacySQSQueueURLEnv)),
-		MediaRawBucketName:         trimmedLookup(lookup, mediaRawBucketNameEnv),
-		MediaShortPublicBucketName: trimmedLookup(lookup, mediaShortBucketNameEnv),
-		MediaShortPublicBaseURL:    trimmedLookup(lookup, mediaShortBaseURLEnv),
-		MediaMainPrivateBucketName: trimmedLookup(lookup, mediaMainBucketNameEnv),
-		MediaConvertServiceRoleARN: trimmedLookup(lookup, mediaRoleARNEnv),
+		AppEnv:                          trimmedLookup(lookup, "APP_ENV"),
+		APIAddr:                         trimmedLookup(lookup, "API_ADDR"),
+		PostgresDSN:                     trimmedLookup(lookup, "POSTGRES_DSN"),
+		RedisAddr:                       trimmedLookup(lookup, "REDIS_ADDR"),
+		AWSRegion:                       trimmedLookup(lookup, "AWS_REGION"),
+		MediaJobsQueueURL:               firstNonEmpty(trimmedLookup(lookup, mediaJobsQueueURLEnv), trimmedLookup(lookup, legacySQSQueueURLEnv)),
+		MediaRawBucketName:              trimmedLookup(lookup, mediaRawBucketNameEnv),
+		MediaShortPublicBucketName:      trimmedLookup(lookup, mediaShortBucketNameEnv),
+		MediaShortPublicBaseURL:         trimmedLookup(lookup, mediaShortBaseURLEnv),
+		MediaMainPrivateBucketName:      trimmedLookup(lookup, mediaMainBucketNameEnv),
+		MediaConvertServiceRoleARN:      trimmedLookup(lookup, mediaRoleARNEnv),
+		CreatorAvatarUploadBucketName:   trimmedLookup(lookup, avatarUploadBucketEnv),
+		CreatorAvatarDeliveryBucketName: trimmedLookup(lookup, avatarDeliveryBucketEnv),
+		CreatorAvatarBaseURL:            trimmedLookup(lookup, avatarBaseURLEnv),
 	}
 
 	if cfg.AppEnv == "" {
@@ -77,7 +86,30 @@ func (c Config) ValidateAPI() error {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
-	return c.validateMediaSandbox(true)
+	if err := c.validateMediaSandbox(true); err != nil {
+		return err
+	}
+
+	requiredAvatarFields := []struct {
+		name  string
+		value string
+	}{
+		{name: avatarUploadBucketEnv, value: c.CreatorAvatarUploadBucketName},
+		{name: avatarDeliveryBucketEnv, value: c.CreatorAvatarDeliveryBucketName},
+		{name: avatarBaseURLEnv, value: c.CreatorAvatarBaseURL},
+	}
+
+	var missingAvatar []string
+	for _, field := range requiredAvatarFields {
+		if field.value == "" {
+			missingAvatar = append(missingAvatar, field.name)
+		}
+	}
+	if len(missingAvatar) > 0 {
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(missingAvatar, ", "))
+	}
+
+	return nil
 }
 
 // ValidateWorker は worker 設定の整合性を検証します。

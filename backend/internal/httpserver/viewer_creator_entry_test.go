@@ -12,6 +12,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -25,6 +26,43 @@ func (s viewerCreatorRegistrationWriterStub) RegisterApprovedCreator(
 	input creator.SelfServeRegistrationInput,
 ) (creator.SelfServeRegistrationResult, error) {
 	return s.registerApprovedCreator(ctx, input)
+}
+
+type viewerCreatorAvatarUploadHandlerStub struct {
+	completeUpload         func(context.Context, creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error)
+	consumeCompletedUpload func(context.Context, uuid.UUID, string) error
+	createUpload           func(context.Context, creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error)
+	resolveCompletedUpload func(context.Context, uuid.UUID, string) (creatoravatar.CompletedUpload, error)
+}
+
+func (s viewerCreatorAvatarUploadHandlerStub) CompleteUpload(
+	ctx context.Context,
+	input creatoravatar.CompleteUploadInput,
+) (creatoravatar.CompleteUploadResult, error) {
+	return s.completeUpload(ctx, input)
+}
+
+func (s viewerCreatorAvatarUploadHandlerStub) ConsumeCompletedUpload(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	avatarUploadToken string,
+) error {
+	return s.consumeCompletedUpload(ctx, viewerUserID, avatarUploadToken)
+}
+
+func (s viewerCreatorAvatarUploadHandlerStub) CreateUpload(
+	ctx context.Context,
+	input creatoravatar.CreateUploadInput,
+) (creatoravatar.CreateUploadResult, error) {
+	return s.createUpload(ctx, input)
+}
+
+func (s viewerCreatorAvatarUploadHandlerStub) ResolveCompletedUpload(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	avatarUploadToken string,
+) (creatoravatar.CompletedUpload, error) {
+	return s.resolveCompletedUpload(ctx, viewerUserID, avatarUploadToken)
 }
 
 type viewerActiveModeSwitcherStub struct {
@@ -117,6 +155,144 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 	}
 	if gotInput.Bio != "bio" {
 		t.Fatalf("POST /api/viewer/creator-registration bio got %q want %q", gotInput.Bio, "bio")
+	}
+}
+
+func TestViewerCreatorRegistrationSuccessWithAvatarUploadToken(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("12111111-1111-1111-1111-111111111111")
+	var gotInput creator.SelfServeRegistrationInput
+	resolveCalled := false
+	consumeCalled := false
+
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         viewerID,
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorAvatarUpload: viewerCreatorAvatarUploadHandlerStub{
+			resolveCompletedUpload: func(_ context.Context, viewerUserID uuid.UUID, avatarUploadToken string) (creatoravatar.CompletedUpload, error) {
+				resolveCalled = true
+				if viewerUserID != viewerID {
+					t.Fatalf("ResolveCompletedUpload() viewer id got %s want %s", viewerUserID, viewerID)
+				}
+				if avatarUploadToken != "vcupl_token" {
+					t.Fatalf("ResolveCompletedUpload() token got %q want %q", avatarUploadToken, "vcupl_token")
+				}
+				return creatoravatar.CompletedUpload{
+					AvatarAssetID:     "asset_creator_registration_avatar_token",
+					AvatarUploadToken: avatarUploadToken,
+					AvatarURL:         "https://cdn.example.com/creator-avatar/avatar.png",
+				}, nil
+			},
+			consumeCompletedUpload: func(_ context.Context, viewerUserID uuid.UUID, avatarUploadToken string) error {
+				consumeCalled = true
+				if viewerUserID != viewerID {
+					t.Fatalf("ConsumeCompletedUpload() viewer id got %s want %s", viewerUserID, viewerID)
+				}
+				if avatarUploadToken != "vcupl_token" {
+					t.Fatalf("ConsumeCompletedUpload() token got %q want %q", avatarUploadToken, "vcupl_token")
+				}
+				return nil
+			},
+			createUpload: func(context.Context, creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error) {
+				return creatoravatar.CreateUploadResult{}, errors.New("should not be called")
+			},
+			completeUpload: func(context.Context, creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error) {
+				return creatoravatar.CompleteUploadResult{}, errors.New("should not be called")
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(_ context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				gotInput = input
+				return creator.SelfServeRegistrationResult{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/viewer/creator-registration",
+		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","avatarUploadToken":"vcupl_token"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	if !resolveCalled {
+		t.Fatal("POST /api/viewer/creator-registration resolveCalled = false, want true")
+	}
+	if !consumeCalled {
+		t.Fatal("POST /api/viewer/creator-registration consumeCalled = false, want true")
+	}
+	if gotInput.AvatarURL == nil || *gotInput.AvatarURL != "https://cdn.example.com/creator-avatar/avatar.png" {
+		t.Fatalf("POST /api/viewer/creator-registration avatar url got %v want %q", gotInput.AvatarURL, "https://cdn.example.com/creator-avatar/avatar.png")
+	}
+}
+
+func TestViewerCreatorRegistrationInvalidAvatarUploadToken(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         uuid.New(),
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorAvatarUpload: viewerCreatorAvatarUploadHandlerStub{
+			resolveCompletedUpload: func(context.Context, uuid.UUID, string) (creatoravatar.CompletedUpload, error) {
+				return creatoravatar.CompletedUpload{}, creatoravatar.ErrUploadExpired
+			},
+			consumeCompletedUpload: func(context.Context, uuid.UUID, string) error {
+				return errors.New("should not be called")
+			},
+			createUpload: func(context.Context, creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error) {
+				return creatoravatar.CreateUploadResult{}, errors.New("should not be called")
+			},
+			completeUpload: func(context.Context, creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error) {
+				return creatoravatar.CompleteUploadResult{}, errors.New("should not be called")
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				return creator.SelfServeRegistrationResult{}, errors.New("should not be called")
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/viewer/creator-registration",
+		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","avatarUploadToken":"vcupl_token"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_avatar_upload_token"`) {
+		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_avatar_upload_token", rec.Body.String())
 	}
 }
 

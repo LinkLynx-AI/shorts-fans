@@ -3,8 +3,10 @@ package s3
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,6 +20,9 @@ type stubObjectAPI struct {
 	putErr      error
 	deleteInput *awss3.DeleteObjectInput
 	deleteErr   error
+	getInput    *awss3.GetObjectInput
+	getOutput   *awss3.GetObjectOutput
+	getErr      error
 	headInput   *awss3.HeadObjectInput
 	headOutput  *awss3.HeadObjectOutput
 	headErr     error
@@ -31,6 +36,16 @@ func (s *stubObjectAPI) PutObject(_ context.Context, params *awss3.PutObjectInpu
 func (s *stubObjectAPI) DeleteObject(_ context.Context, params *awss3.DeleteObjectInput, _ ...func(*awss3.Options)) (*awss3.DeleteObjectOutput, error) {
 	s.deleteInput = params
 	return &awss3.DeleteObjectOutput{}, s.deleteErr
+}
+
+func (s *stubObjectAPI) GetObject(_ context.Context, params *awss3.GetObjectInput, _ ...func(*awss3.Options)) (*awss3.GetObjectOutput, error) {
+	s.getInput = params
+	if s.getOutput == nil {
+		s.getOutput = &awss3.GetObjectOutput{
+			Body: io.NopCloser(strings.NewReader("")),
+		}
+	}
+	return s.getOutput, s.getErr
 }
 
 func (s *stubObjectAPI) HeadObject(_ context.Context, params *awss3.HeadObjectInput, _ ...func(*awss3.Options)) (*awss3.HeadObjectOutput, error) {
@@ -234,6 +249,28 @@ func TestHeadObject(t *testing.T) {
 	}
 }
 
+func TestGetObject(t *testing.T) {
+	t.Parallel()
+
+	client := newClient(&stubObjectAPI{
+		getOutput: &awss3.GetObjectOutput{
+			Body:        io.NopCloser(strings.NewReader("avatar-bytes")),
+			ContentType: aws.String("image/png"),
+		},
+	}, &stubPresignAPI{})
+
+	got, err := client.GetObject(context.Background(), "avatar-bucket", "creator-avatar/key.png")
+	if err != nil {
+		t.Fatalf("GetObject() error = %v, want nil", err)
+	}
+	if string(got.Body) != "avatar-bytes" {
+		t.Fatalf("GetObject() body got %q want %q", string(got.Body), "avatar-bytes")
+	}
+	if got.ContentType != "image/png" {
+		t.Fatalf("GetObject() content type got %q want %q", got.ContentType, "image/png")
+	}
+}
+
 func TestClientMethodsValidateInput(t *testing.T) {
 	t.Parallel()
 
@@ -252,6 +289,9 @@ func TestClientMethodsValidateInput(t *testing.T) {
 	}
 	if _, err := client.HeadObject(context.Background(), "", "key"); err == nil {
 		t.Fatal("HeadObject() error = nil, want error")
+	}
+	if _, err := client.GetObject(context.Background(), "", "key"); err == nil {
+		t.Fatal("GetObject() error = nil, want error")
 	}
 }
 
@@ -281,6 +321,9 @@ func TestClientPropagatesErrors(t *testing.T) {
 	}
 	if _, err := newClient(&stubObjectAPI{headErr: errors.New("head failed")}, &stubPresignAPI{}).HeadObject(context.Background(), "bucket", "key"); err == nil {
 		t.Fatal("HeadObject() error = nil, want error")
+	}
+	if _, err := newClient(&stubObjectAPI{getErr: errors.New("get failed")}, &stubPresignAPI{}).GetObject(context.Background(), "bucket", "key"); err == nil {
+		t.Fatal("GetObject() error = nil, want error")
 	}
 }
 

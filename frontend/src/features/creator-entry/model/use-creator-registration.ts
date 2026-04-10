@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import {
+  useEffect,
   startTransition,
   useState,
 } from "react";
@@ -11,21 +12,176 @@ import {
   useSetCurrentViewer,
   useSetViewerSession,
 } from "@/entities/viewer";
+import { ApiError } from "@/shared/api";
 
+import {
+  completeCreatorRegistrationAvatarUpload,
+  createCreatorRegistrationAvatarUpload,
+  uploadCreatorRegistrationAvatarTarget,
+} from "../api/avatar-upload";
 import { registerCreator } from "../api/register-creator";
-import { getCreatorRegistrationErrorMessage } from "./creator-entry";
+import {
+  getCreatorEntryErrorCode,
+  getCreatorRegistrationErrorMessage,
+} from "./creator-entry";
+
+const creatorRegistrationAvatarMimeTypes = ["image/jpeg", "image/png", "image/webp"] as const;
+const creatorRegistrationAvatarAccept = creatorRegistrationAvatarMimeTypes.join(",");
+const creatorRegistrationAvatarMimeTypeSet = new Set<string>(creatorRegistrationAvatarMimeTypes);
+const creatorRegistrationAvatarMaxFileSizeBytes = 5_242_880;
+const creatorRegistrationInvalidCompletedAvatarMessage =
+  "avatar upload の有効期限が切れました。再度申し込むともう一度アップロードします。";
+
+type CompletedAvatarUpload = {
+  avatarAssetID: string;
+  avatarUploadToken: string;
+  avatarURL: string;
+};
+
+type CreatorRegistrationAvatarState =
+  | { kind: "empty" }
+  | { fileName: string; kind: "invalid"; message: string }
+  | { file: File; kind: "selected" }
+  | { file: File; kind: "uploading" }
+  | { completedUpload: CompletedAvatarUpload; file: File; kind: "completed" }
+  | { file: File; kind: "failed"; message: string };
+
+type CreatorRegistrationAvatarField = {
+  canClear: boolean;
+  fileName: string | null;
+  inputAccept: string;
+  isError: boolean;
+  kind: CreatorRegistrationAvatarState["kind"];
+  message: string;
+  previewUrl: string | null;
+};
 
 type UseCreatorRegistrationResult = {
+  avatar: CreatorRegistrationAvatarField;
+  avatarInputKey: number;
   bio: string;
+  clearAvatarSelection: () => void;
   displayName: string;
   errorMessage: string | null;
   handle: string;
   isSubmitting: boolean;
+  selectAvatarFile: (file: File | null) => void;
   setBio: (bio: string) => void;
   setDisplayName: (displayName: string) => void;
   setHandle: (handle: string) => void;
   submit: () => Promise<void>;
 };
+
+function validateAvatarFile(file: File): string | null {
+  if (file.size <= 0) {
+    return "avatar file を読み取れませんでした。別の画像を選択してください。";
+  }
+  if (file.size > creatorRegistrationAvatarMaxFileSizeBytes) {
+    return "avatar は 5MB 以下の画像を選択してください。";
+  }
+  if (!creatorRegistrationAvatarMimeTypeSet.has(file.type)) {
+    return "avatar は JPEG / PNG / WebP のみ選択できます。";
+  }
+
+  return null;
+}
+
+function getAvatarUploadErrorMessage(error: unknown): string {
+  const creatorEntryErrorCode = getCreatorEntryErrorCode(error);
+  if (creatorEntryErrorCode !== null) {
+    return getCreatorRegistrationErrorMessage(error);
+  }
+
+  if (error instanceof ApiError && error.code === "network") {
+    return "avatar のアップロードに失敗しました。通信状態を確認してから再度お試しください。";
+  }
+  if (error instanceof ApiError) {
+    return "avatar のアップロードに失敗しました。再度お試しください。";
+  }
+
+  return "avatar のアップロードに失敗しました。少し時間を置いてから再度お試しください。";
+}
+
+function getAvatarPreviewFile(state: CreatorRegistrationAvatarState): File | null {
+  switch (state.kind) {
+    case "selected":
+    case "uploading":
+    case "completed":
+    case "failed":
+      return state.file;
+    case "empty":
+    case "invalid":
+      return null;
+  }
+}
+
+function buildAvatarField(
+  state: CreatorRegistrationAvatarState,
+  previewUrl: string | null,
+): CreatorRegistrationAvatarField {
+  switch (state.kind) {
+    case "empty":
+      return {
+        canClear: false,
+        fileName: null,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: false,
+        kind: "empty",
+        message: "未設定でも登録できます。",
+        previewUrl,
+      };
+    case "invalid":
+      return {
+        canClear: true,
+        fileName: state.fileName,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: true,
+        kind: "invalid",
+        message: state.message,
+        previewUrl,
+      };
+    case "selected":
+      return {
+        canClear: true,
+        fileName: state.file.name,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: false,
+        kind: "selected",
+        message: "登録時にアップロードします。",
+        previewUrl,
+      };
+    case "uploading":
+      return {
+        canClear: true,
+        fileName: state.file.name,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: false,
+        kind: "uploading",
+        message: "アップロードしています。",
+        previewUrl,
+      };
+    case "completed":
+      return {
+        canClear: true,
+        fileName: state.file.name,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: false,
+        kind: "completed",
+        message: "アップロード済みです。",
+        previewUrl,
+      };
+    case "failed":
+      return {
+        canClear: true,
+        fileName: state.file.name,
+        inputAccept: creatorRegistrationAvatarAccept,
+        isError: true,
+        kind: "failed",
+        message: state.message,
+        previewUrl,
+      };
+  }
+}
 
 /**
  * creator registration form の入力状態と submit を管理する。
@@ -37,28 +193,146 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   const [bio, setBioState] = useState("");
   const [displayName, setDisplayNameState] = useState("");
   const [handle, setHandleState] = useState("");
+  const [avatarState, setAvatarState] = useState<CreatorRegistrationAvatarState>({ kind: "empty" });
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null);
+  const [avatarInputKey, setAvatarInputKey] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const setDisplayName = (nextDisplayName: string) => {
-    setDisplayNameState(nextDisplayName);
+  useEffect(() => {
+    const previewFile = getAvatarPreviewFile(avatarState);
+    if (previewFile === null) {
+      setAvatarPreviewUrl(null);
+      return;
+    }
+
+    const nextPreviewUrl = URL.createObjectURL(previewFile);
+    setAvatarPreviewUrl(nextPreviewUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextPreviewUrl);
+    };
+  }, [avatarState]);
+
+  const clearErrorMessage = () => {
     if (errorMessage !== null) {
       setErrorMessage(null);
     }
+  };
+
+  const setDisplayName = (nextDisplayName: string) => {
+    setDisplayNameState(nextDisplayName);
+    clearErrorMessage();
   };
 
   const setBio = (nextBio: string) => {
     setBioState(nextBio);
-    if (errorMessage !== null) {
-      setErrorMessage(null);
-    }
+    clearErrorMessage();
   };
 
   const setHandle = (nextHandle: string) => {
     setHandleState(nextHandle);
-    if (errorMessage !== null) {
-      setErrorMessage(null);
+    clearErrorMessage();
+  };
+
+  const clearAvatarSelection = () => {
+    setAvatarState({ kind: "empty" });
+    setAvatarInputKey((currentKey) => currentKey + 1);
+    clearErrorMessage();
+  };
+
+  const selectAvatarFile = (file: File | null) => {
+    if (file === null) {
+      clearAvatarSelection();
+      return;
     }
+
+    const validationMessage = validateAvatarFile(file);
+    if (validationMessage !== null) {
+      setAvatarState({
+        fileName: file.name,
+        kind: "invalid",
+        message: validationMessage,
+      });
+      clearErrorMessage();
+      return;
+    }
+
+    setAvatarState({
+      file,
+      kind: "selected",
+    });
+    clearErrorMessage();
+  };
+
+  const uploadAvatarFile = async (file: File): Promise<CompletedAvatarUpload> => {
+    setAvatarState({
+      file,
+      kind: "uploading",
+    });
+
+    try {
+      const createResult = await createCreatorRegistrationAvatarUpload(file);
+      await uploadCreatorRegistrationAvatarTarget({
+        file,
+        target: createResult.uploadTarget,
+      });
+      const completedResult = await completeCreatorRegistrationAvatarUpload(createResult.avatarUploadToken);
+      const completedUpload = {
+        avatarAssetID: completedResult.avatar.id,
+        avatarUploadToken: completedResult.avatarUploadToken,
+        avatarURL: completedResult.avatar.url,
+      };
+
+      setAvatarState({
+        completedUpload,
+        file,
+        kind: "completed",
+      });
+
+      return completedUpload;
+    } catch (error) {
+      const message = getAvatarUploadErrorMessage(error);
+
+      setAvatarState({
+        file,
+        kind: "failed",
+        message,
+      });
+
+      throw error;
+    }
+  };
+
+  const resolveAvatarUploadToken = async (currentAvatarState: CreatorRegistrationAvatarState): Promise<string | undefined> => {
+    switch (currentAvatarState.kind) {
+      case "empty":
+        return undefined;
+      case "invalid":
+        setErrorMessage(currentAvatarState.message);
+        return undefined;
+      case "completed":
+        return currentAvatarState.completedUpload.avatarUploadToken;
+      case "selected":
+      case "failed":
+        return (await uploadAvatarFile(currentAvatarState.file)).avatarUploadToken;
+      case "uploading":
+        return undefined;
+    }
+  };
+
+  const resetCompletedAvatarUploadToken = () => {
+    setAvatarState((currentAvatarState) => {
+      if (currentAvatarState.kind !== "completed") {
+        return currentAvatarState;
+      }
+
+      return {
+        file: currentAvatarState.file,
+        kind: "failed",
+        message: creatorRegistrationInvalidCompletedAvatarMessage,
+      };
+    });
   };
 
   const submit = async () => {
@@ -78,8 +352,30 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    const currentAvatarState = avatarState;
+    if (currentAvatarState.kind === "invalid") {
+      setErrorMessage(currentAvatarState.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    let avatarUploadToken: string | undefined;
+
+    try {
+      avatarUploadToken = await resolveAvatarUploadToken(currentAvatarState);
+      if (currentAvatarState.kind !== "empty" && avatarUploadToken === undefined) {
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (error) {
+      setErrorMessage(getAvatarUploadErrorMessage(error));
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
       await registerCreator({
+        ...(avatarUploadToken ? { avatarUploadToken } : {}),
         bio,
         displayName,
         handle,
@@ -101,6 +397,9 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
         router.push("/fan/creator/success");
       });
     } catch (error) {
+      if (getCreatorEntryErrorCode(error) === "invalid_avatar_upload_token") {
+        resetCompletedAvatarUploadToken();
+      }
       setErrorMessage(getCreatorRegistrationErrorMessage(error));
     } finally {
       setIsSubmitting(false);
@@ -108,11 +407,15 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   };
 
   return {
+    avatar: buildAvatarField(avatarState, avatarPreviewUrl),
+    avatarInputKey,
     bio,
+    clearAvatarSelection,
     displayName,
     errorMessage,
     handle,
     isSubmitting,
+    selectAvatarFile,
     setBio,
     setDisplayName,
     setHandle,
