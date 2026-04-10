@@ -7,7 +7,11 @@ import {
   CreatorFollowButton,
   CreatorStatList,
 } from "@/entities/creator";
-import { useHasViewerSession } from "@/entities/viewer";
+import {
+  useCurrentViewer,
+  useHasViewerSession,
+} from "@/entities/viewer";
+import { useCreatorModeEntry } from "@/features/creator-entry";
 import {
   buildCreatorShortDetailHref,
   resolveCreatorProfileBackHref,
@@ -15,6 +19,7 @@ import {
 } from "@/features/creator-navigation";
 import { useFanAuthDialog } from "@/features/fan-auth";
 import { DetailShell } from "@/widgets/detail-shell";
+import { Button } from "@/shared/ui";
 
 import type {
   CreatorProfileShellShortItem,
@@ -64,6 +69,35 @@ function formatPreviewDuration(seconds: number): string {
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
 }
 
+function normalizeViewerIDForSelfComparison(viewerID: string | undefined): string | null {
+  if (!viewerID) {
+    return null;
+  }
+
+  const normalizedViewerID = viewerID.trim().toLowerCase().replaceAll("-", "");
+
+  return /^[0-9a-f]{32}$/.test(normalizedViewerID) ? normalizedViewerID : null;
+}
+
+function normalizeCreatorIDForSelfComparison(creatorID: string): string | null {
+  const normalizedCreatorID = creatorID.trim().toLowerCase();
+
+  if (!normalizedCreatorID.startsWith("creator_")) {
+    return null;
+  }
+
+  const viewerID = normalizedCreatorID.slice("creator_".length);
+
+  return /^[0-9a-f]{32}$/.test(viewerID) ? viewerID : null;
+}
+
+function isSelfCreatorProfile(currentViewerID: string | undefined, creatorID: string): boolean {
+  const normalizedViewerID = normalizeViewerIDForSelfComparison(currentViewerID);
+  const normalizedCreatorViewerID = normalizeCreatorIDForSelfComparison(creatorID);
+
+  return normalizedViewerID !== null && normalizedCreatorViewerID !== null && normalizedViewerID === normalizedCreatorViewerID;
+}
+
 function CreatorProfileShortGridTile({
   creatorDisplayName,
   creatorId,
@@ -103,10 +137,17 @@ export function CreatorProfileShell({
   state,
 }: CreatorProfileShellProps) {
   const { creator, shorts, stats, viewer } = state;
+  const currentViewer = useCurrentViewer();
   const { openFanAuthDialog } = useFanAuthDialog();
   const hasViewerSession = useHasViewerSession();
+  const {
+    enterCreatorMode,
+    errorMessage: creatorModeEntryErrorMessage,
+    isSubmitting: isCreatorModeEntrySubmitting,
+  } = useCreatorModeEntry();
   const backHref = resolveCreatorProfileBackHref(routeState);
   const displayHandle = creator.handle.replace(/^@/, "");
+  const isSelfProfile = isSelfCreatorProfile(currentViewer?.id, creator.id);
   const {
     errorMessage,
     fanCount,
@@ -125,6 +166,7 @@ export function CreatorProfileShell({
       openFanAuthDialog();
     },
   });
+  const primaryActionErrorMessage = isSelfProfile ? creatorModeEntryErrorMessage : errorMessage;
   const resolvedStats = {
     ...stats,
     fanCount,
@@ -159,20 +201,34 @@ export function CreatorProfileShell({
         <p className="mt-4 text-[13px] leading-[1.6] text-muted">{creator.bio}</p>
 
         <div className="mt-[14px]">
-          <CreatorFollowButton
-            fullWidth
-            onClick={() => {
-              void toggleFollow();
-            }}
-            isFollowing={isFollowing}
-            isPending={isPending}
-          />
-          {errorMessage ? (
+          {isSelfProfile ? (
+            <Button
+              aria-busy={isCreatorModeEntrySubmitting || undefined}
+              className="w-full rounded-[10px] text-[13px] font-bold shadow-none"
+              disabled={isCreatorModeEntrySubmitting}
+              onClick={() => {
+                void enterCreatorMode();
+              }}
+              type="button"
+            >
+              {isCreatorModeEntrySubmitting ? "Creatorページを開いています..." : "Creatorページを開く"}
+            </Button>
+          ) : (
+            <CreatorFollowButton
+              fullWidth
+              onClick={() => {
+                void toggleFollow();
+              }}
+              isFollowing={isFollowing}
+              isPending={isPending}
+            />
+          )}
+          {primaryActionErrorMessage ? (
             <p
               className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
               role="alert"
             >
-              {errorMessage}
+              {primaryActionErrorMessage}
             </p>
           ) : null}
         </div>

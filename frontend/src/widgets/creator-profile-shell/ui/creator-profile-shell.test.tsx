@@ -9,7 +9,11 @@ import {
   CreatorFollowApiError,
   updateCreatorFollow,
 } from "@/entities/creator";
-import { useHasViewerSession } from "@/entities/viewer";
+import {
+  useCurrentViewer,
+  useHasViewerSession,
+} from "@/entities/viewer";
+import { useCreatorModeEntry } from "@/features/creator-entry";
 import { useFanAuthDialog } from "@/features/fan-auth";
 import {
   CreatorProfileShell,
@@ -30,7 +34,17 @@ vi.mock("@/entities/viewer", async (importOriginal) => {
 
   return {
     ...actual,
+    useCurrentViewer: vi.fn(),
     useHasViewerSession: vi.fn(),
+  };
+});
+
+vi.mock("@/features/creator-entry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/creator-entry")>();
+
+  return {
+    ...actual,
+    useCreatorModeEntry: vi.fn(),
   };
 });
 
@@ -44,9 +58,12 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
 });
 
 const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
+const mockedUseCurrentViewer = vi.mocked(useCurrentViewer);
 const mockedUseHasViewerSession = vi.mocked(useHasViewerSession);
+const mockedUseCreatorModeEntry = vi.mocked(useCreatorModeEntry);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
 const openFanAuthDialog = vi.fn();
+const enterCreatorMode = vi.fn();
 
 function buildReadyState(
   overrides?: Partial<Extract<CreatorProfileShellState, { kind: "ready" }>>,
@@ -118,8 +135,18 @@ function getFanStatValue(): string | null {
 describe("CreatorProfileShell", () => {
   beforeEach(() => {
     mockedUpdateCreatorFollow.mockReset();
+    mockedUseCurrentViewer.mockReset();
     mockedUseHasViewerSession.mockReset();
+    mockedUseCreatorModeEntry.mockReset();
     openFanAuthDialog.mockReset();
+    enterCreatorMode.mockReset();
+    mockedUseCurrentViewer.mockReturnValue(null);
+    mockedUseCreatorModeEntry.mockReturnValue({
+      clearError: vi.fn(),
+      enterCreatorMode,
+      errorMessage: null,
+      isSubmitting: false,
+    });
     mockedUseFanAuthDialog.mockReturnValue({
       closeFanAuthDialog: vi.fn(),
       isFanAuthDialogOpen: false,
@@ -148,6 +175,56 @@ describe("CreatorProfileShell", () => {
       "href",
       "/shorts/rooftop?creatorId=creator_mina_rei&from=creator&profileFrom=search&profileQ=mina",
     );
+  });
+
+  it("replaces the follow CTA with a creator page entry button on self profile", async () => {
+    const user = userEvent.setup();
+
+    mockedUseCurrentViewer.mockReturnValue({
+      activeMode: "fan",
+      canAccessCreatorMode: true,
+      id: "11111111-1111-1111-1111-111111111111",
+    });
+    mockedUseHasViewerSession.mockReturnValue(true);
+
+    render(
+      <CreatorProfileShell
+        routeState={{ from: "search", q: "mika" }}
+        state={buildReadyState({
+          creator: {
+            avatar: null,
+            bio: "Public shorts から paid main へつながる creator mock profile.",
+            displayName: "Mika Aoi",
+            handle: "@mikaaoi",
+            id: "creator_11111111111111111111111111111111",
+          },
+          shorts: [
+            {
+              canonicalMainId: "main_mika_preview",
+              creatorId: "creator_11111111111111111111111111111111",
+              id: "short_mika_preview",
+              media: {
+                durationSeconds: 16,
+                id: "asset_short_mika_preview",
+                kind: "video",
+                posterUrl: null,
+                url: "https://cdn.example.com/shorts/mika-preview.mp4",
+              },
+              previewDurationSeconds: 16,
+              routeShortId: "rooftop",
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Creatorページを開く" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Follow" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Creatorページを開く" }));
+
+    expect(enterCreatorMode).toHaveBeenCalledTimes(1);
+    expect(mockedUpdateCreatorFollow).not.toHaveBeenCalled();
   });
 
   it("updates the CTA state and fan count after an authenticated unfollow succeeds", async () => {
