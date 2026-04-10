@@ -12,6 +12,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 )
@@ -56,6 +57,14 @@ type ViewerCreatorRegistrationWriter interface {
 	RegisterApprovedCreator(ctx context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error)
 }
 
+// ViewerCreatorAvatarUploadHandler は creator registration avatar upload を表します。
+type ViewerCreatorAvatarUploadHandler interface {
+	CompleteUpload(ctx context.Context, input creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error)
+	ConsumeCompletedUpload(ctx context.Context, viewerUserID uuid.UUID, avatarUploadToken string) error
+	CreateUpload(ctx context.Context, input creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error)
+	ResolveCompletedUpload(ctx context.Context, viewerUserID uuid.UUID, avatarUploadToken string) (creatoravatar.CompletedUpload, error)
+}
+
 // ViewerActiveModeSwitcher は viewer active mode 切替を表します。
 type ViewerActiveModeSwitcher interface {
 	SwitchActiveMode(ctx context.Context, rawSessionToken string, activeMode auth.ActiveMode) error
@@ -86,6 +95,7 @@ type HandlerConfig struct {
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
 	CreatorFollow        CreatorFollowWriter
+	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
 	CreatorRegistration  ViewerCreatorRegistrationWriter
 	FanProfileFollowing  FanProfileFollowingReader
 	FanProfileOverview   FanProfileOverviewReader
@@ -155,7 +165,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
-	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.ViewerActiveMode, config.ViewerBootstrap)
+	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.CreatorAvatarUpload, config.ViewerActiveMode, config.ViewerBootstrap)
 
 	return router
 }

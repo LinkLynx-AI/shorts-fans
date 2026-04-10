@@ -210,6 +210,81 @@ func TestRegisterApprovedCreatorUpdatesExistingCapabilityAndProfile(t *testing.T
 	}
 }
 
+func TestRegisterApprovedCreatorAppliesNewAvatarURLWhenProvided(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	userID := uuid.MustParse("26222222-2222-2222-2222-222222222222")
+	displayName := "New Name"
+	bio := "updated bio"
+	handle := "new_name"
+	nextAvatarURL := "https://cdn.example.com/avatar-next.png"
+	tx := &creatorTxStub{}
+	beginner := &creatorTxBeginnerStub{tx: tx}
+
+	var gotCreateProfileArg sqlc.CreateCreatorProfileParams
+	var gotUpdateProfileArg sqlc.UpdateCreatorProfileParams
+
+	repo := &Repository{
+		txBeginner: beginner,
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryStubQueries{
+				getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{}, pgx.ErrNoRows
+				},
+				createCapability: func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
+					return testCapabilityRow(userID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+				},
+				getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return sqlc.AppCreatorProfile{}, pgx.ErrNoRows
+				},
+				createProfile: func(_ context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
+					gotCreateProfileArg = arg
+					return testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), stringPtr(nextAvatarURL), nil), nil
+				},
+				updateProfile: func(_ context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
+					gotUpdateProfileArg = arg
+					return testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), stringPtr(nextAvatarURL), nil), nil
+				},
+			}
+		},
+	}
+
+	got, err := repo.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		AvatarURL:   &nextAvatarURL,
+		UserID:      userID,
+		DisplayName: displayName,
+		Handle:      handle,
+		Bio:         bio,
+	})
+	if err != nil {
+		t.Fatalf("RegisterApprovedCreator() error = %v, want nil", err)
+	}
+	if gotCreateProfileArg.AvatarUrl != pgText(stringPtr(nextAvatarURL)) {
+		t.Fatalf("RegisterApprovedCreator() create avatar arg got %v want %v", gotCreateProfileArg.AvatarUrl, pgText(stringPtr(nextAvatarURL)))
+	}
+	if !reflect.DeepEqual(got.Profile.AvatarURL, stringPtr(nextAvatarURL)) {
+		t.Fatalf("RegisterApprovedCreator() profile avatar got %v want %v", got.Profile.AvatarURL, stringPtr(nextAvatarURL))
+	}
+	if gotUpdateProfileArg.UserID.Valid {
+		t.Fatalf("RegisterApprovedCreator() update profile arg got %#v want create path only", gotUpdateProfileArg)
+	}
+}
+
+func TestResolveUpdatedAvatarURL(t *testing.T) {
+	t.Parallel()
+
+	existingAvatarURL := stringPtr("https://cdn.example.com/existing.png")
+	nextAvatarURL := stringPtr("https://cdn.example.com/next.png")
+
+	if got := resolveUpdatedAvatarURL(existingAvatarURL, nil); !reflect.DeepEqual(got, existingAvatarURL) {
+		t.Fatalf("resolveUpdatedAvatarURL() got %v want %v", got, existingAvatarURL)
+	}
+	if got := resolveUpdatedAvatarURL(existingAvatarURL, nextAvatarURL); !reflect.DeepEqual(got, nextAvatarURL) {
+		t.Fatalf("resolveUpdatedAvatarURL() got %v want %v", got, nextAvatarURL)
+	}
+}
+
 func TestRegisterApprovedCreatorRejectsBlankDisplayName(t *testing.T) {
 	t.Parallel()
 

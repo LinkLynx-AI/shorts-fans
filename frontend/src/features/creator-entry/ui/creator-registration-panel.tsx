@@ -14,11 +14,15 @@ import { useCreatorRegistration } from "../model/use-creator-registration";
  */
 export function CreatorRegistrationPanel() {
   const {
+    avatar,
+    avatarInputKey,
     bio,
+    clearAvatarSelection,
     displayName,
     errorMessage,
     handle,
     isSubmitting,
+    selectAvatarFile,
     setBio,
     setDisplayName,
     setHandle,
@@ -36,7 +40,7 @@ export function CreatorRegistrationPanel() {
         </h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           この最小実装では申込完了後すぐに creator mode を使えます。ここでは表示名、unique な handle、
-          自己紹介を受け取り、avatar は未設定のまま作成します。
+          自己紹介に加えて、任意で avatar を登録時にアップロードできます。
         </p>
 
         <form
@@ -92,11 +96,54 @@ export function CreatorRegistrationPanel() {
           </div>
 
           <section className="rounded-[20px] border border-dashed border-[#c9d8e1] bg-[#f7fafc] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-              Avatar
-            </p>
-            <p className="mt-1 text-sm leading-6 text-muted">
-              この PR では upload を実装しません。creator 登録後は avatar 未設定で保存されます。
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+                  Avatar
+                </p>
+                <p className="mt-1 text-sm leading-6 text-muted">
+                  任意です。JPEG / PNG / WebP の 5MB 以下の画像を 1 枚だけ登録できます。
+                </p>
+              </div>
+              {avatar.canClear ? (
+                <button
+                  className="rounded-full border border-[#c9d8e1] px-3 py-1 text-xs font-semibold text-muted transition hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={isSubmitting}
+                  onClick={() => clearAvatarSelection()}
+                  type="button"
+                >
+                  画像を外す
+                </button>
+              ) : null}
+            </div>
+
+            <label
+              className="mt-3 grid gap-1.5"
+              htmlFor="creator-registration-avatar"
+            >
+              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+                Avatar image
+              </span>
+            </label>
+            <input
+              accept={avatar.inputAccept}
+              className="mt-1 block w-full rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 py-3 text-sm text-foreground file:mr-3 file:rounded-full file:border-0 file:bg-accent file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-accent-foreground outline-none transition focus:border-accent focus:ring-4 focus:ring-ring/60"
+              disabled={isSubmitting}
+              id="creator-registration-avatar"
+              key={avatarInputKey}
+              onChange={(event) => selectAvatarFile(event.target.files?.[0] ?? null)}
+              type="file"
+            />
+            {avatar.fileName ? (
+              <p className="mt-2 text-xs leading-5 text-muted">
+                選択中: {avatar.fileName}
+              </p>
+            ) : null}
+            <p
+              aria-live="polite"
+              className={`mt-2 text-sm leading-6 ${avatar.isError ? "text-[#b2394f]" : "text-muted"}`}
+            >
+              {avatar.message}
             </p>
           </section>
 

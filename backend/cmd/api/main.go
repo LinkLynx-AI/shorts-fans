@@ -13,6 +13,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
@@ -77,6 +78,19 @@ func main() {
 		logger.Error("failed to initialize creator upload service", "error", err)
 		os.Exit(1)
 	}
+	creatorAvatarService, err := creatoravatar.NewService(
+		creatoravatar.ServiceConfig{
+			DeliveryBaseURL:    cfg.CreatorAvatarBaseURL,
+			DeliveryBucketName: cfg.CreatorAvatarDeliveryBucketName,
+			UploadBucketName:   cfg.CreatorAvatarUploadBucketName,
+		},
+		s3Client,
+		creatoravatar.NewRedisUploadStore(redisClient),
+	)
+	if err != nil {
+		logger.Error("failed to initialize creator avatar service", "error", err)
+		os.Exit(1)
+	}
 
 	server := httpserver.New(
 		httpserver.Config{
@@ -92,6 +106,7 @@ func main() {
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
 			CreatorFollow:        creatorRepository,
+			CreatorAvatarUpload:  creatorAvatarService,
 			CreatorRegistration:  creatorRepository,
 			FanProfileOverview:   fanProfileRepository,
 			FanProfileFollowing:  fanProfileRepository,

@@ -8,6 +8,7 @@ type RegisterCreatorOptions = {
 };
 
 type RegisterCreatorInput = {
+  avatarUploadToken?: string;
   bio: string;
   displayName: string;
   handle: string;
@@ -24,7 +25,12 @@ export async function registerCreator(
     ...(options.baseUrl ? { baseUrl: options.baseUrl } : {}),
     ...(options.fetcher ? { fetcher: options.fetcher } : {}),
     init: {
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        bio: input.bio,
+        displayName: input.displayName,
+        handle: input.handle,
+        ...(input.avatarUploadToken ? { avatarUploadToken: input.avatarUploadToken } : {}),
+      }),
       credentials: "include",
       headers: {
         "Content-Type": "application/json",

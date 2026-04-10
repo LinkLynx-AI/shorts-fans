@@ -21,15 +21,18 @@ func TestValidateAPI(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		PostgresDSN:                "postgres://example",
-		RedisAddr:                  "localhost:6379",
-		AWSRegion:                  "ap-northeast-1",
-		MediaJobsQueueURL:          "https://example.com/queue",
-		MediaRawBucketName:         "raw-bucket",
-		MediaShortPublicBucketName: "short-bucket",
-		MediaShortPublicBaseURL:    "https://example.com/shorts",
-		MediaMainPrivateBucketName: "main-bucket",
-		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+		PostgresDSN:                     "postgres://example",
+		RedisAddr:                       "localhost:6379",
+		AWSRegion:                       "ap-northeast-1",
+		MediaJobsQueueURL:               "https://example.com/queue",
+		MediaRawBucketName:              "raw-bucket",
+		MediaShortPublicBucketName:      "short-bucket",
+		MediaShortPublicBaseURL:         "https://example.com/shorts",
+		MediaMainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN:      "arn:aws:iam::123456789012:role/media-role",
+		CreatorAvatarUploadBucketName:   "avatar-upload-bucket",
+		CreatorAvatarDeliveryBucketName: "avatar-delivery-bucket",
+		CreatorAvatarBaseURL:            "https://example.com/avatar",
 	}
 
 	if err := cfg.ValidateAPI(); err != nil {
@@ -52,6 +55,26 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	cfg := Config{
 		PostgresDSN: "postgres://example",
 		RedisAddr:   "localhost:6379",
+	}
+
+	if err := cfg.ValidateAPI(); err == nil {
+		t.Fatal("ValidateAPI() error = nil, want error")
+	}
+}
+
+func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		PostgresDSN:                "postgres://example",
+		RedisAddr:                  "localhost:6379",
+		AWSRegion:                  "ap-northeast-1",
+		MediaJobsQueueURL:          "https://example.com/queue",
+		MediaRawBucketName:         "raw-bucket",
+		MediaShortPublicBucketName: "short-bucket",
+		MediaShortPublicBaseURL:    "https://example.com/shorts",
+		MediaMainPrivateBucketName: "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
