@@ -83,8 +83,6 @@ func TestAutoPublishIfReady(t *testing.T) {
 				ID:                  pgUUID(mainID),
 				MediaAssetID:        pgUUID(mainAssetID),
 				State:               mainStateDraft,
-				PriceMinor:          pgInt64(int64Ptr(1800)),
-				CurrencyCode:        pgText(stringPtr("JPY")),
 				OwnershipConfirmed:  true,
 				ConsentConfirmed:    true,
 				ApprovedForUnlockAt: pgtype.Timestamptz{},

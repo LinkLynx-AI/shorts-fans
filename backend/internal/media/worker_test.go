@@ -118,3 +118,169 @@ func TestWorkerPropagatesProcessorError(t *testing.T) {
 		t.Fatalf("Run() error got %v want %v", err, wantErr)
 	}
 }
+
+func TestNewWorkerValidatesDependenciesAndDefaultsIdleDelay(t *testing.T) {
+	t.Parallel()
+
+	processor := stubWorkerProcessor{
+		processAsset: func(context.Context, uuid.UUID) error { return nil },
+		processNextQueued: func(context.Context) (bool, error) {
+			return false, nil
+		},
+	}
+	queue := stubWakeQueue{
+		receive: func(context.Context) ([]WakeMessage, error) { return nil, nil },
+		delete:  func(context.Context, string) error { return nil },
+	}
+
+	if _, err := NewWorker(WorkerConfig{}, nil, processor); err == nil {
+		t.Fatal("NewWorker() error = nil, want queue validation error")
+	}
+	if _, err := NewWorker(WorkerConfig{}, queue, nil); err == nil {
+		t.Fatal("NewWorker() error = nil, want processor validation error")
+	}
+
+	worker, err := NewWorker(WorkerConfig{}, queue, processor)
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v, want nil", err)
+	}
+	if got, want := worker.idleDelay, defaultWorkerIdleDelay; got != want {
+		t.Fatalf("NewWorker() idleDelay got %s want %s", got, want)
+	}
+}
+
+func TestWorkerRunRejectsNilWorker(t *testing.T) {
+	t.Parallel()
+
+	var worker *Worker
+	if err := worker.Run(context.Background()); err == nil {
+		t.Fatal("Run() error = nil, want nil receiver error")
+	}
+}
+
+func TestWorkerRunPropagatesReceiveError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("receive failed")
+	worker, err := NewWorker(WorkerConfig{IdleDelay: time.Millisecond}, stubWakeQueue{
+		receive: func(context.Context) ([]WakeMessage, error) { return nil, wantErr },
+		delete:  func(context.Context, string) error { return nil },
+	}, stubWorkerProcessor{
+		processAsset: func(context.Context, uuid.UUID) error { return nil },
+		processNextQueued: func(context.Context) (bool, error) {
+			return false, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v, want nil", err)
+	}
+
+	if err := worker.Run(context.Background()); !errors.Is(err, wantErr) {
+		t.Fatalf("Run() error got %v want %v", err, wantErr)
+	}
+}
+
+func TestWorkerRunPropagatesDeleteError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("delete failed")
+	worker, err := NewWorker(WorkerConfig{IdleDelay: time.Millisecond}, stubWakeQueue{
+		receive: func(context.Context) ([]WakeMessage, error) {
+			return []WakeMessage{{
+				MediaAssetID:  uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				ReceiptHandle: "receipt-1",
+			}}, nil
+		},
+		delete: func(context.Context, string) error { return wantErr },
+	}, stubWorkerProcessor{
+		processAsset: func(context.Context, uuid.UUID) error { return nil },
+		processNextQueued: func(context.Context) (bool, error) {
+			return false, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v, want nil", err)
+	}
+
+	if err := worker.Run(context.Background()); !errors.Is(err, wantErr) {
+		t.Fatalf("Run() error got %v want %v", err, wantErr)
+	}
+}
+
+func TestWorkerRunReconcilesWhenQueueIsEmpty(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	receiveCalls := 0
+	reconcileCalls := 0
+	worker, err := NewWorker(WorkerConfig{IdleDelay: time.Hour}, stubWakeQueue{
+		receive: func(context.Context) ([]WakeMessage, error) {
+			receiveCalls++
+			return nil, nil
+		},
+		delete: func(context.Context, string) error { return nil },
+	}, stubWorkerProcessor{
+		processAsset: func(context.Context, uuid.UUID) error {
+			t.Fatal("ProcessAsset() should not be called when queue is empty")
+			return nil
+		},
+		processNextQueued: func(context.Context) (bool, error) {
+			reconcileCalls++
+			if reconcileCalls == 2 {
+				cancel()
+			}
+			return false, nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v, want nil", err)
+	}
+
+	if err := worker.Run(ctx); err != nil {
+		t.Fatalf("Run() error = %v, want nil", err)
+	}
+	if receiveCalls != 1 {
+		t.Fatalf("Run() receiveCalls got %d want 1", receiveCalls)
+	}
+	if reconcileCalls != 2 {
+		t.Fatalf("Run() reconcileCalls got %d want 2", reconcileCalls)
+	}
+}
+
+func TestWorkerRunPropagatesReconcileError(t *testing.T) {
+	t.Parallel()
+
+	wantErr := errors.New("reconcile failed")
+	worker, err := NewWorker(WorkerConfig{IdleDelay: time.Millisecond}, stubWakeQueue{
+		receive: func(context.Context) ([]WakeMessage, error) { return nil, nil },
+		delete:  func(context.Context, string) error { return nil },
+	}, stubWorkerProcessor{
+		processAsset: func(context.Context, uuid.UUID) error { return nil },
+		processNextQueued: func(context.Context) (bool, error) {
+			return false, wantErr
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewWorker() error = %v, want nil", err)
+	}
+
+	if err := worker.Run(context.Background()); !errors.Is(err, wantErr) {
+		t.Fatalf("Run() error got %v want %v", err, wantErr)
+	}
+}
+
+func TestWaitForIdle(t *testing.T) {
+	t.Parallel()
+
+	if err := waitForIdle(context.Background(), time.Nanosecond); err != nil {
+		t.Fatalf("waitForIdle() error = %v, want nil", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if err := waitForIdle(ctx, time.Second); !errors.Is(err, context.Canceled) {
+		t.Fatalf("waitForIdle() error got %v want %v", err, context.Canceled)
+	}
+}

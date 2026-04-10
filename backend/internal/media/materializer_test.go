@@ -161,6 +161,142 @@ func TestMaterializerCopyFailure(t *testing.T) {
 	}
 }
 
+func TestNewMaterializerValidatesConfigAndTrims(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	converter := &stubTranscodeClient{}
+	objects := &stubPosterObjectManager{}
+
+	if _, err := NewMaterializer(MaterializerConfig{}, nil, delivery, objects); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want converter validation error")
+	}
+	if _, err := NewMaterializer(MaterializerConfig{}, converter, nil, objects); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want delivery validation error")
+	}
+	if _, err := NewMaterializer(MaterializerConfig{}, converter, delivery, nil); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want object manager validation error")
+	}
+	if _, err := NewMaterializer(MaterializerConfig{
+		MainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}, converter, delivery, objects); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want short bucket validation error")
+	}
+	if _, err := NewMaterializer(MaterializerConfig{
+		ShortPublicBucketName:      "short-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}, converter, delivery, objects); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want main bucket validation error")
+	}
+	if _, err := NewMaterializer(MaterializerConfig{
+		ShortPublicBucketName: "short-bucket",
+		MainPrivateBucketName: "main-bucket",
+	}, converter, delivery, objects); err == nil {
+		t.Fatal("NewMaterializer() error = nil, want service role validation error")
+	}
+
+	materializer, err := NewMaterializer(MaterializerConfig{
+		ShortPublicBucketName:      " short-bucket ",
+		MainPrivateBucketName:      " main-bucket ",
+		MediaConvertServiceRoleARN: " arn:aws:iam::123456789012:role/media-role ",
+	}, converter, delivery, objects)
+	if err != nil {
+		t.Fatalf("NewMaterializer() error = %v, want nil", err)
+	}
+	if got, want := materializer.shortPublicBucketName, "short-bucket"; got != want {
+		t.Fatalf("NewMaterializer() short bucket got %q want %q", got, want)
+	}
+	if got, want := materializer.mainPrivateBucketName, "main-bucket"; got != want {
+		t.Fatalf("NewMaterializer() main bucket got %q want %q", got, want)
+	}
+	if got, want := materializer.mediaconvertServiceRoleARN, "arn:aws:iam::123456789012:role/media-role"; got != want {
+		t.Fatalf("NewMaterializer() role arn got %q want %q", got, want)
+	}
+}
+
+func TestMaterializeValidatesRequestAndReceiver(t *testing.T) {
+	t.Parallel()
+
+	var nilMaterializer *Materializer
+	if _, err := nilMaterializer.Materialize(context.Background(), MaterializeRequest{}); err == nil {
+		t.Fatal("Materialize() error = nil, want nil receiver error")
+	}
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+	materializer, err := NewMaterializer(MaterializerConfig{
+		ShortPublicBucketName:      "short-bucket",
+		MainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}, &stubTranscodeClient{}, delivery, &stubPosterObjectManager{})
+	if err != nil {
+		t.Fatalf("NewMaterializer() error = %v, want nil", err)
+	}
+
+	tests := []struct {
+		name string
+		req  MaterializeRequest
+	}{
+		{name: "missing role", req: MaterializeRequest{SourceBucket: "raw-bucket", SourceKey: "raw/input.mp4"}},
+		{name: "missing source bucket", req: MaterializeRequest{Role: roleShort, SourceKey: "raw/input.mp4", ShortID: mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")}},
+		{name: "missing source key", req: MaterializeRequest{Role: roleShort, SourceBucket: "raw-bucket", ShortID: mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")}},
+		{name: "missing main id", req: MaterializeRequest{Role: roleMain, SourceBucket: "raw-bucket", SourceKey: "raw/input.mp4"}},
+		{name: "missing short id", req: MaterializeRequest{Role: roleShort, SourceBucket: "raw-bucket", SourceKey: "raw/input.mp4"}},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := materializer.Materialize(context.Background(), tt.req); err == nil {
+				t.Fatal("Materialize() error = nil, want validation error")
+			}
+		})
+	}
+}
+
+func TestMaterializeRejectsUnsupportedRole(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+	materializer, err := NewMaterializer(MaterializerConfig{
+		ShortPublicBucketName:      "short-bucket",
+		MainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+	}, &stubTranscodeClient{}, delivery, &stubPosterObjectManager{})
+	if err != nil {
+		t.Fatalf("NewMaterializer() error = %v, want nil", err)
+	}
+
+	if _, err := materializer.Materialize(context.Background(), MaterializeRequest{
+		Role:         "preview",
+		SourceBucket: "raw-bucket",
+		SourceKey:    "raw/input.mp4",
+	}); err == nil {
+		t.Fatal("Materialize() error = nil, want unsupported role error")
+	}
+}
+
 func mustUUID(value string) uuid.UUID {
 	return uuid.MustParse(value)
 }
