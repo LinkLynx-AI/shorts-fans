@@ -26,7 +26,9 @@ CREATE INDEX idx_media_processing_jobs_status
 CREATE INDEX idx_media_processing_jobs_creator_user_id
     ON app.media_processing_jobs (creator_user_id);
 
-CREATE OR REPLACE VIEW app.public_shorts AS
+DROP VIEW IF EXISTS app.public_shorts;
+
+CREATE VIEW app.public_shorts AS
 SELECT
     s.id,
     s.creator_user_id,

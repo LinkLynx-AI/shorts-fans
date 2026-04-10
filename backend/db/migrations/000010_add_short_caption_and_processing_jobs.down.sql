@@ -1,4 +1,13 @@
-CREATE OR REPLACE VIEW app.public_shorts AS
+DROP VIEW IF EXISTS app.public_shorts;
+
+DROP INDEX IF EXISTS idx_media_processing_jobs_creator_user_id;
+DROP INDEX IF EXISTS idx_media_processing_jobs_status;
+DROP TABLE IF EXISTS app.media_processing_jobs;
+
+ALTER TABLE app.shorts
+    DROP COLUMN IF EXISTS caption;
+
+CREATE VIEW app.public_shorts AS
 SELECT
     s.id,
     s.creator_user_id,
@@ -20,10 +29,3 @@ WHERE c.state = 'approved'
     AND s.state = 'approved_for_publish'
     AND s.published_at IS NOT NULL
     AND (s.post_report_state IS NULL OR s.post_report_state NOT IN ('temporarily_limited', 'removed'));
-
-DROP INDEX IF EXISTS idx_media_processing_jobs_creator_user_id;
-DROP INDEX IF EXISTS idx_media_processing_jobs_status;
-DROP TABLE IF EXISTS app.media_processing_jobs;
-
-ALTER TABLE app.shorts
-    DROP COLUMN IF EXISTS caption;
