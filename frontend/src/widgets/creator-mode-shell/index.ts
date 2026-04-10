@@ -8,3 +8,4 @@ export type {
   CreatorModeShellState,
 } from "./model/creator-mode-shell";
 export { CreatorModeShell } from "./ui/creator-mode-shell";
+export { CreatorProfileSettingsShell } from "./ui/creator-profile-settings-shell";
