@@ -30,12 +30,13 @@
 ## この smoke が確認しないこと
 
 - raw upload bucket への browser upload
+- creator avatar upload / delivery path
 - MediaConvert job の submit / complete / retry
 - DB 更新、worker dequeue、`media_asset.processing_state` の遷移
 - `short-main linkage` や review/publish 判定
 - creator / fan UI からの playback
 
-つまり、cycle1 の「AWS media sandbox に local backend から到達できるか」を見る smoke であって、「media workflow 実装が完成したか」を見るものではありません。
+つまり、cycle1 の「AWS media sandbox に local backend から到達できるか」を見る smoke であって、「media workflow 実装が完成したか」を見るものではありません。`SHO-148` で追加した creator avatar 用 bucket / CloudFront もこの smoke の対象外です。
 
 ## 事前条件
 

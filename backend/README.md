@@ -187,6 +187,12 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 - `MEDIA_MAIN_PRIVATE_BUCKET_NAME`
 - `MEDIACONVERT_SERVICE_ROLE_ARN`
 
+creator avatar 用の後続 task では次も参照しますが、現時点の `cmd/api` / `cmd/worker` は未使用です。
+
+- `CREATOR_AVATAR_UPLOAD_BUCKET_NAME`
+- `CREATOR_AVATAR_DELIVERY_BUCKET_NAME`
+- `CREATOR_AVATAR_BASE_URL`
+
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
 `cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、および media sandbox 用 env 一式を必須にします。creator upload endpoint が常時有効なため、`AWS_REGION` と media bucket / queue / role 設定が不足している場合は fail fast します。`cmd/worker` は SQS 設定が未投入でも骨格起動できます。
