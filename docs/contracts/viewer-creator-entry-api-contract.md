@@ -19,7 +19,7 @@
 - creator dashboard / creator home 自体の read 契約
 - review / pending / reject / resubmit workflow
 - avatar crop / delete
-- public creator publish / public search 露出
+- public creator search / profile transport shape の新設・変更
 
 ## Canonical Sources
 
@@ -208,16 +208,17 @@
 
 - request user を viewer 自身の creator として登録します。
 - creator capability は即時 `approved` で upsert します。
-- creator profile は private profile として upsert します。
+- creator profile は registration transaction 内で upsert し、暫定運用として成功時に即時 public 化します。
+- この即時 public 化は temporary behavior であり、creator review workflow 実装時に削除します。
 - `avatarUploadToken` を送らない場合:
-  - 初回登録は `avatar_url = null`、`published_at = null` で保存します。
-  - 既存 profile がある場合は `displayName`、`handle`、`bio` を更新し、既存 `avatar_url` / `published_at` は保持します。
+  - 初回登録は `avatar_url = null` で作成し、その後 registration 成功時に `published_at` を設定します。
+  - 既存 profile がある場合は `displayName`、`handle`、`bio` を更新し、既存 `avatar_url` を保持します。
 - `avatarUploadToken` を送る場合:
   - token は same viewer が create / complete 済みであり、未期限切れかつ未消費である必要があります。
   - 初回登録・既存 profile 更新のどちらでも、resolved avatar を `avatar_url` へ反映します。
   - successful registration で token を消費します。
+- 既存 profile が既に public の場合は、既存 `published_at` を保持します。
 - `bio` を省略した場合は empty string として扱います。
-- registration 完了だけでは public creator profile にはなりません。
 - avatar 未選択は正常系であり、avatar upload failure と混同しません。
 
 ### Error Contract
