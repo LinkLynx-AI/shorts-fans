@@ -64,7 +64,12 @@ func (r *Repository) RegisterApprovedCreator(
 			return err
 		}
 
-		profile, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, handle, input.AvatarURL, bio)
+		if _, err := upsertPrivateProfile(ctx, q, input.UserID, displayName, handle, input.AvatarURL, bio); err != nil {
+			return err
+		}
+
+		// TODO: creator review workflow を実装したら、self-serve registration 直後に public 化する暫定処理を削除する。
+		profile, err := publishProfileForSelfServeRegistration(ctx, q, input.UserID)
 		if err != nil {
 			return err
 		}
@@ -206,6 +211,24 @@ func upsertPrivateProfile(
 	profile, err := mapProfile(updatedRow)
 	if err != nil {
 		return Profile{}, fmt.Errorf("creator profile 更新結果の変換 user=%s: %w", userID, err)
+	}
+
+	return profile, nil
+}
+
+func publishProfileForSelfServeRegistration(ctx context.Context, q queries, userID uuid.UUID) (Profile, error) {
+	row, err := q.PublishCreatorProfile(ctx, postgres.UUIDToPG(userID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Profile{}, fmt.Errorf("creator profile 公開 user=%s: %w", userID, ErrProfileNotFound)
+		}
+
+		return Profile{}, fmt.Errorf("creator profile 公開 user=%s: %w", userID, err)
+	}
+
+	profile, err := mapProfile(row)
+	if err != nil {
+		return Profile{}, fmt.Errorf("creator profile 公開結果の変換 user=%s: %w", userID, err)
 	}
 
 	return profile, nil

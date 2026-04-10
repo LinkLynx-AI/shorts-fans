@@ -22,11 +22,13 @@ func TestRegisterApprovedCreatorCreatesCapabilityAndProfile(t *testing.T) {
 	displayName := "Mina Rei"
 	handle := "minarei"
 	bio := "close-up shorts"
+	publishedAt := timePtr(now.Add(2 * time.Minute))
 	tx := &creatorTxStub{}
 	beginner := &creatorTxBeginnerStub{tx: tx}
 
 	var gotCapabilityArg sqlc.CreateCreatorCapabilityParams
 	var gotProfileArg sqlc.CreateCreatorProfileParams
+	var gotPublishUserID pgtype.UUID
 
 	repo := &Repository{
 		txBeginner: beginner,
@@ -70,6 +72,10 @@ func TestRegisterApprovedCreatorCreatesCapabilityAndProfile(t *testing.T) {
 						UpdatedAt:   pgTime(timePtr(now.Add(time.Minute))),
 					}, nil
 				},
+				publishProfile: func(_ context.Context, userIDArg pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					gotPublishUserID = userIDArg
+					return testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), nil, publishedAt), nil
+				},
 			}
 		},
 	}
@@ -98,8 +104,14 @@ func TestRegisterApprovedCreatorCreatesCapabilityAndProfile(t *testing.T) {
 	if gotProfileArg.Handle != handle {
 		t.Fatalf("RegisterApprovedCreator() handle arg got %v want %v", gotProfileArg.Handle, handle)
 	}
+	if gotProfileArg.PublishedAt != pgTime(nil) {
+		t.Fatalf("RegisterApprovedCreator() create published_at arg got %v want %v", gotProfileArg.PublishedAt, pgTime(nil))
+	}
 	if gotProfileArg.Bio != bio {
 		t.Fatalf("RegisterApprovedCreator() bio arg got %q want %q", gotProfileArg.Bio, bio)
+	}
+	if gotPublishUserID != pgUUID(userID) {
+		t.Fatalf("RegisterApprovedCreator() publish user arg got %v want %v", gotPublishUserID, pgUUID(userID))
 	}
 	if got.Profile.Handle == nil || *got.Profile.Handle != handle {
 		t.Fatalf("RegisterApprovedCreator() handle got %v want %v", got.Profile.Handle, handle)
@@ -107,8 +119,8 @@ func TestRegisterApprovedCreatorCreatesCapabilityAndProfile(t *testing.T) {
 	if got.Profile.AvatarURL != nil {
 		t.Fatalf("RegisterApprovedCreator() avatar url got %v want nil", got.Profile.AvatarURL)
 	}
-	if got.Profile.PublishedAt != nil {
-		t.Fatalf("RegisterApprovedCreator() published at got %v want nil", got.Profile.PublishedAt)
+	if !reflect.DeepEqual(got.Profile.PublishedAt, publishedAt) {
+		t.Fatalf("RegisterApprovedCreator() published at got %v want %v", got.Profile.PublishedAt, publishedAt)
 	}
 	if !beginner.began {
 		t.Fatal("RegisterApprovedCreator() began = false, want true")
@@ -132,11 +144,13 @@ func TestRegisterApprovedCreatorUpdatesExistingCapabilityAndProfile(t *testing.T
 	displayName := "New Name"
 	bio := "updated bio"
 	handle := "new_name"
+	publishedAt := timePtr(now.Add(3 * time.Hour))
 	tx := &creatorTxStub{}
 	beginner := &creatorTxBeginnerStub{tx: tx}
 
 	var gotUpdateCapabilityArg sqlc.UpdateCreatorCapabilityStateParams
 	var gotUpdateProfileArg sqlc.UpdateCreatorProfileParams
+	var gotPublishUserID pgtype.UUID
 
 	repo := &Repository{
 		txBeginner: beginner,
@@ -159,6 +173,12 @@ func TestRegisterApprovedCreatorUpdatesExistingCapabilityAndProfile(t *testing.T
 				updateProfile: func(_ context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
 					gotUpdateProfileArg = arg
 					row := testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), existingAvatarURL, nil)
+					row.Bio = bio
+					return row, nil
+				},
+				publishProfile: func(_ context.Context, userIDArg pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					gotPublishUserID = userIDArg
+					row := testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), existingAvatarURL, publishedAt)
 					row.Bio = bio
 					return row, nil
 				},
@@ -199,11 +219,17 @@ func TestRegisterApprovedCreatorUpdatesExistingCapabilityAndProfile(t *testing.T
 	if gotUpdateProfileArg.Bio != bio {
 		t.Fatalf("RegisterApprovedCreator() bio update arg got %q want %q", gotUpdateProfileArg.Bio, bio)
 	}
+	if gotPublishUserID != pgUUID(userID) {
+		t.Fatalf("RegisterApprovedCreator() publish user arg got %v want %v", gotPublishUserID, pgUUID(userID))
+	}
 	if got.Profile.Handle == nil || *got.Profile.Handle != handle {
 		t.Fatalf("RegisterApprovedCreator() profile handle got %v want %v", valueOrNil(got.Profile.Handle), handle)
 	}
 	if !reflect.DeepEqual(got.Profile.AvatarURL, existingAvatarURL) {
 		t.Fatalf("RegisterApprovedCreator() profile avatar got %v want %v", got.Profile.AvatarURL, existingAvatarURL)
+	}
+	if !reflect.DeepEqual(got.Profile.PublishedAt, publishedAt) {
+		t.Fatalf("RegisterApprovedCreator() profile published at got %v want %v", got.Profile.PublishedAt, publishedAt)
 	}
 	if !tx.committed {
 		t.Fatal("RegisterApprovedCreator() committed = false, want true")
@@ -219,6 +245,7 @@ func TestRegisterApprovedCreatorAppliesNewAvatarURLWhenProvided(t *testing.T) {
 	bio := "updated bio"
 	handle := "new_name"
 	nextAvatarURL := "https://cdn.example.com/avatar-next.png"
+	publishedAt := timePtr(now.Add(2 * time.Minute))
 	tx := &creatorTxStub{}
 	beginner := &creatorTxBeginnerStub{tx: tx}
 
@@ -246,6 +273,9 @@ func TestRegisterApprovedCreatorAppliesNewAvatarURLWhenProvided(t *testing.T) {
 					gotUpdateProfileArg = arg
 					return testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), stringPtr(nextAvatarURL), nil), nil
 				},
+				publishProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testProfileRow(userID, now, stringPtr(displayName), stringPtr(handle), stringPtr(nextAvatarURL), publishedAt), nil
+				},
 			}
 		},
 	}
@@ -265,6 +295,9 @@ func TestRegisterApprovedCreatorAppliesNewAvatarURLWhenProvided(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Profile.AvatarURL, stringPtr(nextAvatarURL)) {
 		t.Fatalf("RegisterApprovedCreator() profile avatar got %v want %v", got.Profile.AvatarURL, stringPtr(nextAvatarURL))
+	}
+	if !reflect.DeepEqual(got.Profile.PublishedAt, publishedAt) {
+		t.Fatalf("RegisterApprovedCreator() profile published at got %v want %v", got.Profile.PublishedAt, publishedAt)
 	}
 	if gotUpdateProfileArg.UserID.Valid {
 		t.Fatalf("RegisterApprovedCreator() update profile arg got %#v want create path only", gotUpdateProfileArg)
@@ -378,6 +411,51 @@ func TestRegisterApprovedCreatorReturnsWrappedErrorWhenCapabilityLookupFails(t *
 	}
 }
 
+func TestRegisterApprovedCreatorReturnsWrappedErrorWhenPublishFails(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("38333333-3333-3333-3333-333333333333")
+	tx := &creatorTxStub{}
+	beginner := &creatorTxBeginnerStub{tx: tx}
+	expectedErr := errors.New("publish failed")
+
+	repo := &Repository{
+		txBeginner: beginner,
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryStubQueries{
+				getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{}, pgx.ErrNoRows
+				},
+				createCapability: func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error) {
+					return testCapabilityRow(userID, time.Unix(1710000000, 0).UTC(), nil, nil, nil, nil, timePtr(time.Unix(1710000000, 0).UTC()), nil, nil), nil
+				},
+				getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return sqlc.AppCreatorProfile{}, pgx.ErrNoRows
+				},
+				createProfile: func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
+					return testProfileRow(userID, time.Unix(1710000000, 0).UTC(), stringPtr("Mina"), stringPtr("mina"), nil, nil), nil
+				},
+				publishProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return sqlc.AppCreatorProfile{}, expectedErr
+				},
+			}
+		},
+	}
+
+	_, err := repo.RegisterApprovedCreator(context.Background(), SelfServeRegistrationInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Handle:      "mina",
+		Bio:         "bio",
+	})
+	if !errors.Is(err, expectedErr) {
+		t.Fatalf("RegisterApprovedCreator() error got %v want wrapped %v", err, expectedErr)
+	}
+	if !tx.rolledBack {
+		t.Fatal("RegisterApprovedCreator() rolledBack = false, want true")
+	}
+}
+
 func TestRegisterApprovedCreatorKeepsApprovedCapabilityState(t *testing.T) {
 	t.Parallel()
 
@@ -386,6 +464,7 @@ func TestRegisterApprovedCreatorKeepsApprovedCapabilityState(t *testing.T) {
 	tx := &creatorTxStub{}
 	beginner := &creatorTxBeginnerStub{tx: tx}
 	updateCalled := false
+	publishedAt := timePtr(now.Add(2 * time.Minute))
 
 	repo := &Repository{
 		txBeginner: beginner,
@@ -403,6 +482,9 @@ func TestRegisterApprovedCreatorKeepsApprovedCapabilityState(t *testing.T) {
 				},
 				createProfile: func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
 					return testProfileRow(userID, now, stringPtr("Mina"), stringPtr("mina"), nil, nil), nil
+				},
+				publishProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testProfileRow(userID, now, stringPtr("Mina"), stringPtr("mina"), nil, publishedAt), nil
 				},
 			}
 		},
@@ -422,6 +504,9 @@ func TestRegisterApprovedCreatorKeepsApprovedCapabilityState(t *testing.T) {
 	}
 	if got.Capability.State != "approved" {
 		t.Fatalf("RegisterApprovedCreator() capability state got %q want approved", got.Capability.State)
+	}
+	if !reflect.DeepEqual(got.Profile.PublishedAt, publishedAt) {
+		t.Fatalf("RegisterApprovedCreator() profile published at got %v want %v", got.Profile.PublishedAt, publishedAt)
 	}
 }
 
