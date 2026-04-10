@@ -114,7 +114,14 @@ func (c Config) ValidateAPI() error {
 
 // ValidateWorker は worker 設定の整合性を検証します。
 func (c Config) ValidateWorker() error {
-	return c.validateMediaSandbox(false)
+	if err := c.validateMediaSandbox(false); err != nil {
+		return err
+	}
+	if c.MediaSandboxEnabled() && c.PostgresDSN == "" {
+		return fmt.Errorf("missing required environment variables: POSTGRES_DSN")
+	}
+
+	return nil
 }
 
 // ValidateMediaSmoke は media smoke 用の設定が不足なく与えられているか検証します。

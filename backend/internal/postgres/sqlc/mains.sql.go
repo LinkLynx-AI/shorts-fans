@@ -111,6 +111,34 @@ func (q *Queries) GetMainByID(ctx context.Context, id pgtype.UUID) (AppMain, err
 	return i, err
 }
 
+const getMainByMediaAssetID = `-- name: GetMainByMediaAssetID :one
+SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+FROM app.mains
+WHERE media_asset_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetMainByMediaAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (AppMain, error) {
+	row := q.db.QueryRow(ctx, getMainByMediaAssetID, mediaAssetID)
+	var i AppMain
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.PriceMinor,
+		&i.CurrencyCode,
+		&i.OwnershipConfirmed,
+		&i.ConsentConfirmed,
+		&i.ApprovedForUnlockAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUnlockableMainByID = `-- name: GetUnlockableMainByID :one
 SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
 FROM app.unlockable_mains

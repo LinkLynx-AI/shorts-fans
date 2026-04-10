@@ -20,6 +20,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
 )
 
 func main() {
@@ -58,6 +59,19 @@ func main() {
 		logger.Error("failed to initialize s3 client", "error", err)
 		os.Exit(1)
 	}
+	sqsClient, err := sqs.NewClient(ctx, sqs.Config{
+		Region:   cfg.AWSRegion,
+		QueueURL: cfg.MediaJobsQueueURL,
+	})
+	if err != nil {
+		logger.Error("failed to initialize sqs client", "error", err)
+		os.Exit(1)
+	}
+	mediaJobsQueue, err := sqs.NewQueue(sqsClient, cfg.MediaJobsQueueURL)
+	if err != nil {
+		logger.Error("failed to initialize media jobs queue", "error", err)
+		os.Exit(1)
+	}
 
 	creatorRepository := creator.NewRepository(pool)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
@@ -68,7 +82,8 @@ func main() {
 	modeSwitcher := auth.NewModeSwitcher(authRepository)
 	creatorUploadService, err := creatorupload.NewService(
 		creatorupload.ServiceConfig{
-			RawBucketName: cfg.MediaRawBucketName,
+			RawBucketName:      cfg.MediaRawBucketName,
+			ProcessingNotifier: mediaJobsQueue,
 		},
 		s3Client,
 		creatorupload.NewRedisPackageStore(redisClient),

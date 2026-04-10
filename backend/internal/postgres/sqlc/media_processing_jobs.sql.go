@@ -11,6 +11,98 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const claimMediaProcessingJobByAssetID = `-- name: ClaimMediaProcessingJobByAssetID :one
+WITH candidate AS (
+    SELECT id
+    FROM app.media_processing_jobs
+    WHERE app.media_processing_jobs.media_asset_id = $1
+        AND app.media_processing_jobs.status = 'queued'
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE app.media_processing_jobs AS j
+SET
+    status = 'processing',
+    attempt_count = j.attempt_count + 1,
+    last_error_code = NULL,
+    last_error_message = NULL,
+    started_at = CURRENT_TIMESTAMP,
+    completed_at = NULL,
+    failed_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+FROM candidate
+WHERE j.id = candidate.id
+RETURNING j.id, j.creator_user_id, j.media_asset_id, j.asset_role, j.status, j.attempt_count, j.last_error_code, j.last_error_message, j.queued_at, j.started_at, j.completed_at, j.failed_at, j.created_at, j.updated_at
+`
+
+func (q *Queries) ClaimMediaProcessingJobByAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, claimMediaProcessingJobByAssetID, mediaAssetID)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const claimNextQueuedMediaProcessingJob = `-- name: ClaimNextQueuedMediaProcessingJob :one
+WITH candidate AS (
+    SELECT id
+    FROM app.media_processing_jobs
+    WHERE status = 'queued'
+    ORDER BY queued_at ASC, id ASC
+    LIMIT 1
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE app.media_processing_jobs AS j
+SET
+    status = 'processing',
+    attempt_count = j.attempt_count + 1,
+    last_error_code = NULL,
+    last_error_message = NULL,
+    started_at = CURRENT_TIMESTAMP,
+    completed_at = NULL,
+    failed_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+FROM candidate
+WHERE j.id = candidate.id
+RETURNING j.id, j.creator_user_id, j.media_asset_id, j.asset_role, j.status, j.attempt_count, j.last_error_code, j.last_error_message, j.queued_at, j.started_at, j.completed_at, j.failed_at, j.created_at, j.updated_at
+`
+
+func (q *Queries) ClaimNextQueuedMediaProcessingJob(ctx context.Context) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, claimNextQueuedMediaProcessingJob)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createMediaProcessingJob = `-- name: CreateMediaProcessingJob :one
 INSERT INTO app.media_processing_jobs (
     creator_user_id,
@@ -64,6 +156,153 @@ func (q *Queries) CreateMediaProcessingJob(ctx context.Context, arg CreateMediaP
 		arg.CompletedAt,
 		arg.FailedAt,
 	)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getMediaProcessingJobByMediaAssetID = `-- name: GetMediaProcessingJobByMediaAssetID :one
+SELECT id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
+FROM app.media_processing_jobs
+WHERE media_asset_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetMediaProcessingJobByMediaAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, getMediaProcessingJobByMediaAssetID, mediaAssetID)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markMediaProcessingJobFailed = `-- name: MarkMediaProcessingJobFailed :one
+UPDATE app.media_processing_jobs
+SET
+    status = 'failed',
+    last_error_code = $1,
+    last_error_message = $2,
+    failed_at = CURRENT_TIMESTAMP,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $3
+RETURNING id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
+`
+
+type MarkMediaProcessingJobFailedParams struct {
+	LastErrorCode    pgtype.Text
+	LastErrorMessage pgtype.Text
+	ID               pgtype.UUID
+}
+
+func (q *Queries) MarkMediaProcessingJobFailed(ctx context.Context, arg MarkMediaProcessingJobFailedParams) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, markMediaProcessingJobFailed, arg.LastErrorCode, arg.LastErrorMessage, arg.ID)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markMediaProcessingJobSucceeded = `-- name: MarkMediaProcessingJobSucceeded :one
+UPDATE app.media_processing_jobs
+SET
+    status = 'succeeded',
+    last_error_code = NULL,
+    last_error_message = NULL,
+    completed_at = CURRENT_TIMESTAMP,
+    failed_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
+`
+
+func (q *Queries) MarkMediaProcessingJobSucceeded(ctx context.Context, id pgtype.UUID) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, markMediaProcessingJobSucceeded, id)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const requeueMediaProcessingJob = `-- name: RequeueMediaProcessingJob :one
+UPDATE app.media_processing_jobs
+SET
+    status = 'queued',
+    last_error_code = $1,
+    last_error_message = $2,
+    queued_at = CURRENT_TIMESTAMP,
+    started_at = NULL,
+    completed_at = NULL,
+    failed_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $3
+RETURNING id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
+`
+
+type RequeueMediaProcessingJobParams struct {
+	LastErrorCode    pgtype.Text
+	LastErrorMessage pgtype.Text
+	ID               pgtype.UUID
+}
+
+func (q *Queries) RequeueMediaProcessingJob(ctx context.Context, arg RequeueMediaProcessingJobParams) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, requeueMediaProcessingJob, arg.LastErrorCode, arg.LastErrorMessage, arg.ID)
 	var i AppMediaProcessingJob
 	err := row.Scan(
 		&i.ID,

@@ -30,6 +30,12 @@ FROM app.mains
 WHERE id = $1
 LIMIT 1;
 
+-- name: GetMainByMediaAssetID :one
+SELECT *
+FROM app.mains
+WHERE media_asset_id = $1
+LIMIT 1;
+
 -- name: ListMainsByCreatorUserID :many
 SELECT *
 FROM app.mains

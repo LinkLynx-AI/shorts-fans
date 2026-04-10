@@ -160,8 +160,9 @@ type CompletePackageResult struct {
 
 // ServiceConfig は creator upload service の実行設定を表します。
 type ServiceConfig struct {
-	PackageTTL    time.Duration
-	RawBucketName string
+	PackageTTL         time.Duration
+	RawBucketName      string
+	ProcessingNotifier ProcessingNotifier
 }
 
 type packageStore interface {
@@ -172,6 +173,11 @@ type packageStore interface {
 
 type draftRepository interface {
 	CreateDraftPackage(ctx context.Context, input createDraftPackageInput) (CompletePackageResult, error)
+}
+
+// ProcessingNotifier は completion 後の media processing wake-up を best-effort で通知します。
+type ProcessingNotifier interface {
+	NotifyProcessingQueued(ctx context.Context, mediaAssetIDs []uuid.UUID) error
 }
 
 // Storage は creator upload に必要な S3 操作を表します。
@@ -189,6 +195,7 @@ type Service struct {
 	rawBucketName string
 	repository    draftRepository
 	storage       Storage
+	notifier      ProcessingNotifier
 }
 
 // NewService は creator upload service を構築します。
@@ -217,6 +224,7 @@ func NewService(cfg ServiceConfig, storage Storage, packageStore packageStore, r
 		rawBucketName: strings.TrimSpace(cfg.RawBucketName),
 		repository:    repository,
 		storage:       storage,
+		notifier:      cfg.ProcessingNotifier,
 	}, nil
 }
 
@@ -338,6 +346,10 @@ func (s *Service) CompletePackage(ctx context.Context, input CompletePackageInpu
 	})
 	if err != nil {
 		return CompletePackageResult{}, fmt.Errorf("persist upload package token=%s: %w", packageToken, err)
+	}
+	if s.notifier != nil {
+		// DB の queued job を source of truth とし、wake-up 通知失敗では API を落とさない。
+		_ = s.notifier.NotifyProcessingQueued(ctx, collectCreatedMediaAssetIDs(result))
 	}
 
 	if err := s.consumePackage(ctx, packageToken, pkg); err != nil {
@@ -529,6 +541,21 @@ func normalizeFileMetadata(metadata FileMetadata, label string) (FileMetadata, e
 		FileSizeBytes: metadata.FileSizeBytes,
 		MimeType:      mimeType,
 	}, nil
+}
+
+func collectCreatedMediaAssetIDs(result CompletePackageResult) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, 1+len(result.Shorts))
+	if result.Main.MediaAsset.ID != uuid.Nil {
+		ids = append(ids, result.Main.MediaAsset.ID)
+	}
+	for _, short := range result.Shorts {
+		if short.MediaAsset.ID == uuid.Nil {
+			continue
+		}
+		ids = append(ids, short.MediaAsset.ID)
+	}
+
+	return ids
 }
 
 func normalizeVideoMimeType(value string) (string, error) {

@@ -192,7 +192,7 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
-`cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media sandbox 用 env 一式、および creator avatar upload / delivery 用 env 一式を必須にします。creator upload endpoint と creator registration avatar upload endpoint が常時有効なため、`AWS_REGION`、media bucket / queue / role 設定、avatar bucket / base URL 設定が不足している場合は fail fast します。`cmd/worker` は SQS 設定が未投入でも骨格起動でき、creator avatar env は不要です。
+`cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media sandbox 用 env 一式、および creator avatar upload / delivery 用 env 一式を必須にします。creator upload endpoint と creator registration avatar upload endpoint が常時有効なため、`AWS_REGION`、media bucket / queue / role 設定、avatar bucket / base URL 設定が不足している場合は fail fast します。`cmd/worker` は creator avatar env を要求しませんが、media sandbox を有効にして起動する場合は `POSTGRES_DSN` と media queue / bucket / role 設定が必要です。
 
 `cmd/media-smoke` は次を前提にします。
 
@@ -206,17 +206,17 @@ smoke は `short_public` と `main_private` に一時 probe object を置き、`
 
 - `cmd/api`: API サーバーの entrypoint
 - `cmd/media-smoke`: dev AWS media sandbox の representative path を検証する entrypoint
-- `cmd/worker`: worker 骨格の entrypoint
+- `cmd/worker`: media processing worker の entrypoint
 - `cmd/migrate`: migration 実行 entrypoint
 - `cmd/schema`: migration から人間向け YAML スキーマを生成する entrypoint
 - `internal/config`: 環境変数読込と validation
 - `internal/dbschema`: 一時 DB を使った schema introspection と YAML 出力
 - `internal/httpserver`: Gin router と graceful shutdown
-- `internal/mediaconvert`: MediaConvert access check
+- `internal/mediaconvert`: MediaConvert access check と materialization job 実行
 - `internal/postgres`: `pgxpool` 初期化と readiness
 - `internal/redis`: Redis client 初期化と readiness
 - `internal/s3`: S3 upload / signed URL helper
-- `internal/sqs`: SQS 設定と client factory の骨格
+- `internal/sqs`: SQS 設定、client factory、media wake-up helper
 - `db/migrations`: `golang-migrate` 用 SQL
 - `db/queries`: `sqlc` 用 query
 

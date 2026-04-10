@@ -72,6 +72,14 @@ func (s repositoryStub) CreateDraftPackage(ctx context.Context, input createDraf
 	return s.createDraftPackage(ctx, input)
 }
 
+type notifierStub struct {
+	notify func(context.Context, []uuid.UUID) error
+}
+
+func (s notifierStub) NotifyProcessingQueued(ctx context.Context, mediaAssetIDs []uuid.UUID) error {
+	return s.notify(ctx, mediaAssetIDs)
+}
+
 func newValidCompletePackageInput(creatorID uuid.UUID) CompletePackageInput {
 	return CompletePackageInput{
 		CreatorUserID: creatorID,
@@ -355,6 +363,7 @@ func TestCompletePackageSuccess(t *testing.T) {
 	shortID := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
 	shortAssetID := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
 	deleteCalled := false
+	notifierCalled := false
 	var gotRepositoryInput createDraftPackageInput
 
 	service := &Service{
@@ -423,6 +432,18 @@ func TestCompletePackageSuccess(t *testing.T) {
 				}, nil
 			},
 		},
+		notifier: notifierStub{
+			notify: func(_ context.Context, mediaAssetIDs []uuid.UUID) error {
+				notifierCalled = true
+				if len(mediaAssetIDs) != 2 {
+					t.Fatalf("NotifyProcessingQueued() ids got %v want 2 ids", mediaAssetIDs)
+				}
+				if mediaAssetIDs[0] != mainAssetID || mediaAssetIDs[1] != shortAssetID {
+					t.Fatalf("NotifyProcessingQueued() ids got %v want [%s %s]", mediaAssetIDs, mainAssetID, shortAssetID)
+				}
+				return nil
+			},
+		},
 		storage: storageStub{
 			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
 				return medias3.PresignedUpload{}, nil
@@ -462,6 +483,80 @@ func TestCompletePackageSuccess(t *testing.T) {
 	}
 	if !deleteCalled {
 		t.Fatal("CompletePackage() deleteCalled = false, want true")
+	}
+	if !notifierCalled {
+		t.Fatal("CompletePackage() notifierCalled = false, want true")
+	}
+}
+
+func TestCompletePackageIgnoresNotifierFailure(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	creatorID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	notifyErr := errors.New("publish failed")
+
+	service := &Service{
+		now:           func() time.Time { return now },
+		rawBucketName: "raw-bucket",
+		packageStore: packageStoreStub{
+			savePackage: func(context.Context, string, storedPackage, time.Duration) error { return nil },
+			getPackage: func(context.Context, string) (storedPackage, error) {
+				return storedPackage{
+					CreatorUserID: creatorID.String(),
+					ExpiresAt:     now.Add(time.Minute),
+					Main: storedEntry{
+						UploadEntryID: "main-entry",
+						Role:          roleMain,
+						MimeType:      "video/mp4",
+						FileSizeBytes: 100,
+						StorageKey:    "main-key",
+					},
+					Shorts: []storedEntry{{
+						UploadEntryID: "short-entry",
+						Role:          roleShort,
+						MimeType:      "video/mp4",
+						FileSizeBytes: 10,
+						StorageKey:    "short-key",
+					}},
+				}, nil
+			},
+			deletePkg: func(context.Context, string) error { return nil },
+		},
+		repository: repositoryStub{
+			createDraftPackage: func(context.Context, createDraftPackageInput) (CompletePackageResult, error) {
+				return CompletePackageResult{
+					Main: CreatedMain{
+						MediaAsset: CreatedMediaAsset{ID: uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")},
+					},
+					Shorts: []CreatedShort{{
+						MediaAsset: CreatedMediaAsset{ID: uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")},
+					}},
+				}, nil
+			},
+		},
+		notifier: notifierStub{
+			notify: func(context.Context, []uuid.UUID) error { return notifyErr },
+		},
+		storage: storageStub{
+			presignPutObject: func(context.Context, string, string, string, time.Duration) (medias3.PresignedUpload, error) {
+				return medias3.PresignedUpload{}, nil
+			},
+			headObject: func(_ context.Context, _ string, key string) (medias3.ObjectMetadata, error) {
+				switch key {
+				case "main-key":
+					return medias3.ObjectMetadata{ContentLength: 100, ContentType: "video/mp4"}, nil
+				case "short-key":
+					return medias3.ObjectMetadata{ContentLength: 10, ContentType: "video/mp4"}, nil
+				default:
+					return medias3.ObjectMetadata{}, fmt.Errorf("unexpected key: %s", key)
+				}
+			},
+		},
+	}
+
+	if _, err := service.CompletePackage(context.Background(), newValidCompletePackageInput(creatorID)); err != nil {
+		t.Fatalf("CompletePackage() error = %v, want nil even when notifier fails", err)
 	}
 }
 

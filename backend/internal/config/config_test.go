@@ -86,6 +86,7 @@ func TestValidateWorker(t *testing.T) {
 	t.Parallel()
 
 	validMediaConfig := Config{
+		PostgresDSN:                "postgres://example",
 		AWSRegion:                  "ap-northeast-1",
 		MediaJobsQueueURL:          "https://example.com/queue",
 		MediaRawBucketName:         "raw-bucket",
@@ -111,8 +112,22 @@ func TestValidateWorker(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name: "missing postgres dsn is rejected",
+			cfg: Config{
+				AWSRegion:                  validMediaConfig.AWSRegion,
+				MediaJobsQueueURL:          validMediaConfig.MediaJobsQueueURL,
+				MediaRawBucketName:         validMediaConfig.MediaRawBucketName,
+				MediaShortPublicBucketName: validMediaConfig.MediaShortPublicBucketName,
+				MediaShortPublicBaseURL:    validMediaConfig.MediaShortPublicBaseURL,
+				MediaMainPrivateBucketName: validMediaConfig.MediaMainPrivateBucketName,
+				MediaConvertServiceRoleARN: validMediaConfig.MediaConvertServiceRoleARN,
+			},
+			wantErr: true,
+		},
+		{
 			name: "missing region is rejected",
 			cfg: Config{
+				PostgresDSN:       validMediaConfig.PostgresDSN,
 				MediaJobsQueueURL: validMediaConfig.MediaJobsQueueURL,
 			},
 			wantErr: true,
@@ -120,13 +135,15 @@ func TestValidateWorker(t *testing.T) {
 		{
 			name: "missing queue url is rejected",
 			cfg: Config{
-				AWSRegion: validMediaConfig.AWSRegion,
+				PostgresDSN: validMediaConfig.PostgresDSN,
+				AWSRegion:   validMediaConfig.AWSRegion,
 			},
 			wantErr: true,
 		},
 		{
 			name: "partial media sandbox config is rejected",
 			cfg: Config{
+				PostgresDSN:                validMediaConfig.PostgresDSN,
 				AWSRegion:                  validMediaConfig.AWSRegion,
 				MediaJobsQueueURL:          validMediaConfig.MediaJobsQueueURL,
 				MediaShortPublicBucketName: validMediaConfig.MediaShortPublicBucketName,
