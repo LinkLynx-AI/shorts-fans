@@ -1,6 +1,5 @@
+import type { FanHubTab } from "@/entities/fan-profile";
 import type { FeedTab, ShortId } from "@/entities/short";
-
-type FanProfileTab = "library" | "pinned";
 
 export type CreatorProfileRouteOrigin =
   | {
@@ -19,7 +18,7 @@ export type CreatorProfileRouteOrigin =
       creatorDisplayName?: string | undefined;
       creatorHandle?: `@${string}` | undefined;
       from: "short";
-      shortFanTab?: FanProfileTab | undefined;
+      shortFanTab?: FanHubTab | undefined;
       shortId: ShortId;
     };
 
@@ -28,18 +27,18 @@ export type CreatorProfileRouteState = {
   creatorHandle?: `@${string}` | undefined;
   from?: CreatorProfileRouteOrigin["from"] | undefined;
   q?: string | undefined;
-  shortFanTab?: FanProfileTab | undefined;
+  shortFanTab?: FanHubTab | undefined;
   shortId?: ShortId | undefined;
   tab?: FeedTab | undefined;
 };
 
 export type CreatorShortDetailRouteState = {
   creatorId?: string | undefined;
-  fanTab?: FanProfileTab | undefined;
+  fanTab?: FanHubTab | undefined;
   from?: "creator" | "fan" | undefined;
   profileFrom?: CreatorProfileRouteOrigin["from"] | undefined;
   profileQ?: string | undefined;
-  profileShortFanTab?: FanProfileTab | undefined;
+  profileShortFanTab?: FanHubTab | undefined;
   profileShortId?: ShortId | undefined;
   profileTab?: FeedTab | undefined;
 };
@@ -143,7 +142,7 @@ export function buildCreatorShortDetailHref(
  */
 export function buildFanProfileShortDetailHref(
   shortId: ShortId,
-  fanTab: FanProfileTab = "pinned",
+  fanTab: FanHubTab = "pinned",
 ): string {
   return `/shorts/${shortId}${buildQueryString({
     fanTab,

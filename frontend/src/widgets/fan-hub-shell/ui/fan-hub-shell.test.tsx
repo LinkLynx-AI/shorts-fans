@@ -185,9 +185,11 @@ describe("FanHubShell account menu", () => {
     );
 
     const pinnedLink = screen.getByRole("link", { name: /雨上がりの balcony preview/i });
-    const pinnedPoster = pinnedLink.querySelector("video");
+    const pinnedPoster = pinnedLink.querySelector("[style*='background-image']");
 
     expect(pinnedPoster).not.toBeNull();
-    expect(pinnedPoster).toHaveAttribute("poster", "https://cdn.example.com/shorts/sora-after-rain-poster.jpg");
+    expect(pinnedPoster).toHaveStyle({
+      backgroundImage: 'url("https://cdn.example.com/shorts/sora-after-rain-poster.jpg")',
+    });
   });
 });

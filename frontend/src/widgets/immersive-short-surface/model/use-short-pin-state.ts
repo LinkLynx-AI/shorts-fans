@@ -4,12 +4,12 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import {
+  getShortPinErrorMessage,
   ShortPinApiError,
   updateShortPin,
 } from "@/entities/short";
 import { useHasViewerSession } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
-import { ApiError } from "@/shared/api";
 
 type UseShortPinStateOptions = {
   enabled?: boolean;
@@ -23,26 +23,6 @@ type UseShortPinStateResult = {
   isPinned: boolean;
   onToggle: () => void;
 };
-
-function getShortPinErrorMessage(error: unknown): string {
-  if (error instanceof ShortPinApiError) {
-    if (error.code === "not_found") {
-      return "この short は現在利用できません。";
-    }
-
-    return "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。";
-  }
-
-  if (error instanceof ApiError) {
-    if (error.code === "network") {
-      return "pin 状態を更新できませんでした。通信状態を確認してから再度お試しください。";
-    }
-
-    return "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。";
-  }
-
-  return "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。";
-}
 
 /**
  * 単一 short detail 用の pin pending / success / error state を管理する。

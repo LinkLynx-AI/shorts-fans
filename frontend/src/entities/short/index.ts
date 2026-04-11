@@ -8,6 +8,9 @@ export {
   getPublicShortDetail,
 } from "./api/get-public-short-detail";
 export {
+  getShortPinErrorMessage,
+} from "./api/get-short-pin-error-message";
+export {
   ShortPinApiError,
   updateShortPin,
 } from "./api/update-short-pin";

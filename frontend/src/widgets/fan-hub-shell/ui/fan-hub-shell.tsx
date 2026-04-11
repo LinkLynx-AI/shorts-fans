@@ -113,15 +113,22 @@ function FanMediaTile({
 }) {
   const frame = (
     <span className="relative block aspect-[3/4] overflow-hidden rounded-[4px] bg-[linear-gradient(180deg,var(--short-tile-top)_0%,var(--short-tile-mid)_42%,var(--short-tile-bottom)_100%)] shadow-[0_14px_28px_rgba(36,94,132,0.12)] transition-transform hover:scale-[1.01]">
-      <video
-        aria-hidden="true"
-        className="absolute inset-0 size-full object-cover"
-        muted
-        playsInline
-        poster={short.media.posterUrl ?? undefined}
-        preload="metadata"
-        src={short.media.url}
-      />
+      {short.media.posterUrl ? (
+        <span
+          aria-hidden="true"
+          className="absolute inset-0 block bg-cover bg-center"
+          style={{ backgroundImage: `url("${short.media.posterUrl}")` }}
+        />
+      ) : (
+        <video
+          aria-hidden="true"
+          className="absolute inset-0 size-full object-cover"
+          muted
+          playsInline
+          preload="none"
+          src={short.media.url}
+        />
+      )}
       <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.04)_0%,rgba(6,21,33,0.2)_58%,rgba(6,21,33,0.4)_100%)]" />
     </span>
   );
