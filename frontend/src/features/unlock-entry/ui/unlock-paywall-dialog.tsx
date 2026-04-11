@@ -16,8 +16,10 @@ export type UnlockPaywallDialogProps = {
   unlock: UnlockSurfaceModel;
 };
 
-function buildPaywallTitle(shortTitle: string): string {
-  return `${shortTitle} の続きを見る`;
+function buildPaywallTitle(caption: string): string {
+  const normalizedCaption = caption.trim().replace(/[。.!?]+$/u, "");
+
+  return normalizedCaption ? `${normalizedCaption} の続きを見る` : "この short の続きを見る";
 }
 
 function getUnlockButtonLabel(unlock: UnlockSurfaceModel): string {
@@ -42,7 +44,7 @@ export function UnlockPaywallDialog({
   const confirmEnabled =
     (!unlock.setup.requiresAgeConfirmation || acceptAge) &&
     (!unlock.setup.requiresTermsAcceptance || acceptTerms);
-  const title = buildPaywallTitle(unlock.short.title);
+  const title = buildPaywallTitle(unlock.short.caption);
   const buttonLabel = getUnlockButtonLabel(unlock);
 
   return (

@@ -16,7 +16,9 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
@@ -75,11 +77,23 @@ func main() {
 
 	creatorRepository := creator.NewRepository(pool)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
+	feedRepository := feed.NewRepository(pool)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
 	modeSwitcher := auth.NewModeSwitcher(authRepository)
+	shortDisplayDelivery, err := media.NewDelivery(
+		media.DeliveryConfig{
+			ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+			MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
+		},
+		s3Client,
+	)
+	if err != nil {
+		logger.Error("failed to initialize short display delivery", "error", err)
+		os.Exit(1)
+	}
 	creatorUploadService, err := creatorupload.NewService(
 		creatorupload.ServiceConfig{
 			RawBucketName:      cfg.MediaRawBucketName,
@@ -120,6 +134,7 @@ func main() {
 			CreatorUpload:        creatorUploadService,
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
+			FanFeed:              feedRepository,
 			CreatorFollow:        creatorRepository,
 			CreatorAvatarUpload:  creatorAvatarService,
 			CreatorRegistration:  creatorRepository,
@@ -127,6 +142,7 @@ func main() {
 			FanProfileFollowing:  fanProfileRepository,
 			FanAuth:              authLifecycle,
 			AuthCookie:           httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
+			ShortDisplayAssets:   shortDisplayDelivery,
 			ViewerActiveMode:     modeSwitcher,
 			ViewerBootstrap:      viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{

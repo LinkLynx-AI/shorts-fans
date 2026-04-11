@@ -137,7 +137,6 @@
 | `id` | `string` | short identifier |
 | `canonicalMainId` | `string` | `1 short : 1 canonical main` の target |
 | `creatorId` | `string` | short owner |
-| `title` | `string` | short title |
 | `caption` | `string` | public caption |
 | `media` | `VideoDisplayAsset` | public short playback asset |
 | `previewDurationSeconds` | `number` | short 自身の長さ |

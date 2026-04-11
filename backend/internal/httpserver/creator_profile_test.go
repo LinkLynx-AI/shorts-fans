@@ -12,6 +12,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/google/uuid"
 )
 
@@ -293,8 +294,8 @@ func TestCreatorProfileShortsRoute(t *testing.T) {
 	if response.Data == nil || len(response.Data.Items) != 1 {
 		t.Fatalf("response.Data.Items got %#v want len 1", response.Data)
 	}
-	if response.Data.Items[0].ID != shortPublicID(shortID) {
-		t.Fatalf("response.Data.Items[0].ID got %q want %q", response.Data.Items[0].ID, shortPublicID(shortID))
+	if response.Data.Items[0].ID != shorts.FormatPublicShortID(shortID) {
+		t.Fatalf("response.Data.Items[0].ID got %q want %q", response.Data.Items[0].ID, shorts.FormatPublicShortID(shortID))
 	}
 	if response.Meta.Page == nil || !response.Meta.Page.HasNext || response.Meta.Page.NextCursor == nil {
 		t.Fatalf("response.Meta.Page got %#v want next cursor", response.Meta.Page)

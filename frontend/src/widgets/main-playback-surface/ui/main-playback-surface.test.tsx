@@ -43,7 +43,9 @@ describe("MainPlaybackSurface", () => {
       "href",
       "/creators/creator_aoi_n",
     );
-    expect(screen.getByText("soft light preview の続き。")).toBeInTheDocument();
+    expect(
+      screen.getByText(`${surface.entryShort?.caption.trim().replace(/[。.!?]+$/u, "")} の続き。`),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 

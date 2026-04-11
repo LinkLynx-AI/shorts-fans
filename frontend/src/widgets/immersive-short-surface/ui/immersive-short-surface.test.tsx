@@ -31,6 +31,10 @@ describe("ImmersiveShortSurface", () => {
   const continueMainSurface = getShortSurfaceById("softlight");
   const directUnlockSurface = getShortSurfaceById("afterrain");
   const ownerPreviewSurface = getShortSurfaceById("balcony");
+  const feedDialogTitle = `${feedSurface.short.caption.trim().replace(/[。.!?]+$/u, "")} の続きを見る`;
+  const detailDialogTitle = detailSurface
+    ? `${detailSurface.short.caption.trim().replace(/[。.!?]+$/u, "")} の続きを見る`
+    : "";
 
   afterEach(() => {
     push.mockReset();
@@ -57,7 +61,7 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(screen.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
   });
 
   it("redirects unauthenticated viewers to the login entry before opening paywall", async () => {
@@ -71,7 +75,7 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(push).toHaveBeenCalledWith("/login");
-    expect(screen.queryByRole("dialog", { name: "quiet rooftop preview の続きを見る" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: feedDialogTitle })).not.toBeInTheDocument();
   });
 
   it("renders detail mode with back navigation and the same creator block", async () => {
@@ -98,7 +102,7 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(screen.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: detailDialogTitle })).toBeInTheDocument();
   });
 
   it("renders continue-main detail content as an action button", async () => {

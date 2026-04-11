@@ -59,6 +59,7 @@ type mediaAssetSeed struct {
 }
 
 type shortSeed struct {
+	caption              string
 	id                   uuid.UUID
 	mediaAssetID         uuid.UUID
 	approvedForPublishAt time.Time
@@ -88,12 +89,14 @@ var mediaAssets = []mediaAssetSeed{
 
 var publicShorts = []shortSeed{
 	{
+		caption:              "雨上がりの balcony preview。続きは main で。",
 		id:                   shortAID,
 		mediaAssetID:         shortAAssetID,
 		approvedForPublishAt: shortAApprovedAt,
 		publishedAt:          shortAPublishedAt,
 	},
 	{
+		caption:              "soft light の short preview。",
 		id:                   shortBID,
 		mediaAssetID:         shortBAssetID,
 		approvedForPublishAt: shortBApprovedAt,
@@ -368,6 +371,7 @@ func upsertShort(ctx context.Context, tx pgx.Tx, short shortSeed) error {
 			creator_user_id,
 			canonical_main_id,
 			media_asset_id,
+			caption,
 			state,
 			review_reason_code,
 			post_report_state,
@@ -378,21 +382,23 @@ func upsertShort(ctx context.Context, tx pgx.Tx, short shortSeed) error {
 			$2,
 			$3,
 			$4,
+			$5,
 			'approved_for_publish',
 			NULL,
 			NULL,
-			$5,
-			$6
+			$6,
+			$7
 		)
 		ON CONFLICT (id) DO UPDATE
 		SET
+			caption = EXCLUDED.caption,
 			state = EXCLUDED.state,
 			review_reason_code = EXCLUDED.review_reason_code,
 			post_report_state = EXCLUDED.post_report_state,
 			approved_for_publish_at = EXCLUDED.approved_for_publish_at,
 			published_at = EXCLUDED.published_at,
 			updated_at = CURRENT_TIMESTAMP
-	`, short.id, creatorUserID, mainID, short.mediaAssetID, short.approvedForPublishAt, short.publishedAt); err != nil {
+	`, short.id, creatorUserID, mainID, short.mediaAssetID, short.caption, short.approvedForPublishAt, short.publishedAt); err != nil {
 		return fmt.Errorf("shorts upsert short_id=%s: %w", short.id, err)
 	}
 

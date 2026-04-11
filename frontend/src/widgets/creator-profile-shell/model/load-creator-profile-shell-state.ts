@@ -1,11 +1,9 @@
 import {
-  getCreatorById,
   getCreatorProfileHeader,
   getCreatorProfileShortGrid,
   type CreatorProfileHeader,
   type CreatorProfileShortGridItem,
 } from "@/entities/creator";
-import { getShortById, listShorts } from "@/entities/short";
 import { ApiError } from "@/shared/api";
 
 export type CreatorProfileShellShortItem = CreatorProfileShortGridItem & {
@@ -32,40 +30,8 @@ type LoadCreatorProfileShellStateOptions = {
   sessionToken?: string | undefined;
 };
 
-const creatorProfileShortRouteAliasById: Readonly<Record<string, string>> = {
-  short_mina_hotel_mirror: "mirror",
-  short_mina_rooftop: "rooftop",
-};
-
 function isNotFoundApiError(error: unknown): error is ApiError {
   return error instanceof ApiError && error.code === "http" && error.status === 404;
-}
-
-function resolveCreatorProfileShortRouteId(item: CreatorProfileShortGridItem): string {
-  const aliasedShortId = creatorProfileShortRouteAliasById[item.id];
-
-  if (aliasedShortId) {
-    return aliasedShortId;
-  }
-
-  if (getShortById(item.id)) {
-    return item.id;
-  }
-
-  const resolvedCreatorID = getCreatorById(item.creatorId)?.id;
-
-  if (!resolvedCreatorID) {
-    return item.id;
-  }
-
-  const matchingShorts = listShorts().filter((short) =>
-    getCreatorById(short.creatorId)?.id === resolvedCreatorID &&
-    short.previewDurationSeconds === item.previewDurationSeconds,
-  );
-
-  const [matchingShort] = matchingShorts;
-
-  return matchingShorts.length === 1 && matchingShort ? matchingShort.id : item.id;
 }
 
 /**
@@ -101,7 +67,7 @@ export async function loadCreatorProfileShellState(
       kind: "ready",
       shorts: shortGrid.items.map((item) => ({
         ...item,
-        routeShortId: resolveCreatorProfileShortRouteId(item),
+        routeShortId: item.id,
       })),
       stats: profile.stats,
       viewer: profile.viewer,

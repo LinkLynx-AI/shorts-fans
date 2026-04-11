@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -14,16 +14,18 @@ import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
-import type { DetailShortSurface, FeedShortSurface } from "../model/mock-short-surface";
+import type { DetailShortSurface, FeedShortSurface } from "../model/short-surface";
 
 export type ImmersiveShortSurfaceProps =
   | {
       activeTab: FeedTab;
+      isActive?: boolean;
       mode: "feed";
       surface: FeedShortSurface;
     }
   | {
       backHref: string;
+      isActive?: boolean;
       mode: "detail";
       surface: DetailShortSurface;
     };
@@ -178,10 +180,12 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const hasViewerSession = useHasViewerSession();
   const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
+  const isActive = props.isActive ?? true;
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
   const unlockAction = getUnlockEntryAction(unlock);
@@ -205,6 +209,27 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    if (!isActive) {
+      video.pause();
+      return;
+    }
+
+    const playPromise = video.play();
+
+    if (playPromise) {
+      void playPromise.catch(() => {
+        video.muted = true;
+      });
+    }
+  }, [isActive, short.media.url]);
 
   /**
    * setup-required main の setup dialog を開く前に確認状態を初期化する。
@@ -291,7 +316,20 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
+      <video
+        ref={videoRef}
+        aria-hidden="true"
+        autoPlay={isActive}
+        className="absolute inset-0 size-full object-cover"
+        loop
+        muted
+        playsInline
+        poster={short.media.posterUrl ?? undefined}
+        preload={isActive ? "auto" : "metadata"}
+        src={short.media.url}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_34%)]" />
 
       <div className="relative h-full">
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
@@ -302,9 +340,9 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             className="w-full"
             cta={unlock.unlockCta}
             disabled={!isHydrated || isSubmittingMainAccess}
-            {...(unlockAction === "open_main"
+            {...(surface.mainEntryEnabled && unlockAction === "open_main"
               ? { onClick: handleOpenMain }
-              : unlockAction === "open_paywall"
+              : surface.mainEntryEnabled && unlockAction === "open_paywall"
                 ? { onClick: handleOpenPaywall }
                 : {})}
           />

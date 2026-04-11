@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import type { FeedTab } from "@/entities/short";
+import { viewerSessionCookieName } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
-import { FeedShell, getMockFeedShellState } from "@/widgets/feed-shell";
+import { FeedShell, loadFeedShellState } from "@/widgets/feed-shell";
 
 function normalizeFeedTab(tab: string | string[] | undefined): FeedTab {
   return tab === "following" ? "following" : "recommended";
@@ -22,10 +24,15 @@ export default async function RootPage({
 
     if (!viewerState.hasSession) {
       redirect(buildFanLoginHref());
+      return null;
     }
   }
 
-  const state = getMockFeedShellState(activeTab);
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore?.get?.(viewerSessionCookieName)?.value;
+  const state = await loadFeedShellState(activeTab, {
+    sessionToken,
+  });
 
   return <FeedShell state={state} />;
 }

@@ -3,9 +3,9 @@ import Link from "next/link";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { cn } from "@/shared/lib";
 import { Button, SurfacePanel } from "@/shared/ui";
-import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 
 import type { FeedShellState } from "../model/mock-feed-shell";
+import { FeedReel } from "./feed-reel";
 
 type FeedShellProps = {
   state: FeedShellState;
@@ -35,11 +35,13 @@ function FeedTabsNavigation({ activeTab }: { activeTab: "following" | "recommend
 }
 
 function FeedFallbackState({
+  activeTab,
   ctaHref,
   ctaLabel,
   description,
   title,
 }: {
+  activeTab: "following" | "recommended";
   ctaHref?: string;
   ctaLabel?: string;
   description: string;
@@ -50,7 +52,7 @@ function FeedFallbackState({
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
       <div className="relative flex h-full flex-col">
         <div className="flex justify-center px-4 pt-6">
-          <FeedTabsNavigation activeTab="following" />
+          <FeedTabsNavigation activeTab={activeTab} />
         </div>
         <div className="flex flex-1 items-center px-4 pb-24">
           <SurfacePanel className="w-full px-5 py-5 text-foreground">
@@ -73,12 +75,13 @@ function FeedFallbackState({
  */
 export function FeedShell({ state }: FeedShellProps) {
   if (state.kind === "ready") {
-    return <ImmersiveShortSurface activeTab={state.tab} mode="feed" surface={state.surface} />;
+    return <FeedReel activeTab={state.tab} surfaces={state.surfaces} />;
   }
 
   if (state.kind === "empty") {
     return (
       <FeedFallbackState
+        activeTab={state.tab}
         description="following feed は 200 empty を返せる前提なので、ここで空状態を受けられるようにしています。実際の copy と CTA は後続 task で詰めます。"
         title="フォロー中の creator はまだいません"
       />
@@ -87,6 +90,7 @@ export function FeedShell({ state }: FeedShellProps) {
 
   return (
     <FeedFallbackState
+      activeTab={state.tab}
       ctaHref={buildFanLoginHref()}
       ctaLabel="ログインへ進む"
       description="following feed が auth_required を返したときは、この entry から fan login へ進めるようにしています。"
