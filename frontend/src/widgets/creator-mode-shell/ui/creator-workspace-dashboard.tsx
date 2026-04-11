@@ -19,7 +19,6 @@ import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-w
 import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
 import type { CreatorWorkspaceTopPerformersState } from "../model/creator-workspace-top-performers";
 import type {
-  CreatorWorkspaceDetailSelection,
   CreatorWorkspacePreviewDetailSelection,
 } from "./creator-mode-shell.types";
 import { CreatorWorkspacePreviewGrid } from "./creator-workspace-preview-grid";
@@ -173,7 +172,6 @@ export function CreatorWorkspaceDashboard({
   activeTab,
   creator,
   onChangeTab,
-  onOpenDetail,
   onOpenPreviewDetail,
   onRetryPreviewCollections,
   onRetrySummary,
@@ -186,7 +184,6 @@ export function CreatorWorkspaceDashboard({
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   creator: CreatorSummary;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
-  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
   onOpenPreviewDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetryPreviewCollections: () => void;
   onRetrySummary: () => void;
@@ -202,11 +199,10 @@ export function CreatorWorkspaceDashboard({
       <CreatorWorkspaceTopBar />
       <CreatorWorkspaceSummarySection onRetry={onRetrySummary} state={summaryState} />
       <CreatorWorkspaceTopPerformers
-        onOpenDetail={onOpenDetail}
+        onOpenDetail={onOpenPreviewDetail}
         onRetry={onRetryTopPerformers}
         previewCollectionsState={previewCollectionsState}
         state={topPerformersState}
-        workspace={state.workspace}
       />
       <CreatorWorkspaceManagedPosts
         activeTab={activeTab}

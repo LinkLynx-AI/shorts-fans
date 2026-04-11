@@ -6,14 +6,13 @@ import type {
   CreatorWorkspaceTopMainPerformer,
   CreatorWorkspaceTopShortPerformer,
 } from "../api/get-creator-workspace-top-performers";
-import type { ApprovedCreatorWorkspaceState } from "../model/approved-creator-workspace";
 import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
 import type { CreatorWorkspaceTopPerformersState } from "../model/creator-workspace-top-performers";
 import {
   createVideoPosterStyle,
   formatUnlockMetric,
 } from "../lib/creator-mode-shell-ui";
-import type { CreatorWorkspaceDetailSelection } from "./creator-mode-shell.types";
+import type { CreatorWorkspacePreviewDetailSelection } from "./creator-mode-shell.types";
 
 function CreatorWorkspaceTopPerformerThumb({ posterUrl }: { posterUrl: string }) {
   return (
@@ -36,9 +35,9 @@ function CreatorWorkspaceTopPerformerRow({
   index: number;
   label: string;
   metric: string;
-  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   posterUrl: string;
-  selection: CreatorWorkspaceDetailSelection | null;
+  selection: CreatorWorkspacePreviewDetailSelection | null;
 }) {
   return (
     <button
@@ -112,32 +111,33 @@ function buildTopPerformerRows(
   topMain: CreatorWorkspaceTopMainPerformer | null,
   topShort: CreatorWorkspaceTopShortPerformer | null,
   previewCollectionsState: CreatorWorkspacePreviewCollectionsState,
-  workspace: ApprovedCreatorWorkspaceState,
 ): readonly {
   label: string;
   metric: string;
   posterUrl: string;
-  selection: CreatorWorkspaceDetailSelection | null;
+  selection: CreatorWorkspacePreviewDetailSelection | null;
 }[] {
   const rows: {
     label: string;
     metric: string;
     posterUrl: string;
-    selection: CreatorWorkspaceDetailSelection | null;
+    selection: CreatorWorkspacePreviewDetailSelection | null;
   }[] = [];
   const readyCollections = previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null;
 
   if (topMain) {
-    const leadShortId = readyCollections?.mains.items.find((item) => item.id === topMain.id)?.leadShortId ?? null;
+    const previewMainIndex = readyCollections?.mains.items.findIndex((item) => item.id === topMain.id) ?? -1;
+    const previewMain = previewMainIndex >= 0 ? readyCollections?.mains.items[previewMainIndex] ?? null : null;
 
     rows.push({
       label: "Top main",
       metric: formatUnlockMetric(topMain.unlockCount),
       posterUrl: topMain.media.posterUrl,
-      selection: leadShortId && workspace.detailsByTab.main[leadShortId]
+      selection: previewMain
         ? {
-            kind: "mock",
-            shortId: leadShortId,
+            index: previewMainIndex,
+            item: previewMain,
+            kind: "preview-main",
             tab: "main",
           }
         : null,
@@ -145,14 +145,18 @@ function buildTopPerformerRows(
   }
 
   if (topShort) {
+    const previewShortIndex = readyCollections?.shorts.items.findIndex((item) => item.id === topShort.id) ?? -1;
+    const previewShort = previewShortIndex >= 0 ? readyCollections?.shorts.items[previewShortIndex] ?? null : null;
+
     rows.push({
       label: "Top short",
       metric: formatUnlockMetric(topShort.attributedUnlockCount),
       posterUrl: topShort.media.posterUrl,
-      selection: workspace.detailsByTab.shorts[topShort.id]
+      selection: previewShort
         ? {
-            kind: "mock",
-            shortId: topShort.id,
+            index: previewShortIndex,
+            item: previewShort,
+            kind: "preview-short",
             tab: "shorts",
           }
         : null,
@@ -167,13 +171,11 @@ export function CreatorWorkspaceTopPerformers({
   onRetry,
   previewCollectionsState,
   state,
-  workspace,
 }: {
-  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetry: () => void;
   previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
   state: CreatorWorkspaceTopPerformersState;
-  workspace: ApprovedCreatorWorkspaceState;
 }) {
   if (state.kind === "loading") {
     return <CreatorWorkspaceTopPerformersLoading />;
@@ -187,7 +189,6 @@ export function CreatorWorkspaceTopPerformers({
     state.topPerformers.topMain,
     state.topPerformers.topShort,
     previewCollectionsState,
-    workspace,
   );
 
   if (rows.length === 0) {

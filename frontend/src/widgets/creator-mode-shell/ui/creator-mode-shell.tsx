@@ -63,7 +63,6 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
           activeTab={activeTab}
           creator={creator}
           onChangeTab={setActiveTab}
-          onOpenDetail={handleOpenDetail}
           onOpenPreviewDetail={handleOpenDetail}
           onRetryPreviewCollections={retryPreviewCollections}
           onRetrySummary={retrySummary}

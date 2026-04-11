@@ -215,7 +215,7 @@ describe("CreatorPage", () => {
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
   });
 
-  it("renders contract-backed summary data and top performers for creator-mode viewers", async () => {
+  it("opens top performers with the same preview detail flow as the lower preview cards", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -270,15 +270,27 @@ describe("CreatorPage", () => {
     expect(screen.getByRole("button", { name: /^Top short\b/ })).toBeEnabled();
     expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
     expect(await screen.findByTestId("creator-workspace-preview-tile")).toBeInTheDocument();
-    expect(screen.queryByText("linked short からの流入を unlock に変えている本編です。")).not.toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得したショートデータです。")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
 
-    expect(await screen.findByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
+    expect(await screen.findByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(screen.getByText("¥1,800")).toBeInTheDocument();
+    expect(screen.getAllByText("12:00")).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
     expect(await screen.findByRole("button", { name: "Main" })).toHaveAttribute("aria-pressed", "true");
+
+    await user.click(screen.getByRole("button", { name: /^Top short\b/ }));
+
+    expect(await screen.findByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(screen.getAllByText("0:16")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(await screen.findByRole("button", { name: "Shorts" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("switches the viewer back to fan mode home from the account menu", async () => {
