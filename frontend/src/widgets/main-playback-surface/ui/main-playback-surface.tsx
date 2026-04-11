@@ -25,7 +25,7 @@ function PinRail({ pinned }: { pinned: boolean }) {
   const label = pinned ? "Pinned short" : "Pin short";
 
   return (
-    <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "204px" }}>
+    <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "240px" }}>
       <button
         aria-label={label}
         aria-pressed={pinned}
@@ -63,6 +63,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
   const statusCopy = getMainPlaybackStatusCopy(surface);
   const statusMeta = getMainPlaybackStatusMeta(surface);
   const continuationCopy = surface.entryShort ? `${surface.entryShort.title} の続き。` : "short の続きから再生中。";
+  const playbackLabel = `${surface.main.title} playback`;
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -77,6 +78,16 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(surface.themeShort)}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
+      <video
+        aria-label={playbackLabel}
+        className="absolute inset-0 size-full object-cover"
+        controls
+        playsInline
+        poster={surface.main.media.posterUrl ?? undefined}
+        preload="metadata"
+        src={surface.main.media.url}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,17,26,0.18)_0%,rgba(6,17,26,0.04)_28%,rgba(6,17,26,0.14)_62%,rgba(6,17,26,0.5)_100%)]" />
 
       <div className="relative h-full">
         <h1 className="sr-only">{surface.main.title}</h1>
@@ -95,7 +106,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
 
         <PinRail pinned={surface.viewer.isPinned} />
 
-        <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
+        <div className="absolute inset-x-4 z-20" style={{ bottom: "188px" }}>
           <div className="flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl">
             <span className="flex min-w-0 flex-1 items-center gap-3">
               <span className="inline-flex min-h-[34px] shrink-0 items-center rounded-full bg-accent-strong px-3.5 text-xs font-semibold tracking-[-0.01em] text-white">
@@ -112,7 +123,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
           </div>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
+        <div className="absolute inset-x-0 z-10 px-4" style={{ bottom: "112px" }}>
           <div className="w-[min(88%,344px)] max-w-[344px]">
             <div className="flex w-fit max-w-full items-center gap-2.5">
               <Link

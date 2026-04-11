@@ -1,13 +1,12 @@
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
-import { getShortById } from "@/entities/short";
+import { viewerSessionCookieName } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
-import { parseMockMainPlaybackGrantContext } from "@/features/unlock-entry";
-import { readMockSignedToken } from "@/shared/lib/mock-signed-token";
 import {
-  getMainPlaybackSurfaceById,
+  loadMainPlaybackSurface,
   MainPlaybackLockedState,
   MainPlaybackSurface,
 } from "@/widgets/main-playback-surface";
@@ -70,43 +69,33 @@ export default async function MainPlaybackPage({
   const viewerState = await getFanAuthGateState();
 
   if (!viewerState.hasSession) {
-    redirect(buildFanLoginHref());
+    return redirect(buildFanLoginHref());
   }
 
   const [rawParams, rawSearchParams] = await Promise.all([params, searchParams]);
   const { mainId } = parseMainPlaybackParams(rawParams);
-  const { fromShortId: normalizedFromShortId, grant: normalizedGrant } =
-    parseMainPlaybackSearchParams(rawSearchParams);
-
-  const entryShort = getShortById(normalizedFromShortId);
-
-  if (!entryShort || entryShort.canonicalMainId !== mainId) {
-    notFound();
-  }
+  const { fromShortId: normalizedFromShortId, grant: normalizedGrant } = parseMainPlaybackSearchParams(rawSearchParams);
 
   const fallbackHref = `/shorts/${normalizedFromShortId}`;
-  const grantPayload = readMockSignedToken(normalizedGrant);
-  const parsedGrantContext = grantPayload
-    ? parseMockMainPlaybackGrantContext(grantPayload.context)
-    : null;
+  const cookieStore = await cookies();
+  const sessionToken = cookieStore.get(viewerSessionCookieName)?.value;
+  const result = await loadMainPlaybackSurface(mainId, {
+    fromShortId: normalizedFromShortId,
+    grant: normalizedGrant,
+    sessionToken,
+  });
 
-  if (
-    !parsedGrantContext ||
-    parsedGrantContext.mainId !== mainId ||
-    parsedGrantContext.fromShortId !== normalizedFromShortId
-  ) {
+  if (result.kind === "auth_required") {
+    return redirect(buildFanLoginHref());
+  }
+
+  if (result.kind === "locked") {
     return <MainPlaybackLockedState fallbackHref={fallbackHref} />;
   }
 
-  const surface = getMainPlaybackSurfaceById(
-    mainId,
-    normalizedFromShortId,
-    parsedGrantContext.grantKind,
-  );
-
-  if (!surface) {
-    notFound();
+  if (result.kind === "not_found") {
+    return notFound();
   }
 
-  return <MainPlaybackSurface fallbackHref={fallbackHref} surface={surface} />;
+  return <MainPlaybackSurface fallbackHref={fallbackHref} surface={result.surface} />;
 }

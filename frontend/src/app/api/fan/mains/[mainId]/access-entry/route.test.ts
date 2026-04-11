@@ -8,7 +8,11 @@ import {
   getCurrentViewerBootstrap,
   viewerSessionCookieName,
 } from "@/entities/viewer";
-import { issueMockSignedToken, readMockSignedToken } from "@/shared/lib/mock-signed-token";
+import {
+  createMockSessionProof,
+  issueMockSignedToken,
+  readMockSignedToken,
+} from "@/shared/lib/mock-signed-token";
 
 import { POST } from "./route";
 
@@ -55,6 +59,7 @@ async function expectPlaybackGrantResponse(
     fromShortId: string;
     grantKind: "owner" | "unlocked";
     mainId: string;
+    sessionToken: string;
   },
 ) {
   const body = await response.json();
@@ -75,7 +80,12 @@ async function expectPlaybackGrantResponse(
     throw new Error("grant payload missing");
   }
 
-  expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual(expected);
+  expect(parseMockMainPlaybackGrantContext(grantPayload.context)).toEqual({
+    fromShortId: expected.fromShortId,
+    grantKind: expected.grantKind,
+    mainId: expected.mainId,
+  });
+  expect(grantPayload.sessionProof).toBe(createMockSessionProof(expected.sessionToken));
 }
 
 describe("POST /api/fan/mains/[mainId]/access-entry", () => {
@@ -157,6 +167,7 @@ describe("POST /api/fan/mains/[mainId]/access-entry", () => {
       fromShortId: "rooftop",
       grantKind: "unlocked",
       mainId: "main_mina_quiet_rooftop",
+      sessionToken: "viewer-session",
     });
   });
 
@@ -178,6 +189,7 @@ describe("POST /api/fan/mains/[mainId]/access-entry", () => {
       fromShortId: "softlight",
       grantKind: "unlocked",
       mainId: "main_aoi_blue_balcony",
+      sessionToken: "viewer-session",
     });
   });
 
@@ -199,6 +211,7 @@ describe("POST /api/fan/mains/[mainId]/access-entry", () => {
       fromShortId: "balcony",
       grantKind: "owner",
       mainId: "main_aoi_blue_balcony",
+      sessionToken: "viewer-session",
     });
   });
 

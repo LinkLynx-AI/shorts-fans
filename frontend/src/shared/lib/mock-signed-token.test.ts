@@ -1,4 +1,5 @@
 import {
+  createMockSessionProof,
   issueMockSignedToken,
   readMockSignedToken,
   verifyMockSignedToken,
@@ -57,5 +58,27 @@ describe("mock signed token", () => {
     ).toMatchObject({
       context: "main_aoi_blue_balcony::softlight",
     });
+  });
+
+  it("verifies a token only for the bound session proof", () => {
+    const sessionProof = createMockSessionProof("viewer-session");
+    const token = issueMockSignedToken("main_aoi_blue_balcony::softlight", {
+      nowMs: 1_000,
+      sessionProof,
+      ttlMs: 10_000,
+    });
+
+    expect(
+      verifyMockSignedToken("main_aoi_blue_balcony::softlight", token, {
+        nowMs: 5_000,
+        sessionProof,
+      }),
+    ).toBe(true);
+    expect(
+      verifyMockSignedToken("main_aoi_blue_balcony::softlight", token, {
+        nowMs: 5_000,
+        sessionProof: createMockSessionProof("other-session"),
+      }),
+    ).toBe(false);
   });
 });

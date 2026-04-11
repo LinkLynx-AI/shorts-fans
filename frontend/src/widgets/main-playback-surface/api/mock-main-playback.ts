@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { getCreatorById } from "@/entities/creator";
-import { getFanHubState } from "@/entities/fan-profile";
 import { getMainById } from "@/entities/main";
 import { getShortById } from "@/entities/short";
 import {
@@ -10,7 +9,11 @@ import {
   type MainPlaybackGrantKind,
 } from "@/features/unlock-entry";
 
-import type { MainPlaybackSurface } from "../model/main-playback-surface";
+import {
+  buildMainPlaybackSurface,
+  type MainPlaybackPayload,
+  type MainPlaybackSurface,
+} from "../model/main-playback-surface";
 
 const mainMediaSchema = z.object({
   durationSeconds: z.number().int().positive(),
@@ -68,16 +71,12 @@ const accessSchema = z.object({
   status: z.enum(["locked", "owner", "unlocked"]),
 });
 
-const playbackSurfaceSchema = z.object({
+const playbackPayloadSchema = z.object({
   access: accessSchema,
   creator: creatorSchema,
   entryShort: entryShortSchema,
   main: playbackMainSchema,
   resumePositionSeconds: z.number().int().nonnegative().nullable(),
-  themeShort: entryShortSchema.unwrap(),
-  viewer: z.object({
-    isPinned: z.boolean(),
-  }),
 });
 
 function buildPlaybackAccess(
@@ -120,13 +119,13 @@ function buildPlaybackAccess(
 }
 
 /**
- * main playback surface 用の mock を取得する。
+ * main playback transport payload 用の mock を取得する。
  */
-export function getMainPlaybackSurfaceById(
+export function getMainPlaybackPayloadById(
   mainId: string,
   fromShortId?: string,
   grantKind?: MainPlaybackGrantKind,
-): MainPlaybackSurface | undefined {
+): MainPlaybackPayload | undefined {
   if (!fromShortId || !grantKind) {
     return undefined;
   }
@@ -162,9 +161,7 @@ export function getMainPlaybackSurfaceById(
     return undefined;
   }
 
-  const pinnedShortIds = new Set(getFanHubState("pinned").pinnedItems.map((item) => item.short.id));
-
-  return playbackSurfaceSchema.parse({
+  return playbackPayloadSchema.parse({
     access: playbackState.access,
     creator,
     entryShort,
@@ -176,9 +173,26 @@ export function getMainPlaybackSurfaceById(
       title: main.title,
     },
     resumePositionSeconds: playbackState.resumePositionSeconds,
-    themeShort,
-    viewer: {
-      isPinned: entryShort ? pinnedShortIds.has(entryShort.id) : false,
-    },
   });
+}
+
+/**
+ * main playback surface 用の mock を取得する。
+ */
+export function getMainPlaybackSurfaceById(
+  mainId: string,
+  fromShortId?: string,
+  grantKind?: MainPlaybackGrantKind,
+): MainPlaybackSurface | undefined {
+  if (!fromShortId) {
+    return undefined;
+  }
+
+  const payload = getMainPlaybackPayloadById(mainId, fromShortId, grantKind);
+
+  if (!payload) {
+    return undefined;
+  }
+
+  return buildMainPlaybackSurface(payload, fromShortId);
 }

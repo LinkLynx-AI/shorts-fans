@@ -1,23 +1,56 @@
+import { getFanHubState } from "@/entities/fan-profile";
 import type { CreatorSummary } from "@/entities/creator";
 import type { MainMediaAsset, MainSummary } from "@/entities/main";
-import type { ShortPreviewMeta } from "@/entities/short";
+import { getShortById, type ShortPreviewMeta } from "@/entities/short";
 import type { MainAccessState } from "@/features/unlock-entry";
 
 export type MainPlaybackSurfaceMain = MainSummary & {
   media: MainMediaAsset;
 };
 
-export type MainPlaybackSurface = {
+export type MainPlaybackPayload = {
   access: MainAccessState;
   creator: CreatorSummary;
   entryShort: ShortPreviewMeta | null;
   main: MainPlaybackSurfaceMain;
   resumePositionSeconds: number | null;
+};
+
+export type MainPlaybackSurface = {
+  access: MainPlaybackPayload["access"];
+  creator: MainPlaybackPayload["creator"];
+  entryShort: MainPlaybackPayload["entryShort"];
+  main: MainPlaybackPayload["main"];
+  resumePositionSeconds: MainPlaybackPayload["resumePositionSeconds"];
   themeShort: ShortPreviewMeta;
   viewer: {
     isPinned: boolean;
   };
 };
+
+/**
+ * main playback payload を UI surface 用の state に補完する。
+ */
+export function buildMainPlaybackSurface(
+  payload: MainPlaybackPayload,
+  fromShortId: string,
+): MainPlaybackSurface | undefined {
+  const themeShort = payload.entryShort ?? getShortById(fromShortId);
+
+  if (!themeShort) {
+    return undefined;
+  }
+
+  const pinnedShortIds = new Set(getFanHubState("pinned").pinnedItems.map((item) => item.short.id));
+
+  return {
+    ...payload,
+    themeShort,
+    viewer: {
+      isPinned: pinnedShortIds.has(themeShort.id),
+    },
+  };
+}
 
 function formatSecondsAsTimestamp(seconds: number): string {
   const normalized = Math.max(0, Math.floor(seconds));

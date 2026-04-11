@@ -34,6 +34,8 @@ describe("MainPlaybackSurface", () => {
 
     render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
 
+    const playback = screen.getByLabelText("blue balcony main playback");
+
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.getByText("Playing main")).toBeInTheDocument();
     expect(screen.getByText("resume without another unlock step")).toBeInTheDocument();
@@ -44,6 +46,10 @@ describe("MainPlaybackSurface", () => {
       "/creators/creator_aoi_n",
     );
     expect(screen.getByText("soft light preview の続き。")).toBeInTheDocument();
+    expect(playback).toHaveAttribute("controls");
+    expect(playback).toHaveAttribute("poster", surface.main.media.posterUrl ?? "");
+    expect(playback).toHaveAttribute("preload", "metadata");
+    expect(playback).toHaveAttribute("src", surface.main.media.url);
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 

@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 
 import { ViewerSessionProvider } from "@/entities/viewer";
 import { getFeedSurfaceByTab, getShortSurfaceById } from "@/widgets/immersive-short-surface";
@@ -58,6 +58,63 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(screen.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" })).toBeInTheDocument();
+  });
+
+  it("pushes to main playback after confirming the setup-required paywall", async () => {
+    const user = userEvent.setup();
+    const mainHref = "/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=grant_123";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            href: mainHref,
+          },
+          error: null,
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
+      { hasSession: true },
+    );
+
+    const unlockButton = screen.getByRole("button", { name: /Unlock/i });
+
+    await waitFor(() => {
+      expect(unlockButton).not.toBeDisabled();
+    });
+    await user.click(unlockButton);
+
+    const dialog = screen.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" });
+
+    await user.click(within(dialog).getByRole("checkbox", { name: "18歳以上であり、年齢確認に同意する" }));
+    await user.click(within(dialog).getByRole("checkbox", { name: "利用規約とポリシーに同意し、main 再生へ進む" }));
+    await user.click(within(dialog).getByRole("button", { name: /Unlock/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(feedSurface.unlock.mainAccessEntry.routePath, {
+        body: JSON.stringify({
+          acceptedAge: true,
+          acceptedTerms: true,
+          entryToken: feedSurface.unlock.mainAccessEntry.token,
+          fromShortId: feedSurface.short.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      expect(push).toHaveBeenCalledWith(mainHref);
+    });
   });
 
   it("redirects unauthenticated viewers to the login entry before opening paywall", async () => {
@@ -149,6 +206,62 @@ describe("ImmersiveShortSurface", () => {
     );
 
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
+  });
+
+  it("pushes directly to main playback for unlock-available content", async () => {
+    if (!directUnlockSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+    const mainHref = "/mains/main_sora_after_rain?fromShortId=afterrain&grant=grant_456";
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            href: mainHref,
+          },
+          error: null,
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" mode="detail" surface={directUnlockSurface} />,
+      { hasSession: true },
+    );
+
+    const unlockButton = screen.getByRole("button", { name: /Unlock/i });
+
+    await waitFor(() => {
+      expect(unlockButton).not.toBeDisabled();
+    });
+    await user.click(unlockButton);
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(directUnlockSurface.unlock.mainAccessEntry.routePath, {
+        body: JSON.stringify({
+          acceptedAge: false,
+          acceptedTerms: false,
+          entryToken: directUnlockSurface.unlock.mainAccessEntry.token,
+          fromShortId: directUnlockSurface.short.id,
+        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      expect(push).toHaveBeenCalledWith(mainHref);
+    });
+    expect(screen.queryByRole("dialog", { name: /続きを見る/ })).not.toBeInTheDocument();
   });
 
   it("renders owner-preview detail content as an action button", () => {

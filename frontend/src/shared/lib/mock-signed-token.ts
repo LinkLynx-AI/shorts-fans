@@ -7,10 +7,12 @@ type SignedTokenPayload = {
   context: string;
   expiresAtMs: number;
   nonce: string;
+  sessionProof?: string;
 };
 
 type SignedTokenOptions = {
   nowMs?: number;
+  sessionProof?: string;
   ttlMs?: number;
 };
 
@@ -27,7 +29,10 @@ function decodePayload(value: string): SignedTokenPayload | null {
       parsed === null ||
       typeof parsed.context !== "string" ||
       typeof parsed.expiresAtMs !== "number" ||
-      typeof parsed.nonce !== "string"
+      typeof parsed.nonce !== "string" ||
+      ("sessionProof" in parsed &&
+        parsed.sessionProof !== undefined &&
+        typeof parsed.sessionProof !== "string")
     ) {
       return null;
     }
@@ -40,6 +45,13 @@ function decodePayload(value: string): SignedTokenPayload | null {
 
 function signValue(value: string): string {
   return createHmac("sha256", MOCK_SIGNED_TOKEN_SECRET).update(value).digest("base64url");
+}
+
+/**
+ * current session に紐づく比較用 proof を生成する。
+ */
+export function createMockSessionProof(sessionToken: string): string {
+  return signValue(`session-proof::${sessionToken}`);
 }
 
 function hasValidSignature(encodedPayload: string, providedSignature: string): boolean {
@@ -83,6 +95,7 @@ export function issueMockSignedToken(context: string, options?: SignedTokenOptio
     context,
     expiresAtMs: nowMs + ttlMs,
     nonce: randomUUID(),
+    ...(options?.sessionProof ? { sessionProof: options.sessionProof } : {}),
   });
   const signature = signValue(encodedPayload);
 
@@ -95,10 +108,19 @@ export function issueMockSignedToken(context: string, options?: SignedTokenOptio
 export function verifyMockSignedToken(
   context: string,
   token: string,
-  options?: Pick<SignedTokenOptions, "nowMs">,
+  options?: Pick<SignedTokenOptions, "nowMs" | "sessionProof">,
 ): boolean {
   const payload = getVerifiedPayload(token, options);
-  return payload?.context === context;
+
+  if (!payload || payload.context !== context) {
+    return false;
+  }
+
+  if (options?.sessionProof) {
+    return payload.sessionProof === options.sessionProof;
+  }
+
+  return true;
 }
 
 /**

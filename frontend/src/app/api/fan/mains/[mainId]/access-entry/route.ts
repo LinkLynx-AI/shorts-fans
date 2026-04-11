@@ -10,7 +10,11 @@ import {
   getUnlockSurfaceByShortId,
   type MainPlaybackGrantKind,
 } from "@/features/unlock-entry";
-import { issueMockSignedToken, verifyMockSignedToken } from "@/shared/lib/mock-signed-token";
+import {
+  createMockSessionProof,
+  issueMockSignedToken,
+  verifyMockSignedToken,
+} from "@/shared/lib/mock-signed-token";
 
 const accessEntryParamsSchema = z.object({
   mainId: z.string().min(1),
@@ -182,6 +186,9 @@ export async function POST(
 
   const grantToken = issueMockSignedToken(
     buildMockMainPlaybackGrantContext(mainId, fromShortId, grantKind),
+    {
+      sessionProof: createMockSessionProof(sessionToken),
+    },
   );
 
   return buildSuccessResponse(getMainPlaybackHref(mainId, fromShortId, grantToken));
