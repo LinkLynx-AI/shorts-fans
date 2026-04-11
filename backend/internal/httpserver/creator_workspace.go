@@ -11,16 +11,19 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 const (
-	creatorWorkspaceAuthRequiredMessage   = "creator workspace requires authentication"
-	creatorWorkspaceMainListRequestScope  = "creator_workspace_mains"
-	creatorWorkspaceRequestScope          = "creator_workspace"
-	creatorWorkspaceShortListRequestScope = "creator_workspace_shorts"
-	creatorWorkspaceTopPerformersScope    = "creator_workspace_top_performers"
+	creatorWorkspaceAuthRequiredMessage     = "creator workspace requires authentication"
+	creatorWorkspaceMainDetailRequestScope  = "creator_workspace_main_preview_detail"
+	creatorWorkspaceMainListRequestScope    = "creator_workspace_mains"
+	creatorWorkspaceRequestScope            = "creator_workspace"
+	creatorWorkspaceShortDetailRequestScope = "creator_workspace_short_preview_detail"
+	creatorWorkspaceShortListRequestScope   = "creator_workspace_shorts"
+	creatorWorkspaceTopPerformersScope      = "creator_workspace_top_performers"
 )
 
 type creatorWorkspaceResponseData struct {
@@ -51,6 +54,14 @@ type creatorWorkspacePreviewShortListResponseData struct {
 
 type creatorWorkspacePreviewMainListResponseData struct {
 	Items []creatorWorkspacePreviewMainItem `json:"items"`
+}
+
+type creatorWorkspacePreviewShortDetailResponseData struct {
+	Preview creatorWorkspacePreviewShortDetailPayload `json:"preview"`
+}
+
+type creatorWorkspacePreviewMainDetailResponseData struct {
+	Preview creatorWorkspacePreviewMainDetailPayload `json:"preview"`
 }
 
 type creatorWorkspaceTopPerformersResponseData struct {
@@ -87,6 +98,43 @@ type creatorWorkspacePreviewMainItem struct {
 	LeadShortID     string                            `json:"leadShortId"`
 	Media           creatorWorkspacePreviewMediaAsset `json:"media"`
 	PriceJpy        int64                             `json:"priceJpy"`
+}
+
+type creatorWorkspacePreviewAccessPayload struct {
+	MainID string `json:"mainId"`
+	Reason string `json:"reason"`
+	Status string `json:"status"`
+}
+
+type creatorWorkspacePreviewShortSummary struct {
+	Caption                string     `json:"caption"`
+	CanonicalMainID        string     `json:"canonicalMainId"`
+	CreatorID              string     `json:"creatorId"`
+	ID                     string     `json:"id"`
+	Media                  mediaAsset `json:"media"`
+	PreviewDurationSeconds int64      `json:"previewDurationSeconds"`
+	Title                  string     `json:"title"`
+}
+
+type creatorWorkspacePreviewMainSummary struct {
+	DurationSeconds int64      `json:"durationSeconds"`
+	ID              string     `json:"id"`
+	Media           mediaAsset `json:"media"`
+	PriceJpy        int64      `json:"priceJpy"`
+	Title           string     `json:"title"`
+}
+
+type creatorWorkspacePreviewShortDetailPayload struct {
+	Access  creatorWorkspacePreviewAccessPayload `json:"access"`
+	Creator creatorSummary                       `json:"creator"`
+	Short   creatorWorkspacePreviewShortSummary  `json:"short"`
+}
+
+type creatorWorkspacePreviewMainDetailPayload struct {
+	Access     creatorWorkspacePreviewAccessPayload `json:"access"`
+	Creator    creatorSummary                       `json:"creator"`
+	EntryShort creatorWorkspacePreviewShortSummary  `json:"entryShort"`
+	Main       creatorWorkspacePreviewMainSummary   `json:"main"`
 }
 
 type creatorWorkspacePreviewMediaAsset struct {
@@ -126,10 +174,24 @@ func registerCreatorWorkspaceRoutes(
 		},
 	)
 	router.GET(
+		"/api/creator/workspace/shorts/:shortId/preview",
+		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
+		func(c *gin.Context) {
+			handleCreatorWorkspacePreviewShortDetail(c, reader)
+		},
+	)
+	router.GET(
 		"/api/creator/workspace/mains",
 		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainListRequestScope, creatorWorkspaceAuthRequiredMessage),
 		func(c *gin.Context) {
 			handleCreatorWorkspacePreviewMains(c, reader)
+		},
+	)
+	router.GET(
+		"/api/creator/workspace/mains/:mainId/preview",
+		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
+		func(c *gin.Context) {
+			handleCreatorWorkspacePreviewMainDetail(c, reader)
 		},
 	)
 	router.GET(
@@ -245,6 +307,43 @@ func handleCreatorWorkspacePreviewShorts(c *gin.Context, reader CreatorWorkspace
 	})
 }
 
+func handleCreatorWorkspacePreviewShortDetail(c *gin.Context, reader CreatorWorkspaceReader) {
+	shortID, err := shorts.ParsePublicShortID(c.Param("shortId"))
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortDetailRequestScope, http.StatusNotFound, "not_found", "creator workspace preview was not found")
+		return
+	}
+
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortDetailRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	detail, err := reader.GetWorkspacePreviewShortDetail(c.Request.Context(), viewerUserID, shortID)
+	if err != nil {
+		writeCreatorWorkspaceReadError(c, creatorWorkspaceShortDetailRequestScope, err)
+		return
+	}
+
+	responsePayload, err := buildCreatorWorkspacePreviewShortDetailPayload(detail)
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortDetailRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspacePreviewShortDetailResponseData]{
+		Data: &creatorWorkspacePreviewShortDetailResponseData{
+			Preview: responsePayload,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceShortDetailRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
 func handleCreatorWorkspacePreviewMains(c *gin.Context, reader CreatorWorkspaceReader) {
 	viewerUserID, ok := authenticatedViewerIDFromContext(c)
 	if !ok {
@@ -284,6 +383,43 @@ func handleCreatorWorkspacePreviewMains(c *gin.Context, reader CreatorWorkspaceR
 				HasNext:    nextCursor != nil,
 				NextCursor: encodeCreatorWorkspacePreviewCursor(nextCursor),
 			},
+		},
+		Error: nil,
+	})
+}
+
+func handleCreatorWorkspacePreviewMainDetail(c *gin.Context, reader CreatorWorkspaceReader) {
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainDetailRequestScope, http.StatusNotFound, "not_found", "creator workspace preview was not found")
+		return
+	}
+
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainDetailRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	detail, err := reader.GetWorkspacePreviewMainDetail(c.Request.Context(), viewerUserID, mainID)
+	if err != nil {
+		writeCreatorWorkspaceReadError(c, creatorWorkspaceMainDetailRequestScope, err)
+		return
+	}
+
+	responsePayload, err := buildCreatorWorkspacePreviewMainDetailPayload(detail)
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainDetailRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspacePreviewMainDetailResponseData]{
+		Data: &creatorWorkspacePreviewMainDetailResponseData{
+			Preview: responsePayload,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceMainDetailRequestScope),
+			Page:      nil,
 		},
 		Error: nil,
 	})
@@ -375,12 +511,82 @@ func buildCreatorWorkspaceTopPerformersPayload(
 	}
 }
 
+func buildCreatorWorkspacePreviewShortDetailPayload(
+	detail creator.WorkspacePreviewShortDetail,
+) (creatorWorkspacePreviewShortDetailPayload, error) {
+	creatorSummary, err := buildCreatorSummary(detail.Creator)
+	if err != nil {
+		return creatorWorkspacePreviewShortDetailPayload{}, err
+	}
+
+	shortSummary := buildCreatorWorkspacePreviewShortSummary(detail.Creator.UserID, detail.Short)
+
+	return creatorWorkspacePreviewShortDetailPayload{
+		Access:  buildCreatorWorkspacePreviewAccessPayload(detail.Short.CanonicalMainID),
+		Creator: creatorSummary,
+		Short:   shortSummary,
+	}, nil
+}
+
+func buildCreatorWorkspacePreviewMainDetailPayload(
+	detail creator.WorkspacePreviewMainDetail,
+) (creatorWorkspacePreviewMainDetailPayload, error) {
+	creatorSummary, err := buildCreatorSummary(detail.Creator)
+	if err != nil {
+		return creatorWorkspacePreviewMainDetailPayload{}, err
+	}
+
+	return creatorWorkspacePreviewMainDetailPayload{
+		Access:     buildCreatorWorkspacePreviewAccessPayload(detail.Main.ID),
+		Creator:    creatorSummary,
+		EntryShort: buildCreatorWorkspacePreviewShortSummary(detail.Creator.UserID, detail.EntryShort),
+		Main:       buildCreatorWorkspacePreviewMainSummary(detail.Main),
+	}, nil
+}
+
+func buildCreatorWorkspacePreviewShortSummary(
+	creatorUserID uuid.UUID,
+	shortSummary creator.WorkspacePreviewShortSummary,
+) creatorWorkspacePreviewShortSummary {
+	return creatorWorkspacePreviewShortSummary{
+		Caption:                shortSummary.Caption,
+		CanonicalMainID:        mainPublicID(shortSummary.CanonicalMainID),
+		CreatorID:              creator.FormatPublicID(creatorUserID),
+		ID:                     shortPublicID(shortSummary.ID),
+		Media:                  buildVideoMediaAsset(shortSummary.Media),
+		PreviewDurationSeconds: shortSummary.PreviewDurationSeconds,
+		Title:                  shortSummary.Title,
+	}
+}
+
+func buildCreatorWorkspacePreviewMainSummary(
+	mainSummary creator.WorkspacePreviewMainSummary,
+) creatorWorkspacePreviewMainSummary {
+	return creatorWorkspacePreviewMainSummary{
+		DurationSeconds: mainSummary.DurationSeconds,
+		ID:              mainPublicID(mainSummary.ID),
+		Media:           buildVideoMediaAsset(mainSummary.Media),
+		PriceJpy:        mainSummary.PriceJpy,
+		Title:           mainSummary.Title,
+	}
+}
+
+func buildCreatorWorkspacePreviewAccessPayload(mainID uuid.UUID) creatorWorkspacePreviewAccessPayload {
+	return creatorWorkspacePreviewAccessPayload{
+		MainID: mainPublicID(mainID),
+		Reason: "owner_preview",
+		Status: "owner",
+	}
+}
+
 func writeCreatorWorkspaceReadError(c *gin.Context, requestScope string, err error) {
 	switch {
 	case errors.Is(err, creator.ErrCreatorModeUnavailable):
 		writeCreatorWorkspaceListError(c, requestScope, http.StatusForbidden, "creator_mode_unavailable", "creator mode is not available")
 	case errors.Is(err, creator.ErrProfileNotFound):
 		writeCreatorWorkspaceListError(c, requestScope, http.StatusNotFound, "not_found", "creator workspace was not found")
+	case errors.Is(err, creator.ErrWorkspacePreviewNotFound):
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusNotFound, "not_found", "creator workspace preview was not found")
 	default:
 		writeCreatorWorkspaceListError(c, requestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
 	}
@@ -417,6 +623,8 @@ func writeCreatorWorkspaceError(c *gin.Context, status int, code string, message
 // CreatorWorkspaceReader は creator private workspace summary 用の read 操作を表します。
 type CreatorWorkspaceReader interface {
 	GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (creator.Workspace, error)
+	GetWorkspacePreviewMainDetail(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) (creator.WorkspacePreviewMainDetail, error)
+	GetWorkspacePreviewShortDetail(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (creator.WorkspacePreviewShortDetail, error)
 	GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error)
 	ListWorkspacePreviewMains(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
 	ListWorkspacePreviewShorts(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)

@@ -14,6 +14,10 @@ import {
   getCreatorWorkspacePreviewShorts,
 } from "@/widgets/creator-mode-shell/api/get-creator-workspace-preview-collections";
 import {
+  getCreatorWorkspacePreviewMainDetail,
+  getCreatorWorkspacePreviewShortDetail,
+} from "@/widgets/creator-mode-shell/api/get-creator-workspace-preview-detail";
+import {
   CreatorModeShell,
   getMockCreatorModeShellState,
 } from "@/widgets/creator-mode-shell";
@@ -64,10 +68,17 @@ vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-preview-collecti
   getCreatorWorkspacePreviewShorts: vi.fn(),
 }));
 
+vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-preview-detail", () => ({
+  getCreatorWorkspacePreviewMainDetail: vi.fn(),
+  getCreatorWorkspacePreviewShortDetail: vi.fn(),
+}));
+
 type CreatorWorkspaceSummary = Awaited<ReturnType<typeof getCreatorWorkspaceSummary>>;
 type CreatorWorkspaceTopPerformers = Awaited<ReturnType<typeof getCreatorWorkspaceTopPerformers>>;
 type CreatorWorkspacePreviewShorts = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShorts>>;
 type CreatorWorkspacePreviewMains = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMains>>;
+type CreatorWorkspacePreviewShortDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShortDetail>>;
+type CreatorWorkspacePreviewMainDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMainDetail>>;
 
 function createDeferredPromise<TResult = void>() {
   let resolvePromise: (value: TResult | PromiseLike<TResult>) => void = () => {};
@@ -169,6 +180,91 @@ function createCreatorWorkspaceTopPerformers(
   };
 }
 
+function createCreatorWorkspacePreviewShortDetail(
+  overrides: Partial<CreatorWorkspacePreviewShortDetail> = {},
+): CreatorWorkspacePreviewShortDetail {
+  return {
+    access: {
+      mainId: "main_quiet_rooftop",
+      reason: "owner_preview",
+      status: "owner",
+    },
+    creator: {
+      avatar: null,
+      bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+      displayName: "Mina Rei",
+      handle: "@minarei",
+      id: "creator_mina_rei",
+    },
+    kind: "preview-short",
+    requestId: "req_creator_workspace_short_detail_001",
+    short: {
+      caption: "quiet rooftop preview.",
+      canonicalMainId: "main_quiet_rooftop",
+      creatorId: "creator_mina_rei",
+      id: "short_quiet_rooftop",
+      media: {
+        durationSeconds: 16,
+        id: "asset_short_quiet_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg",
+        url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
+      },
+      previewDurationSeconds: 16,
+    },
+    ...overrides,
+  };
+}
+
+function createCreatorWorkspacePreviewMainDetail(
+  overrides: Partial<CreatorWorkspacePreviewMainDetail> = {},
+): CreatorWorkspacePreviewMainDetail {
+  return {
+    access: {
+      mainId: "main_quiet_rooftop",
+      reason: "owner_preview",
+      status: "owner",
+    },
+    creator: {
+      avatar: null,
+      bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+      displayName: "Mina Rei",
+      handle: "@minarei",
+      id: "creator_mina_rei",
+    },
+    entryShort: {
+      caption: "quiet rooftop preview.",
+      canonicalMainId: "main_quiet_rooftop",
+      creatorId: "creator_mina_rei",
+      id: "short_quiet_rooftop",
+      media: {
+        durationSeconds: 16,
+        id: "asset_short_quiet_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg",
+        url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
+      },
+      previewDurationSeconds: 16,
+    },
+    kind: "preview-main",
+    main: {
+      durationSeconds: 720,
+      id: "main_quiet_rooftop",
+      media: {
+        durationSeconds: 720,
+        id: "asset_main_quiet_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/creator/preview/mains/quiet-rooftop-poster.jpg",
+        url: "https://cdn.example.com/creator/preview/mains/quiet-rooftop.mp4",
+      },
+      priceJpy: 1800,
+      title: "quiet rooftop main",
+    },
+    requestId: "req_creator_workspace_main_detail_001",
+    ...overrides,
+  };
+}
+
 function createCreatorWorkspacePreviewMains(
   overrides: Partial<CreatorWorkspacePreviewMains> = {},
 ): CreatorWorkspacePreviewMains {
@@ -209,10 +305,14 @@ describe("CreatorPage", () => {
     vi.mocked(getCreatorWorkspaceTopPerformers).mockReset();
     vi.mocked(getCreatorWorkspacePreviewMains).mockReset();
     vi.mocked(getCreatorWorkspacePreviewShorts).mockReset();
+    vi.mocked(getCreatorWorkspacePreviewMainDetail).mockReset();
+    vi.mocked(getCreatorWorkspacePreviewShortDetail).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(createCreatorWorkspaceSummary());
     vi.mocked(getCreatorWorkspaceTopPerformers).mockResolvedValue(createCreatorWorkspaceTopPerformers());
     vi.mocked(getCreatorWorkspacePreviewShorts).mockResolvedValue(createCreatorWorkspacePreviewShorts());
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
+    vi.mocked(getCreatorWorkspacePreviewShortDetail).mockResolvedValue(createCreatorWorkspacePreviewShortDetail());
+    vi.mocked(getCreatorWorkspacePreviewMainDetail).mockResolvedValue(createCreatorWorkspacePreviewMainDetail());
   });
 
   it("renders contract-backed summary data and top performers for creator-mode viewers", async () => {
@@ -427,7 +527,7 @@ describe("CreatorPage", () => {
     expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeInTheDocument();
   });
 
-  it("renders contract-backed preview lists and opens lower cards with actual preview data", async () => {
+  it("renders contract-backed preview lists and allows inline playback in lower detail cards", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -452,6 +552,14 @@ describe("CreatorPage", () => {
     expect(screen.queryByText("short_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.queryByText("main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.queryByText("asset_short_quiet_rooftop")).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "ショートを再生" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "ショートを再生" }));
+
+    expect(screen.getByLabelText("ショート動画")).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
+    );
 
     await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
 
@@ -459,6 +567,15 @@ describe("CreatorPage", () => {
     expect(screen.queryByText("asset_main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.getByText("¥1,800")).toBeInTheDocument();
     expect(screen.getAllByText("12:00")).toHaveLength(2);
+    expect(await screen.findByRole("button", { name: "本編を再生" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("ショート動画")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "本編を再生" }));
+
+    expect(screen.getByLabelText("本編動画")).toHaveAttribute(
+      "src",
+      "https://cdn.example.com/creator/preview/mains/quiet-rooftop.mp4",
+    );
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
@@ -467,6 +584,11 @@ describe("CreatorPage", () => {
     expect(await screen.findByText("12:00")).toBeInTheDocument();
     expect(await screen.findByText("¥1,800")).toBeInTheDocument();
     expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+
+    expect(await screen.findByRole("button", { name: "本編を再生" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
   });
 
   it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {
@@ -498,6 +620,37 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "再読み込み" }));
 
     expect(await screen.findByText("0:16")).toBeInTheDocument();
+  });
+
+  it("shows a local preview detail error and retries inside the detail screen", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspacePreviewShortDetail)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(createCreatorWorkspacePreviewShortDetail());
+
+    render(await CreatorPage());
+
+    await screen.findByText("0:16");
+    await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "動画詳細を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
+    );
+    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+
+    expect(await screen.findByRole("button", { name: "ショートを再生" })).toBeInTheDocument();
   });
 
   it("shows a local summary error and retries without hiding managed mock sections", async () => {

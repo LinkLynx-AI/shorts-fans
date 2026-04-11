@@ -18,14 +18,40 @@ import (
 )
 
 type stubCreatorWorkspaceReader struct {
-	getWorkspace              func(context.Context, uuid.UUID) (creator.Workspace, error)
-	getWorkspaceTopPerformers func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error)
-	listWorkspacePreviewMain  func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
-	listWorkspacePreviewShort func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
+	getWorkspace                   func(context.Context, uuid.UUID) (creator.Workspace, error)
+	getWorkspacePreviewMainDetail  func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewMainDetail, error)
+	getWorkspacePreviewShortDetail func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewShortDetail, error)
+	getWorkspaceTopPerformers      func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error)
+	listWorkspacePreviewMain       func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
+	listWorkspacePreviewShort      func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
 }
 
 func (s stubCreatorWorkspaceReader) GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (creator.Workspace, error) {
 	return s.getWorkspace(ctx, viewerUserID)
+}
+
+func (s stubCreatorWorkspaceReader) GetWorkspacePreviewMainDetail(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	mainID uuid.UUID,
+) (creator.WorkspacePreviewMainDetail, error) {
+	if s.getWorkspacePreviewMainDetail == nil {
+		return creator.WorkspacePreviewMainDetail{}, nil
+	}
+
+	return s.getWorkspacePreviewMainDetail(ctx, viewerUserID, mainID)
+}
+
+func (s stubCreatorWorkspaceReader) GetWorkspacePreviewShortDetail(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	shortID uuid.UUID,
+) (creator.WorkspacePreviewShortDetail, error) {
+	if s.getWorkspacePreviewShortDetail == nil {
+		return creator.WorkspacePreviewShortDetail{}, nil
+	}
+
+	return s.getWorkspacePreviewShortDetail(ctx, viewerUserID, shortID)
 }
 
 func (s stubCreatorWorkspaceReader) GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error) {
@@ -558,6 +584,178 @@ func TestCreatorWorkspacePreviewMainsRoute(t *testing.T) {
 	}
 }
 
+func TestCreatorWorkspacePreviewShortDetailRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("01010101-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("02020202-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("03030303-1111-1111-1111-111111111111")
+	assetID := uuid.MustParse("04040404-1111-1111-1111-111111111111")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewShortDetail: func(_ context.Context, gotViewerUserID uuid.UUID, gotShortID uuid.UUID) (creator.WorkspacePreviewShortDetail, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("GetWorkspacePreviewShortDetail() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotShortID != shortID {
+					t.Fatalf("GetWorkspacePreviewShortDetail() shortID got %s want %s", gotShortID, shortID)
+				}
+
+				return creator.WorkspacePreviewShortDetail{
+					Creator: creator.Profile{
+						UserID:      viewerID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						AvatarURL:   stringPtr("https://cdn.example.com/creator/mina/avatar.jpg"),
+						Bio:         "quiet rooftop と hotel light の preview を軸に投稿。",
+					},
+					Short: creator.WorkspacePreviewShortSummary{
+						Caption:                "quiet rooftop preview.",
+						CanonicalMainID:        mainID,
+						ID:                     shortID,
+						Media:                  testWorkspacePreviewDisplayAsset(assetID, 16, "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4", "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg"),
+						PreviewDurationSeconds: 16,
+						Title:                  "quiet rooftop preview",
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/shorts/{shortId}/preview status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspacePreviewShortDetailResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want preview short detail")
+	}
+	if response.Data.Preview.Short.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.Preview.Short.ID got %q want %q", response.Data.Preview.Short.ID, shortPublicID(shortID))
+	}
+	if response.Data.Preview.Access.Status != "owner" {
+		t.Fatalf("response.Data.Preview.Access.Status got %q want %q", response.Data.Preview.Access.Status, "owner")
+	}
+	if response.Data.Preview.Access.Reason != "owner_preview" {
+		t.Fatalf("response.Data.Preview.Access.Reason got %q want %q", response.Data.Preview.Access.Reason, "owner_preview")
+	}
+	if response.Data.Preview.Short.Media.URL != "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4" {
+		t.Fatalf("response.Data.Preview.Short.Media.URL got %q want playback url", response.Data.Preview.Short.Media.URL)
+	}
+	if response.Meta.Page != nil {
+		t.Fatalf("response.Meta.Page got %#v want nil", response.Meta.Page)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspacePreviewShortDetailRouteReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewShortDetail: func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewShortDetail, error) {
+				return creator.WorkspacePreviewShortDetail{}, creator.ErrWorkspacePreviewNotFound
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("05050505-1111-1111-1111-111111111111"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/short_missing/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/shorts/{shortId}/preview status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+	if response.Error.Message != "creator workspace preview was not found" {
+		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "creator workspace preview was not found")
+	}
+}
+
+func TestCreatorWorkspacePreviewShortDetailRouteReturnsNotFoundFromReader(t *testing.T) {
+	t.Parallel()
+
+	shortID := uuid.MustParse("05050505-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewShortDetail: func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewShortDetail, error) {
+				return creator.WorkspacePreviewShortDetail{}, creator.ErrWorkspacePreviewNotFound
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("06060606-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/shorts/{shortId}/preview status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+}
+
 func TestCreatorWorkspacePreviewShortsRouteReturnsCreatorModeUnavailable(t *testing.T) {
 	t.Parallel()
 
@@ -598,6 +796,182 @@ func TestCreatorWorkspacePreviewShortsRouteReturnsCreatorModeUnavailable(t *test
 	}
 	if response.Error == nil || response.Error.Code != "creator_mode_unavailable" {
 		t.Fatalf("response.Error got %#v want creator_mode_unavailable", response.Error)
+	}
+}
+
+func TestCreatorWorkspacePreviewMainDetailRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("06060606-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("07070707-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("08080808-1111-1111-1111-111111111111")
+	mainAssetID := uuid.MustParse("09090909-1111-1111-1111-111111111111")
+	shortAssetID := uuid.MustParse("0a0a0a0a-1111-1111-1111-111111111111")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewMainDetail: func(_ context.Context, gotViewerUserID uuid.UUID, gotMainID uuid.UUID) (creator.WorkspacePreviewMainDetail, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("GetWorkspacePreviewMainDetail() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotMainID != mainID {
+					t.Fatalf("GetWorkspacePreviewMainDetail() mainID got %s want %s", gotMainID, mainID)
+				}
+
+				return creator.WorkspacePreviewMainDetail{
+					Creator: creator.Profile{
+						UserID:      viewerID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						AvatarURL:   stringPtr("https://cdn.example.com/creator/mina/avatar.jpg"),
+						Bio:         "quiet rooftop と hotel light の preview を軸に投稿。",
+					},
+					EntryShort: creator.WorkspacePreviewShortSummary{
+						Caption:                "quiet rooftop preview.",
+						CanonicalMainID:        mainID,
+						ID:                     shortID,
+						Media:                  testWorkspacePreviewDisplayAsset(shortAssetID, 16, "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4", "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg"),
+						PreviewDurationSeconds: 16,
+						Title:                  "quiet rooftop preview",
+					},
+					Main: creator.WorkspacePreviewMainSummary{
+						DurationSeconds: 720,
+						ID:              mainID,
+						Media:           testWorkspacePreviewDisplayAsset(mainAssetID, 720, "https://signed.example.com/creator/preview/mains/quiet-rooftop.mp4", "https://signed.example.com/creator/preview/mains/quiet-rooftop-poster.jpg"),
+						PriceJpy:        1800,
+						Title:           "",
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/mains/{mainId}/preview status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspacePreviewMainDetailResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want preview main detail")
+	}
+	if response.Data.Preview.Main.ID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.Preview.Main.ID got %q want %q", response.Data.Preview.Main.ID, mainPublicID(mainID))
+	}
+	if response.Data.Preview.EntryShort.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.Preview.EntryShort.ID got %q want %q", response.Data.Preview.EntryShort.ID, shortPublicID(shortID))
+	}
+	if response.Data.Preview.Access.MainID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.Preview.Access.MainID got %q want %q", response.Data.Preview.Access.MainID, mainPublicID(mainID))
+	}
+	if response.Data.Preview.Main.Media.URL != "https://signed.example.com/creator/preview/mains/quiet-rooftop.mp4" {
+		t.Fatalf("response.Data.Preview.Main.Media.URL got %q want playback url", response.Data.Preview.Main.Media.URL)
+	}
+	if response.Meta.Page != nil {
+		t.Fatalf("response.Meta.Page got %#v want nil", response.Meta.Page)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspacePreviewMainDetailRouteReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	mainID := uuid.MustParse("0b0b0b0b-2222-2222-2222-222222222222")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewMainDetail: func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewMainDetail, error) {
+				return creator.WorkspacePreviewMainDetail{}, creator.ErrWorkspacePreviewNotFound
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("0c0c0c0c-2222-2222-2222-222222222222"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/mains/{mainId}/preview status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+	if response.Error.Message != "creator workspace preview was not found" {
+		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "creator workspace preview was not found")
+	}
+}
+
+func TestCreatorWorkspacePreviewMainDetailRouteRejectsInvalidID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("0d0d0d0d-2222-2222-2222-222222222222"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/main_missing/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/mains/{mainId}/preview status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
 	}
 }
 
@@ -896,5 +1270,15 @@ func testWorkspacePreviewCardAsset(id uuid.UUID, durationSeconds int64, posterUR
 		ID:              id,
 		Kind:            "video",
 		PosterURL:       posterURL,
+	}
+}
+
+func testWorkspacePreviewDisplayAsset(assetID uuid.UUID, durationSeconds int64, playbackURL string, posterURL string) media.VideoDisplayAsset {
+	return media.VideoDisplayAsset{
+		DurationSeconds: durationSeconds,
+		ID:              assetID,
+		Kind:            "video",
+		PosterURL:       posterURL,
+		URL:             playbackURL,
 	}
 }

@@ -1,7 +1,10 @@
 "use client";
 
 import { ArrowLeft } from "lucide-react";
-import type { ReactNode } from "react";
+import {
+  type ReactNode,
+  useState,
+} from "react";
 
 import {
   CreatorAvatar,
@@ -9,6 +12,7 @@ import {
 } from "@/entities/creator";
 import { Button } from "@/shared/ui";
 
+import type { CreatorWorkspacePreviewDetailState } from "../model/use-creator-workspace-preview-detail";
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
 import type {
   ApprovedCreatorWorkspaceDetailMetric,
@@ -61,10 +65,20 @@ function CreatorWorkspaceActionButton({
   );
 }
 
-function CreatorWorkspaceDetailMedia({
+function CreatorWorkspacePlaybackAffordance() {
+  return (
+    <span className="relative mx-auto block size-[74px] rounded-full bg-white/18 backdrop-blur-[14px]">
+      <span className="absolute left-1/2 top-1/2 -ml-[6px] -mt-3 h-0 w-0 border-y-[12px] border-y-transparent border-l-[18px] border-l-white" />
+    </span>
+  );
+}
+
+function CreatorWorkspaceDetailPosterFrame({
+  children,
   detail,
   poster,
 }: {
+  children: ReactNode;
   detail: CreatorWorkspaceResolvedDetailState;
   poster: CreatorWorkspaceDetailPoster;
 }) {
@@ -109,15 +123,115 @@ function CreatorWorkspaceDetailMedia({
           ) : null}
         </div>
 
-        <span className="relative mx-auto block size-[74px] rounded-full bg-white/18 backdrop-blur-[14px]">
-          <span className="absolute left-1/2 top-1/2 -ml-[6px] -mt-3 h-0 w-0 border-y-[12px] border-y-transparent border-l-[18px] border-l-white" />
-        </span>
+        {children}
 
         <span className="inline-flex min-h-[30px] w-fit items-center justify-center rounded-full bg-white/18 px-3 text-[11px] font-bold tracking-[0.08em] text-[#f8fcff] backdrop-blur-[10px]">
           {detail.durationLabel}
         </span>
       </div>
     </div>
+  );
+}
+
+function resolveCreatorWorkspacePreviewMedia(
+  previewDetailState: CreatorWorkspacePreviewDetailState,
+): {
+  posterUrl: string;
+  url: string;
+} | null {
+  if (previewDetailState.kind !== "ready") {
+    return null;
+  }
+
+  if (previewDetailState.detail.kind === "preview-main") {
+    return {
+      posterUrl: previewDetailState.detail.main.media.posterUrl,
+      url: previewDetailState.detail.main.media.url,
+    };
+  }
+
+  return {
+    posterUrl: previewDetailState.detail.short.media.posterUrl,
+    url: previewDetailState.detail.short.media.url,
+  };
+}
+
+function CreatorWorkspaceDetailMedia({
+  detail,
+  onRetryPreviewDetail,
+  poster,
+  previewDetailState,
+}: {
+  detail: CreatorWorkspaceResolvedDetailState;
+  onRetryPreviewDetail: () => void;
+  poster: CreatorWorkspaceDetailPoster;
+  previewDetailState: CreatorWorkspacePreviewDetailState;
+}) {
+  const [isPlaybackOpen, setIsPlaybackOpen] = useState(false);
+  const previewMedia = resolveCreatorWorkspacePreviewMedia(previewDetailState);
+
+  if (poster.kind === "preview" && isPlaybackOpen && previewMedia) {
+    return (
+      <div className="overflow-hidden rounded-[32px] bg-black">
+        <video
+          aria-label={`${detail.kindLabel}動画`}
+          autoPlay
+          className="block aspect-[4/5] w-full object-cover"
+          controls
+          playsInline
+          poster={previewMedia.posterUrl}
+          preload="metadata"
+          src={previewMedia.url}
+        />
+      </div>
+    );
+  }
+
+  if (poster.kind === "preview" && previewDetailState.kind === "error") {
+    return (
+      <CreatorWorkspaceDetailPosterFrame detail={detail} poster={poster}>
+        <div className="grid justify-items-center gap-3 px-5 text-center">
+          <p className="m-0 text-sm font-medium leading-6 text-white" role="alert">
+            {previewDetailState.message}
+          </p>
+          <Button onClick={onRetryPreviewDetail} size="sm" type="button" variant="secondary">
+            再読み込み
+          </Button>
+        </div>
+      </CreatorWorkspaceDetailPosterFrame>
+    );
+  }
+
+  if (poster.kind === "preview") {
+    return (
+      <CreatorWorkspaceDetailPosterFrame detail={detail} poster={poster}>
+        {previewDetailState.kind === "ready" ? (
+          <button
+            aria-label={`${detail.kindLabel}を再生`}
+            className="absolute inset-0 flex items-center justify-center bg-transparent focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/72"
+            onClick={() => {
+              setIsPlaybackOpen(true);
+            }}
+            type="button"
+          >
+            <CreatorWorkspacePlaybackAffordance />
+          </button>
+        ) : (
+          <span
+            className="mx-auto inline-flex min-h-[42px] items-center justify-center rounded-full bg-white/18 px-4 text-[12px] font-bold tracking-[0.04em] text-white backdrop-blur-[12px]"
+            role="status"
+          >
+            再生準備中...
+          </span>
+        )}
+      </CreatorWorkspaceDetailPosterFrame>
+    );
+  }
+
+  return (
+    <CreatorWorkspaceDetailPosterFrame detail={detail} poster={poster}>
+      <CreatorWorkspacePlaybackAffordance />
+    </CreatorWorkspaceDetailPosterFrame>
   );
 }
 
@@ -268,6 +382,8 @@ export function CreatorWorkspaceDetailView({
   detailSelection,
   onBack,
   onOpenDetail,
+  onRetryPreviewDetail,
+  previewDetailState,
   previewCollections,
   state,
 }: {
@@ -275,6 +391,8 @@ export function CreatorWorkspaceDetailView({
   detailSelection: CreatorWorkspaceDetailViewSelection;
   onBack: () => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
+  onRetryPreviewDetail: () => void;
+  previewDetailState: CreatorWorkspacePreviewDetailState;
   previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
   state: CreatorModeShellReadyState;
 }) {
@@ -310,6 +428,11 @@ export function CreatorWorkspaceDetailView({
     return null;
   }
 
+  const detailMediaKey =
+    detailSelection.kind === "mock"
+      ? `${detailSelection.kind}:${detailSelection.tab}:${detailSelection.shortId}`
+      : `${detailSelection.kind}:${detailSelection.item.id}`;
+
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
       <div className="flex items-center justify-between gap-3">
@@ -338,7 +461,13 @@ export function CreatorWorkspaceDetailView({
           </div>
         </div>
 
-        <CreatorWorkspaceDetailMedia detail={detail} poster={poster} />
+        <CreatorWorkspaceDetailMedia
+          detail={detail}
+          key={detailMediaKey}
+          onRetryPreviewDetail={onRetryPreviewDetail}
+          poster={poster}
+          previewDetailState={previewDetailState}
+        />
 
         <div className="grid gap-1.5">
           <p className="m-0 text-[15px] leading-[1.6] text-foreground">{detail.summary}</p>
