@@ -211,6 +211,8 @@ const shortThemes: Record<string, ShortTheme> = {
   },
 };
 
+const fallbackThemeIds = Object.keys(shortThemes);
+
 const feedShortByTab = {
   following: "softlight",
   recommended: "rooftop",
@@ -262,11 +264,7 @@ export function getShortsByCreatorId(creatorId: string): readonly ShortPreviewMe
  */
 export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId): CSSProperties {
   const shortId = typeof short === "string" ? short : short.id;
-  const theme = shortThemes[shortId];
-
-  if (!theme) {
-    throw new Error(`Unknown short theme: ${shortId}`);
-  }
+  const theme = shortThemes[shortId] ?? getFallbackShortTheme(shortId);
 
   return {
     "--short-bg-accent": theme.background.accent,
@@ -277,4 +275,24 @@ export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId
     "--short-tile-mid": theme.tile.mid,
     "--short-tile-top": theme.tile.top,
   } as CSSProperties;
+}
+
+function getFallbackShortTheme(shortId: ShortId): ShortTheme {
+  const fallbackThemeId = fallbackThemeIds[hashString(shortId) % fallbackThemeIds.length];
+
+  if (!fallbackThemeId) {
+    return shortThemes.rooftop;
+  }
+
+  return shortThemes[fallbackThemeId] ?? shortThemes.rooftop;
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  return hash;
 }
