@@ -22,6 +22,7 @@ type FeedPinSurface = {
 
 type FeedPinItemState = {
   errorMessage: string | null;
+  hasLocalOverride: boolean;
   isPending: boolean;
   isPinned: boolean;
 };
@@ -33,6 +34,7 @@ type FeedPinInteraction = FeedPinItemState & {
 function buildFeedPinItemState(isPinned: boolean): FeedPinItemState {
   return {
     errorMessage: null,
+    hasLocalOverride: false,
     isPending: false,
     isPinned,
   };
@@ -51,9 +53,35 @@ function mergeFeedPinState(
   const nextStateByShortId = { ...currentStateByShortId };
 
   for (const surface of surfaces) {
-    if (!(surface.short.id in nextStateByShortId)) {
+    const currentState = nextStateByShortId[surface.short.id];
+
+    if (!currentState) {
       nextStateByShortId[surface.short.id] = buildFeedPinItemState(surface.viewer.isPinned);
+      continue;
     }
+
+    if (currentState.isPending) {
+      continue;
+    }
+
+    if (currentState.hasLocalOverride) {
+      if (surface.viewer.isPinned === currentState.isPinned) {
+        nextStateByShortId[surface.short.id] = {
+          ...currentState,
+          hasLocalOverride: false,
+        };
+      }
+      continue;
+    }
+
+    nextStateByShortId[surface.short.id] =
+      surface.viewer.isPinned === currentState.isPinned
+        ? currentState
+        : {
+            ...currentState,
+            errorMessage: null,
+            isPinned: surface.viewer.isPinned,
+          };
   }
 
   return nextStateByShortId;
@@ -131,6 +159,7 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
         ...currentStateByShortId,
         [shortId]: {
           errorMessage: null,
+          hasLocalOverride: true,
           isPending: false,
           isPinned: result.viewer.isPinned,
         },

@@ -129,6 +129,94 @@ describe("FeedReel", () => {
     expect(await screen.findByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("syncs the pin state when refreshed feed data changes the same short", () => {
+    const initialSurface = getFeedSurfaceByTab("following");
+    const refreshedSurface = {
+      ...initialSurface,
+      viewer: {
+        isPinned: true,
+      },
+    };
+
+    const { rerender } = renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[initialSurface]} />,
+      { hasSession: true },
+    );
+
+    expect(screen.getByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <FeedReel activeTab="following" surfaces={[refreshedSurface]} />
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps the successful local pin state until refreshed feed data catches up", async () => {
+    const user = userEvent.setup();
+    const initialSurface = getFeedSurfaceByTab("following");
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              isPinned: true,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_pin_put_success_003",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    const { rerender } = renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[initialSurface]} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Pin short" }));
+
+    expect(await screen.findByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <FeedReel activeTab="following" surfaces={[initialSurface]} />
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <FeedReel
+          activeTab="following"
+          surfaces={[
+            {
+              ...initialSurface,
+              viewer: {
+                isPinned: true,
+              },
+            },
+          ]}
+        />
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("redirects unauthenticated viewers to login when pin is tapped", async () => {
     const user = userEvent.setup();
 
