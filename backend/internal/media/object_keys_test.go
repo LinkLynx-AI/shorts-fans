@@ -1,6 +1,10 @@
 package media
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/google/uuid"
+)
 
 func TestBuildShortDeliveryObjectKeys(t *testing.T) {
 	t.Parallel()
@@ -21,6 +25,14 @@ func TestBuildShortDeliveryObjectKeys(t *testing.T) {
 	}
 }
 
+func TestBuildShortDeliveryObjectKeysRejectsNilID(t *testing.T) {
+	t.Parallel()
+
+	if _, err := BuildShortDeliveryObjectKeys(uuid.Nil); err == nil {
+		t.Fatal("BuildShortDeliveryObjectKeys() error = nil, want error")
+	}
+}
+
 func TestBuildMainDeliveryObjectKeys(t *testing.T) {
 	t.Parallel()
 
@@ -37,5 +49,13 @@ func TestBuildMainDeliveryObjectKeys(t *testing.T) {
 	}
 	if got, want := keys.PosterTempBase, "mains/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster-temp"; got != want {
 		t.Fatalf("BuildMainDeliveryObjectKeys() poster temp got %q want %q", got, want)
+	}
+}
+
+func TestBuildMainDeliveryObjectKeysRejectsNilID(t *testing.T) {
+	t.Parallel()
+
+	if _, err := BuildMainDeliveryObjectKeys(uuid.Nil); err == nil {
+		t.Fatal("BuildMainDeliveryObjectKeys() error = nil, want error")
 	}
 }
