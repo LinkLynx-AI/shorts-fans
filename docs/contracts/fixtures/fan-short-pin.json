@@ -1,0 +1,122 @@
+{
+  "PUT /api/fan/shorts/{shortId}/pin": {
+    "pin_success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "viewer": {
+            "isPinned": true
+          }
+        },
+        "meta": {
+          "requestId": "req_short_pin_put_success_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "pin_auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_short_pin_put_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "short pin requires authentication"
+        }
+      }
+    },
+    "pin_not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_short_pin_put_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "short was not found"
+        }
+      }
+    },
+    "pin_repeat": {
+      "status": 200,
+      "body": {
+        "data": {
+          "viewer": {
+            "isPinned": true
+          }
+        },
+        "meta": {
+          "requestId": "req_short_pin_put_repeat_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "DELETE /api/fan/shorts/{shortId}/pin": {
+    "unpin_success": {
+      "status": 200,
+      "body": {
+        "data": {
+          "viewer": {
+            "isPinned": false
+          }
+        },
+        "meta": {
+          "requestId": "req_short_pin_delete_success_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "unpin_auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_short_pin_delete_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "short pin requires authentication"
+        }
+      }
+    },
+    "unpin_not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_short_pin_delete_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "short was not found"
+        }
+      }
+    },
+    "unpin_repeat": {
+      "status": 200,
+      "body": {
+        "data": {
+          "viewer": {
+            "isPinned": false
+          }
+        },
+        "meta": {
+          "requestId": "req_short_pin_delete_repeat_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  }
+}
