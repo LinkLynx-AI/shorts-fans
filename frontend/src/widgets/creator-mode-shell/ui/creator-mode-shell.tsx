@@ -24,8 +24,9 @@ import type {
   CreatorWorkspacePreviewShortItem,
 } from "../api/get-creator-workspace-preview-collections";
 import type {
+  ApprovedCreatorWorkspaceDetailMetric,
+  ApprovedCreatorWorkspaceDetailSetting,
   ApprovedCreatorWorkspaceOverviewMetrics,
-  ApprovedCreatorWorkspaceDetailState,
   ApprovedCreatorWorkspaceManagedItem,
   ApprovedCreatorWorkspaceManagedItemTone,
   ApprovedCreatorWorkspaceManagedTab,
@@ -40,9 +41,46 @@ import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-work
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 
 type CreatorWorkspaceDetailSelection = {
+  kind: "mock";
   shortId: string;
   tab: ApprovedCreatorWorkspaceManagedTab;
 };
+
+type CreatorWorkspacePreviewDetailSelection =
+  | {
+      index: number;
+      item: CreatorWorkspacePreviewMainItem;
+      kind: "preview-main";
+      tab: "main";
+    }
+  | {
+      index: number;
+      item: CreatorWorkspacePreviewShortItem;
+      kind: "preview-short";
+      tab: "shorts";
+    };
+
+type CreatorWorkspaceResolvedDetailState = {
+  durationLabel: string;
+  kindLabel: string;
+  linkedMainShortId: string | null;
+  linkedShortIds: readonly string[];
+  metrics: readonly ApprovedCreatorWorkspaceDetailMetric[];
+  settings: readonly ApprovedCreatorWorkspaceDetailSetting[];
+  statusLabel: string | null;
+  statusTone: ApprovedCreatorWorkspaceManagedItemTone | null;
+  summary: string;
+};
+
+type CreatorWorkspaceDetailPoster =
+  | {
+      kind: "mock";
+      poster: ApprovedCreatorWorkspacePoster;
+    }
+  | {
+      kind: "preview";
+      posterUrl: string;
+    };
 
 function formatCount(value: number): string {
   return value.toLocaleString("ja-JP");
@@ -62,6 +100,14 @@ function formatDurationLabel(totalSeconds: number): string {
   }
 
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function buildPreviewShortAriaLabel(item: CreatorWorkspacePreviewShortItem, index: number): string {
+  return `ショート詳細を開く ${index + 1}件目 ${formatDurationLabel(item.previewDurationSeconds)}`;
+}
+
+function buildPreviewMainAriaLabel(item: CreatorWorkspacePreviewMainItem, index: number): string {
+  return `本編詳細を開く ${index + 1}件目 ${formatJpy(item.priceJpy)} ${formatDurationLabel(item.durationSeconds)}`;
 }
 
 function buildRevisionRequestedDetail({
@@ -471,7 +517,7 @@ function CreatorWorkspaceTopPerformers({
             }`}
             key={`${item.kind}:${item.shortId}`}
             onClick={() => {
-              onOpenDetail({ shortId: item.shortId, tab: item.kind });
+              onOpenDetail({ kind: "mock", shortId: item.shortId, tab: item.kind });
             }}
             type="button"
           >
@@ -536,7 +582,7 @@ function CreatorWorkspaceManagedTile({
       aria-label={poster.title}
       className="relative overflow-hidden rounded-[4px] text-left transition"
       onClick={() => {
-        onOpenDetail({ shortId: item.shortId, tab });
+        onOpenDetail({ kind: "mock", shortId: item.shortId, tab });
       }}
       type="button"
     >
@@ -561,12 +607,14 @@ function CreatorWorkspaceManagedTile({
 function CreatorWorkspaceManagedPosts({
   activeTab,
   onChangeTab,
+  onOpenPreviewDetail,
   onRetry,
   state,
   workspace,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
+  onOpenPreviewDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetry: () => void;
   state: CreatorWorkspacePreviewCollectionsState;
   workspace: ApprovedCreatorWorkspaceState;
@@ -606,6 +654,7 @@ function CreatorWorkspaceManagedPosts({
       <CreatorWorkspacePreviewGrid
         activeTab={activeTab}
         activeTabLabel={activeTabLabel}
+        onOpenDetail={onOpenPreviewDetail}
         onRetry={onRetry}
         state={state}
       />
@@ -667,25 +716,86 @@ function CreatorWorkspacePreviewTileFrame({
   );
 }
 
-function CreatorWorkspacePreviewShortTile({ item }: { item: CreatorWorkspacePreviewShortItem }) {
+function CreatorWorkspacePreviewTileButton({
+  ariaLabel,
+  children,
+  onClick,
+}: {
+  ariaLabel: string;
+  children: ReactNode;
+  onClick: () => void;
+}) {
   return (
-    <CreatorWorkspacePreviewTileFrame
-      badge="Short"
-      bottomLeft={null}
-      bottomRight={formatDurationLabel(item.previewDurationSeconds)}
-      posterUrl={item.media.posterUrl}
-    />
+    <button
+      aria-label={ariaLabel}
+      className="overflow-hidden rounded-[4px] text-left transition hover:opacity-95"
+      onClick={onClick}
+      type="button"
+    >
+      {children}
+    </button>
   );
 }
 
-function CreatorWorkspacePreviewMainTile({ item }: { item: CreatorWorkspacePreviewMainItem }) {
+function CreatorWorkspacePreviewShortTile({
+  index,
+  item,
+  onOpenDetail,
+}: {
+  index: number;
+  item: CreatorWorkspacePreviewShortItem;
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+}) {
   return (
-    <CreatorWorkspacePreviewTileFrame
-      badge="Main"
-      bottomLeft={formatJpy(item.priceJpy)}
-      bottomRight={formatDurationLabel(item.durationSeconds)}
-      posterUrl={item.media.posterUrl}
-    />
+    <CreatorWorkspacePreviewTileButton
+      ariaLabel={buildPreviewShortAriaLabel(item, index)}
+      onClick={() => {
+        onOpenDetail({
+          index,
+          item,
+          kind: "preview-short",
+          tab: "shorts",
+        });
+      }}
+    >
+      <CreatorWorkspacePreviewTileFrame
+        badge="Short"
+        bottomLeft={null}
+        bottomRight={formatDurationLabel(item.previewDurationSeconds)}
+        posterUrl={item.media.posterUrl}
+      />
+    </CreatorWorkspacePreviewTileButton>
+  );
+}
+
+function CreatorWorkspacePreviewMainTile({
+  index,
+  item,
+  onOpenDetail,
+}: {
+  index: number;
+  item: CreatorWorkspacePreviewMainItem;
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+}) {
+  return (
+    <CreatorWorkspacePreviewTileButton
+      ariaLabel={buildPreviewMainAriaLabel(item, index)}
+      onClick={() => {
+        onOpenDetail({
+          index,
+          item,
+          kind: "preview-main",
+          tab: "main",
+        });
+      }}
+    >
+      <CreatorWorkspacePreviewTileFrame
+        badge="Main"
+        bottomLeft={formatJpy(item.priceJpy)}
+        bottomRight={formatDurationLabel(item.durationSeconds)}
+        posterUrl={item.media.posterUrl}
+      />
+    </CreatorWorkspacePreviewTileButton>
   );
 }
 
@@ -740,11 +850,13 @@ function CreatorWorkspacePreviewEmpty({ activeTabLabel }: { activeTabLabel: stri
 function CreatorWorkspacePreviewGrid({
   activeTab,
   activeTabLabel,
+  onOpenDetail,
   onRetry,
   state,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   activeTabLabel: string;
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetry: () => void;
   state: CreatorWorkspacePreviewCollectionsState;
 }) {
@@ -765,11 +877,11 @@ function CreatorWorkspacePreviewGrid({
   return (
     <section className="mt-[18px] grid grid-cols-3 gap-[3px]">
       {activeTab === "shorts"
-        ? state.collections.shorts.items.map((item) => (
-            <CreatorWorkspacePreviewShortTile item={item} key={item.id} />
+        ? state.collections.shorts.items.map((item, index) => (
+            <CreatorWorkspacePreviewShortTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
           ))
-        : state.collections.mains.items.map((item) => (
-            <CreatorWorkspacePreviewMainTile item={item} key={item.id} />
+        : state.collections.mains.items.map((item, index) => (
+            <CreatorWorkspacePreviewMainTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
           ))}
     </section>
   );
@@ -779,24 +891,26 @@ function CreatorWorkspaceDetailMedia({
   detail,
   poster,
 }: {
-  detail: ApprovedCreatorWorkspaceDetailState;
-  poster: ApprovedCreatorWorkspacePoster;
+  detail: CreatorWorkspaceResolvedDetailState;
+  poster: CreatorWorkspaceDetailPoster;
 }) {
   const pendingLike = detail.statusTone === "pending" || detail.statusTone === "revision" || detail.statusTone === "paused";
   const mutedLike = detail.statusTone === "hidden" || detail.statusTone === "removed";
+  const isMockPoster = poster.kind === "mock";
+  const hasStatus = detail.statusTone !== null && detail.statusLabel !== null;
 
   return (
     <div className="relative overflow-hidden rounded-[32px]">
       <span
         aria-hidden="true"
         className={`block aspect-[4/5] bg-[linear-gradient(180deg,var(--creator-workspace-tile-top),var(--creator-workspace-tile-mid)_42%,var(--creator-workspace-tile-bottom)_100%)] ${
-          detail.statusTone === "approved" ? "" : "brightness-[0.72] saturate-[0.82]"
+          hasStatus && detail.statusTone !== "approved" ? "brightness-[0.72] saturate-[0.82]" : ""
         }`}
-        style={createPosterStyle(poster)}
+        style={isMockPoster ? createPosterStyle(poster.poster) : createVideoPosterStyle(poster.posterUrl)}
       />
       <div
         className={`absolute inset-0 flex flex-col justify-between p-4 ${
-          detail.statusTone === "approved"
+          detail.statusTone === "approved" || !hasStatus
             ? "bg-[linear-gradient(180deg,rgba(6,21,33,0.12)_0%,rgba(6,21,33,0.04)_34%,rgba(6,21,33,0.58)_100%)]"
             : "bg-[linear-gradient(180deg,rgba(6,21,33,0.34)_0%,rgba(6,21,33,0.16)_34%,rgba(6,21,33,0.7)_100%)]"
         }`}
@@ -805,19 +919,21 @@ function CreatorWorkspaceDetailMedia({
           <span className="inline-flex min-h-[30px] items-center justify-center rounded-full bg-white/18 px-3 text-[11px] font-bold tracking-[0.08em] text-[#f8fcff] backdrop-blur-[10px]">
             {detail.kindLabel}
           </span>
-          <span
-            className={`inline-flex min-h-[30px] items-center justify-center rounded-full px-3 text-[11px] font-bold tracking-[0.08em] backdrop-blur-[10px] ${
-              detail.statusTone === "approved"
-                ? "bg-[rgba(52,168,83,0.18)] text-[#f4fff7]"
-                : pendingLike
-                  ? "bg-[rgba(16,130,200,0.18)] text-[#eff8ff]"
-                  : mutedLike
-                    ? "bg-[rgba(7,19,29,0.18)] text-[#f6fbff]"
-                    : "bg-[rgba(217,77,77,0.2)] text-[#fff6f6]"
-            }`}
-          >
-            {detail.statusLabel}
-          </span>
+          {hasStatus ? (
+            <span
+              className={`inline-flex min-h-[30px] items-center justify-center rounded-full px-3 text-[11px] font-bold tracking-[0.08em] backdrop-blur-[10px] ${
+                detail.statusTone === "approved"
+                  ? "bg-[rgba(52,168,83,0.18)] text-[#f4fff7]"
+                  : pendingLike
+                    ? "bg-[rgba(16,130,200,0.18)] text-[#eff8ff]"
+                    : mutedLike
+                      ? "bg-[rgba(7,19,29,0.18)] text-[#f6fbff]"
+                      : "bg-[rgba(217,77,77,0.2)] text-[#fff6f6]"
+              }`}
+            >
+              {detail.statusLabel}
+            </span>
+          ) : null}
         </div>
 
         <span className="relative mx-auto block size-[74px] rounded-full bg-white/18 backdrop-blur-[14px]">
@@ -832,12 +948,12 @@ function CreatorWorkspaceDetailMedia({
   );
 }
 
-function CreatorWorkspaceDetailMetrics({ detail }: { detail: ApprovedCreatorWorkspaceDetailState }) {
+function CreatorWorkspaceDetailMetrics({ metrics }: { metrics: readonly ApprovedCreatorWorkspaceDetailMetric[] }) {
   return (
     <div className="grid grid-cols-2 border-y border-[rgba(167,220,249,0.48)] py-1">
-      {detail.metrics.map((metric, index) => (
+      {metrics.map((metric, index) => (
         <div
-          className={`grid gap-1 px-2 py-3 text-center ${detail.metrics.length % 2 === 1 && index === detail.metrics.length - 1 ? "col-span-2" : ""}`}
+          className={`grid gap-1 px-2 py-3 text-center ${metrics.length % 2 === 1 && index === metrics.length - 1 ? "col-span-2" : ""}`}
           key={metric.label}
         >
           <strong className="text-[18px] font-bold text-foreground">{metric.value}</strong>
@@ -863,10 +979,14 @@ function CreatorWorkspaceDetailSection({
   );
 }
 
-function CreatorWorkspaceDetailSettings({ detail }: { detail: ApprovedCreatorWorkspaceDetailState }) {
+function CreatorWorkspaceDetailSettings({
+  settings,
+}: {
+  settings: readonly ApprovedCreatorWorkspaceDetailSetting[];
+}) {
   return (
     <div className="grid border-t border-[rgba(167,220,249,0.4)]">
-      {detail.settings.map((item) => (
+      {settings.map((item) => (
         <div
           className="flex min-h-12 items-center justify-between gap-3 border-b border-[rgba(167,220,249,0.4)]"
           key={item.label}
@@ -921,24 +1041,106 @@ function CreatorWorkspaceDetailLinkedGrid({
   );
 }
 
+function buildPreviewShortDetailSettings(item: CreatorWorkspacePreviewShortItem) {
+  return [
+    { label: "長さ", value: formatDurationLabel(item.previewDurationSeconds) },
+  ] as const;
+}
+
+function buildPreviewMainDetailSettings(item: CreatorWorkspacePreviewMainItem) {
+  return [
+    { label: "価格", value: formatJpy(item.priceJpy) },
+    { label: "長さ", value: formatDurationLabel(item.durationSeconds) },
+  ] as const;
+}
+
+function CreatorWorkspacePreviewDetailLinkedGrid({
+  items,
+  onOpenDetail,
+}: {
+  items: readonly (CreatorWorkspacePreviewMainItem | CreatorWorkspacePreviewShortItem)[];
+  onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-[3px]">
+      {items.map((item, index) => (
+        "priceJpy" in item ? (
+          <CreatorWorkspacePreviewMainTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+        ) : (
+          <CreatorWorkspacePreviewShortTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+        )
+      ))}
+    </div>
+  );
+}
+
 function CreatorWorkspaceDetailView({
   creator,
   detailSelection,
   onBack,
   onOpenDetail,
+  previewCollections,
   state,
 }: {
   creator: CreatorSummary;
-  detailSelection: CreatorWorkspaceDetailSelection;
+  detailSelection: CreatorWorkspaceDetailSelection | CreatorWorkspacePreviewDetailSelection;
   onBack: () => void;
-  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onOpenDetail: (selection: CreatorWorkspaceDetailSelection | CreatorWorkspacePreviewDetailSelection) => void;
+  previewCollections: NonNullable<Extract<CreatorWorkspacePreviewCollectionsState, { kind: "ready" }>["collections"]> | null;
   state: Extract<CreatorModeShellState, { kind: "ready" }>;
 }) {
-  const detail = state.workspace.detailsByTab[detailSelection.tab][detailSelection.shortId];
-  const poster = state.workspace.posters[detailSelection.shortId];
+  let detail: CreatorWorkspaceResolvedDetailState | null = null;
+  let poster: CreatorWorkspaceDetailPoster | null = null;
+  let linkedPreviewItems: readonly (CreatorWorkspacePreviewMainItem | CreatorWorkspacePreviewShortItem)[] = [];
 
-  if (!detail || !poster) {
-    return null;
+  if (detailSelection.kind === "mock") {
+    const mockDetail = state.workspace.detailsByTab[detailSelection.tab][detailSelection.shortId];
+    const mockPoster = state.workspace.posters[detailSelection.shortId];
+
+    if (!mockDetail || !mockPoster) {
+      return null;
+    }
+
+    detail = mockDetail;
+    poster = {
+      kind: "mock",
+      poster: mockPoster,
+    };
+  } else {
+    if (!previewCollections) {
+      return null;
+    }
+
+    detail = detailSelection.kind === "preview-main"
+      ? {
+          durationLabel: formatDurationLabel(detailSelection.item.durationSeconds),
+          kindLabel: "本編",
+          linkedMainShortId: null,
+          linkedShortIds: [],
+          metrics: [],
+          settings: buildPreviewMainDetailSettings(detailSelection.item),
+          statusLabel: null,
+          statusTone: null,
+          summary: "owner preview 一覧から取得した本編データです。",
+        }
+      : {
+          durationLabel: formatDurationLabel(detailSelection.item.previewDurationSeconds),
+          kindLabel: "ショート",
+          linkedMainShortId: null,
+          linkedShortIds: [],
+          metrics: [],
+          settings: buildPreviewShortDetailSettings(detailSelection.item),
+          statusLabel: null,
+          statusTone: null,
+          summary: "owner preview 一覧から取得したショートデータです。",
+        };
+    poster = {
+      kind: "preview",
+      posterUrl: detailSelection.item.media.posterUrl,
+    };
+    linkedPreviewItems = detailSelection.kind === "preview-main"
+      ? previewCollections.shorts.items.filter((item) => item.canonicalMainId === detailSelection.item.id)
+      : previewCollections.mains.items.filter((item) => item.id === detailSelection.item.canonicalMainId);
   }
 
   return (
@@ -975,13 +1177,15 @@ function CreatorWorkspaceDetailView({
           <p className="m-0 text-[15px] leading-[1.6] text-foreground">{detail.summary}</p>
         </div>
 
-        <CreatorWorkspaceDetailMetrics detail={detail} />
+        {detail.metrics.length > 0 ? <CreatorWorkspaceDetailMetrics metrics={detail.metrics} /> : null}
 
-        <CreatorWorkspaceDetailSection title="設定">
-          <CreatorWorkspaceDetailSettings detail={detail} />
-        </CreatorWorkspaceDetailSection>
+        {detail.settings.length > 0 ? (
+          <CreatorWorkspaceDetailSection title="設定">
+            <CreatorWorkspaceDetailSettings settings={detail.settings} />
+          </CreatorWorkspaceDetailSection>
+        ) : null}
 
-        {detailSelection.tab === "main" && detail.linkedShortIds.length > 0 ? (
+        {detailSelection.kind === "mock" && detailSelection.tab === "main" && detail.linkedShortIds.length > 0 ? (
           <CreatorWorkspaceDetailSection title="紐づくショート">
             <CreatorWorkspaceDetailLinkedGrid
               items={detail.linkedShortIds}
@@ -992,7 +1196,7 @@ function CreatorWorkspaceDetailView({
           </CreatorWorkspaceDetailSection>
         ) : null}
 
-        {detailSelection.tab === "shorts" && detail.linkedMainShortId ? (
+        {detailSelection.kind === "mock" && detailSelection.tab === "shorts" && detail.linkedMainShortId ? (
           <CreatorWorkspaceDetailSection title="紐づく本編">
             <CreatorWorkspaceDetailLinkedGrid
               items={[detail.linkedMainShortId]}
@@ -1000,6 +1204,12 @@ function CreatorWorkspaceDetailView({
               tab="main"
               workspace={state.workspace}
             />
+          </CreatorWorkspaceDetailSection>
+        ) : null}
+
+        {detailSelection.kind !== "mock" && linkedPreviewItems.length > 0 ? (
+          <CreatorWorkspaceDetailSection title={detailSelection.kind === "preview-main" ? "紐づくショート" : "紐づく本編"}>
+            <CreatorWorkspacePreviewDetailLinkedGrid items={linkedPreviewItems} onOpenDetail={onOpenDetail} />
           </CreatorWorkspaceDetailSection>
         ) : null}
       </section>
@@ -1012,6 +1222,7 @@ function CreatorWorkspaceDashboard({
   creator,
   onChangeTab,
   onOpenDetail,
+  onOpenPreviewDetail,
   onRetryPreviewCollections,
   onRetrySummary,
   previewCollectionsState,
@@ -1022,6 +1233,7 @@ function CreatorWorkspaceDashboard({
   creator: CreatorSummary;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onOpenPreviewDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetryPreviewCollections: () => void;
   onRetrySummary: () => void;
   previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
@@ -1037,6 +1249,7 @@ function CreatorWorkspaceDashboard({
       <CreatorWorkspaceManagedPosts
         activeTab={activeTab}
         onChangeTab={onChangeTab}
+        onOpenPreviewDetail={onOpenPreviewDetail}
         onRetry={onRetryPreviewCollections}
         state={previewCollectionsState}
         workspace={state.workspace}
@@ -1057,7 +1270,7 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
     state: previewCollectionsState,
   } = useCreatorWorkspacePreviewCollections();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
-  const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailSelection | null>(null);
+  const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailSelection | CreatorWorkspacePreviewDetailSelection | null>(null);
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
   const blockedState = summaryBlockedState ?? previewBlockedState;
 
@@ -1074,7 +1287,11 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
           onBack={() => {
             setDetailSelection(null);
           }}
-          onOpenDetail={setDetailSelection}
+          onOpenDetail={(selection) => {
+            setActiveTab(selection.tab);
+            setDetailSelection(selection);
+          }}
+          previewCollections={previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null}
           state={state}
         />
       ) : (
@@ -1083,6 +1300,10 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
           creator={creator}
           onChangeTab={setActiveTab}
           onOpenDetail={(selection) => {
+            setActiveTab(selection.tab);
+            setDetailSelection(selection);
+          }}
+          onOpenPreviewDetail={(selection) => {
             setActiveTab(selection.tab);
             setDetailSelection(selection);
           }}
