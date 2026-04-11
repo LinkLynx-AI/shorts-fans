@@ -39,6 +39,8 @@ type queries interface {
 	PublishShort(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
 	ListPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppPublicShort, error)
 	GetPublicShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppPublicShort, error)
+	PutPinnedShort(ctx context.Context, arg sqlc.PutPinnedShortParams) error
+	DeletePinnedShort(ctx context.Context, arg sqlc.DeletePinnedShortParams) error
 	ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error)
 	GetCanonicalMainIDByShortID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 }

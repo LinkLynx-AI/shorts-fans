@@ -53,6 +53,8 @@
 | `viewer.isFollowingCreator` | `boolean` | current viewer の creator follow state |
 | `unlockCta` | `UnlockCtaState` | 下部固定 CTA 用。price と main 長さはここから組み立てる |
 
+- short pin relation の write contract は `docs/contracts/fan-short-pin-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
+
 #### HTTP States
 
 | case | status |
@@ -74,6 +76,7 @@
 
 - `data.detail`: `ShortDetail`
 - `meta.page = null`
+- short pin relation の write contract は `docs/contracts/fan-short-pin-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
 
 #### HTTP States
 

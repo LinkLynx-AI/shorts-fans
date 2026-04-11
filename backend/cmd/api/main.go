@@ -22,6 +22,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
 )
 
@@ -88,6 +89,7 @@ func main() {
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	fanProfileRepository := fanprofile.NewRepository(pool)
+	shortsRepository := shorts.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
@@ -144,6 +146,7 @@ func main() {
 			CreatorProfile:       creatorRepository,
 			CreatorProfileShorts: creatorRepository,
 			FanFeed:              feedRepository,
+			FanShortPin:          shortsRepository,
 			CreatorFollow:        creatorRepository,
 			CreatorAvatarUpload:  creatorAvatarService,
 			CreatorRegistration:  creatorRepository,

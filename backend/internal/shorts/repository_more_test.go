@@ -26,6 +26,8 @@ type repositoryStubQueries struct {
 	publishShort        func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 	listPublicShorts    func(context.Context, pgtype.UUID) ([]sqlc.AppPublicShort, error)
 	getPublicShort      func(context.Context, pgtype.UUID) (sqlc.AppPublicShort, error)
+	putPinnedShort      func(context.Context, sqlc.PutPinnedShortParams) error
+	deletePinnedShort   func(context.Context, sqlc.DeletePinnedShortParams) error
 	listCanonicalShorts func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
 	getCanonicalMainID  func(context.Context, pgtype.UUID) (pgtype.UUID, error)
 }
@@ -112,6 +114,20 @@ func (s repositoryStubQueries) GetPublicShortByID(ctx context.Context, id pgtype
 		return sqlc.AppPublicShort{}, nil
 	}
 	return s.getPublicShort(ctx, id)
+}
+
+func (s repositoryStubQueries) PutPinnedShort(ctx context.Context, arg sqlc.PutPinnedShortParams) error {
+	if s.putPinnedShort == nil {
+		return nil
+	}
+	return s.putPinnedShort(ctx, arg)
+}
+
+func (s repositoryStubQueries) DeletePinnedShort(ctx context.Context, arg sqlc.DeletePinnedShortParams) error {
+	if s.deletePinnedShort == nil {
+		return nil
+	}
+	return s.deletePinnedShort(ctx, arg)
 }
 
 func (s repositoryStubQueries) ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error) {
