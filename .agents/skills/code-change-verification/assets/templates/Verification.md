@@ -7,6 +7,13 @@
 ## Command results
 - `...`: pass / fail / skipped
 
+## Coverage gates
+- Backend:
+- Backend artifact:
+- Frontend:
+- Frontend artifact:
+- Notes:
+
 ## Architecture guard
 - Status:
 - Notes:
