@@ -266,19 +266,19 @@ describe("CreatorPage", () => {
     expect(screen.getByText("¥82,000")).toBeInTheDocument();
     expect(screen.getByText("差し戻しが2件あります")).toBeInTheDocument();
     expect(screen.getByText("short 1件 / main 1件を確認してください")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Top main" })).toBeEnabled();
-    expect(screen.getByRole("button", { name: "Top short" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Top short\b/ })).toBeEnabled();
     expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
     expect(await screen.findByTestId("creator-workspace-preview-tile")).toBeInTheDocument();
     expect(screen.queryByText("linked short からの流入を unlock に変えている本編です。")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Top main" }));
+    await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
 
     expect(await screen.findByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(await screen.findByRole("tab", { name: "Main", selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Main" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("switches the viewer back to fan mode home from the account menu", async () => {
@@ -424,7 +424,7 @@ describe("CreatorPage", () => {
 
     expect(screen.getByText("workspace summary を読み込んでいます...")).toBeInTheDocument();
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeInTheDocument();
   });
 
   it("renders contract-backed preview lists and opens lower cards with actual preview data", async () => {
@@ -462,7 +462,7 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
-    await user.click(screen.getByRole("tab", { name: "Main" }));
+    await user.click(screen.getByRole("button", { name: "Main" }));
 
     expect(await screen.findByText("12:00")).toBeInTheDocument();
     expect(await screen.findByText("¥1,800")).toBeInTheDocument();
@@ -493,7 +493,7 @@ describe("CreatorPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "動画一覧を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
     );
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "再読み込み" }));
 
@@ -535,7 +535,7 @@ describe("CreatorPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "creator workspace summary を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
     );
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "再読み込み" }));
 
@@ -618,8 +618,8 @@ describe("CreatorPage", () => {
 
     await screen.findByText("@minarei");
 
-    expect(screen.queryByRole("button", { name: "Top main" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Top short" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Top main\b/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Top short\b/ })).not.toBeInTheDocument();
   });
 
   it("falls back to a generic revision message when revision counts are inconsistent", async () => {

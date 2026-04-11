@@ -42,7 +42,7 @@ function CreatorWorkspaceTopPerformerRow({
 }) {
   return (
     <button
-      aria-label={label}
+      aria-label={`${label} ${metric}`}
       className={`flex min-h-[58px] w-full items-center justify-between gap-[14px] bg-transparent px-0 text-left text-foreground disabled:cursor-default disabled:opacity-100 ${
         index === 0 ? "" : "border-t border-[rgba(167,220,249,0.32)]"
       }`}

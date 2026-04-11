@@ -153,9 +153,7 @@ function CreatorWorkspaceManagedPosts({
   return (
     <>
       <div
-        aria-label="Your videos"
         className="mt-[18px] grid grid-cols-2 border-t border-[rgba(167,220,249,0.48)]"
-        role="tablist"
       >
         {workspace.managedCollections.tabs.map((tab) => {
           const active = tab.key === activeTab;
@@ -163,7 +161,7 @@ function CreatorWorkspaceManagedPosts({
           return (
             <button
               aria-label={tab.label}
-              aria-selected={active}
+              aria-pressed={active}
               className={`inline-flex min-h-[42px] min-w-0 items-center justify-center border-t-2 pt-[10px] text-xs font-bold uppercase tracking-[0.08em] ${
                 active ? "border-t-foreground text-foreground" : "border-t-transparent text-muted"
               }`}
@@ -171,7 +169,6 @@ function CreatorWorkspaceManagedPosts({
               onClick={() => {
                 onChangeTab(tab.key);
               }}
-              role="tab"
               type="button"
             >
               {tab.label}
