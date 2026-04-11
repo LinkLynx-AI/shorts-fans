@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -15,6 +16,16 @@ import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
 import type { DetailShortSurface, FeedShortSurface } from "../model/short-surface";
+
+const feedSurfaceStyle = {
+  "--short-bg-accent": "#68c0eb",
+  "--short-bg-end": "#07131d",
+  "--short-bg-mid": "#2a648f",
+  "--short-bg-start": "#94e0ff",
+  "--short-tile-bottom": "#0f2234",
+  "--short-tile-mid": "#4cc0eb",
+  "--short-tile-top": "#d8f3ff",
+} as CSSProperties;
 
 export type ImmersiveShortSurfaceProps =
   | {
@@ -191,6 +202,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const pinned = viewer.isPinned;
   const unlockAction = getUnlockEntryAction(unlock);
+  const surfaceStyle = mode === "feed" ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
     mode === "feed"
       ? buildCreatorProfileHref(creator.id, {
@@ -316,7 +328,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   return (
-    <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(short)}>
+    <section className="absolute inset-0 overflow-hidden text-white" style={surfaceStyle}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
       <video
         ref={videoRef}

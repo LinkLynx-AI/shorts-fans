@@ -37,6 +37,20 @@ type ShortTheme = {
   };
 };
 
+const defaultShortTheme: ShortTheme = {
+  background: {
+    accent: "#68c0eb",
+    end: "#07131d",
+    mid: "#2a648f",
+    start: "#94e0ff",
+  },
+  tile: {
+    bottom: "#0f2234",
+    mid: "#4cc0eb",
+    top: "#d8f3ff",
+  },
+};
+
 const shorts = [
   {
     caption: "雨上がりの balcony preview。続きは main で。",
@@ -184,17 +198,8 @@ const shortThemes: Record<string, ShortTheme> = {
     },
   },
   rooftop: {
-    background: {
-      accent: "#68c0eb",
-      end: "#07131d",
-      mid: "#2a648f",
-      start: "#94e0ff",
-    },
-    tile: {
-      bottom: "#0f2234",
-      mid: "#4cc0eb",
-      top: "#d8f3ff",
-    },
+    background: defaultShortTheme.background,
+    tile: defaultShortTheme.tile,
   },
   softlight: {
     background: {
@@ -281,10 +286,10 @@ function getFallbackShortTheme(shortId: ShortId): ShortTheme {
   const fallbackThemeId = fallbackThemeIds[hashString(shortId) % fallbackThemeIds.length];
 
   if (!fallbackThemeId) {
-    return shortThemes.rooftop;
+    return defaultShortTheme;
   }
 
-  return shortThemes[fallbackThemeId] ?? shortThemes.rooftop;
+  return shortThemes[fallbackThemeId] ?? defaultShortTheme;
 }
 
 function hashString(value: string): number {

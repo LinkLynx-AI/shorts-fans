@@ -213,4 +213,29 @@ describe("ImmersiveShortSurface", () => {
 
     expect(screen.getByRole("dialog", { name: "この short の続きを見る" })).toBeInTheDocument();
   });
+
+  it("renders feed mode without short theme lookup for unknown short ids", () => {
+    const surface = {
+      ...feedSurface,
+      short: {
+        ...feedSurface.short,
+        id: "short_dbcc1756d3d9406988e6860c7348609c",
+      },
+      unlock: {
+        ...feedSurface.unlock,
+        short: {
+          ...feedSurface.unlock.short,
+          id: "short_dbcc1756d3d9406988e6860c7348609c",
+        },
+      },
+    };
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    expect(screen.getByRole("link", { name: /おすすめ/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
+  });
 });
