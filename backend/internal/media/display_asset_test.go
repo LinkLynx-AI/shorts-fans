@@ -3,6 +3,7 @@ package media
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -169,14 +170,25 @@ func TestMainDisplaySourceValidateRejectsInvalidInput(t *testing.T) {
 func TestResolveShortDisplayAssetPropagatesPlaybackResolutionError(t *testing.T) {
 	t.Parallel()
 
-	var delivery *Delivery
-	_, err := delivery.ResolveShortDisplayAsset(ShortDisplaySource{
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+	delivery.shortPublicBaseURL = "http://%"
+
+	_, err = delivery.ResolveShortDisplayAsset(ShortDisplaySource{
 		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
 		ShortID:    mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
 		DurationMS: 1000,
 	}, AccessBoundaryPublic)
 	if err == nil {
 		t.Fatal("ResolveShortDisplayAsset() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "resolve short playback url") {
+		t.Fatalf("ResolveShortDisplayAsset() error got %q want playback resolution context", err)
 	}
 }
 
