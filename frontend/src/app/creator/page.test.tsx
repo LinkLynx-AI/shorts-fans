@@ -211,6 +211,7 @@ function createCreatorWorkspacePreviewShortDetail(
         url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
       },
       previewDurationSeconds: 16,
+      title: "quiet rooftop preview",
     },
     ...overrides,
   };
@@ -245,6 +246,7 @@ function createCreatorWorkspacePreviewMainDetail(
         url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
       },
       previewDurationSeconds: 16,
+      title: "quiet rooftop preview",
     },
     kind: "preview-main",
     main: {
