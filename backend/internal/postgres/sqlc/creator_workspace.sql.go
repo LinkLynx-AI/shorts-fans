@@ -143,3 +143,117 @@ func (q *Queries) ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Co
 	}
 	return items, nil
 }
+
+const listCreatorWorkspaceTopMainCandidatesByCreatorUserID = `-- name: ListCreatorWorkspaceTopMainCandidatesByCreatorUserID :many
+SELECT
+    m.id,
+    m.media_asset_id,
+    COALESCE(m.price_minor, 0)::bigint AS price_minor,
+    COALESCE(m.currency_code, '')::text AS currency_code,
+    m.created_at,
+    COUNT(mu.user_id)::bigint AS unlock_count
+FROM app.mains AS m
+LEFT JOIN app.main_unlocks AS mu
+    ON mu.main_id = m.id
+WHERE m.creator_user_id = $1
+    AND m.media_asset_id IS NOT NULL
+    AND m.price_minor IS NOT NULL
+    AND m.currency_code IS NOT NULL
+GROUP BY
+    m.id,
+    m.media_asset_id,
+    m.price_minor,
+    m.currency_code,
+    m.created_at
+ORDER BY unlock_count DESC, m.created_at DESC, m.id DESC
+`
+
+type ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow struct {
+	ID           pgtype.UUID
+	MediaAssetID pgtype.UUID
+	PriceMinor   int64
+	CurrencyCode string
+	CreatedAt    pgtype.Timestamptz
+	UnlockCount  int64
+}
+
+func (q *Queries) ListCreatorWorkspaceTopMainCandidatesByCreatorUserID(ctx context.Context, ownerUserID pgtype.UUID) ([]ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listCreatorWorkspaceTopMainCandidatesByCreatorUserID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow
+	for rows.Next() {
+		var i ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.MediaAssetID,
+			&i.PriceMinor,
+			&i.CurrencyCode,
+			&i.CreatedAt,
+			&i.UnlockCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listCreatorWorkspaceTopShortCandidatesByCreatorUserID = `-- name: ListCreatorWorkspaceTopShortCandidatesByCreatorUserID :many
+SELECT
+    s.id,
+    s.canonical_main_id,
+    s.media_asset_id,
+    s.created_at,
+    COUNT(mu.user_id)::bigint AS attributed_unlock_count
+FROM app.shorts AS s
+LEFT JOIN app.main_unlocks AS mu
+    ON mu.main_id = s.canonical_main_id
+WHERE s.creator_user_id = $1
+    AND s.media_asset_id IS NOT NULL
+GROUP BY
+    s.id,
+    s.canonical_main_id,
+    s.media_asset_id,
+    s.created_at
+ORDER BY attributed_unlock_count DESC, s.created_at DESC, s.id DESC
+`
+
+type ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow struct {
+	ID                    pgtype.UUID
+	CanonicalMainID       pgtype.UUID
+	MediaAssetID          pgtype.UUID
+	CreatedAt             pgtype.Timestamptz
+	AttributedUnlockCount int64
+}
+
+func (q *Queries) ListCreatorWorkspaceTopShortCandidatesByCreatorUserID(ctx context.Context, ownerUserID pgtype.UUID) ([]ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listCreatorWorkspaceTopShortCandidatesByCreatorUserID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow
+	for rows.Next() {
+		var i ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CanonicalMainID,
+			&i.MediaAssetID,
+			&i.CreatedAt,
+			&i.AttributedUnlockCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

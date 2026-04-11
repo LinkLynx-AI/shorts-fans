@@ -8,6 +8,7 @@ import userEvent from "@testing-library/user-event";
 import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-viewer-active-mode";
 import { ApiError } from "@/shared/api";
 import { getCreatorWorkspaceSummary } from "@/widgets/creator-mode-shell/api/get-creator-workspace-summary";
+import { getCreatorWorkspaceTopPerformers } from "@/widgets/creator-mode-shell/api/get-creator-workspace-top-performers";
 import {
   getCreatorWorkspacePreviewMains,
   getCreatorWorkspacePreviewShorts,
@@ -54,12 +55,17 @@ vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-summary", () => 
   getCreatorWorkspaceSummary: vi.fn(),
 }));
 
+vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-top-performers", () => ({
+  getCreatorWorkspaceTopPerformers: vi.fn(),
+}));
+
 vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-preview-collections", () => ({
   getCreatorWorkspacePreviewMains: vi.fn(),
   getCreatorWorkspacePreviewShorts: vi.fn(),
 }));
 
 type CreatorWorkspaceSummary = Awaited<ReturnType<typeof getCreatorWorkspaceSummary>>;
+type CreatorWorkspaceTopPerformers = Awaited<ReturnType<typeof getCreatorWorkspaceTopPerformers>>;
 type CreatorWorkspacePreviewShorts = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShorts>>;
 type CreatorWorkspacePreviewMains = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMains>>;
 
@@ -135,6 +141,34 @@ function createCreatorWorkspacePreviewShorts(
   };
 }
 
+function createCreatorWorkspaceTopPerformers(
+  overrides: Partial<CreatorWorkspaceTopPerformers> = {},
+): CreatorWorkspaceTopPerformers {
+  return {
+    topMain: {
+      id: "main_quiet_rooftop",
+      media: {
+        durationSeconds: 720,
+        id: "asset_main_quiet_rooftop",
+        kind: "video",
+        posterUrl: "https://signed.example.com/mains/top-quiet-rooftop.jpg",
+      },
+      unlockCount: 238,
+    },
+    topShort: {
+      attributedUnlockCount: 238,
+      id: "short_quiet_rooftop",
+      media: {
+        durationSeconds: 16,
+        id: "asset_short_quiet_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/shorts/top-quiet-rooftop.jpg",
+      },
+    },
+    ...overrides,
+  };
+}
+
 function createCreatorWorkspacePreviewMains(
   overrides: Partial<CreatorWorkspacePreviewMains> = {},
 ): CreatorWorkspacePreviewMains {
@@ -172,14 +206,16 @@ describe("CreatorPage", () => {
     mockedRouter.replace.mockReset();
     vi.mocked(switchViewerActiveMode).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockReset();
+    vi.mocked(getCreatorWorkspaceTopPerformers).mockReset();
     vi.mocked(getCreatorWorkspacePreviewMains).mockReset();
     vi.mocked(getCreatorWorkspacePreviewShorts).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(createCreatorWorkspaceSummary());
+    vi.mocked(getCreatorWorkspaceTopPerformers).mockResolvedValue(createCreatorWorkspaceTopPerformers());
     vi.mocked(getCreatorWorkspacePreviewShorts).mockResolvedValue(createCreatorWorkspacePreviewShorts());
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
   });
 
-  it("renders contract-backed summary data for creator-mode viewers", async () => {
+  it("renders contract-backed summary data and top performers for creator-mode viewers", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -230,22 +266,19 @@ describe("CreatorPage", () => {
     expect(screen.getByText("¥82,000")).toBeInTheDocument();
     expect(screen.getByText("差し戻しが2件あります")).toBeInTheDocument();
     expect(screen.getByText("short 1件 / main 1件を確認してください")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Top main" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Top short" })).toBeEnabled();
+    expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
     expect(await screen.findByTestId("creator-workspace-preview-tile")).toBeInTheDocument();
+    expect(screen.queryByText("linked short からの流入を unlock に変えている本編です。")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Top main" }));
 
-    expect(screen.getByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "rooftop side preview" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "rooftop side preview" }));
-
-    expect(screen.getByText("同じ main に送る別導線として比較しているショートです。")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(await screen.findByText("linked short からの流入を unlock に変えている本編です。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
-    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Main", selected: true })).toBeInTheDocument();
   });
 
   it("switches the viewer back to fan mode home from the account menu", async () => {
@@ -370,6 +403,7 @@ describe("CreatorPage", () => {
   it("shows a summary loading state while the workspace request is pending", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const deferred = createDeferredPromise<CreatorWorkspaceSummary>();
+    const topPerformersDeferred = createDeferredPromise<CreatorWorkspaceTopPerformers>();
     const previewShortsDeferred = createDeferredPromise<CreatorWorkspacePreviewShorts>();
     const previewMainsDeferred = createDeferredPromise<CreatorWorkspacePreviewMains>();
 
@@ -382,6 +416,7 @@ describe("CreatorPage", () => {
       hasSession: true,
     });
     vi.mocked(getCreatorWorkspaceSummary).mockReturnValue(deferred.promise);
+    vi.mocked(getCreatorWorkspaceTopPerformers).mockReturnValue(topPerformersDeferred.promise);
     vi.mocked(getCreatorWorkspacePreviewShorts).mockReturnValue(previewShortsDeferred.promise);
     vi.mocked(getCreatorWorkspacePreviewMains).mockReturnValue(previewMainsDeferred.promise);
 
@@ -516,6 +551,61 @@ describe("CreatorPage", () => {
 
     expect(screen.queryByText("差し戻し")).not.toBeInTheDocument();
     expect(screen.queryByText(/差し戻しが/)).not.toBeInTheDocument();
+  });
+
+  it("shows a retryable top performers error without hiding the rest of the workspace", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspaceTopPerformers)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(createCreatorWorkspaceTopPerformers());
+
+    render(await CreatorPage());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "top performers を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
+    );
+    expect(screen.getByText("@minarei")).toBeInTheDocument();
+    expect(screen.getAllByTestId("creator-workspace-preview-tile")).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+
+    expect(await screen.findAllByText("238 unlocks")).toHaveLength(2);
+  });
+
+  it("hides the top performers section when the contract response is empty", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspaceTopPerformers).mockResolvedValue(
+      createCreatorWorkspaceTopPerformers({
+        topMain: null,
+        topShort: null,
+      }),
+    );
+
+    render(await CreatorPage());
+
+    await screen.findByText("@minarei");
+
+    expect(screen.queryByRole("button", { name: "Top main" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Top short" })).not.toBeInTheDocument();
   });
 
   it("falls back to a generic revision message when revision counts are inconsistent", async () => {

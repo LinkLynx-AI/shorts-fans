@@ -19,12 +19,21 @@ import (
 
 type stubCreatorWorkspaceReader struct {
 	getWorkspace              func(context.Context, uuid.UUID) (creator.Workspace, error)
+	getWorkspaceTopPerformers func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error)
 	listWorkspacePreviewMain  func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
 	listWorkspacePreviewShort func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
 }
 
 func (s stubCreatorWorkspaceReader) GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (creator.Workspace, error) {
 	return s.getWorkspace(ctx, viewerUserID)
+}
+
+func (s stubCreatorWorkspaceReader) GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+	if s.getWorkspaceTopPerformers == nil {
+		return creator.WorkspaceTopPerformers{}, nil
+	}
+
+	return s.getWorkspaceTopPerformers(ctx, viewerUserID)
 }
 
 func (s stubCreatorWorkspaceReader) ListWorkspacePreviewMains(
@@ -589,6 +598,147 @@ func TestCreatorWorkspacePreviewShortsRouteReturnsCreatorModeUnavailable(t *test
 	}
 	if response.Error == nil || response.Error.Code != "creator_mode_unavailable" {
 		t.Fatalf("response.Error got %#v want creator_mode_unavailable", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceTopPerformersRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("abababab-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("bcbcbcbc-2222-2222-2222-222222222222")
+	shortID := uuid.MustParse("cdcdcdcd-2222-2222-2222-222222222222")
+	mainAssetID := uuid.MustParse("dededede-2222-2222-2222-222222222222")
+	shortAssetID := uuid.MustParse("efefefef-2222-2222-2222-222222222222")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspace: func(context.Context, uuid.UUID) (creator.Workspace, error) {
+				return creator.Workspace{}, nil
+			},
+			getWorkspaceTopPerformers: func(_ context.Context, gotViewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("GetWorkspaceTopPerformers() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+
+				return creator.WorkspaceTopPerformers{
+					TopMain: &creator.WorkspaceTopMainPerformer{
+						ID:          mainID,
+						Media:       testWorkspacePreviewCardAsset(mainAssetID, 720, "https://signed.example.com/mains/top.jpg"),
+						UnlockCount: 238,
+					},
+					TopShort: &creator.WorkspaceTopShortPerformer{
+						AttributedUnlockCount: 238,
+						ID:                    shortID,
+						Media:                 testWorkspacePreviewCardAsset(shortAssetID, 16, "https://cdn.example.com/shorts/top.jpg"),
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/top-performers", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/top-performers status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspaceTopPerformersResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want top performers payload")
+	}
+	if response.Data.TopPerformers.TopMain == nil {
+		t.Fatal("response.Data.TopPerformers.TopMain = nil, want non-nil")
+	}
+	if response.Data.TopPerformers.TopMain.ID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.TopPerformers.TopMain.ID got %q want %q", response.Data.TopPerformers.TopMain.ID, mainPublicID(mainID))
+	}
+	if response.Data.TopPerformers.TopMain.UnlockCount != 238 {
+		t.Fatalf("response.Data.TopPerformers.TopMain.UnlockCount got %d want %d", response.Data.TopPerformers.TopMain.UnlockCount, 238)
+	}
+	if response.Data.TopPerformers.TopShort == nil {
+		t.Fatal("response.Data.TopPerformers.TopShort = nil, want non-nil")
+	}
+	if response.Data.TopPerformers.TopShort.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.TopPerformers.TopShort.ID got %q want %q", response.Data.TopPerformers.TopShort.ID, shortPublicID(shortID))
+	}
+	if response.Data.TopPerformers.TopShort.AttributedUnlockCount != 238 {
+		t.Fatalf("response.Data.TopPerformers.TopShort.AttributedUnlockCount got %d want %d", response.Data.TopPerformers.TopShort.AttributedUnlockCount, 238)
+	}
+	if response.Meta.Page != nil {
+		t.Fatalf("response.Meta.Page got %#v want nil", response.Meta.Page)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceTopPerformersRouteReturnsEmptyPayload(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("f0f0f0f0-2222-2222-2222-222222222222")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspace: func(context.Context, uuid.UUID) (creator.Workspace, error) {
+				return creator.Workspace{}, nil
+			},
+			getWorkspaceTopPerformers: func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+				return creator.WorkspaceTopPerformers{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/top-performers", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/top-performers status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspaceTopPerformersResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want top performers payload")
+	}
+	if response.Data.TopPerformers.TopMain != nil {
+		t.Fatalf("response.Data.TopPerformers.TopMain got %#v want nil", response.Data.TopPerformers.TopMain)
+	}
+	if response.Data.TopPerformers.TopShort != nil {
+		t.Fatalf("response.Data.TopPerformers.TopShort got %#v want nil", response.Data.TopPerformers.TopShort)
 	}
 }
 

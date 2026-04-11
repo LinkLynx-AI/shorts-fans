@@ -18,6 +18,8 @@ type repositoryStubQueries struct {
 	createCapability                   func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	getCapability                      func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	getWorkspaceMetrics                func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
+	listWorkspaceTopMainCandidates     func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error)
+	listWorkspaceTopShortCandidates    func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error)
 	listWorkspacePreviewMainsByCreator func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	getRevisionSummary                 func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	getMediaAsset                      func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
@@ -65,6 +67,20 @@ func (s repositoryStubQueries) GetCreatorWorkspaceOverviewMetrics(ctx context.Co
 		return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
 	}
 	return s.getWorkspaceMetrics(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) ListCreatorWorkspaceTopMainCandidatesByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error) {
+	if s.listWorkspaceTopMainCandidates == nil {
+		return nil, nil
+	}
+	return s.listWorkspaceTopMainCandidates(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) ListCreatorWorkspaceTopShortCandidatesByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error) {
+	if s.listWorkspaceTopShortCandidates == nil {
+		return nil, nil
+	}
+	return s.listWorkspaceTopShortCandidates(ctx, creatorUserID)
 }
 
 func (s repositoryStubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {

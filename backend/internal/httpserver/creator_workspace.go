@@ -20,6 +20,7 @@ const (
 	creatorWorkspaceMainListRequestScope  = "creator_workspace_mains"
 	creatorWorkspaceRequestScope          = "creator_workspace"
 	creatorWorkspaceShortListRequestScope = "creator_workspace_shorts"
+	creatorWorkspaceTopPerformersScope    = "creator_workspace_top_performers"
 )
 
 type creatorWorkspaceResponseData struct {
@@ -50,6 +51,27 @@ type creatorWorkspacePreviewShortListResponseData struct {
 
 type creatorWorkspacePreviewMainListResponseData struct {
 	Items []creatorWorkspacePreviewMainItem `json:"items"`
+}
+
+type creatorWorkspaceTopPerformersResponseData struct {
+	TopPerformers creatorWorkspaceTopPerformersPayload `json:"topPerformers"`
+}
+
+type creatorWorkspaceTopPerformersPayload struct {
+	TopMain  *creatorWorkspaceTopMainPerformer  `json:"topMain"`
+	TopShort *creatorWorkspaceTopShortPerformer `json:"topShort"`
+}
+
+type creatorWorkspaceTopMainPerformer struct {
+	ID          string                            `json:"id"`
+	Media       creatorWorkspacePreviewMediaAsset `json:"media"`
+	UnlockCount int64                             `json:"unlockCount"`
+}
+
+type creatorWorkspaceTopShortPerformer struct {
+	AttributedUnlockCount int64                             `json:"attributedUnlockCount"`
+	ID                    string                            `json:"id"`
+	Media                 creatorWorkspacePreviewMediaAsset `json:"media"`
 }
 
 type creatorWorkspacePreviewShortItem struct {
@@ -108,6 +130,13 @@ func registerCreatorWorkspaceRoutes(
 		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainListRequestScope, creatorWorkspaceAuthRequiredMessage),
 		func(c *gin.Context) {
 			handleCreatorWorkspacePreviewMains(c, reader)
+		},
+	)
+	router.GET(
+		"/api/creator/workspace/top-performers",
+		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceTopPerformersScope, creatorWorkspaceAuthRequiredMessage),
+		func(c *gin.Context) {
+			handleCreatorWorkspaceTopPerformers(c, reader)
 		},
 	)
 }
@@ -260,6 +289,37 @@ func handleCreatorWorkspacePreviewMains(c *gin.Context, reader CreatorWorkspaceR
 	})
 }
 
+func handleCreatorWorkspaceTopPerformers(c *gin.Context, reader CreatorWorkspaceReader) {
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceTopPerformersScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	topPerformers, err := reader.GetWorkspaceTopPerformers(c.Request.Context(), viewerUserID)
+	if err != nil {
+		writeCreatorWorkspaceReadError(c, creatorWorkspaceTopPerformersScope, err)
+		return
+	}
+
+	responsePayload, buildErr := buildCreatorWorkspaceTopPerformersPayload(topPerformers)
+	if buildErr != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceTopPerformersScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceTopPerformersResponseData]{
+		Data: &creatorWorkspaceTopPerformersResponseData{
+			TopPerformers: responsePayload,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceTopPerformersScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
 func buildCreatorWorkspacePreviewShortItem(item creator.WorkspacePreviewShortItem) (creatorWorkspacePreviewShortItem, error) {
 	mediaPayload := buildCreatorWorkspacePreviewMediaAssetPayload(item.Media)
 
@@ -290,6 +350,33 @@ func buildCreatorWorkspacePreviewMediaAssetPayload(asset media.VideoPreviewCardA
 		Kind:            asset.Kind,
 		PosterURL:       asset.PosterURL,
 	}
+}
+
+func buildCreatorWorkspaceTopPerformersPayload(
+	topPerformers creator.WorkspaceTopPerformers,
+) (creatorWorkspaceTopPerformersPayload, error) {
+	var topMainPayload *creatorWorkspaceTopMainPerformer
+	if topPerformers.TopMain != nil {
+		topMainPayload = &creatorWorkspaceTopMainPerformer{
+			ID:          mainPublicID(topPerformers.TopMain.ID),
+			Media:       buildCreatorWorkspacePreviewMediaAssetPayload(topPerformers.TopMain.Media),
+			UnlockCount: topPerformers.TopMain.UnlockCount,
+		}
+	}
+
+	var topShortPayload *creatorWorkspaceTopShortPerformer
+	if topPerformers.TopShort != nil {
+		topShortPayload = &creatorWorkspaceTopShortPerformer{
+			AttributedUnlockCount: topPerformers.TopShort.AttributedUnlockCount,
+			ID:                    shortPublicID(topPerformers.TopShort.ID),
+			Media:                 buildCreatorWorkspacePreviewMediaAssetPayload(topPerformers.TopShort.Media),
+		}
+	}
+
+	return creatorWorkspaceTopPerformersPayload{
+		TopMain:  topMainPayload,
+		TopShort: topShortPayload,
+	}, nil
 }
 
 func writeCreatorWorkspaceReadError(c *gin.Context, requestScope string, err error) {
@@ -334,6 +421,7 @@ func writeCreatorWorkspaceError(c *gin.Context, status int, code string, message
 // CreatorWorkspaceReader は creator private workspace summary 用の read 操作を表します。
 type CreatorWorkspaceReader interface {
 	GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (creator.Workspace, error)
+	GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error)
 	ListWorkspacePreviewMains(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
 	ListWorkspacePreviewShorts(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
 }
