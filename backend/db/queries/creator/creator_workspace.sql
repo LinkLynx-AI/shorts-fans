@@ -30,3 +30,25 @@ SELECT
         WHERE s.creator_user_id = sqlc.arg(owner_user_id)
             AND s.state = 'revision_requested'
     ) AS short_count;
+
+-- name: ListCreatorWorkspacePreviewMainsByCreatorUserID :many
+SELECT
+    id,
+    creator_user_id,
+    media_asset_id,
+    state,
+    review_reason_code,
+    post_report_state,
+    COALESCE(price_minor, 0)::bigint AS price_minor,
+    COALESCE(currency_code, '')::text AS currency_code,
+    ownership_confirmed,
+    consent_confirmed,
+    approved_for_unlock_at,
+    created_at,
+    updated_at
+FROM app.mains
+WHERE creator_user_id = sqlc.arg(owner_user_id)
+    AND media_asset_id IS NOT NULL
+    AND price_minor IS NOT NULL
+    AND currency_code IS NOT NULL
+ORDER BY created_at DESC, id DESC;

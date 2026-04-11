@@ -249,6 +249,42 @@ func TestResolveShortDisplayAsset(t *testing.T) {
 	}
 }
 
+func TestResolveShortPreviewCardAsset(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	shortID := mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	assetID := mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	got, err := delivery.ResolveShortPreviewCardAsset(ShortDisplaySource{
+		AssetID:    assetID,
+		ShortID:    shortID,
+		DurationMS: 42001,
+	})
+	if err != nil {
+		t.Fatalf("ResolveShortPreviewCardAsset() error = %v, want nil", err)
+	}
+
+	if got.ID != assetID {
+		t.Fatalf("ResolveShortPreviewCardAsset() id got %s want %s", got.ID, assetID)
+	}
+	if got.Kind != "video" {
+		t.Fatalf("ResolveShortPreviewCardAsset() kind got %q want %q", got.Kind, "video")
+	}
+	if got.PosterURL != "https://cdn.example.com/media/shorts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster.jpg" {
+		t.Fatalf("ResolveShortPreviewCardAsset() poster url got %q", got.PosterURL)
+	}
+	if got.DurationSeconds != 43 {
+		t.Fatalf("ResolveShortPreviewCardAsset() duration got %d want %d", got.DurationSeconds, 43)
+	}
+}
+
 func TestResolveShortDisplayAssetRejectsUnsupportedBoundary(t *testing.T) {
 	t.Parallel()
 
@@ -318,6 +354,50 @@ func TestResolveMainDisplayAsset(t *testing.T) {
 	}
 	if signer.calls[0].expires != DefaultSignedURLTTL || signer.calls[1].expires != DefaultSignedURLTTL {
 		t.Fatalf("ResolveMainDisplayAsset() expires got %#v want all %s", signer.calls, DefaultSignedURLTTL)
+	}
+}
+
+func TestResolveMainPreviewCardAsset(t *testing.T) {
+	t.Parallel()
+
+	signer := &stubMainURLSigner{
+		urls: map[string]string{
+			"mains/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster.jpg": "https://signed.example.com/main-poster",
+		},
+	}
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, signer)
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	assetID := mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	mainID := mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	got, err := delivery.ResolveMainPreviewCardAsset(context.Background(), MainDisplaySource{
+		AssetID:    assetID,
+		MainID:     mainID,
+		DurationMS: 120000,
+	}, 0)
+	if err != nil {
+		t.Fatalf("ResolveMainPreviewCardAsset() error = %v, want nil", err)
+	}
+
+	if got.ID != assetID {
+		t.Fatalf("ResolveMainPreviewCardAsset() id got %s want %s", got.ID, assetID)
+	}
+	if got.PosterURL != "https://signed.example.com/main-poster" {
+		t.Fatalf("ResolveMainPreviewCardAsset() poster url got %q", got.PosterURL)
+	}
+	if got.DurationSeconds != 120 {
+		t.Fatalf("ResolveMainPreviewCardAsset() duration got %d want %d", got.DurationSeconds, 120)
+	}
+	if len(signer.calls) != 1 {
+		t.Fatalf("ResolveMainPreviewCardAsset() signer call count got %d want %d", len(signer.calls), 1)
+	}
+	if signer.calls[0].expires != DefaultSignedURLTTL {
+		t.Fatalf("ResolveMainPreviewCardAsset() expires got %#v want %s", signer.calls, DefaultSignedURLTTL)
 	}
 }
 

@@ -32,8 +32,16 @@ func (s stubQueries) GetCreatorWorkspaceOverviewMetrics(context.Context, pgtype.
 	return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
 }
 
+func (s stubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+	return nil, nil
+}
+
 func (s stubQueries) GetCreatorWorkspaceRevisionRequestedSummary(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {
 	return sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow{}, nil
+}
+
+func (s stubQueries) GetMediaAssetByID(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error) {
+	return sqlc.AppMediaAsset{}, nil
 }
 
 func (s stubQueries) UpdateCreatorCapabilityState(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
@@ -68,11 +76,19 @@ func (s stubQueries) GetPublicCreatorProfileByHandle(context.Context, string) (s
 	return sqlc.AppPublicCreatorProfile{}, nil
 }
 
+func (s stubQueries) ListMainsByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+	return nil, nil
+}
+
 func (s stubQueries) ListCreatorProfileShortGridItems(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error) {
 	return nil, nil
 }
 
 func (s stubQueries) ListRecentPublicCreatorProfiles(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
+	return nil, nil
+}
+
+func (s stubQueries) ListShortsByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
 	return nil, nil
 }
 

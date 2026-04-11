@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
@@ -34,7 +35,9 @@ type queries interface {
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	GetCreatorWorkspaceOverviewMetrics(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
+	ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
+	GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	DeleteCreatorFollow(ctx context.Context, arg sqlc.DeleteCreatorFollowParams) error
@@ -43,8 +46,10 @@ type queries interface {
 	GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	GetPublicCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
 	GetPublicCreatorProfileByHandle(ctx context.Context, handle string) (sqlc.AppPublicCreatorProfile, error)
+	ListMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppMain, error)
 	ListCreatorProfileShortGridItems(ctx context.Context, arg sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
 	ListRecentPublicCreatorProfiles(ctx context.Context, arg sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	ListShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppShort, error)
 	PutCreatorFollow(ctx context.Context, arg sqlc.PutCreatorFollowParams) error
 	SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
@@ -56,6 +61,7 @@ type Repository struct {
 	txBeginner postgres.TxBeginner
 	queries    queries
 	newQueries func(sqlc.DBTX) queries
+	delivery   *media.Delivery
 }
 
 // Capability は domain 向けの creator capability レコードです。
@@ -140,13 +146,14 @@ type UpdateProfileInput struct {
 }
 
 // NewRepository は pgxpool ベースの creator repository を構築します。
-func NewRepository(pool *pgxpool.Pool) *Repository {
+func NewRepository(pool *pgxpool.Pool, delivery *media.Delivery) *Repository {
 	return &Repository{
 		txBeginner: pool,
 		queries:    sqlc.New(pool),
 		newQueries: func(db sqlc.DBTX) queries {
 			return sqlc.New(db)
 		},
+		delivery: delivery,
 	}
 }
 
