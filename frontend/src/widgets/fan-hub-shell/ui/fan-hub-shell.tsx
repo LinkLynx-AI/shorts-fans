@@ -166,7 +166,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
         <Dialog.Root>
           <Dialog.Trigger asChild>
             <button
-              aria-label="Settings"
+              aria-label="Account menu"
               className="inline-flex size-[34px] items-center justify-center rounded-full text-accent-strong transition hover:bg-accent/10"
               onClick={clearAccountMenuErrors}
               type="button"

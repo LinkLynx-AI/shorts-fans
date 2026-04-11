@@ -80,7 +80,7 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
 
     expect(screen.getByRole("link", { name: "Creator登録を始める" })).toHaveAttribute(
       "href",
@@ -98,7 +98,7 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
 
     expect(screen.getByRole("button", { name: "Creator mode に切り替え" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
@@ -121,7 +121,7 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
 
     expect(screen.getByRole("button", { name: "ログアウトしています..." })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Creator mode に切り替え" })).toBeDisabled();
@@ -144,7 +144,7 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       "ログアウトできませんでした。少し時間を置いてからやり直してください。",
@@ -168,7 +168,7 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
-    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.click(screen.getByRole("button", { name: "Account menu" }));
     await user.click(screen.getByRole("button", { name: "ログアウト" }));
 
     expect(logout).toHaveBeenCalledTimes(1);
