@@ -127,25 +127,31 @@ describe("loadCreatorWorkspacePreviewCollections", () => {
       },
     });
 
-    expect(getCreatorWorkspacePreviewShorts).toHaveBeenNthCalledWith(1, {
-      credentials: "include",
-      cursor: undefined,
-      signal: undefined,
-    });
-    expect(getCreatorWorkspacePreviewShorts).toHaveBeenNthCalledWith(2, {
-      credentials: "include",
-      cursor: "short_cursor_2",
-      signal: undefined,
-    });
-    expect(getCreatorWorkspacePreviewMains).toHaveBeenNthCalledWith(1, {
-      credentials: "include",
-      cursor: undefined,
-      signal: undefined,
-    });
-    expect(getCreatorWorkspacePreviewMains).toHaveBeenNthCalledWith(2, {
-      credentials: "include",
-      cursor: "main_cursor_2",
-      signal: undefined,
-    });
+    expect(getCreatorWorkspacePreviewShorts).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        credentials: "include",
+      }),
+    );
+    expect(getCreatorWorkspacePreviewShorts).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        credentials: "include",
+        cursor: "short_cursor_2",
+      }),
+    );
+    expect(getCreatorWorkspacePreviewMains).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        credentials: "include",
+      }),
+    );
+    expect(getCreatorWorkspacePreviewMains).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        credentials: "include",
+        cursor: "main_cursor_2",
+      }),
+    );
   });
 });

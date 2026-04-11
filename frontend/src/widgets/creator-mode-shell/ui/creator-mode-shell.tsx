@@ -644,7 +644,10 @@ function CreatorWorkspacePreviewTileFrame({
       />
       <div className="absolute inset-0 flex flex-col justify-between bg-[linear-gradient(180deg,rgba(6,21,33,0.12)_0%,rgba(6,21,33,0.03)_34%,rgba(6,21,33,0.66)_100%)] p-2.5">
         <div className="flex items-start justify-between gap-2">
-          <span className="inline-flex min-h-6 items-center justify-center rounded-full bg-white/16 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white backdrop-blur-[10px]">
+          <span
+            aria-hidden="true"
+            className="inline-flex min-h-6 items-center justify-center rounded-full bg-white/16 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white backdrop-blur-[10px]"
+          >
             {badge}
           </span>
           <span className="sr-only">{badge}</span>
