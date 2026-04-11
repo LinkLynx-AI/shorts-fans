@@ -6,7 +6,7 @@ import {
   ArrowLeft,
   Bookmark,
   ChevronRight,
-  Settings,
+  Menu,
   SquarePlay,
 } from "lucide-react";
 
@@ -171,7 +171,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
               onClick={clearAccountMenuErrors}
               type="button"
             >
-              <Settings aria-hidden="true" className="size-5" strokeWidth={1.9} />
+              <Menu aria-hidden="true" className="size-5" strokeWidth={1.9} />
             </button>
           </Dialog.Trigger>
           <Dialog.Portal>

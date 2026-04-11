@@ -3,6 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import {
   ChevronRight,
+  Menu,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -25,26 +26,6 @@ import { CreatorWorkspacePreviewGrid } from "./creator-workspace-preview-grid";
 import { CreatorWorkspaceSummarySection } from "./creator-workspace-summary-section";
 import { CreatorWorkspaceTopPerformers } from "./creator-workspace-top-performers";
 
-function AccountMenuIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      className="size-5 fill-none stroke-current [stroke-linecap:round] [stroke-linejoin:round] [stroke-width:1.7]"
-      viewBox="0 0 20 20"
-    >
-      <line x1="10" x2="10" y1="1.8" y2="4.1" />
-      <line x1="10" x2="10" y1="15.9" y2="18.2" />
-      <line x1="1.8" x2="4.1" y1="10" y2="10" />
-      <line x1="15.9" x2="18.2" y1="10" y2="10" />
-      <line x1="4.2" x2="5.9" y1="4.2" y2="5.9" />
-      <line x1="14.1" x2="15.8" y1="14.1" y2="15.8" />
-      <line x1="14.1" x2="15.8" y1="5.9" y2="4.2" />
-      <line x1="4.2" x2="5.9" y1="15.8" y2="14.1" />
-      <circle cx="10" cy="10" r="3.1" />
-    </svg>
-  );
-}
-
 function CreatorWorkspaceAccountMenu() {
   const {
     clearError,
@@ -62,7 +43,7 @@ function CreatorWorkspaceAccountMenu() {
           onClick={clearError}
           type="button"
         >
-          <AccountMenuIcon />
+          <Menu aria-hidden="true" className="size-5" strokeWidth={1.9} />
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
