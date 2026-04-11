@@ -1,6 +1,5 @@
 import type { CreatorSummary } from "@/entities/creator";
-import type { MainSummary } from "@/entities/main";
-import type { ShortSummary } from "@/entities/short";
+import type { ShortMediaAsset } from "@/entities/short";
 
 import type { UnlockCtaState } from "./unlock-cta";
 
@@ -24,15 +23,30 @@ export type MainAccessEntry = {
   token: string;
 };
 
+export type UnlockMainSummary = {
+  durationSeconds: number;
+  id: string;
+  priceJpy: number;
+};
+
+export type UnlockShortSummary = {
+  caption: string;
+  canonicalMainId: string;
+  creatorId: string;
+  id: string;
+  media: ShortMediaAsset;
+  previewDurationSeconds: number;
+};
+
 export type MainPlaybackGrantKind = "owner" | "unlocked";
 
 export type UnlockSurfaceModel = {
   access: MainAccessState;
   creator: CreatorSummary;
   mainAccessEntry: MainAccessEntry;
-  main: MainSummary;
+  main: UnlockMainSummary;
   setup: UnlockSetupState;
-  short: ShortSummary;
+  short: UnlockShortSummary;
   unlockCta: UnlockCtaState;
 };
 

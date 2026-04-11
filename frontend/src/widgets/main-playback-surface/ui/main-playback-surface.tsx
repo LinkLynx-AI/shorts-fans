@@ -63,6 +63,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
   const statusCopy = getMainPlaybackStatusCopy(surface);
   const statusMeta = getMainPlaybackStatusMeta(surface);
   const continuationCopy = surface.entryShort ? buildShortContinuationCopy(surface.entryShort.caption) : "short の続きから再生中。";
+  const playbackHeading = surface.entryShort?.caption.trim() || "Main playback";
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -79,7 +80,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
 
       <div className="relative h-full">
-        <h1 className="sr-only">{surface.main.title}</h1>
+        <h1 className="sr-only">{playbackHeading}</h1>
         <div className="relative z-10 px-4 pt-4">
           <Button
             aria-label="Back"
@@ -93,7 +94,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
           </Button>
         </div>
 
-        <PinRail pinned={surface.viewer.isPinned} />
+        {surface.viewer.isPinned !== null ? <PinRail pinned={surface.viewer.isPinned} /> : null}
 
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
           <div className="flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl">

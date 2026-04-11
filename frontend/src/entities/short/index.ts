@@ -22,6 +22,11 @@ export type {
   ShortPinMutationResult,
 } from "./api/update-short-pin";
 export {
+  publicShortSummarySchema,
+  shortVideoDisplayAssetSchema,
+  unlockCtaStateSchema,
+} from "./api/contracts";
+export {
   buildShortContinuationCopy,
   buildShortPaywallTitle,
   getFeedShortForTab,

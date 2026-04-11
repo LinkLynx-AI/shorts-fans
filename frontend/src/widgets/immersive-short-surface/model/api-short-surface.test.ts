@@ -39,9 +39,8 @@ describe("api short surface builders", () => {
       },
     });
 
-    expect(surface.mainEntryEnabled).toBe(false);
+    expect(surface.mainEntryEnabled).toBe(true);
     expect(surface.short.caption).toBe("quiet rooftop preview");
-    expect(surface.short.title).toBe("quiet rooftop preview");
     expect(surface.unlock.access).toEqual({
       mainId: "main_33333333333333333333333333333333",
       reason: "unlock_required",
@@ -99,6 +98,7 @@ describe("api short surface builders", () => {
     });
     expect(surface.unlock.main.priceJpy).toBe(0);
     expect(surface.unlock.main.durationSeconds).toBe(16);
+    expect(surface.mainEntryEnabled).toBe(false);
     expect(surface.viewer).toEqual({
       isFollowingCreator: true,
       isPinned: false,
@@ -141,7 +141,6 @@ describe("api short surface builders", () => {
     });
 
     expect(surface.short.caption).toBe("");
-    expect(surface.short.title).toBe("");
-    expect(surface.unlock.main.title).toBe("");
+    expect(surface.unlock.short.caption).toBe("");
   });
 });

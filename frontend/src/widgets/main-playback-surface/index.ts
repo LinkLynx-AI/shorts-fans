@@ -1,4 +1,5 @@
 export { getMainPlaybackSurfaceById } from "./api/mock-main-playback";
+export { requestMainPlaybackSurface } from "./api/request-main-playback-surface";
 export {
   getMainPlaybackStatusCopy,
   getMainPlaybackStatusMeta,

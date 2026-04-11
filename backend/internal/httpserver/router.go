@@ -14,6 +14,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanmain"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
@@ -67,6 +68,18 @@ type ShortDisplayAssetResolver interface {
 	ResolveShortDisplayAsset(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error)
 }
 
+// MainDisplayAssetResolver は main 向け display asset 解決を表します。
+type MainDisplayAssetResolver interface {
+	ResolveMainDisplayAsset(ctx context.Context, source media.MainDisplaySource, boundary media.AccessBoundary, ttl time.Duration) (media.VideoDisplayAsset, error)
+}
+
+// FanUnlockMainService は fan unlock / main playback 導線を表します。
+type FanUnlockMainService interface {
+	GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error)
+	GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (fanmain.UnlockSurface, error)
+	IssueAccessEntry(ctx context.Context, sessionBinding string, input fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+}
+
 // CreatorFollowWriter は creator follow mutation を表します。
 type CreatorFollowWriter interface {
 	FollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
@@ -116,6 +129,7 @@ type HandlerConfig struct {
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
 	FanFeed              FanFeedReader
+	FanUnlockMain        FanUnlockMainService
 	FanShortPin          FanShortPinWriter
 	CreatorFollow        CreatorFollowWriter
 	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
@@ -125,6 +139,7 @@ type HandlerConfig struct {
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
 	ShortDisplayAssets   ShortDisplayAssetResolver
+	MainDisplayAssets    MainDisplayAssetResolver
 	ViewerActiveMode     ViewerActiveModeSwitcher
 	ViewerBootstrap      ViewerBootstrapReader
 	Dependencies         []Dependency
@@ -189,6 +204,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)
+	registerFanUnlockMainRoutes(router, config.FanUnlockMain, config.ShortDisplayAssets, config.MainDisplayAssets, config.ViewerBootstrap)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.CreatorAvatarUpload, config.ViewerActiveMode, config.ViewerBootstrap)

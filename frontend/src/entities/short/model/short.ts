@@ -144,6 +144,15 @@ const shorts = [
   },
 ] as const satisfies readonly ShortSummary[];
 
+const shortAliasIdsById: Readonly<Record<string, ShortId>> = {
+  short_aoi_balcony_cut: "balcony",
+  short_aoi_softlight: "softlight",
+  short_mina_hotel_mirror: "mirror",
+  short_mina_rooftop: "rooftop",
+  short_sora_afterrain: "afterrain",
+  short_sora_poolcut: "poolcut",
+};
+
 const shortThemes: Record<string, ShortTheme> = {
   afterrain: {
     background: {
@@ -223,6 +232,10 @@ const feedShortByTab = {
   recommended: "rooftop",
 } as const satisfies Record<FeedTab, ShortId>;
 
+function resolveShortId(id: ShortId): ShortId {
+  return shortAliasIdsById[id] ?? id;
+}
+
 /**
  * mock short 一覧を取得する。
  */
@@ -234,7 +247,9 @@ export function listShorts(): readonly ShortPreviewMeta[] {
  * short ID から preview meta を取得する。
  */
 export function getShortById(id: ShortId): ShortPreviewMeta | undefined {
-  return shorts.find((short) => short.id === id);
+  const resolvedId = resolveShortId(id);
+
+  return shorts.find((short) => short.id === resolvedId);
 }
 
 /**
@@ -284,7 +299,7 @@ export function buildShortContinuationCopy(caption: string): string {
  * short 背景用の CSS variable style を返す。
  */
 export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId): CSSProperties {
-  const shortId = typeof short === "string" ? short : short.id;
+  const shortId = resolveShortId(typeof short === "string" ? short : short.id);
   const theme = shortThemes[shortId] ?? getFallbackShortTheme(shortId);
 
   return {

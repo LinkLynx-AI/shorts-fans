@@ -8,7 +8,6 @@
             "id": "short_mina_rooftop",
             "canonicalMainId": "main_mina_quiet_rooftop",
             "creatorId": "creator_mina_rei",
-            "title": "quiet rooftop preview",
             "caption": "quiet rooftop preview。",
             "media": {
               "id": "asset_short_mina_rooftop",
@@ -34,7 +33,6 @@
           },
           "main": {
             "id": "main_mina_quiet_rooftop",
-            "title": "quiet rooftop main",
             "durationSeconds": 480,
             "priceJpy": 1800
           },
@@ -74,7 +72,6 @@
             "id": "short_sora_afterrain",
             "canonicalMainId": "main_sora_after_rain",
             "creatorId": "creator_sora_vale",
-            "title": "after rain preview",
             "caption": "雨上がりの balcony preview。続きは main で。",
             "media": {
               "id": "asset_short_sora_afterrain",
@@ -100,7 +97,6 @@
           },
           "main": {
             "id": "main_sora_after_rain",
-            "title": "after rain main",
             "durationSeconds": 540,
             "priceJpy": 2100
           },
@@ -140,7 +136,6 @@
             "id": "short_aoi_softlight",
             "canonicalMainId": "main_aoi_blue_balcony",
             "creatorId": "creator_aoi_n",
-            "title": "soft light preview",
             "caption": "soft light の preview。",
             "media": {
               "id": "asset_short_aoi_softlight",
@@ -166,7 +161,6 @@
           },
           "main": {
             "id": "main_aoi_blue_balcony",
-            "title": "blue balcony main",
             "durationSeconds": 720,
             "priceJpy": 2200
           },
@@ -206,7 +200,6 @@
             "id": "short_aoi_balcony_cut",
             "canonicalMainId": "main_aoi_blue_balcony",
             "creatorId": "creator_aoi_n",
-            "title": "balcony cut preview",
             "caption": "blue tone の balcony preview。",
             "media": {
               "id": "asset_short_aoi_balcony_cut",
@@ -232,7 +225,6 @@
           },
           "main": {
             "id": "main_aoi_blue_balcony",
-            "title": "blue balcony main",
             "durationSeconds": 720,
             "priceJpy": 2200
           },
@@ -357,7 +349,6 @@
         "data": {
           "main": {
             "id": "main_aoi_blue_balcony",
-            "title": "blue balcony main",
             "media": {
               "id": "asset_main_aoi_blue_balcony",
               "kind": "video",
@@ -390,7 +381,6 @@
             "id": "short_aoi_softlight",
             "canonicalMainId": "main_aoi_blue_balcony",
             "creatorId": "creator_aoi_n",
-            "title": "soft light preview",
             "caption": "soft light の preview。",
             "media": {
               "id": "asset_short_aoi_softlight",
@@ -415,7 +405,6 @@
         "data": {
           "main": {
             "id": "main_aoi_blue_balcony",
-            "title": "blue balcony main",
             "media": {
               "id": "asset_main_aoi_blue_balcony",
               "kind": "video",
@@ -448,7 +437,6 @@
             "id": "short_aoi_balcony_cut",
             "canonicalMainId": "main_aoi_blue_balcony",
             "creatorId": "creator_aoi_n",
-            "title": "balcony cut preview",
             "caption": "blue tone の balcony preview。",
             "media": {
               "id": "asset_short_aoi_balcony_cut",
