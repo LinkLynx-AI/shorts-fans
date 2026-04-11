@@ -33,6 +33,15 @@ describe("short model", () => {
     });
   });
 
+  it("resolves API alias IDs to the local short fixtures", () => {
+    expect(getShortById("short_mina_rooftop")?.id).toBe("rooftop");
+    expect(getShortById("short_aoi_softlight")?.id).toBe("softlight");
+    expect(getShortThemeStyle("short_mina_rooftop")).toMatchObject({
+      "--short-bg-mid": "#2a648f",
+      "--short-tile-top": "#d8f3ff",
+    });
+  });
+
   it("falls back to a stable theme for unknown short ids", () => {
     const first = getShortThemeStyle("short_dbcc1756d3d9406988e6860c7348609c");
     const second = getShortThemeStyle("short_dbcc1756d3d9406988e6860c7348609c");

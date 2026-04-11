@@ -163,6 +163,37 @@ func TestShortPublicURLRejectsBlankStorageKey(t *testing.T) {
 	}
 }
 
+func TestShortSignedURL(t *testing.T) {
+	t.Parallel()
+
+	signer := &stubMainURLSigner{url: "https://signed.example.com/short-object"}
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		ShortPublicBucketName: "short-bucket",
+		MainPrivateBucketName: "main-bucket",
+	}, signer)
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	got, err := delivery.ShortSignedURL("probe/short.m3u8", 0)
+	if err != nil {
+		t.Fatalf("ShortSignedURL() error = %v, want nil", err)
+	}
+	if got != "https://signed.example.com/short-object" {
+		t.Fatalf("ShortSignedURL() url got %q want %q", got, "https://signed.example.com/short-object")
+	}
+	if signer.bucket != "short-bucket" {
+		t.Fatalf("ShortSignedURL() bucket got %q want %q", signer.bucket, "short-bucket")
+	}
+	if signer.key != "probe/short.m3u8" {
+		t.Fatalf("ShortSignedURL() key got %q want %q", signer.key, "probe/short.m3u8")
+	}
+	if signer.expires != DefaultSignedURLTTL {
+		t.Fatalf("ShortSignedURL() expires got %s want %s", signer.expires, DefaultSignedURLTTL)
+	}
+}
+
 func TestMainSignedURL(t *testing.T) {
 	t.Parallel()
 
@@ -302,10 +333,45 @@ func TestResolveShortDisplayAssetRejectsUnsupportedBoundary(t *testing.T) {
 		DurationMS: 1,
 	}
 
-	for _, boundary := range []AccessBoundary{AccessBoundaryPrivate, AccessBoundaryOwner} {
-		if _, err := delivery.ResolveShortDisplayAsset(source, boundary); err == nil {
-			t.Fatalf("ResolveShortDisplayAsset() boundary=%s error = nil, want error", boundary)
-		}
+	if _, err := delivery.ResolveShortDisplayAsset(source, AccessBoundaryPrivate); err == nil {
+		t.Fatal("ResolveShortDisplayAsset() boundary=private error = nil, want error")
+	}
+}
+
+func TestResolveShortDisplayAssetOwnerBoundary(t *testing.T) {
+	t.Parallel()
+
+	signer := &stubMainURLSigner{
+		urls: map[string]string{
+			"shorts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/playback.mp4": "https://signed.example.com/short-playback",
+			"shorts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster.jpg":   "https://signed.example.com/short-poster",
+		},
+	}
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		ShortPublicBucketName: "short-bucket",
+		MainPrivateBucketName: "main-bucket",
+	}, signer)
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	got, err := delivery.ResolveShortDisplayAsset(ShortDisplaySource{
+		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+		ShortID:    mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		DurationMS: 42001,
+	}, AccessBoundaryOwner)
+	if err != nil {
+		t.Fatalf("ResolveShortDisplayAsset() owner error = %v, want nil", err)
+	}
+	if got.URL != "https://signed.example.com/short-playback" {
+		t.Fatalf("ResolveShortDisplayAsset() owner playback url got %q want %q", got.URL, "https://signed.example.com/short-playback")
+	}
+	if got.PosterURL != "https://signed.example.com/short-poster" {
+		t.Fatalf("ResolveShortDisplayAsset() owner poster url got %q want %q", got.PosterURL, "https://signed.example.com/short-poster")
+	}
+	if len(signer.calls) != 2 {
+		t.Fatalf("ResolveShortDisplayAsset() owner signer call count got %d want %d", len(signer.calls), 2)
 	}
 }
 

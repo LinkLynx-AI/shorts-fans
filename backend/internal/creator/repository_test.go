@@ -52,6 +52,10 @@ func (s stubQueries) GetMediaAssetByID(context.Context, pgtype.UUID) (sqlc.AppMe
 	return sqlc.AppMediaAsset{}, nil
 }
 
+func (s stubQueries) GetShortByID(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+	return sqlc.AppShort{}, nil
+}
+
 func (s stubQueries) UpdateCreatorCapabilityState(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
 	return sqlc.AppCreatorCapability{}, nil
 }

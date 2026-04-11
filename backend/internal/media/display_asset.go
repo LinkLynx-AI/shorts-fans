@@ -53,7 +53,7 @@ type MainDisplaySource struct {
 	DurationMS int64
 }
 
-// ResolveShortDisplayAsset は short 用の playback/poster pair を public boundary で返します。
+// ResolveShortDisplayAsset は short 用の playback/poster pair を boundary ごとに返します。
 func (d *Delivery) ResolveShortDisplayAsset(source ShortDisplaySource, boundary AccessBoundary) (VideoDisplayAsset, error) {
 	if err := source.validate(); err != nil {
 		return VideoDisplayAsset{}, err
@@ -67,11 +67,18 @@ func (d *Delivery) ResolveShortDisplayAsset(source ShortDisplaySource, boundary 
 		return VideoDisplayAsset{}, err
 	}
 
-	playbackURL, err := d.ShortPublicURL(keys.Playback)
+	resolveShortURL := d.ShortPublicURL
+	if boundary == AccessBoundaryOwner {
+		resolveShortURL = func(storageKey string) (string, error) {
+			return d.ShortSignedURL(storageKey, DefaultSignedURLTTL)
+		}
+	}
+
+	playbackURL, err := resolveShortURL(keys.Playback)
 	if err != nil {
 		return VideoDisplayAsset{}, fmt.Errorf("resolve short playback url short=%s: %w", source.ShortID, err)
 	}
-	posterURL, err := d.ShortPublicURL(keys.Poster)
+	posterURL, err := resolveShortURL(keys.Poster)
 	if err != nil {
 		return VideoDisplayAsset{}, fmt.Errorf("resolve short poster url short=%s: %w", source.ShortID, err)
 	}
@@ -185,7 +192,7 @@ func buildVideoPreviewCardAsset(assetID uuid.UUID, posterURL string, durationMS 
 
 func validateShortBoundary(boundary AccessBoundary) error {
 	switch boundary {
-	case AccessBoundaryPublic:
+	case AccessBoundaryPublic, AccessBoundaryOwner:
 		return nil
 	default:
 		return fmt.Errorf("unsupported short access boundary: %s", boundary)

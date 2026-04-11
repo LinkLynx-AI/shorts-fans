@@ -1,5 +1,3 @@
-import { z } from "zod";
-
 import { getCreatorById } from "@/entities/creator";
 import { getMainById } from "@/entities/main";
 import { getShortById } from "@/entities/short";
@@ -10,79 +8,7 @@ import {
   getMockMainAccessRoutePath,
   type UnlockSurfaceModel,
 } from "../model/unlock-entry";
-
-const accessSchema = z.object({
-  mainId: z.string().min(1),
-  reason: z.enum(["owner_preview", "session_unlocked", "unlock_required"]),
-  status: z.enum(["locked", "owner", "unlocked"]),
-});
-
-const unlockCtaSchema = z.object({
-  mainDurationSeconds: z.number().int().positive().nullable(),
-  priceJpy: z.number().int().positive().nullable(),
-  resumePositionSeconds: z.number().int().nonnegative().nullable(),
-  state: z.enum(["continue_main", "owner_preview", "setup_required", "unavailable", "unlock_available"]),
-});
-
-const setupSchema = z.object({
-  required: z.boolean(),
-  requiresAgeConfirmation: z.boolean(),
-  requiresTermsAcceptance: z.boolean(),
-});
-
-const mediaAssetSchema = z.object({
-  durationSeconds: z.number().int().nonnegative().nullable(),
-  id: z.string().min(1),
-  kind: z.literal("video"),
-  posterUrl: z.string().nullable(),
-  url: z.string().url(),
-});
-
-const shortSchema = z.object({
-  canonicalMainId: z.string().min(1),
-  caption: z.string().min(1),
-  creatorId: z.string().min(1),
-  id: z.string().min(1),
-  media: mediaAssetSchema,
-  previewDurationSeconds: z.number().int().nonnegative(),
-  title: z.string().min(1),
-});
-
-const creatorAssetSchema = z.object({
-  durationSeconds: z.null(),
-  id: z.string().min(1),
-  kind: z.literal("image"),
-  posterUrl: z.null(),
-  url: z.string().min(1),
-});
-
-const creatorSchema = z.object({
-  avatar: creatorAssetSchema,
-  bio: z.string().min(1),
-  displayName: z.string().min(1),
-  handle: z.custom<`@${string}`>((value) => typeof value === "string" && value.startsWith("@")),
-  id: z.string().min(1),
-});
-
-const mainSummarySchema = z.object({
-  durationSeconds: z.number().int().positive(),
-  id: z.string().min(1),
-  priceJpy: z.number().int().positive(),
-  title: z.string().min(1),
-});
-
-const unlockSurfaceSchema = z.object({
-  access: accessSchema,
-  creator: creatorSchema,
-  mainAccessEntry: z.object({
-    routePath: z.string().min(1),
-    token: z.string().min(1),
-  }),
-  main: mainSummarySchema,
-  setup: setupSchema,
-  short: shortSchema,
-  unlockCta: unlockCtaSchema,
-});
+import { unlockSurfaceSchema } from "./contracts";
 
 type RawUnlockState = {
   access: UnlockSurfaceModel["access"];
@@ -234,16 +160,18 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
     creator,
     mainAccessEntry: {
       routePath: getMockMainAccessRoutePath(main.id),
-      token: issueMockSignedToken(buildMockMainAccessEntryContext(main.id, short.id)),
+      token: issueMockSignedToken(buildMockMainAccessEntryContext(main.id, shortId)),
     },
     main: {
       durationSeconds: main.durationSeconds,
       id: main.id,
       priceJpy: main.priceJpy,
-      title: main.title,
     },
     setup: rawState.setup,
-    short,
+    short: {
+      ...short,
+      id: shortId,
+    },
     unlockCta: rawState.unlockCta,
   });
 }

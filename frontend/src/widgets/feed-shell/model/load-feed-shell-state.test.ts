@@ -78,7 +78,7 @@ describe("loadFeedShellState", () => {
     };
     const surface = {
       creator: apiItem.creator,
-      mainEntryEnabled: false,
+      mainEntryEnabled: true,
       short: {
         ...apiItem.short,
         title: apiItem.short.caption,

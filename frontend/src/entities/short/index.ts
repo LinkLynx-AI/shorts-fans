@@ -16,14 +16,16 @@ export type {
   FanFeedTab,
   PublicShortDetail,
 } from "./api/contracts";
-export {
-  publicShortSummarySchema,
-} from "./api/contracts";
 export type {
   ShortPinAction,
   ShortPinApiErrorCode,
   ShortPinMutationResult,
 } from "./api/update-short-pin";
+export {
+  publicShortSummarySchema,
+  shortVideoDisplayAssetSchema,
+  unlockCtaStateSchema,
+} from "./api/contracts";
 export {
   buildShortContinuationCopy,
   buildShortPaywallTitle,

@@ -1,10 +1,10 @@
 import type { CreatorSummary } from "@/entities/creator";
-import type { FanFeedItem, PublicShortDetail, ShortPreviewMeta } from "@/entities/short";
+import type { FanFeedItem, PublicShortDetail } from "@/entities/short";
 import { getMockMainAccessRoutePath, type MainAccessState, type UnlockCtaState, type UnlockSurfaceModel } from "@/features/unlock-entry";
 
 import type { DetailShortSurface, FeedShortSurface } from "./short-surface";
 
-function buildShortPreviewMeta(item: FanFeedItem["short"]): ShortPreviewMeta {
+function buildShortPreviewMeta(item: FanFeedItem["short"]): UnlockSurfaceModel["short"] {
   return {
     caption: item.caption,
     canonicalMainId: item.canonicalMainId,
@@ -12,7 +12,6 @@ function buildShortPreviewMeta(item: FanFeedItem["short"]): ShortPreviewMeta {
     id: item.id,
     media: item.media,
     previewDurationSeconds: item.previewDurationSeconds,
-    title: item.caption,
   };
 }
 
@@ -45,7 +44,7 @@ function buildUnlockSurfaceModel({
   unlockCta,
 }: {
   creator: CreatorSummary;
-  short: ShortPreviewMeta;
+  short: UnlockSurfaceModel["short"];
   unlockCta: UnlockCtaState;
 }): UnlockSurfaceModel {
   return {
@@ -55,7 +54,6 @@ function buildUnlockSurfaceModel({
       durationSeconds: unlockCta.mainDurationSeconds ?? short.previewDurationSeconds,
       id: short.canonicalMainId,
       priceJpy: unlockCta.priceJpy ?? 0,
-      title: short.caption,
     },
     mainAccessEntry: {
       routePath: getMockMainAccessRoutePath(short.canonicalMainId),
@@ -76,7 +74,7 @@ function buildShortSurfaceBase(item: Pick<FanFeedItem, "creator" | "short" | "un
 
   return {
     creator: item.creator,
-    mainEntryEnabled: false,
+    mainEntryEnabled: true,
     short,
     unlock: buildUnlockSurfaceModel({
       creator: item.creator,
@@ -105,6 +103,7 @@ export function buildFeedSurfaceFromApiItem(item: FanFeedItem): FeedShortSurface
 export function buildDetailSurfaceFromApi(detail: PublicShortDetail): DetailShortSurface {
   return {
     ...buildShortSurfaceBase(detail),
+    mainEntryEnabled: false,
     viewer: {
       isFollowingCreator: detail.viewer.isFollowingCreator,
       isPinned: detail.viewer.isPinned,

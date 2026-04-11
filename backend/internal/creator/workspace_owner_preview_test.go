@@ -11,6 +11,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -275,6 +276,269 @@ func TestListWorkspacePreviewMainsSkipsUnexpectedCurrency(t *testing.T) {
 	}
 }
 
+func TestGetWorkspacePreviewShortDetail(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("0b0b0b0b-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("0c0c0c0c-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("0d0d0d0d-1111-1111-1111-111111111111")
+	assetID := uuid.MustParse("0e0e0e0e-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
+			}
+			return testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")), nil
+		},
+		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
+			if id != pgUUID(assetID) {
+				t.Fatalf("GetMediaAssetByID() id got %v want %v", id, pgUUID(assetID))
+			}
+			return testWorkspacePreviewAssetRow(assetID, viewerUserID, now, int64Ptr(16000), workspacePreviewAssetReadyState), nil
+		},
+	})
+	repo.delivery = delivery
+
+	got, err := repo.GetWorkspacePreviewShortDetail(context.Background(), viewerUserID, shortID)
+	if err != nil {
+		t.Fatalf("GetWorkspacePreviewShortDetail() error = %v, want nil", err)
+	}
+	if got.Creator.UserID != viewerUserID {
+		t.Fatalf("GetWorkspacePreviewShortDetail() creator got %s want %s", got.Creator.UserID, viewerUserID)
+	}
+	if got.Short.ID != shortID {
+		t.Fatalf("GetWorkspacePreviewShortDetail() short id got %s want %s", got.Short.ID, shortID)
+	}
+	if got.Short.CanonicalMainID != mainID {
+		t.Fatalf("GetWorkspacePreviewShortDetail() canonical main id got %s want %s", got.Short.CanonicalMainID, mainID)
+	}
+	if got.Short.Title != "quiet rooftop preview" {
+		t.Fatalf("GetWorkspacePreviewShortDetail() title got %q want %q", got.Short.Title, "quiet rooftop preview")
+	}
+	if got.Short.Media.URL == "" {
+		t.Fatal("GetWorkspacePreviewShortDetail() media url = empty, want playback url")
+	}
+}
+
+func TestGetWorkspacePreviewShortDetailReturnsNotFoundWhenShortMissing(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("3b3b3b3b-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("3d3d3d3d-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
+			}
+			return sqlc.AppShort{}, pgx.ErrNoRows
+		},
+	})
+	repo.delivery = delivery
+
+	_, err := repo.GetWorkspacePreviewShortDetail(context.Background(), viewerUserID, shortID)
+	if !errors.Is(err, ErrWorkspacePreviewNotFound) {
+		t.Fatalf("GetWorkspacePreviewShortDetail() error got %v want %v", err, ErrWorkspacePreviewNotFound)
+	}
+}
+
+func TestGetWorkspacePreviewShortDetailReturnsNotFoundWhenShortIsNotPreviewable(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("5b5b5b5b-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("5c5c5c5c-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("5d5d5d5d-1111-1111-1111-111111111111")
+	assetID := uuid.MustParse("5e5e5e5e-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
+			}
+			return testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")), nil
+		},
+		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
+			if id != pgUUID(assetID) {
+				t.Fatalf("GetMediaAssetByID() id got %v want %v", id, pgUUID(assetID))
+			}
+			return testWorkspacePreviewAssetRow(assetID, viewerUserID, now, int64Ptr(16000), "uploaded"), nil
+		},
+	})
+	repo.delivery = delivery
+
+	_, err := repo.GetWorkspacePreviewShortDetail(context.Background(), viewerUserID, shortID)
+	if !errors.Is(err, ErrWorkspacePreviewNotFound) {
+		t.Fatalf("GetWorkspacePreviewShortDetail() error got %v want %v", err, ErrWorkspacePreviewNotFound)
+	}
+}
+
+func TestGetWorkspacePreviewMainDetail(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("1b1b1b1b-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("1c1c1c1c-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("1d1d1d1d-1111-1111-1111-111111111111")
+	mainAssetID := uuid.MustParse("1e1e1e1e-1111-1111-1111-111111111111")
+	shortAssetID := uuid.MustParse("1f1f1f1f-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			return []sqlc.AppMain{
+				testWorkspacePreviewMainRecord(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+			}, nil
+		},
+		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
+			return []sqlc.AppShort{
+				testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, shortAssetID, now.Add(time.Minute), "approved_for_publish", stringPtr("quiet rooftop preview.")),
+			}, nil
+		},
+		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
+			switch id {
+			case pgUUID(mainAssetID):
+				return testWorkspacePreviewAssetRow(mainAssetID, viewerUserID, now, int64Ptr(720000), workspacePreviewAssetReadyState), nil
+			case pgUUID(shortAssetID):
+				return testWorkspacePreviewAssetRow(shortAssetID, viewerUserID, now, int64Ptr(16000), workspacePreviewAssetReadyState), nil
+			default:
+				t.Fatalf("GetMediaAssetByID() id got %v", id)
+				return sqlc.AppMediaAsset{}, nil
+			}
+		},
+	})
+	repo.delivery = delivery
+
+	got, err := repo.GetWorkspacePreviewMainDetail(context.Background(), viewerUserID, mainID)
+	if err != nil {
+		t.Fatalf("GetWorkspacePreviewMainDetail() error = %v, want nil", err)
+	}
+	if got.Main.ID != mainID {
+		t.Fatalf("GetWorkspacePreviewMainDetail() main id got %s want %s", got.Main.ID, mainID)
+	}
+	if got.Main.Title != "" {
+		t.Fatalf("GetWorkspacePreviewMainDetail() title got %q want empty string", got.Main.Title)
+	}
+	if got.EntryShort.ID != shortID {
+		t.Fatalf("GetWorkspacePreviewMainDetail() entry short id got %s want %s", got.EntryShort.ID, shortID)
+	}
+	if got.EntryShort.Title != "quiet rooftop preview" {
+		t.Fatalf("GetWorkspacePreviewMainDetail() entry short title got %q want %q", got.EntryShort.Title, "quiet rooftop preview")
+	}
+	if got.Main.Media.URL == "" {
+		t.Fatal("GetWorkspacePreviewMainDetail() media url = empty, want playback url")
+	}
+}
+
+func TestGetWorkspacePreviewMainDetailReturnsNotFoundWhenMainMissing(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("4b4b4b4b-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("4c4c4c4c-1111-1111-1111-111111111111")
+	otherMainID := uuid.MustParse("4d4d4d4d-1111-1111-1111-111111111111")
+	mainAssetID := uuid.MustParse("4e4e4e4e-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			return []sqlc.AppMain{
+				testWorkspacePreviewMainRecord(otherMainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+			}, nil
+		},
+	})
+	repo.delivery = delivery
+
+	_, err := repo.GetWorkspacePreviewMainDetail(context.Background(), viewerUserID, mainID)
+	if !errors.Is(err, ErrWorkspacePreviewNotFound) {
+		t.Fatalf("GetWorkspacePreviewMainDetail() error got %v want %v", err, ErrWorkspacePreviewNotFound)
+	}
+}
+
+func TestGetWorkspacePreviewMainDetailReturnsNotFoundWithoutPreviewableEntryShort(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("2b2b2b2b-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("2c2c2c2c-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("2d2d2d2d-1111-1111-1111-111111111111")
+	mainAssetID := uuid.MustParse("2e2e2e2e-1111-1111-1111-111111111111")
+	shortAssetID := uuid.MustParse("2f2f2f2f-1111-1111-1111-111111111111")
+
+	delivery := newWorkspacePreviewDelivery(t)
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			return []sqlc.AppMain{
+				testWorkspacePreviewMainRecord(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+			}, nil
+		},
+		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
+			return []sqlc.AppShort{
+				testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, shortAssetID, now.Add(time.Minute), "approved_for_publish", stringPtr("quiet rooftop preview.")),
+			}, nil
+		},
+		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
+			switch id {
+			case pgUUID(mainAssetID):
+				return testWorkspacePreviewAssetRow(mainAssetID, viewerUserID, now, int64Ptr(720000), workspacePreviewAssetReadyState), nil
+			case pgUUID(shortAssetID):
+				return testWorkspacePreviewAssetRow(shortAssetID, viewerUserID, now, int64Ptr(16000), "uploaded"), nil
+			default:
+				t.Fatalf("GetMediaAssetByID() id got %v", id)
+				return sqlc.AppMediaAsset{}, nil
+			}
+		},
+	})
+	repo.delivery = delivery
+
+	_, err := repo.GetWorkspacePreviewMainDetail(context.Background(), viewerUserID, mainID)
+	if !errors.Is(err, ErrWorkspacePreviewNotFound) {
+		t.Fatalf("GetWorkspacePreviewMainDetail() error got %v want %v", err, ErrWorkspacePreviewNotFound)
+	}
+}
+
 func TestWorkspacePreviewHelpers(t *testing.T) {
 	t.Parallel()
 
@@ -355,6 +619,7 @@ func newWorkspacePreviewDelivery(t *testing.T) *media.Delivery {
 
 	delivery, err := media.NewDelivery(media.DeliveryConfig{
 		ShortPublicBaseURL:    "https://cdn.example.com/shorts",
+		ShortPublicBucketName: "short-public-bucket",
 		MainPrivateBucketName: "main-private-bucket",
 	}, workspacePreviewSignerStub{})
 	if err != nil {
@@ -385,6 +650,27 @@ func testWorkspacePreviewMainRow(
 	}
 }
 
+func testWorkspacePreviewMainRecord(
+	id uuid.UUID,
+	creatorID uuid.UUID,
+	mediaAssetID uuid.UUID,
+	createdAt time.Time,
+	state string,
+	priceMinor int64,
+	currencyCode string,
+) sqlc.AppMain {
+	return sqlc.AppMain{
+		ID:            postgres.UUIDToPG(id),
+		CreatorUserID: postgres.UUIDToPG(creatorID),
+		MediaAssetID:  postgres.UUIDToPG(mediaAssetID),
+		State:         state,
+		PriceMinor:    priceMinor,
+		CurrencyCode:  currencyCode,
+		CreatedAt:     postgres.TimeToPG(&createdAt),
+		UpdatedAt:     postgres.TimeToPG(&createdAt),
+	}
+}
+
 func testWorkspacePreviewShortRow(
 	id uuid.UUID,
 	creatorID uuid.UUID,
@@ -402,6 +688,21 @@ func testWorkspacePreviewShortRow(
 		CreatedAt:       postgres.TimeToPG(&createdAt),
 		UpdatedAt:       postgres.TimeToPG(&createdAt),
 	}
+}
+
+func testWorkspacePreviewShortRowWithCaption(
+	id uuid.UUID,
+	creatorID uuid.UUID,
+	canonicalMainID uuid.UUID,
+	mediaAssetID uuid.UUID,
+	createdAt time.Time,
+	state string,
+	caption *string,
+) sqlc.AppShort {
+	row := testWorkspacePreviewShortRow(id, creatorID, canonicalMainID, mediaAssetID, createdAt, state)
+	row.Caption = postgres.TextToPG(caption)
+
+	return row
 }
 
 func testWorkspacePreviewAssetRow(

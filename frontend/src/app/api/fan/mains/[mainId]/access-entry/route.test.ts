@@ -160,6 +160,27 @@ describe("POST /api/fan/mains/[mainId]/access-entry", () => {
     });
   });
 
+  it("accepts API-style short ids when the unlock flow starts from the feed surface", async () => {
+    const response = await postMainAccessEntry(
+      "main_mina_quiet_rooftop",
+      {
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: issueMockSignedToken(
+          buildMockMainAccessEntryContext("main_mina_quiet_rooftop", "short_mina_rooftop"),
+        ),
+        fromShortId: "short_mina_rooftop",
+      },
+      "viewer-session",
+    );
+
+    await expectPlaybackGrantResponse(response, {
+      fromShortId: "short_mina_rooftop",
+      grantKind: "unlocked",
+      mainId: "main_mina_quiet_rooftop",
+    });
+  });
+
   it("issues an unlocked playback grant for continue_main entries", async () => {
     const response = await postMainAccessEntry(
       "main_aoi_blue_balcony",

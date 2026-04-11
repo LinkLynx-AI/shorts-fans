@@ -39,7 +39,6 @@
 - `data.short`: `ShortSummary`
 - `data.creator`: `CreatorSummary`
 - `data.main.id`: `string`
-- `data.main.title`: `string`
 - `data.main.durationSeconds`: `number`
 - `data.main.priceJpy`: `number`
 - `data.mainAccessEntry.routePath`: `string`
@@ -127,7 +126,6 @@
 #### Response
 
 - `data.main.id`: `string`
-- `data.main.title`: `string`
 - `data.main.media`: `VideoDisplayAsset`
 - `data.main.durationSeconds`: `number`
 - `data.creator`: `CreatorSummary`

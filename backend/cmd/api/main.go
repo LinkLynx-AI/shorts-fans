@@ -15,6 +15,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanmain"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
@@ -78,6 +79,7 @@ func main() {
 
 	delivery, err := media.NewDelivery(media.DeliveryConfig{
 		ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+		ShortPublicBucketName: cfg.MediaShortPublicBucketName,
 		MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
 	}, s3Client)
 	if err != nil {
@@ -88,8 +90,9 @@ func main() {
 	creatorRepository := creator.NewRepository(pool, delivery)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
-	fanProfileRepository := fanprofile.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
+	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository)
+	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
@@ -97,6 +100,7 @@ func main() {
 	shortDisplayDelivery, err := media.NewDelivery(
 		media.DeliveryConfig{
 			ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+			ShortPublicBucketName: cfg.MediaShortPublicBucketName,
 			MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
 		},
 		s3Client,
@@ -146,6 +150,7 @@ func main() {
 			CreatorProfile:         creatorRepository,
 			CreatorProfileShorts:   creatorRepository,
 			FanFeed:                feedRepository,
+			FanUnlockMain:          fanUnlockMainService,
 			FanShortPin:            shortsRepository,
 			CreatorFollow:          creatorRepository,
 			CreatorAvatarUpload:    creatorAvatarService,
@@ -156,6 +161,7 @@ func main() {
 			FanAuth:                authLifecycle,
 			AuthCookie:             httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
 			ShortDisplayAssets:     shortDisplayDelivery,
+			MainDisplayAssets:      shortDisplayDelivery,
 			ViewerActiveMode:       modeSwitcher,
 			ViewerBootstrap:        viewerBootstrapReader,
 			Dependencies: []httpserver.Dependency{

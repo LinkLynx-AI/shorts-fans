@@ -38,7 +38,6 @@ function createUnlockSurfaceModel(
       durationSeconds: 480,
       id: "main_rooftop",
       priceJpy: 1800,
-      title: "quiet rooftop main",
     },
     setup: {
       required: state === "setup_required",
@@ -58,7 +57,6 @@ function createUnlockSurfaceModel(
         url: "https://cdn.example.com/short.mp4",
       },
       previewDurationSeconds: 16,
-      title: "quiet rooftop preview",
     },
     unlockCta: {
       mainDurationSeconds: state === "continue_main" ? null : 480,
