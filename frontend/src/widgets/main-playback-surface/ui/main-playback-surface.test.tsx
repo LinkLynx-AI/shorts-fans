@@ -53,6 +53,8 @@ describe("MainPlaybackSurface", () => {
     expect(video).toHaveAttribute("playsinline");
     expect(video).toHaveAttribute("poster", surface.main.media.posterUrl ?? undefined);
     expect(video).toHaveAttribute("src", surface.main.media.url);
+    expect(video.nextElementSibling).toHaveClass("pointer-events-none");
+    expect(video.nextElementSibling?.nextElementSibling).toHaveClass("pointer-events-none");
     expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute(
       "href",
       "/creators/creator_aoi_n",
