@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 
@@ -7,6 +7,7 @@ import { MainPlaybackSurface } from "./main-playback-surface";
 
 const back = vi.fn();
 const push = vi.fn();
+const play = vi.fn<() => Promise<void>>();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
@@ -16,9 +17,16 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("MainPlaybackSurface", () => {
+  beforeEach(() => {
+    play.mockReset();
+    play.mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(play);
+  });
+
   afterEach(() => {
     back.mockReset();
     push.mockReset();
+    vi.restoreAllMocks();
   });
 
   it("renders playback status and falls back to the provided short when there is no browser history", async () => {
@@ -34,11 +42,19 @@ describe("MainPlaybackSurface", () => {
 
     render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
 
+    const video = screen.getByLabelText("Main playback video");
+
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
     expect(screen.getByText("Playing main")).toBeInTheDocument();
     expect(screen.getByText("resume without another unlock step")).toBeInTheDocument();
     expect(screen.getByText("3:18")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pin short" })).toBeInTheDocument();
+    expect(video).toHaveAttribute("controls");
+    expect(video).toHaveAttribute("playsinline");
+    expect(video).toHaveAttribute("poster", surface.main.media.posterUrl ?? undefined);
+    expect(video).toHaveAttribute("src", surface.main.media.url);
+    expect(video.nextElementSibling).toHaveClass("pointer-events-none");
+    expect(video.nextElementSibling?.nextElementSibling).toHaveClass("pointer-events-none");
     expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute(
       "href",
       "/creators/creator_aoi_n",
@@ -75,6 +91,91 @@ describe("MainPlaybackSurface", () => {
 
     expect(back).toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("applies the resume position to actual playback after metadata loads", () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+
+    const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
+
+    expect(video.currentTime).toBe(0);
+
+    fireEvent(video, new Event("loadedmetadata"));
+
+    expect(video.currentTime).toBe(surface.resumePositionSeconds);
+  });
+
+  it("falls back to muted autoplay when the first playback attempt is rejected", async () => {
+    play.mockRejectedValueOnce(new Error("autoplay blocked")).mockResolvedValueOnce(undefined);
+
+    const surface = getMainPlaybackSurfaceById("main_sora_after_rain", "afterrain", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    render(<MainPlaybackSurface fallbackHref="/shorts/afterrain" surface={surface} />);
+
+    const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
+
+    fireEvent(video, new Event("loadedmetadata"));
+
+    await waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(2);
+    });
+
+    expect(video.muted).toBe(true);
+  });
+
+  it("reapplies the resume position when the playback URL changes for the same media", () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    const { rerender } = render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+
+    const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
+
+    fireEvent(video, new Event("loadedmetadata"));
+    expect(video.currentTime).toBe(surface.resumePositionSeconds);
+
+    video.currentTime = 0;
+
+    rerender(
+      <MainPlaybackSurface
+        fallbackHref="/shorts/softlight"
+        surface={{
+          ...surface,
+          main: {
+            ...surface.main,
+            media: {
+              ...surface.main.media,
+              url: "https://cdn.example.com/mains/aoi-blue-balcony-refreshed.mp4",
+            },
+          },
+        }}
+      />,
+    );
+
+    fireEvent(screen.getByLabelText("Main playback video"), new Event("loadedmetadata"));
+
+    expect((screen.getByLabelText("Main playback video") as HTMLVideoElement).currentTime).toBe(
+      surface.resumePositionSeconds,
+    );
   });
 
   it("falls back to a generic continuation copy when the entry short caption is empty", () => {
