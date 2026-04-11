@@ -60,6 +60,7 @@ describe("widgets", () => {
 
     expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("フォロー中の creator はまだいません")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "creatorを探す" })).toHaveAttribute("href", "/search");
   });
 
   it("renders following auth-required state", () => {

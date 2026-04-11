@@ -82,6 +82,8 @@ export function FeedShell({ state }: FeedShellProps) {
     return (
       <FeedFallbackState
         activeTab={state.tab}
+        ctaHref="/search"
+        ctaLabel="creatorを探す"
         description="following feed は 200 empty を返せる前提なので、ここで空状態を受けられるようにしています。実際の copy と CTA は後続 task で詰めます。"
         title="フォロー中の creator はまだいません"
       />
