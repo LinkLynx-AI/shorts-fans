@@ -8,11 +8,11 @@ export type FeedShellState =
     }
   | {
       kind: "empty";
-      tab: "following";
+      tab: FeedTab;
     }
   | {
       kind: "ready";
-      surface: FeedShortSurface;
+      surfaces: readonly FeedShortSurface[];
       tab: FeedTab;
     };
 
@@ -23,7 +23,7 @@ export type FeedShellState =
 export function getMockFeedShellState(tab: FeedTab): FeedShellState {
   return {
     kind: "ready",
-    surface: getFeedSurfaceByTab(tab),
+    surfaces: [getFeedSurfaceByTab(tab)],
     tab,
   };
 }

@@ -1,9 +1,12 @@
 import {
+  buildShortContinuationCopy,
+  buildShortPaywallTitle,
   getFeedShortForTab,
   getShortById,
   getShortIds,
   getShortThemeStyle,
   getShortsByCreatorId,
+  normalizeShortCaptionForTitle,
 } from "@/entities/short";
 
 describe("short model", () => {
@@ -28,5 +31,25 @@ describe("short model", () => {
       "--short-bg-mid": "#2a648f",
       "--short-tile-top": "#d8f3ff",
     });
+  });
+
+  it("falls back to a stable theme for unknown short ids", () => {
+    const first = getShortThemeStyle("short_dbcc1756d3d9406988e6860c7348609c");
+    const second = getShortThemeStyle("short_dbcc1756d3d9406988e6860c7348609c");
+
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({
+      "--short-bg-accent": expect.any(String),
+      "--short-bg-mid": expect.any(String),
+      "--short-tile-top": expect.any(String),
+    });
+  });
+
+  it("normalizes caption-based copy and falls back when caption is empty", () => {
+    expect(normalizeShortCaptionForTitle(" quiet rooftop preview。 ")).toBe("quiet rooftop preview");
+    expect(buildShortPaywallTitle(" quiet rooftop preview。 ")).toBe("quiet rooftop preview の続きを見る");
+    expect(buildShortPaywallTitle("   ")).toBe("この short の続きを見る");
+    expect(buildShortContinuationCopy(" quiet rooftop preview。 ")).toBe("quiet rooftop preview の続き。");
+    expect(buildShortContinuationCopy("   ")).toBe("short の続きから再生中。");
   });
 });

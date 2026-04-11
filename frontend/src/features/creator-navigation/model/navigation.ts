@@ -1,4 +1,3 @@
-import { getCreatorById } from "@/entities/creator";
 import type { FeedTab, ShortId } from "@/entities/short";
 
 export type CreatorProfileRouteOrigin =
@@ -55,6 +54,10 @@ function buildQueryString(
   const queryString = searchParams.toString();
 
   return queryString.length > 0 ? `?${queryString}` : "";
+}
+
+function isValidCreatorRouteId(creatorId: string): boolean {
+  return /^[A-Za-z0-9_]+$/.test(creatorId);
 }
 
 /**
@@ -131,7 +134,7 @@ export function buildCreatorShortDetailHref(
 export function resolveShortDetailBackHref(
   routeState: CreatorShortDetailRouteState,
 ): string {
-  if (routeState.from !== "creator" || !routeState.creatorId || !getCreatorById(routeState.creatorId)) {
+  if (routeState.from !== "creator" || !routeState.creatorId || !isValidCreatorRouteId(routeState.creatorId)) {
     return "/";
   }
 

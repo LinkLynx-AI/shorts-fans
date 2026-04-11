@@ -1,4 +1,5 @@
 import * as Dialog from "@radix-ui/react-dialog";
+import { buildShortPaywallTitle } from "@/entities/short";
 import { cn } from "@/shared/lib";
 
 import { getUnlockCtaMeta } from "../model/unlock-cta";
@@ -15,10 +16,6 @@ export type UnlockPaywallDialogProps = {
   open: boolean;
   unlock: UnlockSurfaceModel;
 };
-
-function buildPaywallTitle(shortTitle: string): string {
-  return `${shortTitle} の続きを見る`;
-}
 
 function getUnlockButtonLabel(unlock: UnlockSurfaceModel): string {
   const meta = getUnlockCtaMeta(unlock.unlockCta);
@@ -42,7 +39,7 @@ export function UnlockPaywallDialog({
   const confirmEnabled =
     (!unlock.setup.requiresAgeConfirmation || acceptAge) &&
     (!unlock.setup.requiresTermsAcceptance || acceptTerms);
-  const title = buildPaywallTitle(unlock.short.title);
+  const title = buildShortPaywallTitle(unlock.short.caption);
   const buttonLabel = getUnlockButtonLabel(unlock);
 
   return (

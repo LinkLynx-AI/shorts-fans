@@ -40,7 +40,8 @@
 - `data.tab`: request と同じ tab
 - `data.items`: `FeedItem[]`
 - `meta.page`: `CursorPageInfo`
-- `recommended` / `following` ともに返却順は cursor contract だけを固定し、ranking や recommendation algorithm はこの leaf で定義しません。
+- `recommended` は `published_at DESC, id DESC` の newest-first で返します。
+- `following` も同じ cursor 順序で返します。
 
 ### `FeedItem`
 
