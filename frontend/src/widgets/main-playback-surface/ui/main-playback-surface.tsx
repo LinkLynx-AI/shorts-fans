@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -20,6 +21,8 @@ export type MainPlaybackSurfaceProps = {
   fallbackHref: string;
   surface: MainPlaybackSurface;
 };
+
+const MAIN_PLAYBACK_VIDEO_LABEL = "Main playback video";
 
 function PinRail({ pinned }: { pinned: boolean }) {
   const label = pinned ? "Pinned short" : "Pin short";
@@ -59,6 +62,8 @@ function PinRail({ pinned }: { pinned: boolean }) {
  */
 export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfaceProps) {
   const router = useRouter();
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const resumeAppliedRef = useRef<string | null>(null);
   const statusTitle = getMainPlaybackStatusTitle(surface);
   const statusCopy = getMainPlaybackStatusCopy(surface);
   const statusMeta = getMainPlaybackStatusMeta(surface);
@@ -74,9 +79,79 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
     router.push(fallbackHref);
   };
 
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    let cancelled = false;
+    const resumePositionSeconds = surface.resumePositionSeconds;
+    const resumeKey =
+      resumePositionSeconds === null ? null : `${surface.main.media.id}:${surface.main.media.url}:${resumePositionSeconds}`;
+
+    const applyResumePosition = () => {
+      if (resumePositionSeconds === null || resumeKey === null || resumeAppliedRef.current === resumeKey) {
+        return;
+      }
+
+      video.currentTime = resumePositionSeconds;
+      resumeAppliedRef.current = resumeKey;
+    };
+
+    const attemptPlayback = async () => {
+      applyResumePosition();
+      video.muted = false;
+
+      try {
+        await video.play();
+      } catch {
+        if (cancelled) {
+          return;
+        }
+
+        video.muted = true;
+
+        try {
+          await video.play();
+        } catch {
+          // ブラウザ制約で自動再生できない場合は controls から再生してもらう。
+        }
+      }
+    };
+
+    const handleMetadataLoaded = () => {
+      void attemptPlayback();
+    };
+
+    if (video.readyState >= 1) {
+      void attemptPlayback();
+    } else {
+      video.addEventListener("loadedmetadata", handleMetadataLoaded);
+    }
+
+    return () => {
+      cancelled = true;
+      video.removeEventListener("loadedmetadata", handleMetadataLoaded);
+    };
+  }, [surface.main.media.id, surface.main.media.url, surface.resumePositionSeconds]);
+
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(surface.themeShort)}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
+      <video
+        ref={videoRef}
+        aria-label={MAIN_PLAYBACK_VIDEO_LABEL}
+        autoPlay
+        className="absolute inset-0 size-full object-cover"
+        controls
+        playsInline
+        poster={surface.main.media.posterUrl ?? undefined}
+        preload="metadata"
+        src={surface.main.media.url}
+      />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
 
       <div className="relative h-full">
