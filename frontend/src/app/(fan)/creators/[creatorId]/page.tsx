@@ -20,6 +20,7 @@ export default async function CreatorProfilePage({
     creatorHandle?: string | string[];
     from?: string | string[];
     q?: string | string[];
+    shortFanTab?: string | string[];
     shortId?: string | string[];
     tab?: string | string[];
   }>;
@@ -35,6 +36,7 @@ export default async function CreatorProfilePage({
       : undefined,
     from: getEnumQueryParam(rawSearchParams.from, ["feed", "search", "short"]),
     q: getSingleQueryParam(rawSearchParams.q),
+    shortFanTab: getEnumQueryParam(rawSearchParams.shortFanTab, ["library", "pinned"]),
     shortId: getSingleQueryParam(rawSearchParams.shortId),
     tab: getEnumQueryParam(rawSearchParams.tab, ["following", "recommended"]),
   };

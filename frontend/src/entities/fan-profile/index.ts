@@ -3,6 +3,10 @@ export {
 } from "./api/fetch-fan-profile-following";
 export type { FanProfileFollowingPage } from "./api/fetch-fan-profile-following";
 export {
+  fetchFanProfilePinnedShortsPage,
+} from "./api/fetch-fan-profile-pinned-shorts";
+export type { FanProfilePinnedShortsPage } from "./api/fetch-fan-profile-pinned-shorts";
+export {
   fetchFanProfileOverview,
 } from "./api/fetch-fan-profile-overview";
 export {
@@ -18,6 +22,7 @@ export type {
   FanHubTab,
   FanLibraryItem,
   FanPinnedShortItem,
+  FanPinnedShortSummary,
   FanProfileOverview,
   FanSettingsSection,
 } from "./model/fan-profile";

@@ -18,15 +18,21 @@ const creatorFollowFixturePath = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../../docs/contracts/fixtures/fan-creator-follow.json",
 );
+const fanProfileFixturePath = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../docs/contracts/fixtures/fan-profile.json",
+);
 
 const fixtures = JSON.parse(await readFile(fixturePath, "utf8"));
 const viewerBootstrapFixtures = JSON.parse(await readFile(viewerBootstrapFixturePath, "utf8"));
 const creatorFollowFixtures = JSON.parse(await readFile(creatorFollowFixturePath, "utf8"));
+const fanProfileFixtures = JSON.parse(await readFile(fanProfileFixturePath, "utf8"));
 const searchFixtures = fixtures["GET /api/fan/creators/search"];
 const creatorProfileHeaderFixtures = fixtures["GET /api/fan/creators/{creatorId}"];
 const creatorProfileShortGridFixtures = fixtures["GET /api/fan/creators/{creatorId}/shorts"];
 const creatorFollowPutFixtures = creatorFollowFixtures["PUT /api/fan/creators/{creatorId}/follow"];
 const creatorFollowDeleteFixtures = creatorFollowFixtures["DELETE /api/fan/creators/{creatorId}/follow"];
+const fanProfilePinnedShortFixtures = fanProfileFixtures["GET /api/fan/profile/pinned-shorts"];
 const authenticatedCreatorBootstrap = viewerBootstrapFixtures.authenticatedCreator;
 const authenticatedFanBootstrap = viewerBootstrapFixtures.authenticatedFan;
 const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
@@ -127,6 +133,10 @@ if (!authenticatedCreatorBootstrap || !authenticatedFanBootstrap || !unauthentic
 
 if (!creatorFollowPutFixtures || !creatorFollowDeleteFixtures) {
   throw new Error("creator follow fixture が不足しています");
+}
+
+if (!fanProfilePinnedShortFixtures) {
+  throw new Error("fan profile pinned shorts fixture が不足しています");
 }
 
 function buildCorsHeaders(request) {
@@ -301,8 +311,8 @@ function buildFanProfileOverviewResponse(sessionToken) {
       fanProfile: {
         counts: {
           following: getFollowedCreatorIds(sessionToken)?.size ?? defaultFollowedCreatorIds.length,
-          library: 3,
-          pinnedShorts: 3,
+          library: 2,
+          pinnedShorts: 1,
         },
         title: "My archive",
       },
@@ -338,6 +348,10 @@ function buildFanProfileFollowingResponse(sessionToken) {
       requestId: "req_e2e_fan_profile_following_001",
     },
   };
+}
+
+function buildFanProfilePinnedShortsResponse() {
+  return fanProfilePinnedShortFixtures.pinned_populated.body;
 }
 
 function buildCreatorFollowMutationResponse(method, creatorId, sessionToken) {
@@ -827,6 +841,16 @@ const server = http.createServer((request, response) => {
     }
 
     writeJson(request, response, 200, buildFanProfileFollowingResponse(sessionToken));
+    return;
+  }
+
+  if (request.method === "GET" && requestUrl.pathname === "/api/fan/profile/pinned-shorts") {
+    if (!isAuthenticatedFanRequest(request)) {
+      writeAuthRequired(request, response, "req_e2e_fan_profile_pinned_auth_required_001");
+      return;
+    }
+
+    writeJson(request, response, 200, buildFanProfilePinnedShortsResponse());
     return;
   }
 

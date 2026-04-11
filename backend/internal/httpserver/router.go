@@ -107,27 +107,33 @@ type FanProfileFollowingReader interface {
 	ListFollowing(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.FollowingCursor, limit int) ([]fanprofile.FollowingItem, *fanprofile.FollowingCursor, error)
 }
 
+// FanProfilePinnedShortsReader は fan profile pinned shorts 用の read 操作を表します。
+type FanProfilePinnedShortsReader interface {
+	ListPinnedShorts(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.PinnedShortCursor, limit int) ([]fanprofile.PinnedShortItem, *fanprofile.PinnedShortCursor, error)
+}
+
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	AppEnv               string
-	CreatorSearch        CreatorSearchReader
-	CreatorWorkspace     CreatorWorkspaceReader
-	CreatorUpload        CreatorUploadHandler
-	CreatorProfile       CreatorProfileReader
-	CreatorProfileShorts CreatorProfileShortsReader
-	FanFeed              FanFeedReader
-	FanShortPin          FanShortPinWriter
-	CreatorFollow        CreatorFollowWriter
-	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
-	CreatorRegistration  ViewerCreatorRegistrationWriter
-	FanProfileFollowing  FanProfileFollowingReader
-	FanProfileOverview   FanProfileOverviewReader
-	FanAuth              FanAuthService
-	AuthCookie           AuthCookieConfig
-	ShortDisplayAssets   ShortDisplayAssetResolver
-	ViewerActiveMode     ViewerActiveModeSwitcher
-	ViewerBootstrap      ViewerBootstrapReader
-	Dependencies         []Dependency
+	AppEnv                 string
+	CreatorSearch          CreatorSearchReader
+	CreatorWorkspace       CreatorWorkspaceReader
+	CreatorUpload          CreatorUploadHandler
+	CreatorProfile         CreatorProfileReader
+	CreatorProfileShorts   CreatorProfileShortsReader
+	FanFeed                FanFeedReader
+	FanShortPin            FanShortPinWriter
+	CreatorFollow          CreatorFollowWriter
+	CreatorAvatarUpload    ViewerCreatorAvatarUploadHandler
+	CreatorRegistration    ViewerCreatorRegistrationWriter
+	FanProfileFollowing    FanProfileFollowingReader
+	FanProfilePinnedShorts FanProfilePinnedShortsReader
+	FanProfileOverview     FanProfileOverviewReader
+	FanAuth                FanAuthService
+	AuthCookie             AuthCookieConfig
+	ShortDisplayAssets     ShortDisplayAssetResolver
+	ViewerActiveMode       ViewerActiveModeSwitcher
+	ViewerBootstrap        ViewerBootstrapReader
+	Dependencies           []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -184,7 +190,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
-	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
+	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.FanProfilePinnedShorts, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.ViewerBootstrap)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)

@@ -14,7 +14,10 @@ import {
 } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { useHasViewerSession } from "@/entities/viewer";
-import { buildCreatorProfileHref } from "@/features/creator-navigation";
+import {
+  buildCreatorProfileHref,
+  type CreatorProfileRouteOrigin,
+} from "@/features/creator-navigation";
 import {
   buildFanLoginHref,
   isAuthRequiredResponse,
@@ -25,6 +28,7 @@ import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
 import type { DetailShortSurface, FeedShortSurface } from "../model/short-surface";
+import { useShortPinState } from "../model/use-short-pin-state";
 
 const feedSurfaceStyle = {
   "--short-bg-accent": "#68c0eb",
@@ -51,6 +55,7 @@ export type ImmersiveShortSurfaceProps =
     }
   | {
       backHref: string;
+      creatorProfileOrigin: CreatorProfileRouteOrigin;
       isActive?: boolean;
       mode: "detail";
       surface: DetailShortSurface;
@@ -299,9 +304,14 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
+  const detailPinState = useShortPinState({
+    enabled: mode === "detail",
+    initialIsPinned: viewer.isPinned,
+    shortId: short.id,
+  });
   const isActive = props.isActive ?? true;
-  const feedPinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : null;
-  const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : viewer.isPinned;
+  const pinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : detailPinState.errorMessage;
+  const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : detailPinState.isPinned;
   const unlockAction = getUnlockEntryAction(unlock);
   const surfaceStyle = mode === "feed" ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
@@ -310,10 +320,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           from: "feed",
           tab: props.activeTab,
         })
-      : buildCreatorProfileHref(creator.id, {
-          from: "short",
-          shortId: short.id,
-        });
+      : buildCreatorProfileHref(creator.id, props.creatorProfileOrigin);
 
   const resetPaywallState = () => {
     setAcceptAge(false);
@@ -456,16 +463,19 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
                 disabled: props.pin.isPending,
                 onToggle: props.pin.onToggle,
               }
-            : {})}
+            : {
+                disabled: detailPinState.isPending,
+                onToggle: detailPinState.onToggle,
+              })}
         />
-        {feedPinErrorMessage ? (
+        {pinErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
             style={{ bottom: "258px" }}
           >
-            {feedPinErrorMessage}
+            {pinErrorMessage}
           </p>
         ) : null}
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
@@ -480,17 +490,13 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
                 : {})}
           />
         </div>
-        {mode === "feed" ? (
-          <FeedCreatorBlock
-            creator={creator}
-            hasViewerSession={hasViewerSession}
-            initialIsFollowing={viewer.isFollowingCreator}
-            profileHref={profileHref}
-            short={short}
-          />
-        ) : (
-          <CreatorBlock creator={creator} followed={viewer.isFollowingCreator} profileHref={profileHref} short={short} />
-        )}
+        <FeedCreatorBlock
+          creator={creator}
+          hasViewerSession={hasViewerSession}
+          initialIsFollowing={viewer.isFollowingCreator}
+          profileHref={profileHref}
+          short={short}
+        />
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}

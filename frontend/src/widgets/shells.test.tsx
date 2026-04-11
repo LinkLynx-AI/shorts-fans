@@ -152,7 +152,10 @@ describe("widgets", () => {
     );
 
     expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: /after rain preview/i })).toHaveAttribute("href", "/shorts/afterrain");
+    expect(screen.getByRole("link", { name: /雨上がりの balcony preview/i })).toHaveAttribute(
+      "href",
+      "/shorts/afterrain?fanTab=pinned&from=fan",
+    );
   });
 
   it("renders the surface detail shell", () => {

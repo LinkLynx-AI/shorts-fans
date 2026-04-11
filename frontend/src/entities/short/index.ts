@@ -16,6 +16,9 @@ export type {
   FanFeedTab,
   PublicShortDetail,
 } from "./api/contracts";
+export {
+  publicShortSummarySchema,
+} from "./api/contracts";
 export type {
   ShortPinAction,
   ShortPinApiErrorCode,

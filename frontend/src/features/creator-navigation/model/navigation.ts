@@ -1,5 +1,7 @@
 import type { FeedTab, ShortId } from "@/entities/short";
 
+type FanProfileTab = "library" | "pinned";
+
 export type CreatorProfileRouteOrigin =
   | {
       creatorDisplayName?: string | undefined;
@@ -17,6 +19,7 @@ export type CreatorProfileRouteOrigin =
       creatorDisplayName?: string | undefined;
       creatorHandle?: `@${string}` | undefined;
       from: "short";
+      shortFanTab?: FanProfileTab | undefined;
       shortId: ShortId;
     };
 
@@ -25,15 +28,18 @@ export type CreatorProfileRouteState = {
   creatorHandle?: `@${string}` | undefined;
   from?: CreatorProfileRouteOrigin["from"] | undefined;
   q?: string | undefined;
+  shortFanTab?: FanProfileTab | undefined;
   shortId?: ShortId | undefined;
   tab?: FeedTab | undefined;
 };
 
 export type CreatorShortDetailRouteState = {
   creatorId?: string | undefined;
-  from?: "creator" | undefined;
+  fanTab?: FanProfileTab | undefined;
+  from?: "creator" | "fan" | undefined;
   profileFrom?: CreatorProfileRouteOrigin["from"] | undefined;
   profileQ?: string | undefined;
+  profileShortFanTab?: FanProfileTab | undefined;
   profileShortId?: ShortId | undefined;
   profileTab?: FeedTab | undefined;
 };
@@ -85,6 +91,7 @@ export function buildCreatorProfileHref(
 
   return `/creators/${creatorId}${buildQueryString({
     from: origin.from,
+    shortFanTab: origin.shortFanTab,
     shortId: origin.shortId,
   })}`;
 }
@@ -104,7 +111,9 @@ export function resolveCreatorProfileBackHref(
   }
 
   if (routeState.from === "short" && routeState.shortId) {
-    return `/shorts/${routeState.shortId}`;
+    return routeState.shortFanTab
+      ? buildFanProfileShortDetailHref(routeState.shortId, routeState.shortFanTab)
+      : `/shorts/${routeState.shortId}`;
   }
 
   return "/";
@@ -123,8 +132,22 @@ export function buildCreatorShortDetailHref(
     from: "creator",
     profileFrom: routeState.from,
     profileQ: routeState.q?.trim() || undefined,
+    profileShortFanTab: routeState.shortFanTab,
     profileShortId: routeState.shortId,
     profileTab: routeState.tab,
+  })}`;
+}
+
+/**
+ * fan profile 内の pinned short tile 用 href を組み立てる。
+ */
+export function buildFanProfileShortDetailHref(
+  shortId: ShortId,
+  fanTab: FanProfileTab = "pinned",
+): string {
+  return `/shorts/${shortId}${buildQueryString({
+    fanTab,
+    from: "fan",
   })}`;
 }
 
@@ -134,6 +157,12 @@ export function buildCreatorShortDetailHref(
 export function resolveShortDetailBackHref(
   routeState: CreatorShortDetailRouteState,
 ): string {
+  if (routeState.from === "fan") {
+    return `/fan${buildQueryString({
+      tab: routeState.fanTab ?? "pinned",
+    })}`;
+  }
+
   if (routeState.from !== "creator" || !routeState.creatorId || !isValidCreatorRouteId(routeState.creatorId)) {
     return "/";
   }
@@ -146,6 +175,7 @@ export function resolveShortDetailBackHref(
     return routeState.profileShortId
       ? buildCreatorProfileHref(routeState.creatorId, {
           from: "short",
+          shortFanTab: routeState.profileShortFanTab,
           shortId: routeState.profileShortId,
         })
       : `/creators/${routeState.creatorId}`;

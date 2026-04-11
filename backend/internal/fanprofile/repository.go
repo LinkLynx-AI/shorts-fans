@@ -22,6 +22,7 @@ type queries interface {
 	CountPinnedShortsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
 	CountUnlockedMainsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error)
 	ListFanProfileFollowingItems(ctx context.Context, arg sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
+	ListFanProfilePinnedShortItems(ctx context.Context, arg sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error)
 }
 
 // Repository は fan profile private hub 向けの read 操作をまとめます。

@@ -14,7 +14,8 @@ import type { FanHubState } from "@/entities/fan-profile";
 import { useCurrentViewer } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
 import { useFanLogoutEntry } from "@/features/fan-auth";
-import { getShortThemeStyle, type ShortPreviewMeta } from "@/entities/short";
+import { buildFanProfileShortDetailHref } from "@/features/creator-navigation";
+import { getShortThemeStyle } from "@/entities/short";
 import { Button } from "@/shared/ui";
 
 type FanHubShellProps = {
@@ -102,10 +103,27 @@ function FanMediaTile({
 }: {
   href?: string;
   label: string;
-  short: ShortPreviewMeta;
+  short: {
+    id: string;
+    media: {
+      posterUrl: string | null;
+      url: string;
+    };
+  };
 }) {
   const frame = (
-    <span className="block aspect-[3/4] rounded-[4px] bg-[linear-gradient(180deg,var(--short-tile-top)_0%,var(--short-tile-mid)_42%,var(--short-tile-bottom)_100%)] shadow-[0_14px_28px_rgba(36,94,132,0.12)] transition-transform hover:scale-[1.01]" />
+    <span className="relative block aspect-[3/4] overflow-hidden rounded-[4px] bg-[linear-gradient(180deg,var(--short-tile-top)_0%,var(--short-tile-mid)_42%,var(--short-tile-bottom)_100%)] shadow-[0_14px_28px_rgba(36,94,132,0.12)] transition-transform hover:scale-[1.01]">
+      <video
+        aria-hidden="true"
+        className="absolute inset-0 size-full object-cover"
+        muted
+        playsInline
+        poster={short.media.posterUrl ?? undefined}
+        preload="metadata"
+        src={short.media.url}
+      />
+      <span className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.04)_0%,rgba(6,21,33,0.2)_58%,rgba(6,21,33,0.4)_100%)]" />
+    </span>
   );
 
   if (!href) {
@@ -283,8 +301,8 @@ export function FanHubShell({ state }: FanHubShellProps) {
                 : pinnedItems.map((item) => (
                     <FanMediaTile
                       key={item.short.id}
-                      href={`/shorts/${item.short.id}`}
-                      label={`${item.creator.displayName} ${item.short.title}`}
+                      href={buildFanProfileShortDetailHref(item.short.id, "pinned")}
+                      label={`${item.creator.displayName} ${item.short.caption}`}
                       short={item.short}
                     />
                   ))}

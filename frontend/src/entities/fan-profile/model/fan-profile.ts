@@ -1,5 +1,9 @@
 import { getCreatorById, type CreatorSummary } from "@/entities/creator";
-import { getShortById, type ShortPreviewMeta } from "@/entities/short";
+import {
+  getShortById,
+  type ShortMediaAsset,
+  type ShortPreviewMeta,
+} from "@/entities/short";
 
 export type FanHubTab = "library" | "pinned";
 
@@ -21,7 +25,16 @@ export type FanFollowingItem = {
 
 export type FanPinnedShortItem = {
   creator: CreatorSummary;
-  short: ShortPreviewMeta;
+  short: FanPinnedShortSummary;
+};
+
+export type FanPinnedShortSummary = {
+  caption: string;
+  canonicalMainId: string;
+  creatorId: string;
+  id: string;
+  media: ShortMediaAsset;
+  previewDurationSeconds: number;
 };
 
 export type FanLibraryItem = {
@@ -123,7 +136,14 @@ const pinnedItems: readonly FanPinnedShortItem[] = pinnedShortIds.map((shortId) 
 
   return {
     creator: requireCreator(short.creatorId),
-    short,
+    short: {
+      caption: short.caption,
+      canonicalMainId: short.canonicalMainId,
+      creatorId: short.creatorId,
+      id: short.id,
+      media: short.media,
+      previewDurationSeconds: short.previewDurationSeconds,
+    },
   };
 });
 

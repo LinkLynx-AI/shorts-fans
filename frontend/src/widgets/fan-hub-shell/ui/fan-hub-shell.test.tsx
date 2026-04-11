@@ -4,7 +4,7 @@ import {
   screen,
 } from "@testing-library/react";
 
-import { getFanHubState } from "@/entities/fan-profile";
+import { getFanHubState, type FanHubTab } from "@/entities/fan-profile";
 import {
   CurrentViewerProvider,
   ViewerSessionProvider,
@@ -44,11 +44,11 @@ function renderFanHubShell(currentViewer: {
   activeMode: "fan" | "creator";
   canAccessCreatorMode: boolean;
   id: string;
-} | null) {
+} | null, activeTab: FanHubTab = "library") {
   return render(
     <ViewerSessionProvider hasSession>
       <CurrentViewerProvider currentViewer={currentViewer}>
-        <FanHubShell state={getFanHubState("library")} />
+        <FanHubShell state={getFanHubState(activeTab)} />
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
@@ -172,5 +172,22 @@ describe("FanHubShell account menu", () => {
     await user.click(screen.getByRole("button", { name: "ログアウト" }));
 
     expect(logout).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders the pinned short poster in the fan hub grid", () => {
+    renderFanHubShell(
+      {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      "pinned",
+    );
+
+    const pinnedLink = screen.getByRole("link", { name: /雨上がりの balcony preview/i });
+    const pinnedPoster = pinnedLink.querySelector("video");
+
+    expect(pinnedPoster).not.toBeNull();
+    expect(pinnedPoster).toHaveAttribute("poster", "https://cdn.example.com/shorts/sora-after-rain-poster.jpg");
   });
 });
