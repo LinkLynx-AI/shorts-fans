@@ -45,7 +45,7 @@ description: Orchestrate one leaf issue delivery by routing through repo-scoped 
 2. Run `implementation-spec-writer` and produce `Prompt.md`.
 3. Run `implementation-planner` and produce `Plan.md`.
 4. Run `implementation-runbook` and keep `Documentation.md` current during implementation.
-5. Run `code-change-verification` and produce `Verification.md`.
+5. Run `code-change-verification` and produce `Verification.md`, including required coverage gate evidence.
 6. Run `reviewer-remediation-loop` with `references/reviewer-profile.md`.
 7. Run `pr-handoff` and produce `PR.md`.
 

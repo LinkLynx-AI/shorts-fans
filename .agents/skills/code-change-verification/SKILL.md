@@ -23,6 +23,8 @@ description: Run touched-area validation, runtime smoke checks, architecture gua
 ## Validation Matrix
 - Backend changes:
   - `cd backend && go test ./... && go vet ./...`
+- Backend review-ready coverage when the touched backend packages are inside the coverage target defined by `scripts/check-backend-coverage.sh`:
+  - `make backend-coverage-check BACKEND_COVERAGE_MIN=80 BACKEND_COVERAGE_PROFILE=.artifacts/backend-coverage.out`
 - Backend concurrency changes:
   - `cd backend && go test -race ./...`
 - Backend dependency changes:
@@ -53,9 +55,10 @@ description: Run touched-area validation, runtime smoke checks, architecture gua
 ## Guardrails
 - Never hide a failing command.
 - Prefer rerunning the exact failed command after a fix before broadening the validation scope again.
+- If backend coverage is skipped because the diff only touches coverage-excluded backend paths, record the exact skip rationale.
 - If a required tool is unavailable, record that explicitly and explain the residual risk.
 
 ## Output Contract
 - `Verification.md` exists under `./.local/codex-memo/<ISSUE>/`.
-- Validation coverage matches the actual touched areas.
+- Validation coverage matches the actual touched areas, including backend or frontend coverage gates when applicable.
 - Architecture and docs impact are accounted for before reviewer gates.

@@ -15,7 +15,7 @@ If start mode is unclear, ask one clarifying question before execution.
 2. Run `implementation-spec-writer` and freeze the issue into `Prompt.md`.
 3. Run `implementation-planner` and create `Plan.md`.
 4. Run `implementation-runbook` and implement scoped changes while keeping `Documentation.md` current.
-5. Run `code-change-verification` for touched-area validation, architecture checks, docs sync, and runtime smoke.
+5. Run `code-change-verification` for touched-area validation, required coverage gates, architecture checks, docs sync, and runtime smoke.
 6. Run `reviewer-remediation-loop` with the active reviewer profile from `references/reviewer-profile.md`.
 7. If the reviewer or validation gate fails, fix and repeat the affected implementation and verification steps.
 8. Run `pr-handoff` and prepare `PR.md`.
@@ -27,6 +27,7 @@ If start mode is unclear, ask one clarifying question before execution.
 - Start mode decision (child issue start or standalone start).
 - `Prompt.md`, `Plan.md`, `Documentation.md`, `Verification.md`, and `PR.md`.
 - Touched-area validation results and additional issue-specific validation results.
+- Coverage gate result for backend and/or frontend when required by the touched area, including threshold, artifact path, or skip rationale.
 - Reviewer remediation loop result and blocking finding disposition for every remediation loop pass.
 - Runtime smoke gate result for non-trivial changes, or explicit skip rationale for trivial changes.
 - PR URL or PR handoff state, base branch, and merge policy state.
