@@ -302,11 +302,7 @@ func handleCreatorWorkspaceTopPerformers(c *gin.Context, reader CreatorWorkspace
 		return
 	}
 
-	responsePayload, buildErr := buildCreatorWorkspaceTopPerformersPayload(topPerformers)
-	if buildErr != nil {
-		writeCreatorWorkspaceListError(c, creatorWorkspaceTopPerformersScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
-		return
-	}
+	responsePayload := buildCreatorWorkspaceTopPerformersPayload(topPerformers)
 
 	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceTopPerformersResponseData]{
 		Data: &creatorWorkspaceTopPerformersResponseData{
@@ -354,7 +350,7 @@ func buildCreatorWorkspacePreviewMediaAssetPayload(asset media.VideoPreviewCardA
 
 func buildCreatorWorkspaceTopPerformersPayload(
 	topPerformers creator.WorkspaceTopPerformers,
-) (creatorWorkspaceTopPerformersPayload, error) {
+) creatorWorkspaceTopPerformersPayload {
 	var topMainPayload *creatorWorkspaceTopMainPerformer
 	if topPerformers.TopMain != nil {
 		topMainPayload = &creatorWorkspaceTopMainPerformer{
@@ -376,7 +372,7 @@ func buildCreatorWorkspaceTopPerformersPayload(
 	return creatorWorkspaceTopPerformersPayload{
 		TopMain:  topMainPayload,
 		TopShort: topShortPayload,
-	}, nil
+	}
 }
 
 func writeCreatorWorkspaceReadError(c *gin.Context, requestScope string, err error) {
