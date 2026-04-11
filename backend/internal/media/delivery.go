@@ -19,12 +19,14 @@ type MainURLSigner interface {
 // DeliveryConfig は short/main の delivery ref 解決に必要な設定です。
 type DeliveryConfig struct {
 	ShortPublicBaseURL    string
+	ShortPublicBucketName string
 	MainPrivateBucketName string
 }
 
 // Delivery は media asset の delivery ref を解決します。
 type Delivery struct {
 	shortPublicBaseURL    string
+	shortPublicBucketName string
 	mainPrivateBucketName string
 	signer                MainURLSigner
 }
@@ -46,6 +48,7 @@ func NewDelivery(cfg DeliveryConfig, signer MainURLSigner) (*Delivery, error) {
 
 	return &Delivery{
 		shortPublicBaseURL:    strings.TrimSpace(cfg.ShortPublicBaseURL),
+		shortPublicBucketName: strings.TrimSpace(cfg.ShortPublicBucketName),
 		mainPrivateBucketName: strings.TrimSpace(cfg.MainPrivateBucketName),
 		signer:                signer,
 	}, nil
@@ -58,6 +61,29 @@ func (d *Delivery) ShortPublicURL(storageKey string) (string, error) {
 	}
 
 	return joinObjectURL(d.shortPublicBaseURL, storageKey)
+}
+
+// ShortSignedURL は short public bucket object の signed URL を返します。
+func (d *Delivery) ShortSignedURL(storageKey string, ttl time.Duration) (string, error) {
+	if d == nil {
+		return "", fmt.Errorf("delivery is nil")
+	}
+	if strings.TrimSpace(storageKey) == "" {
+		return "", fmt.Errorf("storage key is required")
+	}
+	if strings.TrimSpace(d.shortPublicBucketName) == "" {
+		return "", fmt.Errorf("short public bucket name is required")
+	}
+	if ttl <= 0 {
+		ttl = DefaultSignedURLTTL
+	}
+
+	signedURL, err := d.signer.PresignGetObject(context.Background(), d.shortPublicBucketName, strings.TrimSpace(storageKey), ttl)
+	if err != nil {
+		return "", fmt.Errorf("generate short signed url key=%s: %w", storageKey, err)
+	}
+
+	return signedURL, nil
 }
 
 // MainSignedURL は main private object の signed URL を返します。

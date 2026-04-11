@@ -7,6 +7,7 @@ import type {
   CreatorModeShellReadyState,
   CreatorModeShellState,
 } from "../model/creator-mode-shell";
+import { useCreatorWorkspacePreviewDetail } from "../model/use-creator-workspace-preview-detail";
 import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-workspace-preview-collections";
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 import { useCreatorWorkspaceTopPerformers } from "../model/use-creator-workspace-top-performers";
@@ -33,8 +34,14 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
   } = useCreatorWorkspaceTopPerformers();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailViewSelection | null>(null);
+  const previewDetailSelection = detailSelection?.kind === "mock" ? null : detailSelection;
+  const {
+    blockedState: previewDetailBlockedState,
+    retry: retryPreviewDetail,
+    state: previewDetailState,
+  } = useCreatorWorkspacePreviewDetail(previewDetailSelection);
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
-  const blockedState = summaryBlockedState ?? topPerformersBlockedState ?? previewBlockedState;
+  const blockedState = summaryBlockedState ?? topPerformersBlockedState ?? previewBlockedState ?? previewDetailBlockedState;
 
   function handleOpenDetail(selection: CreatorWorkspaceDetailViewSelection) {
     setActiveTab(selection.tab);
@@ -55,6 +62,8 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
             setDetailSelection(null);
           }}
           onOpenDetail={handleOpenDetail}
+          onRetryPreviewDetail={retryPreviewDetail}
+          previewDetailState={previewDetailState}
           previewCollections={previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null}
           state={state}
         />
