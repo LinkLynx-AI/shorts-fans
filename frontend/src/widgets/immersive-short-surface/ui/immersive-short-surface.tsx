@@ -173,6 +173,7 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
  */
 function CreatorBlock({ creator, followState, followed = false, profileHref, short }: CreatorBlockProps) {
   const caption = short.caption.trim();
+  const interactiveFollowState = followState ?? null;
   const resolvedIsFollowing = followState?.isFollowing ?? followed;
   const followLabel = followState
     ? followState.isPending
@@ -185,6 +186,10 @@ function CreatorBlock({ creator, followState, followed = false, profileHref, sho
     : followed
       ? "Following"
       : "Follow";
+  const followCtaClassName = cn(
+    "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
+    resolvedIsFollowing && "border-[#b6eaff]/78 text-[#d7f5ff]",
+  );
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
@@ -197,19 +202,20 @@ function CreatorBlock({ creator, followState, followed = false, profileHref, sho
             <FeedCreatorAvatar creator={creator} />
             <span className="truncate text-[15px] font-bold text-white">{creator.displayName}</span>
           </Link>
-          <button
-            aria-busy={followState?.isPending || undefined}
-            aria-pressed={resolvedIsFollowing}
-            className={cn(
-              "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
-              resolvedIsFollowing && "border-[#b6eaff]/78 text-[#d7f5ff]",
-            )}
-            disabled={followState?.isPending}
-            onClick={followState?.onToggle}
-            type="button"
-          >
-            {followLabel}
-          </button>
+          {interactiveFollowState ? (
+            <button
+              aria-busy={interactiveFollowState.isPending || undefined}
+              aria-pressed={resolvedIsFollowing}
+              className={followCtaClassName}
+              disabled={interactiveFollowState.isPending}
+              onClick={interactiveFollowState.onToggle}
+              type="button"
+            >
+              {followLabel}
+            </button>
+          ) : (
+            <span className={followCtaClassName}>{followLabel}</span>
+          )}
         </div>
         {caption ? <p className="mt-0.5 text-[14px] leading-[1.45] text-white/92">{caption}</p> : null}
         {followState?.errorMessage ? (

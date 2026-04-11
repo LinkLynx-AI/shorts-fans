@@ -257,6 +257,7 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.queryByRole("link", { name: /おすすめ/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Following" })).not.toBeInTheDocument();
     expect(screen.getByText("Following")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));

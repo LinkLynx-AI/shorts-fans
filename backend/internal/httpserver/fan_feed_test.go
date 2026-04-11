@@ -140,7 +140,10 @@ func TestFanFeedRecommendedRoute(t *testing.T) {
 		t.Fatalf("response.Data.Items[0].UnlockCta.State got %q want %q", response.Data.Items[0].UnlockCta.State, "unlock_available")
 	}
 	if response.Data.Items[0].Viewer.IsFollowingCreator {
-		t.Fatalf("response.Data.Items[0].Viewer.IsFollowingCreator got %#v want false", response.Data.Items[0].Viewer)
+		t.Fatalf(
+			"response.Data.Items[0].Viewer.IsFollowingCreator got %t want false",
+			response.Data.Items[0].Viewer.IsFollowingCreator,
+		)
 	}
 	if !strings.Contains(rec.Body.String(), `"caption":"quiet rooftop preview"`) {
 		t.Fatalf("response body got %q want caption", rec.Body.String())
