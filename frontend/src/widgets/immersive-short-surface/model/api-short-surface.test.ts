@@ -102,4 +102,43 @@ describe("api short surface builders", () => {
       isPinned: false,
     });
   });
+
+  it("preserves empty captions for optional-caption shorts", () => {
+    const surface = buildFeedSurfaceFromApiItem({
+      creator: {
+        avatar: null,
+        bio: "night preview specialist",
+        displayName: "Mina Rei",
+        handle: "@minarei",
+        id: "creator_mina_rei",
+      },
+      short: {
+        caption: "",
+        canonicalMainId: "main_33333333333333333333333333333333",
+        creatorId: "creator_mina_rei",
+        id: "short_22222222222222222222222222222222",
+        media: {
+          durationSeconds: 16,
+          id: "asset_short_mina_rooftop",
+          kind: "video",
+          posterUrl: "https://cdn.example.com/shorts/poster.jpg",
+          url: "https://cdn.example.com/shorts/playback.mp4",
+        },
+        previewDurationSeconds: 16,
+      },
+      unlockCta: {
+        mainDurationSeconds: 480,
+        priceJpy: 1800,
+        resumePositionSeconds: null,
+        state: "unlock_available",
+      },
+      viewer: {
+        isPinned: false,
+      },
+    });
+
+    expect(surface.short.caption).toBe("");
+    expect(surface.short.title).toBe("");
+    expect(surface.unlock.main.title).toBe("");
+  });
 });

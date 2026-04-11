@@ -180,4 +180,37 @@ describe("ImmersiveShortSurface", () => {
 
     expect(screen.getByText("MR")).toBeInTheDocument();
   });
+
+  it("falls back to a generic paywall title when the short has no caption", async () => {
+    const user = userEvent.setup();
+    const surface = {
+      ...feedSurface,
+      short: {
+        ...feedSurface.short,
+        caption: "",
+        title: "",
+      },
+      unlock: {
+        ...feedSurface.unlock,
+        main: {
+          ...feedSurface.unlock.main,
+          title: "",
+        },
+        short: {
+          ...feedSurface.unlock.short,
+          caption: "",
+          title: "",
+        },
+      },
+    };
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    expect(screen.getByRole("dialog", { name: "この short の続きを見る" })).toBeInTheDocument();
+  });
 });

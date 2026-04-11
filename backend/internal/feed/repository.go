@@ -323,15 +323,15 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 
 	displayName := strings.TrimSpace(row.DisplayName.String)
 	handle := strings.TrimSpace(row.Handle)
-	caption := strings.TrimSpace(row.Caption.String)
+	caption := ""
+	if row.Caption.Valid {
+		caption = strings.TrimSpace(row.Caption.String)
+	}
 	if !row.DisplayName.Valid || displayName == "" {
 		return Item{}, fmt.Errorf("public short item の creator display_name がありません")
 	}
 	if handle == "" {
 		return Item{}, fmt.Errorf("public short item の creator handle がありません")
-	}
-	if !row.Caption.Valid || caption == "" {
-		return Item{}, fmt.Errorf("public short item の caption がありません")
 	}
 	if !row.ShortDurationMs.Valid || row.ShortDurationMs.Int64 <= 0 {
 		return Item{}, fmt.Errorf("public short item の short duration_ms がありません")

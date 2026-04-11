@@ -144,6 +144,8 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
  * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
  */
 function CreatorBlock({ creator, followed = false, profileHref, short }: CreatorBlockProps) {
+  const caption = short.caption.trim();
+
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
       <div className="w-[min(88%,344px)] max-w-[344px]">
@@ -165,7 +167,7 @@ function CreatorBlock({ creator, followed = false, profileHref, short }: Creator
             {followed ? "Following" : "Follow"}
           </button>
         </div>
-        <p className="mt-0.5 text-[14px] leading-[1.45] text-white/92">{short.caption}</p>
+        {caption ? <p className="mt-0.5 text-[14px] leading-[1.45] text-white/92">{caption}</p> : null}
       </div>
     </div>
   );

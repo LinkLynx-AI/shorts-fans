@@ -153,6 +153,32 @@ func TestMapFeedItem(t *testing.T) {
 	}
 }
 
+func TestMapFeedItemNormalizesMissingCaption(t *testing.T) {
+	t.Parallel()
+
+	row := makeMapFeedRow()
+	row.Caption = pgtype.Text{}
+
+	item, err := mapFeedItem(row)
+	if err != nil {
+		t.Fatalf("mapFeedItem() error = %v, want nil", err)
+	}
+	if item.Short.Caption != "" {
+		t.Fatalf("mapFeedItem() caption got %q want empty string", item.Short.Caption)
+	}
+
+	row = makeMapFeedRow()
+	row.Caption = makeText("   ")
+
+	item, err = mapFeedItem(row)
+	if err != nil {
+		t.Fatalf("mapFeedItem() error = %v, want nil", err)
+	}
+	if item.Short.Caption != "" {
+		t.Fatalf("mapFeedItem() blank caption got %q want empty string", item.Short.Caption)
+	}
+}
+
 func TestMapFeedItemRejectsInvalidValues(t *testing.T) {
 	t.Parallel()
 
@@ -160,12 +186,6 @@ func TestMapFeedItemRejectsInvalidValues(t *testing.T) {
 	row.IsOwner = "true"
 	if _, err := mapFeedItem(row); err == nil {
 		t.Fatal("mapFeedItem() error = nil, want invalid bool type")
-	}
-
-	row = makeMapFeedRow()
-	row.Caption = pgtype.Text{}
-	if _, err := mapFeedItem(row); err == nil {
-		t.Fatal("mapFeedItem() error = nil, want missing caption")
 	}
 
 	row = makeMapFeedRow()

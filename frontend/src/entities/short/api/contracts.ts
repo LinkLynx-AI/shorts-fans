@@ -13,7 +13,7 @@ export const shortVideoDisplayAssetSchema = z.object({
 });
 
 export const publicShortSummarySchema = z.object({
-  caption: z.string().min(1),
+  caption: z.string(),
   canonicalMainId: z.string().min(1),
   creatorId: z.string().min(1),
   id: z.string().min(1),
