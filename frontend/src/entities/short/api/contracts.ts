@@ -39,6 +39,7 @@ export const fanFeedItemSchema = z.object({
   short: publicShortSummarySchema,
   unlockCta: unlockCtaStateSchema,
   viewer: z.object({
+    isFollowingCreator: z.boolean(),
     isPinned: z.boolean(),
   }),
 });

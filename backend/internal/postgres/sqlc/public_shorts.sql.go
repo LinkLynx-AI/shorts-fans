@@ -147,7 +147,8 @@ SELECT
         WHERE main_unlock.user_id = $1
             AND main_unlock.main_id = s.canonical_main_id
     ) AS is_unlocked,
-    $1 = s.creator_user_id AS is_owner
+    $1 = s.creator_user_id AS is_owner,
+    TRUE AS is_following_creator
 FROM app.public_shorts AS s
 JOIN app.media_assets AS short_media
     ON short_media.id = s.media_asset_id
@@ -180,22 +181,23 @@ type ListFollowingPublicFeedItemsParams struct {
 }
 
 type ListFollowingPublicFeedItemsRow struct {
-	ID              pgtype.UUID
-	CreatorUserID   pgtype.UUID
-	CanonicalMainID pgtype.UUID
-	MediaAssetID    pgtype.UUID
-	Caption         pgtype.Text
-	PublishedAt     pgtype.Timestamptz
-	ShortDurationMs pgtype.Int8
-	DisplayName     pgtype.Text
-	Handle          string
-	AvatarUrl       pgtype.Text
-	Bio             string
-	MainPriceMinor  pgtype.Int8
-	MainDurationMs  pgtype.Int8
-	IsPinned        bool
-	IsUnlocked      bool
-	IsOwner         bool
+	ID                 pgtype.UUID
+	CreatorUserID      pgtype.UUID
+	CanonicalMainID    pgtype.UUID
+	MediaAssetID       pgtype.UUID
+	Caption            pgtype.Text
+	PublishedAt        pgtype.Timestamptz
+	ShortDurationMs    pgtype.Int8
+	DisplayName        pgtype.Text
+	Handle             string
+	AvatarUrl          pgtype.Text
+	Bio                string
+	MainPriceMinor     pgtype.Int8
+	MainDurationMs     pgtype.Int8
+	IsPinned           bool
+	IsUnlocked         bool
+	IsOwner            bool
+	IsFollowingCreator bool
 }
 
 func (q *Queries) ListFollowingPublicFeedItems(ctx context.Context, arg ListFollowingPublicFeedItemsParams) ([]ListFollowingPublicFeedItemsRow, error) {
@@ -229,6 +231,7 @@ func (q *Queries) ListFollowingPublicFeedItems(ctx context.Context, arg ListFoll
 			&i.IsPinned,
 			&i.IsUnlocked,
 			&i.IsOwner,
+			&i.IsFollowingCreator,
 		); err != nil {
 			return nil, err
 		}
@@ -276,7 +279,16 @@ SELECT
     CASE
         WHEN $1::uuid IS NULL THEN FALSE
         ELSE $1::uuid = s.creator_user_id
-    END AS is_owner
+    END AS is_owner,
+    CASE
+        WHEN $1::uuid IS NULL THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.creator_follows AS creator_follow
+            WHERE creator_follow.user_id = $1::uuid
+                AND creator_follow.creator_user_id = s.creator_user_id
+        )
+    END AS is_following_creator
 FROM app.public_shorts AS s
 JOIN app.media_assets AS short_media
     ON short_media.id = s.media_asset_id
@@ -306,22 +318,23 @@ type ListRecommendedPublicFeedItemsParams struct {
 }
 
 type ListRecommendedPublicFeedItemsRow struct {
-	ID              pgtype.UUID
-	CreatorUserID   pgtype.UUID
-	CanonicalMainID pgtype.UUID
-	MediaAssetID    pgtype.UUID
-	Caption         pgtype.Text
-	PublishedAt     pgtype.Timestamptz
-	ShortDurationMs pgtype.Int8
-	DisplayName     pgtype.Text
-	Handle          string
-	AvatarUrl       pgtype.Text
-	Bio             string
-	MainPriceMinor  pgtype.Int8
-	MainDurationMs  pgtype.Int8
-	IsPinned        interface{}
-	IsUnlocked      interface{}
-	IsOwner         interface{}
+	ID                 pgtype.UUID
+	CreatorUserID      pgtype.UUID
+	CanonicalMainID    pgtype.UUID
+	MediaAssetID       pgtype.UUID
+	Caption            pgtype.Text
+	PublishedAt        pgtype.Timestamptz
+	ShortDurationMs    pgtype.Int8
+	DisplayName        pgtype.Text
+	Handle             string
+	AvatarUrl          pgtype.Text
+	Bio                string
+	MainPriceMinor     pgtype.Int8
+	MainDurationMs     pgtype.Int8
+	IsPinned           interface{}
+	IsUnlocked         interface{}
+	IsOwner            interface{}
+	IsFollowingCreator interface{}
 }
 
 func (q *Queries) ListRecommendedPublicFeedItems(ctx context.Context, arg ListRecommendedPublicFeedItemsParams) ([]ListRecommendedPublicFeedItemsRow, error) {
@@ -355,6 +368,7 @@ func (q *Queries) ListRecommendedPublicFeedItems(ctx context.Context, arg ListRe
 			&i.IsPinned,
 			&i.IsUnlocked,
 			&i.IsOwner,
+			&i.IsFollowingCreator,
 		); err != nil {
 			return nil, err
 		}

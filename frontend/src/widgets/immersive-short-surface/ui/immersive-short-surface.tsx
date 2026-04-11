@@ -6,11 +6,20 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-import { CreatorAvatar, getCreatorInitials } from "@/entities/creator";
+import {
+  CreatorAvatar,
+  updateCreatorFollow,
+  useCreatorFollowToggle,
+  getCreatorInitials,
+} from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab, type ShortPreviewMeta } from "@/entities/short";
 import { useHasViewerSession } from "@/entities/viewer";
 import { buildCreatorProfileHref } from "@/features/creator-navigation";
-import { buildFanLoginHref, isAuthRequiredResponse } from "@/features/fan-auth";
+import {
+  buildFanLoginHref,
+  isAuthRequiredResponse,
+  useFanAuthDialog,
+} from "@/features/fan-auth";
 import { getUnlockEntryAction, UnlockCta, UnlockPaywallDialog } from "@/features/unlock-entry";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
@@ -134,6 +143,14 @@ function PinRail({ disabled = false, onToggle, pinned }: PinRailProps) {
 
 type CreatorBlockProps = {
   creator: FeedShortSurface["creator"];
+  followState?:
+    | {
+        errorMessage: string | null;
+        isFollowing: boolean;
+        isPending: boolean;
+        onToggle: () => void;
+      }
+    | undefined;
   followed?: boolean | undefined;
   profileHref: string;
   short: ShortPreviewMeta;
@@ -165,8 +182,25 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
 /**
  * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
  */
-function CreatorBlock({ creator, followed = false, profileHref, short }: CreatorBlockProps) {
+function CreatorBlock({ creator, followState, followed = false, profileHref, short }: CreatorBlockProps) {
   const caption = short.caption.trim();
+  const interactiveFollowState = followState ?? null;
+  const resolvedIsFollowing = followState?.isFollowing ?? followed;
+  const followLabel = followState
+    ? followState.isPending
+      ? followState.isFollowing
+        ? "Unfollowing..."
+        : "Following..."
+      : followState.isFollowing
+        ? "Following"
+        : "Follow"
+    : followed
+      ? "Following"
+      : "Follow";
+  const followCtaClassName = cn(
+    "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
+    resolvedIsFollowing && "border-[#b6eaff]/78 text-[#d7f5ff]",
+  );
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
@@ -179,19 +213,75 @@ function CreatorBlock({ creator, followed = false, profileHref, short }: Creator
             <FeedCreatorAvatar creator={creator} />
             <span className="truncate text-[15px] font-bold text-white">{creator.displayName}</span>
           </Link>
-          <button
-            className={cn(
-              "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
-              followed && "border-[#b6eaff]/78 text-[#d7f5ff]",
-            )}
-            type="button"
-          >
-            {followed ? "Following" : "Follow"}
-          </button>
+          {interactiveFollowState ? (
+            <button
+              aria-busy={interactiveFollowState.isPending || undefined}
+              aria-pressed={resolvedIsFollowing}
+              className={followCtaClassName}
+              disabled={interactiveFollowState.isPending}
+              onClick={interactiveFollowState.onToggle}
+              type="button"
+            >
+              {followLabel}
+            </button>
+          ) : (
+            <span className={followCtaClassName}>{followLabel}</span>
+          )}
         </div>
         {caption ? <p className="mt-0.5 text-[14px] leading-[1.45] text-white/92">{caption}</p> : null}
+        {followState?.errorMessage ? (
+          <p
+            className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+            role="alert"
+          >
+            {followState.errorMessage}
+          </p>
+        ) : null}
       </div>
     </div>
+  );
+}
+
+type FeedCreatorBlockProps = Omit<CreatorBlockProps, "followState" | "followed"> & {
+  hasViewerSession: boolean;
+  initialIsFollowing: boolean;
+};
+
+function FeedCreatorBlock({
+  creator,
+  hasViewerSession,
+  initialIsFollowing,
+  profileHref,
+  short,
+}: FeedCreatorBlockProps) {
+  const { openFanAuthDialog } = useFanAuthDialog();
+  const { errorMessage, isFollowing, isPending, toggleFollow } = useCreatorFollowToggle({
+    creatorId: creator.id,
+    hasViewerSession,
+    initialIsFollowing,
+    onAuthRequired: () => {
+      openFanAuthDialog();
+    },
+    onUnauthenticated: () => {
+      openFanAuthDialog();
+    },
+    updateFollow: updateCreatorFollow,
+  });
+
+  return (
+    <CreatorBlock
+      creator={creator}
+      followState={{
+        errorMessage,
+        isFollowing,
+        isPending,
+        onToggle: () => {
+          void toggleFollow();
+        },
+      }}
+      profileHref={profileHref}
+      short={short}
+    />
   );
 }
 
@@ -210,7 +300,6 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
   const isActive = props.isActive ?? true;
-  const followed = "isFollowingCreator" in viewer ? viewer.isFollowingCreator : undefined;
   const feedPinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : null;
   const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : viewer.isPinned;
   const unlockAction = getUnlockEntryAction(unlock);
@@ -391,7 +480,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
                 : {})}
           />
         </div>
-        <CreatorBlock creator={creator} followed={followed} profileHref={profileHref} short={short} />
+        {mode === "feed" ? (
+          <FeedCreatorBlock
+            creator={creator}
+            hasViewerSession={hasViewerSession}
+            initialIsFollowing={viewer.isFollowingCreator}
+            profileHref={profileHref}
+            short={short}
+          />
+        ) : (
+          <CreatorBlock creator={creator} followed={viewer.isFollowingCreator} profileHref={profileHref} short={short} />
+        )}
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}

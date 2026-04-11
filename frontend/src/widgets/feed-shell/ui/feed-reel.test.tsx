@@ -1,7 +1,11 @@
 import userEvent from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
-import { ViewerSessionProvider } from "@/entities/viewer";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
+import { FanAuthDialogProvider } from "@/features/fan-auth";
 import { getFeedSurfaceByTab } from "@/widgets/immersive-short-surface";
 
 import { FeedReel } from "./feed-reel";
@@ -20,7 +24,11 @@ function renderWithViewerSession(
 ) {
   return render(
     <ViewerSessionProvider hasSession={hasSession}>
-      {ui}
+      <CurrentViewerProvider currentViewer={null}>
+        <FanAuthDialogProvider>
+          {ui}
+        </FanAuthDialogProvider>
+      </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
 }
@@ -134,6 +142,7 @@ describe("FeedReel", () => {
     const refreshedSurface = {
       ...initialSurface,
       viewer: {
+        ...initialSurface.viewer,
         isPinned: true,
       },
     };
@@ -147,7 +156,11 @@ describe("FeedReel", () => {
 
     rerender(
       <ViewerSessionProvider hasSession>
-        <FeedReel activeTab="following" surfaces={[refreshedSurface]} />
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel activeTab="following" surfaces={[refreshedSurface]} />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
       </ViewerSessionProvider>,
     );
 
@@ -192,7 +205,11 @@ describe("FeedReel", () => {
 
     rerender(
       <ViewerSessionProvider hasSession>
-        <FeedReel activeTab="following" surfaces={[initialSurface]} />
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel activeTab="following" surfaces={[initialSurface]} />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
       </ViewerSessionProvider>,
     );
 
@@ -200,17 +217,22 @@ describe("FeedReel", () => {
 
     rerender(
       <ViewerSessionProvider hasSession>
-        <FeedReel
-          activeTab="following"
-          surfaces={[
-            {
-              ...initialSurface,
-              viewer: {
-                isPinned: true,
-              },
-            },
-          ]}
-        />
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel
+              activeTab="following"
+              surfaces={[
+                {
+                  ...initialSurface,
+                  viewer: {
+                    ...initialSurface.viewer,
+                    isPinned: true,
+                  },
+                },
+              ]}
+            />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
       </ViewerSessionProvider>,
     );
 

@@ -38,6 +38,10 @@ export type {
   CreatorSummary,
 } from "./model/creator";
 export {
+  getCreatorFollowErrorMessage,
+  useCreatorFollowToggle,
+} from "./model/use-creator-follow-toggle";
+export {
   CreatorAvatar,
   CreatorIdentity,
   CreatorStatList,

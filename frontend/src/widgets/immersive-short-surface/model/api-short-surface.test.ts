@@ -34,6 +34,7 @@ describe("api short surface builders", () => {
         state: "unlock_available",
       },
       viewer: {
+        isFollowingCreator: false,
         isPinned: true,
       },
     });
@@ -51,6 +52,7 @@ describe("api short surface builders", () => {
       token: "disabled-short_22222222222222222222222222222222",
     });
     expect(surface.viewer).toEqual({
+      isFollowingCreator: false,
       isPinned: true,
     });
   });
@@ -133,6 +135,7 @@ describe("api short surface builders", () => {
         state: "unlock_available",
       },
       viewer: {
+        isFollowingCreator: false,
         isPinned: false,
       },
     });

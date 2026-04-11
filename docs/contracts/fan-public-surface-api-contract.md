@@ -50,6 +50,7 @@
 | `short` | `ShortSummary` | feed 上の public short |
 | `creator` | `CreatorSummary` | creator block 表示用 |
 | `viewer.isPinned` | `boolean` | pin secondary action 表示用 |
+| `viewer.isFollowingCreator` | `boolean` | current viewer の creator follow state |
 | `unlockCta` | `UnlockCtaState` | 下部固定 CTA 用。price と main 長さはここから組み立てる |
 
 - short pin relation の write contract は `docs/contracts/fan-short-pin-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。

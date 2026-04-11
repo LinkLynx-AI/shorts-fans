@@ -36,6 +36,7 @@
                 "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
               },
               "viewer": {
+                "isFollowingCreator": false,
                 "isPinned": false
               },
               "unlockCta": {
@@ -93,6 +94,7 @@
                 "bio": "soft light と close framing の short を中心に更新中。"
               },
               "viewer": {
+                "isFollowingCreator": false,
                 "isPinned": true
               },
               "unlockCta": {
