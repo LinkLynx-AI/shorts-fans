@@ -26,8 +26,14 @@ func (q *Queries) CountCreatorFollowsByUserID(ctx context.Context, userID pgtype
 
 const countPinnedShortsByUserID = `-- name: CountPinnedShortsByUserID :one
 SELECT COUNT(*)::bigint
-FROM app.pinned_shorts
-WHERE user_id = $1
+FROM app.pinned_shorts AS pinned
+JOIN app.public_shorts AS short
+    ON short.id = pinned.short_id
+JOIN app.media_assets AS media
+    ON media.id = short.media_asset_id
+JOIN app.public_creator_profiles AS profile
+    ON profile.user_id = short.creator_user_id
+WHERE pinned.user_id = $1
 `
 
 func (q *Queries) CountPinnedShortsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error) {

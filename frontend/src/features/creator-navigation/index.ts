@@ -1,6 +1,7 @@
 export {
   buildCreatorProfileHref,
   buildCreatorShortDetailHref,
+  buildFanProfileShortDetailHref,
   resolveCreatorProfileBackHref,
   resolveShortDetailBackHref,
 } from "./model/navigation";

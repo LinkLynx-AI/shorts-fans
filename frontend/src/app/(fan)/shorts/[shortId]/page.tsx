@@ -24,9 +24,11 @@ export default async function ShortDetailPage({
   params: Promise<{ shortId: string }>;
   searchParams: Promise<{
     creatorId?: string | string[];
+    fanTab?: string | string[];
     from?: string | string[];
     profileFrom?: string | string[];
     profileQ?: string | string[];
+    profileShortFanTab?: string | string[];
     profileShortId?: string | string[];
     profileTab?: string | string[];
   }>;
@@ -36,16 +38,30 @@ export default async function ShortDetailPage({
   const { shortId } = paramsSchema.parse(rawParams);
   const routeState = {
     creatorId: getSingleQueryParam(rawSearchParams.creatorId),
-    from: getEnumQueryParam(rawSearchParams.from, ["creator"]),
+    fanTab: getEnumQueryParam(rawSearchParams.fanTab, ["library", "pinned"]),
+    from: getEnumQueryParam(rawSearchParams.from, ["creator", "fan"]),
     profileFrom: getEnumQueryParam(rawSearchParams.profileFrom, ["feed", "search", "short"]),
     profileQ: getSingleQueryParam(rawSearchParams.profileQ),
+    profileShortFanTab: getEnumQueryParam(rawSearchParams.profileShortFanTab, ["library", "pinned"]),
     profileShortId: getSingleQueryParam(rawSearchParams.profileShortId),
     profileTab: getEnumQueryParam(rawSearchParams.profileTab, ["following", "recommended"]),
+  };
+  const creatorProfileOrigin = {
+    from: "short" as const,
+    shortFanTab: routeState.from === "fan" ? routeState.fanTab : undefined,
+    shortId,
   };
   const legacySurface = !shortId.startsWith("short_") ? getShortSurfaceById(shortId) : undefined;
 
   if (legacySurface) {
-    return <ImmersiveShortSurface backHref={resolveShortDetailBackHref(routeState)} mode="detail" surface={legacySurface} />;
+    return (
+      <ImmersiveShortSurface
+        backHref={resolveShortDetailBackHref(routeState)}
+        creatorProfileOrigin={creatorProfileOrigin}
+        mode="detail"
+        surface={legacySurface}
+      />
+    );
   }
 
   const cookieStore = await cookies();
@@ -68,6 +84,7 @@ export default async function ShortDetailPage({
   return (
     <ImmersiveShortSurface
       backHref={resolveShortDetailBackHref(routeState)}
+      creatorProfileOrigin={creatorProfileOrigin}
       mode="detail"
       surface={buildDetailSurfaceFromApi(detail)}
     />

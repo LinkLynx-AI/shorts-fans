@@ -8,7 +8,7 @@
             "title": "My archive",
             "counts": {
               "following": 3,
-              "pinnedShorts": 2,
+              "pinnedShorts": 1,
               "library": 2
             }
           }
@@ -137,7 +137,6 @@
                 "id": "short_sora_afterrain",
                 "canonicalMainId": "main_sora_after_rain",
                 "creatorId": "creator_sora_vale",
-                "title": "after rain preview",
                 "caption": "雨上がりの balcony preview。続きは main で。",
                 "media": {
                   "id": "asset_short_sora_afterrain",
@@ -220,7 +219,6 @@
                 "id": "short_mina_rooftop",
                 "canonicalMainId": "main_mina_quiet_rooftop",
                 "creatorId": "creator_mina_rei",
-                "title": "quiet rooftop preview",
                 "caption": "quiet rooftop preview。",
                 "media": {
                   "id": "asset_short_mina_rooftop",

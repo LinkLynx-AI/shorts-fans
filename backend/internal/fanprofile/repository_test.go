@@ -12,7 +12,8 @@ import (
 )
 
 type repositoryStubQueries struct {
-	listFollowing func(context.Context, sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
+	listFollowing    func(context.Context, sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
+	listPinnedShorts func(context.Context, sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error)
 }
 
 func (s repositoryStubQueries) GetUserByID(context.Context, pgtype.UUID) (sqlc.AppUser, error) {
@@ -37,6 +38,14 @@ func (s repositoryStubQueries) ListFanProfileFollowingItems(ctx context.Context,
 	}
 
 	return s.listFollowing(ctx, arg)
+}
+
+func (s repositoryStubQueries) ListFanProfilePinnedShortItems(ctx context.Context, arg sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error) {
+	if s.listPinnedShorts == nil {
+		return nil, nil
+	}
+
+	return s.listPinnedShorts(ctx, arg)
 }
 
 func TestListFollowing(t *testing.T) {

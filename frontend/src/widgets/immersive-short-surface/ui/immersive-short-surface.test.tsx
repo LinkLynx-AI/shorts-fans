@@ -100,6 +100,11 @@ describe("ImmersiveShortSurface", () => {
   const ownerPreviewSurface = getShortSurfaceById("balcony");
   const feedDialogTitle = "quiet rooftop preview の続きを見る";
   const detailDialogTitle = detailSurface ? "quiet rooftop preview の続きを見る" : "";
+  const pinnedDetailOrigin = {
+    from: "short" as const,
+    shortFanTab: "pinned" as const,
+    shortId: "rooftop",
+  };
 
   beforeEach(() => {
     mockedUpdateCreatorFollow.mockReset();
@@ -478,24 +483,117 @@ describe("ImmersiveShortSurface", () => {
     const user = userEvent.setup();
 
     renderWithViewerSession(
-      <ImmersiveShortSurface backHref="/" mode="detail" surface={detailSurface} />,
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
       { hasSession: true },
     );
 
     expect(screen.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/");
     expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
       "href",
-      "/creators/creator_mina_rei?from=short&shortId=rooftop",
+      "/creators/creator_mina_rei?from=short&shortFanTab=pinned&shortId=rooftop",
     );
     expect(screen.queryByRole("link", { name: /おすすめ/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Following" })).not.toBeInTheDocument();
-    expect(screen.getByText("Following")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Following" })).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(screen.getByRole("dialog", { name: detailDialogTitle })).toBeInTheDocument();
+  });
+
+  it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    mockedUpdateCreatorFollow.mockResolvedValue({
+      stats: {
+        fanCount: 11,
+      },
+      viewer: {
+        isFollowing: false,
+      },
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Following" }));
+
+    await waitFor(() => {
+      expect(mockedUpdateCreatorFollow).toHaveBeenCalledWith({
+        action: "unfollow",
+        creatorId: detailSurface.creator.id,
+      });
+      expect(screen.getByRole("button", { name: "Follow" })).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  it("updates the detail pin CTA after an authenticated unpin succeeds", async () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                isPinned: false,
+              },
+            },
+            error: null,
+            meta: {
+              page: null,
+              requestId: "req_short_pin_delete_success_001",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      ),
+    );
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Pinned short" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
+  it("redirects unauthenticated viewers to login when detail pin is tapped", async () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Pinned short" }));
+
+    expect(push).toHaveBeenCalledWith("/login");
   });
 
   it("renders continue-main detail content as an action button", async () => {
@@ -526,7 +624,12 @@ describe("ImmersiveShortSurface", () => {
     );
 
     renderWithViewerSession(
-      <ImmersiveShortSurface backHref="/" mode="detail" surface={continueMainSurface} />,
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: "softlight" }}
+        mode="detail"
+        surface={continueMainSurface}
+      />,
       { hasSession: true },
     );
 
@@ -541,7 +644,12 @@ describe("ImmersiveShortSurface", () => {
     }
 
     renderWithViewerSession(
-      <ImmersiveShortSurface backHref="/" mode="detail" surface={directUnlockSurface} />,
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: "afterrain" }}
+        mode="detail"
+        surface={directUnlockSurface}
+      />,
       { hasSession: true },
     );
 
@@ -554,7 +662,12 @@ describe("ImmersiveShortSurface", () => {
     }
 
     renderWithViewerSession(
-      <ImmersiveShortSurface backHref="/" mode="detail" surface={ownerPreviewSurface} />,
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: "balcony" }}
+        mode="detail"
+        surface={ownerPreviewSurface}
+      />,
       { hasSession: true },
     );
 
