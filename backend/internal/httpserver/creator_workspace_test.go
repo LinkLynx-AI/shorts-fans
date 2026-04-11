@@ -742,6 +742,126 @@ func TestCreatorWorkspaceTopPerformersRouteReturnsEmptyPayload(t *testing.T) {
 	}
 }
 
+func TestCreatorWorkspaceTopPerformersRouteReturnsCreatorModeUnavailable(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspaceTopPerformers: func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+				return creator.WorkspaceTopPerformers{}, creator.ErrCreatorModeUnavailable
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("f1f1f1f1-2222-2222-2222-222222222222"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/top-performers", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("GET /api/creator/workspace/top-performers status got %d want %d", rec.Code, http.StatusForbidden)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "creator_mode_unavailable" {
+		t.Fatalf("response.Error got %#v want creator_mode_unavailable", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceTopPerformersRouteReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspaceTopPerformers: func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+				return creator.WorkspaceTopPerformers{}, creator.ErrProfileNotFound
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("f2f2f2f2-2222-2222-2222-222222222222"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/top-performers", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/top-performers status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceTopPerformersRouteReturnsInternalError(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspaceTopPerformers: func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error) {
+				return creator.WorkspaceTopPerformers{}, errors.New("boom")
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				viewer := auth.CurrentViewer{
+					ID:                   uuid.MustParse("f3f3f3f3-2222-2222-2222-222222222222"),
+					ActiveMode:           auth.ActiveModeCreator,
+					CanAccessCreatorMode: true,
+				}
+				return auth.Bootstrap{CurrentViewer: &viewer}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/top-performers", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/creator/workspace/top-performers status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	}
+}
+
 func TestCreatorWorkspacePreviewCursorHelpers(t *testing.T) {
 	t.Parallel()
 

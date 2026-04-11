@@ -2,6 +2,8 @@ package creator
 
 import (
 	"context"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -230,6 +232,95 @@ func TestGetWorkspaceTopPerformersReturnsTopMainWithoutLinkedShort(t *testing.T)
 	if got.TopShort != nil {
 		t.Fatalf("GetWorkspaceTopPerformers() TopShort got %#v want nil", got.TopShort)
 	}
+}
+
+func TestGetWorkspaceTopPerformersReturnsErrorWhenDeliveryIsNil(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("b1111111-3333-3333-3333-333333333333")
+
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+	})
+
+	_, err := repo.GetWorkspaceTopPerformers(context.Background(), viewerUserID)
+	if err == nil {
+		t.Fatal("GetWorkspaceTopPerformers() error = nil, want non-nil")
+	}
+	if got, want := err.Error(), "delivery is nil"; !containsString(got, want) {
+		t.Fatalf("GetWorkspaceTopPerformers() error got %q want substring %q", got, want)
+	}
+}
+
+func TestGetWorkspaceTopPerformersReturnsErrorWhenTopMainCandidatesQueryFails(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("b2222222-3333-3333-3333-333333333333")
+	wantErr := errors.New("top main query failed")
+
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		listWorkspaceTopMainCandidates: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error) {
+			return nil, wantErr
+		},
+	})
+	repo.delivery = newWorkspacePreviewDelivery(t)
+
+	_, err := repo.GetWorkspaceTopPerformers(context.Background(), viewerUserID)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("GetWorkspaceTopPerformers() error got %v want %v", err, wantErr)
+	}
+	if got, want := err.Error(), "top main 候補読み込み"; !containsString(got, want) {
+		t.Fatalf("GetWorkspaceTopPerformers() error got %q want substring %q", got, want)
+	}
+}
+
+func TestGetWorkspaceTopPerformersReturnsErrorWhenTopShortCandidatesQueryFails(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	viewerUserID := uuid.MustParse("b3333333-3333-3333-3333-333333333333")
+	wantErr := errors.New("top short query failed")
+
+	repo := newRepository(repositoryStubQueries{
+		getCapability: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return testCapabilityRow(viewerUserID, now, nil, nil, nil, nil, timePtr(now), nil, nil), nil
+		},
+		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
+		},
+		listWorkspaceTopMainCandidates: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error) {
+			return nil, nil
+		},
+		listWorkspaceTopShortCandidates: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error) {
+			return nil, wantErr
+		},
+	})
+	repo.delivery = newWorkspacePreviewDelivery(t)
+
+	_, err := repo.GetWorkspaceTopPerformers(context.Background(), viewerUserID)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("GetWorkspaceTopPerformers() error got %v want %v", err, wantErr)
+	}
+	if got, want := err.Error(), "top short 候補読み込み"; !containsString(got, want) {
+		t.Fatalf("GetWorkspaceTopPerformers() error got %q want substring %q", got, want)
+	}
+}
+
+func containsString(got string, want string) bool {
+	return strings.Contains(got, want)
 }
 
 func testWorkspaceTopMainCandidateRow(
