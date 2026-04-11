@@ -321,9 +321,6 @@ func TestGetWorkspacePreviewShortDetail(t *testing.T) {
 	if got.Short.CanonicalMainID != mainID {
 		t.Fatalf("GetWorkspacePreviewShortDetail() canonical main id got %s want %s", got.Short.CanonicalMainID, mainID)
 	}
-	if got.Short.Title != "quiet rooftop preview" {
-		t.Fatalf("GetWorkspacePreviewShortDetail() title got %q want %q", got.Short.Title, "quiet rooftop preview")
-	}
 	if got.Short.Media.URL == "" {
 		t.Fatal("GetWorkspacePreviewShortDetail() media url = empty, want playback url")
 	}
@@ -446,14 +443,8 @@ func TestGetWorkspacePreviewMainDetail(t *testing.T) {
 	if got.Main.ID != mainID {
 		t.Fatalf("GetWorkspacePreviewMainDetail() main id got %s want %s", got.Main.ID, mainID)
 	}
-	if got.Main.Title != "" {
-		t.Fatalf("GetWorkspacePreviewMainDetail() title got %q want empty string", got.Main.Title)
-	}
 	if got.EntryShort.ID != shortID {
 		t.Fatalf("GetWorkspacePreviewMainDetail() entry short id got %s want %s", got.EntryShort.ID, shortID)
-	}
-	if got.EntryShort.Title != "quiet rooftop preview" {
-		t.Fatalf("GetWorkspacePreviewMainDetail() entry short title got %q want %q", got.EntryShort.Title, "quiet rooftop preview")
 	}
 	if got.Main.Media.URL == "" {
 		t.Fatal("GetWorkspacePreviewMainDetail() media url = empty, want playback url")

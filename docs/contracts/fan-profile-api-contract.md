@@ -38,7 +38,6 @@
 | field | type | notes |
 | --- | --- | --- |
 | `main.id` | `string` | canonical main identifier |
-| `main.title` | `string` | main title |
 | `main.durationSeconds` | `number` | main length |
 | `creator` | `CreatorSummary` | owner |
 | `entryShort` | `ShortSummary` | main へ戻るときの entry context として使う linked short |

@@ -314,7 +314,6 @@ function CreatorWorkspaceDetailLinkedGrid({
               metric: "",
               shortId,
               status: detail.statusLabel,
-              title: poster.title,
               tone: detail.statusTone,
             }}
             key={`${tab}:${shortId}`}

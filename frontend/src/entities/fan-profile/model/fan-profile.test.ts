@@ -24,7 +24,7 @@ describe("fan profile model", () => {
       pinnedShorts: 3,
     });
     expect(libraryState.activeTab).toBe("library");
-    expect(libraryState.libraryItems[0]?.main.title).toBe("soft light main");
+    expect(libraryState.libraryItems[0]?.main.id).toBe("main_aoi_soft_light");
     expect(libraryState.pinnedItems).toHaveLength(3);
   });
 

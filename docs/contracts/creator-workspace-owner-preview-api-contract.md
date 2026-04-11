@@ -120,7 +120,6 @@
 #### Response
 
 - `data.preview.main.id`: `string`
-- `data.preview.main.title`: `string`
 - `data.preview.main.media`: `VideoDisplayAsset`
 - `data.preview.main.durationSeconds`: `number`
 - `data.preview.main.priceJpy`: `number`

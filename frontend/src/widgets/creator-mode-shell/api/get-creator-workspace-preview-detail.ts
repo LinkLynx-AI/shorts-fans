@@ -18,7 +18,6 @@ const creatorWorkspacePreviewShortSummarySchema = z.object({
   id: z.string().min(1),
   media: creatorWorkspacePreviewVideoDisplayAssetSchema,
   previewDurationSeconds: z.number().int().positive(),
-  title: z.string(),
 });
 
 const creatorWorkspacePreviewAccessSchema = z.object({
@@ -53,7 +52,6 @@ const creatorWorkspacePreviewMainDetailResponseSchema = z.object({
         id: z.string().min(1),
         media: creatorWorkspacePreviewVideoDisplayAssetSchema,
         priceJpy: z.number().int().nonnegative(),
-        title: z.string(),
       }),
     }),
   }),

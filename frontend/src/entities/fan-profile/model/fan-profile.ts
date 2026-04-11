@@ -48,7 +48,6 @@ export type FanLibraryItem = {
   main: {
     durationSeconds: number;
     id: string;
-    title: string;
   };
   playbackLabel: string;
 };
@@ -73,7 +72,6 @@ const libraryDefinitions = [
     main: {
       durationSeconds: 720,
       id: "main_aoi_soft_light",
-      title: "soft light main",
     },
     playbackLabel: "3:42 left",
     shortId: "softlight",
@@ -82,7 +80,6 @@ const libraryDefinitions = [
     main: {
       durationSeconds: 600,
       id: "main_aoi_balcony_cut",
-      title: "balcony cut main",
     },
     playbackLabel: "4:48 left",
     shortId: "balcony",
@@ -91,7 +88,6 @@ const libraryDefinitions = [
     main: {
       durationSeconds: 660,
       id: "main_mina_hotel_mirror",
-      title: "hotel mirror main",
     },
     playbackLabel: "6:26 left",
     shortId: "mirror",

@@ -22,6 +22,14 @@ type FanHubShellProps = {
   state: FanHubState;
 };
 
+function buildLibraryTileLabel(item: FanHubState["libraryItems"][number]): string {
+  const caption = item.entryShort.caption.trim();
+
+  return caption
+    ? `${item.creator.displayName} ${caption}`
+    : `${item.creator.displayName} unlocked main`;
+}
+
 function FanProfileAvatar() {
   return (
     <span
@@ -301,7 +309,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
                 ? libraryItems.map((item) => (
                     <FanMediaTile
                       key={item.main.id}
-                      label={`${item.creator.displayName} ${item.main.title}`}
+                      label={buildLibraryTileLabel(item)}
                       short={item.entryShort}
                     />
                   ))

@@ -58,7 +58,6 @@ type WorkspacePreviewShortSummary struct {
 	ID                     uuid.UUID
 	Media                  media.VideoDisplayAsset
 	PreviewDurationSeconds int64
-	Title                  string
 }
 
 // WorkspacePreviewShortDetail は owner preview 用 short detail の read model です。
@@ -73,7 +72,6 @@ type WorkspacePreviewMainSummary struct {
 	ID              uuid.UUID
 	Media           media.VideoDisplayAsset
 	PriceJpy        int64
-	Title           string
 }
 
 // WorkspacePreviewMainDetail は owner preview 用 main detail の read model です。
@@ -598,7 +596,6 @@ func (r *Repository) buildWorkspacePreviewShortSummary(
 		ID:                     shortID,
 		Media:                  displayAsset,
 		PreviewDurationSeconds: displayAsset.DurationSeconds,
-		Title:                  normalizeWorkspacePreviewTitleFromCaption(caption),
 	}, true, nil
 }
 
@@ -647,9 +644,6 @@ func (r *Repository) buildWorkspacePreviewMainSummary(
 		ID:              mainID,
 		Media:           displayAsset,
 		PriceJpy:        row.PriceMinor,
-		// main title is not persisted in the current backend model, so keep the
-		// contract shape without inventing a derived title here.
-		Title: "",
 	}, true, nil
 }
 
@@ -691,18 +685,5 @@ func (r *Repository) getWorkspacePreviewAsset(
 		}
 
 		return asset, nil
-	})
-}
-
-func normalizeWorkspacePreviewTitleFromCaption(caption string) string {
-	normalized := strings.TrimSpace(caption)
-
-	return strings.TrimRightFunc(normalized, func(r rune) bool {
-		switch r {
-		case '。', '.', '!', '?':
-			return true
-		default:
-			return false
-		}
 	})
 }
