@@ -982,10 +982,7 @@ function CreatorWorkspaceDetailSection({
 function CreatorWorkspaceDetailSettings({
   settings,
 }: {
-  settings: readonly {
-    label: string;
-    value: string;
-  }[];
+  settings: readonly ApprovedCreatorWorkspaceDetailSetting[];
 }) {
   return (
     <div className="grid border-t border-[rgba(167,220,249,0.4)]">
