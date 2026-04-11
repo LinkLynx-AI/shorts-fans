@@ -14,28 +14,29 @@ import (
 )
 
 type repositoryStubQueries struct {
-	countFollowers       func(context.Context, pgtype.UUID) (int64, error)
-	createCapability     func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
-	getCapability        func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
-	getWorkspaceMetrics  func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
-	getRevisionSummary   func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
-	getMediaAsset        func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
-	updateCapability     func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
-	countPublicShorts    func(context.Context, pgtype.UUID) (int64, error)
-	deleteCreatorFollow  func(context.Context, sqlc.DeleteCreatorFollowParams) error
-	createProfile        func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	getProfile           func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
-	getViewerFollowState func(context.Context, sqlc.GetViewerCreatorFollowStateParams) (bool, error)
-	getPublicProfile     func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
-	getPublicByHandle    func(context.Context, string) (sqlc.AppPublicCreatorProfile, error)
-	listMainsByCreator   func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error)
-	listProfileShortGrid func(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
-	listRecentPublic     func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
-	listShortsByCreator  func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
-	putCreatorFollow     func(context.Context, sqlc.PutCreatorFollowParams) error
-	searchPublic         func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
-	updateProfile        func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
-	publishProfile       func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	countFollowers                     func(context.Context, pgtype.UUID) (int64, error)
+	createCapability                   func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
+	getCapability                      func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	getWorkspaceMetrics                func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceOverviewMetricsRow, error)
+	listWorkspacePreviewMainsByCreator func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
+	getRevisionSummary                 func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
+	getMediaAsset                      func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
+	updateCapability                   func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
+	countPublicShorts                  func(context.Context, pgtype.UUID) (int64, error)
+	deleteCreatorFollow                func(context.Context, sqlc.DeleteCreatorFollowParams) error
+	createProfile                      func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	getProfile                         func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
+	getViewerFollowState               func(context.Context, sqlc.GetViewerCreatorFollowStateParams) (bool, error)
+	getPublicProfile                   func(context.Context, pgtype.UUID) (sqlc.AppPublicCreatorProfile, error)
+	getPublicByHandle                  func(context.Context, string) (sqlc.AppPublicCreatorProfile, error)
+	listMainsByCreator                 func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error)
+	listProfileShortGrid               func(context.Context, sqlc.ListCreatorProfileShortGridItemsParams) ([]sqlc.ListCreatorProfileShortGridItemsRow, error)
+	listRecentPublic                   func(context.Context, sqlc.ListRecentPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	listShortsByCreator                func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
+	putCreatorFollow                   func(context.Context, sqlc.PutCreatorFollowParams) error
+	searchPublic                       func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	updateProfile                      func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
+	publishProfile                     func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
 
 func (s repositoryStubQueries) CountCreatorFollowersByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error) {
@@ -64,6 +65,13 @@ func (s repositoryStubQueries) GetCreatorWorkspaceOverviewMetrics(ctx context.Co
 		return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
 	}
 	return s.getWorkspaceMetrics(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+	if s.listWorkspacePreviewMainsByCreator == nil {
+		return nil, nil
+	}
+	return s.listWorkspacePreviewMainsByCreator(ctx, creatorUserID)
 }
 
 func (s repositoryStubQueries) GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {

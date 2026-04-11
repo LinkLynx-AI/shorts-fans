@@ -151,12 +151,12 @@ func TestListWorkspacePreviewMains(t *testing.T) {
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listMainsByCreator: func(_ context.Context, gotUserID pgtype.UUID) ([]sqlc.AppMain, error) {
+		listWorkspacePreviewMainsByCreator: func(_ context.Context, gotUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
 			if gotUserID != pgUUID(viewerUserID) {
-				t.Fatalf("ListMainsByCreatorUserID() user got %v want %v", gotUserID, pgUUID(viewerUserID))
+				t.Fatalf("ListCreatorWorkspacePreviewMainsByCreatorUserID() user got %v want %v", gotUserID, pgUUID(viewerUserID))
 			}
 
-			return []sqlc.AppMain{
+			return []sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
 				testWorkspacePreviewMainRow(mainAID, viewerUserID, mainAssetAID, now.Add(3*time.Minute), "approved_for_unlock", 2200, workspacePreviewCurrencyCode),
 				testWorkspacePreviewMainRow(mainBID, viewerUserID, mainAssetBID, now.Add(2*time.Minute), "revision_requested", 1800, workspacePreviewCurrencyCode),
 				testWorkspacePreviewMainRow(mainCID, viewerUserID, mainAssetCID, now.Add(time.Minute), "draft", 1500, workspacePreviewCurrencyCode),
@@ -239,8 +239,8 @@ func TestListWorkspacePreviewMainsSkipsUnexpectedCurrency(t *testing.T) {
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
-			return []sqlc.AppMain{
+		listWorkspacePreviewMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+			return []sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
 				testWorkspacePreviewMainRow(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 2200, "USD"),
 			}, nil
 		},
@@ -372,8 +372,8 @@ func testWorkspacePreviewMainRow(
 	state string,
 	priceMinor int64,
 	currencyCode string,
-) sqlc.AppMain {
-	return sqlc.AppMain{
+) sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow {
+	return sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
 		ID:            postgres.UUIDToPG(id),
 		CreatorUserID: postgres.UUIDToPG(creatorID),
 		MediaAssetID:  postgres.UUIDToPG(mediaAssetID),

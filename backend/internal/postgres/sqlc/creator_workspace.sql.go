@@ -70,3 +70,76 @@ func (q *Queries) GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Contex
 	err := row.Scan(&i.MainCount, &i.ShortCount)
 	return i, err
 }
+
+const listCreatorWorkspacePreviewMainsByCreatorUserID = `-- name: ListCreatorWorkspacePreviewMainsByCreatorUserID :many
+SELECT
+    id,
+    creator_user_id,
+    media_asset_id,
+    state,
+    review_reason_code,
+    post_report_state,
+    COALESCE(price_minor, 0)::bigint AS price_minor,
+    COALESCE(currency_code, '')::text AS currency_code,
+    ownership_confirmed,
+    consent_confirmed,
+    approved_for_unlock_at,
+    created_at,
+    updated_at
+FROM app.mains
+WHERE creator_user_id = $1
+    AND media_asset_id IS NOT NULL
+    AND price_minor IS NOT NULL
+    AND currency_code IS NOT NULL
+ORDER BY created_at DESC, id DESC
+`
+
+type ListCreatorWorkspacePreviewMainsByCreatorUserIDRow struct {
+	ID                  pgtype.UUID
+	CreatorUserID       pgtype.UUID
+	MediaAssetID        pgtype.UUID
+	State               string
+	ReviewReasonCode    pgtype.Text
+	PostReportState     pgtype.Text
+	PriceMinor          int64
+	CurrencyCode        string
+	OwnershipConfirmed  bool
+	ConsentConfirmed    bool
+	ApprovedForUnlockAt pgtype.Timestamptz
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, ownerUserID pgtype.UUID) ([]ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+	rows, err := q.db.Query(ctx, listCreatorWorkspacePreviewMainsByCreatorUserID, ownerUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreatorWorkspacePreviewMainsByCreatorUserIDRow
+	for rows.Next() {
+		var i ListCreatorWorkspacePreviewMainsByCreatorUserIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatorUserID,
+			&i.MediaAssetID,
+			&i.State,
+			&i.ReviewReasonCode,
+			&i.PostReportState,
+			&i.PriceMinor,
+			&i.CurrencyCode,
+			&i.OwnershipConfirmed,
+			&i.ConsentConfirmed,
+			&i.ApprovedForUnlockAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

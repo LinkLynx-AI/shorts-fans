@@ -32,6 +32,10 @@ func (s stubQueries) GetCreatorWorkspaceOverviewMetrics(context.Context, pgtype.
 	return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
 }
 
+func (s stubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+	return nil, nil
+}
+
 func (s stubQueries) GetCreatorWorkspaceRevisionRequestedSummary(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {
 	return sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow{}, nil
 }

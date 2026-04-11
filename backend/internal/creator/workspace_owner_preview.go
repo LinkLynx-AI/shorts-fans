@@ -108,7 +108,7 @@ func (r *Repository) ListWorkspacePreviewMains(
 	}
 
 	pageLimit := resolveWorkspacePreviewPageLimit(limit)
-	mainRows, err := r.queries.ListMainsByCreatorUserID(ctx, postgres.UUIDToPG(viewerUserID))
+	mainRows, err := r.queries.ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx, postgres.UUIDToPG(viewerUserID))
 	if err != nil {
 		return nil, nil, fmt.Errorf("creator workspace main preview 一覧取得 user=%s: %w", viewerUserID, err)
 	}
@@ -319,7 +319,7 @@ func (r *Repository) buildWorkspacePreviewShortItem(
 
 func (r *Repository) buildWorkspacePreviewMainItem(
 	ctx context.Context,
-	row sqlc.AppMain,
+	row sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow,
 	leadShortByMainID map[uuid.UUID]previewableLinkedShort,
 	assetCache map[uuid.UUID]sqlc.AppMediaAsset,
 ) (WorkspacePreviewMainItem, bool, error) {
