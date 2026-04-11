@@ -85,7 +85,7 @@ describe("loadCreatorProfileShellState", () => {
             url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
           },
           previewDurationSeconds: 16,
-          routeShortId: "rooftop",
+          routeShortId: "short_mina_rooftop",
         },
       ],
       stats: {

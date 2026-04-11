@@ -1,42 +1,27 @@
-import { getCreatorById, type CreatorSummary } from "@/entities/creator";
+import { getCreatorById } from "@/entities/creator";
 import {
   getFeedShortForTab,
   getShortById,
   type FeedTab,
   type ShortId,
-  type ShortPreviewMeta,
 } from "@/entities/short";
-import { getUnlockSurfaceByShortId, type UnlockSurfaceModel } from "@/features/unlock-entry";
+import { getUnlockSurfaceByShortId } from "@/features/unlock-entry";
 
-export type FeedSurfaceViewerState = {
-  isPinned: boolean;
-};
-
-export type DetailSurfaceViewerState = FeedSurfaceViewerState & {
-  isFollowingCreator: boolean;
-};
-
-type ShortSurfaceBase = {
-  creator: CreatorSummary;
-  short: ShortPreviewMeta;
-  unlock: UnlockSurfaceModel;
-};
-
-export type FeedShortSurface = ShortSurfaceBase & {
-  viewer: FeedSurfaceViewerState;
-};
-
-export type DetailShortSurface = ShortSurfaceBase & {
-  viewer: DetailSurfaceViewerState;
-};
+import type {
+  DetailShortSurface,
+  DetailSurfaceViewerState,
+  FeedShortSurface,
+  FeedSurfaceViewerState,
+  ShortSurfaceBase,
+} from "./short-surface";
 
 const feedViewerStateByShortId: Record<string, FeedSurfaceViewerState> = {
-  afterrain: { isPinned: true },
-  balcony: { isPinned: true },
-  mirror: { isPinned: false },
-  poolcut: { isPinned: false },
-  rooftop: { isPinned: true },
-  softlight: { isPinned: false },
+  afterrain: { isFollowingCreator: true, isPinned: true },
+  balcony: { isFollowingCreator: true, isPinned: true },
+  mirror: { isFollowingCreator: true, isPinned: false },
+  poolcut: { isFollowingCreator: true, isPinned: false },
+  rooftop: { isFollowingCreator: false, isPinned: true },
+  softlight: { isFollowingCreator: true, isPinned: false },
 };
 
 const detailViewerStateByShortId: Record<string, DetailSurfaceViewerState> = {
@@ -69,6 +54,7 @@ function buildShortSurfaceBase(shortId: ShortId): ShortSurfaceBase | undefined {
 
   return {
     creator,
+    mainEntryEnabled: true,
     short,
     unlock,
   };

@@ -5,6 +5,7 @@ import {
   CurrentViewerProvider,
   ViewerSessionProvider,
 } from "@/entities/viewer";
+import { FanAuthDialogProvider } from "@/features/fan-auth";
 import type { CreatorSearchState } from "@/features/creator-search";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
@@ -45,9 +46,21 @@ function renderFanHubShell(activeTab: "library" | "pinned") {
   );
 }
 
+function renderFeedShell(state: ReturnType<typeof getMockFeedShellState>) {
+  return render(
+    <ViewerSessionProvider hasSession>
+      <CurrentViewerProvider currentViewer={null}>
+        <FanAuthDialogProvider>
+          <FeedShell state={state} />
+        </FanAuthDialogProvider>
+      </CurrentViewerProvider>
+    </ViewerSessionProvider>,
+  );
+}
+
 describe("widgets", () => {
   it("renders the feed shell", () => {
-    render(<FeedShell state={getMockFeedShellState("recommended")} />);
+    renderFeedShell(getMockFeedShellState("recommended"));
 
     expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
@@ -60,6 +73,7 @@ describe("widgets", () => {
 
     expect(screen.getByRole("link", { name: /フォロー中/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("フォロー中の creator はまだいません")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "creatorを探す" })).toHaveAttribute("href", "/search");
   });
 
   it("renders following auth-required state", () => {

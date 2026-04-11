@@ -427,7 +427,7 @@ describe("CreatorPage", () => {
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
   });
 
-  it("renders contract-backed preview lists and keeps lower cards non-interactive", async () => {
+  it("renders contract-backed preview lists and opens lower cards with actual preview data", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -443,16 +443,30 @@ describe("CreatorPage", () => {
     render(await CreatorPage());
 
     expect(await screen.findByText("0:16")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "quiet rooftop preview" })).not.toBeInTheDocument();
-
     const previewTiles = screen.getAllByTestId("creator-workspace-preview-tile");
     expect(previewTiles).toHaveLength(1);
+
+    await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
+
+    expect(screen.getByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(screen.queryByText("short_quiet_rooftop")).not.toBeInTheDocument();
+    expect(screen.queryByText("main_quiet_rooftop")).not.toBeInTheDocument();
+    expect(screen.queryByText("asset_short_quiet_rooftop")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+
+    expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(screen.queryByText("asset_main_quiet_rooftop")).not.toBeInTheDocument();
+    expect(screen.getByText("¥1,800")).toBeInTheDocument();
+    expect(screen.getAllByText("12:00")).toHaveLength(2);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
 
     await user.click(screen.getByRole("tab", { name: "Main" }));
 
     expect(await screen.findByText("12:00")).toBeInTheDocument();
     expect(await screen.findByText("¥1,800")).toBeInTheDocument();
-    expect(screen.queryByText("linked short からの流入を unlock に変えている本編です。")).not.toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
   });
 
   it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {

@@ -37,6 +37,20 @@ type ShortTheme = {
   };
 };
 
+const defaultShortTheme: ShortTheme = {
+  background: {
+    accent: "#68c0eb",
+    end: "#07131d",
+    mid: "#2a648f",
+    start: "#94e0ff",
+  },
+  tile: {
+    bottom: "#0f2234",
+    mid: "#4cc0eb",
+    top: "#d8f3ff",
+  },
+};
+
 const shorts = [
   {
     caption: "雨上がりの balcony preview。続きは main で。",
@@ -184,17 +198,8 @@ const shortThemes: Record<string, ShortTheme> = {
     },
   },
   rooftop: {
-    background: {
-      accent: "#68c0eb",
-      end: "#07131d",
-      mid: "#2a648f",
-      start: "#94e0ff",
-    },
-    tile: {
-      bottom: "#0f2234",
-      mid: "#4cc0eb",
-      top: "#d8f3ff",
-    },
+    background: defaultShortTheme.background,
+    tile: defaultShortTheme.tile,
   },
   softlight: {
     background: {
@@ -210,6 +215,8 @@ const shortThemes: Record<string, ShortTheme> = {
     },
   },
 };
+
+const fallbackThemeIds = Object.keys(shortThemes);
 
 const feedShortByTab = {
   following: "softlight",
@@ -257,16 +264,28 @@ export function getShortsByCreatorId(creatorId: string): readonly ShortPreviewMe
   return shorts.filter((short) => short.creatorId === creatorId);
 }
 
+export function normalizeShortCaptionForTitle(caption: string): string {
+  return caption.trim().replace(/[。.!?]+$/u, "");
+}
+
+export function buildShortPaywallTitle(caption: string): string {
+  const normalizedCaption = normalizeShortCaptionForTitle(caption);
+
+  return normalizedCaption ? `${normalizedCaption} の続きを見る` : "この short の続きを見る";
+}
+
+export function buildShortContinuationCopy(caption: string): string {
+  const normalizedCaption = normalizeShortCaptionForTitle(caption);
+
+  return normalizedCaption ? `${normalizedCaption} の続き。` : "short の続きから再生中。";
+}
+
 /**
  * short 背景用の CSS variable style を返す。
  */
 export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId): CSSProperties {
   const shortId = typeof short === "string" ? short : short.id;
-  const theme = shortThemes[shortId];
-
-  if (!theme) {
-    throw new Error(`Unknown short theme: ${shortId}`);
-  }
+  const theme = shortThemes[shortId] ?? getFallbackShortTheme(shortId);
 
   return {
     "--short-bg-accent": theme.background.accent,
@@ -277,4 +296,24 @@ export function getShortThemeStyle(short: Pick<ShortPreviewMeta, "id"> | ShortId
     "--short-tile-mid": theme.tile.mid,
     "--short-tile-top": theme.tile.top,
   } as CSSProperties;
+}
+
+function getFallbackShortTheme(shortId: ShortId): ShortTheme {
+  const fallbackThemeId = fallbackThemeIds[hashString(shortId) % fallbackThemeIds.length];
+
+  if (!fallbackThemeId) {
+    return defaultShortTheme;
+  }
+
+  return shortThemes[fallbackThemeId] ?? defaultShortTheme;
+}
+
+function hashString(value: string): number {
+  let hash = 0;
+
+  for (const char of value) {
+    hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  }
+
+  return hash;
 }

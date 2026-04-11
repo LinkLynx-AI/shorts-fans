@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { CreatorAvatar } from "@/entities/creator";
-import { getShortThemeStyle } from "@/entities/short";
+import { buildShortContinuationCopy, getShortThemeStyle } from "@/entities/short";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -62,7 +62,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
   const statusTitle = getMainPlaybackStatusTitle(surface);
   const statusCopy = getMainPlaybackStatusCopy(surface);
   const statusMeta = getMainPlaybackStatusMeta(surface);
-  const continuationCopy = surface.entryShort ? `${surface.entryShort.title} の続き。` : "short の続きから再生中。";
+  const continuationCopy = surface.entryShort ? buildShortContinuationCopy(surface.entryShort.caption) : "short の続きから再生中。";
 
   const handleBack = () => {
     if (window.history.length > 1) {

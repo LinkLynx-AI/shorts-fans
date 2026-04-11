@@ -1,4 +1,8 @@
 export {
+  buildDetailSurfaceFromApi,
+  buildFeedSurfaceFromApiItem,
+} from "./model/api-short-surface";
+export {
   getFeedSurfaceByTab,
   getShortSurfaceById,
 } from "./model/mock-short-surface";
@@ -7,6 +11,6 @@ export type {
   DetailSurfaceViewerState,
   FeedShortSurface,
   FeedSurfaceViewerState,
-} from "./model/mock-short-surface";
+} from "./model/short-surface";
 export { ImmersiveShortSurface } from "./ui/immersive-short-surface";
 export type { ImmersiveShortSurfaceProps } from "./ui/immersive-short-surface";

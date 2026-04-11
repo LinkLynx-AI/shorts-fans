@@ -40,7 +40,8 @@
 - `data.tab`: request と同じ tab
 - `data.items`: `FeedItem[]`
 - `meta.page`: `CursorPageInfo`
-- `recommended` / `following` ともに返却順は cursor contract だけを固定し、ranking や recommendation algorithm はこの leaf で定義しません。
+- `recommended` は `published_at DESC, id DESC` の newest-first で返します。
+- `following` も同じ cursor 順序で返します。
 
 ### `FeedItem`
 
@@ -49,6 +50,7 @@
 | `short` | `ShortSummary` | feed 上の public short |
 | `creator` | `CreatorSummary` | creator block 表示用 |
 | `viewer.isPinned` | `boolean` | pin secondary action 表示用 |
+| `viewer.isFollowingCreator` | `boolean` | current viewer の creator follow state |
 | `unlockCta` | `UnlockCtaState` | 下部固定 CTA 用。price と main 長さはここから組み立てる |
 
 #### HTTP States

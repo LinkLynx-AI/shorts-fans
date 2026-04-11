@@ -90,7 +90,7 @@ function buildReadyState(
           url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
         },
         previewDurationSeconds: 16,
-        routeShortId: "rooftop",
+        routeShortId: "short_mina_rooftop",
       },
     ],
     stats: {
@@ -173,7 +173,7 @@ describe("CreatorProfileShell", () => {
     expect(screen.getByRole("button", { name: "Following" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: /Mina Rei preview 0:16/i })).toHaveAttribute(
       "href",
-      "/shorts/rooftop?creatorId=creator_mina_rei&from=creator&profileFrom=search&profileQ=mina",
+      "/shorts/short_mina_rooftop?creatorId=creator_mina_rei&from=creator&profileFrom=search&profileQ=mina",
     );
   });
 
@@ -211,7 +211,7 @@ describe("CreatorProfileShell", () => {
                 url: "https://cdn.example.com/shorts/mika-preview.mp4",
               },
               previewDurationSeconds: 16,
-              routeShortId: "rooftop",
+              routeShortId: "short_mika_preview",
             },
           ],
         })}

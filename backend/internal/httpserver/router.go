@@ -15,6 +15,8 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -44,6 +46,18 @@ type CreatorProfileReader interface {
 // CreatorProfileShortsReader は creator profile short grid 用の read 操作を表します。
 type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
+}
+
+// FanFeedReader は public short feed/detail 用の read 操作を表します。
+type FanFeedReader interface {
+	GetDetail(ctx context.Context, shortID uuid.UUID, viewerUserID *uuid.UUID) (feed.Detail, error)
+	ListFollowing(ctx context.Context, viewerUserID uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
+	ListRecommended(ctx context.Context, viewerUserID *uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
+}
+
+// ShortDisplayAssetResolver は short 向け display asset 解決を表します。
+type ShortDisplayAssetResolver interface {
+	ResolveShortDisplayAsset(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error)
 }
 
 // CreatorFollowWriter は creator follow mutation を表します。
@@ -94,6 +108,7 @@ type HandlerConfig struct {
 	CreatorUpload        CreatorUploadHandler
 	CreatorProfile       CreatorProfileReader
 	CreatorProfileShorts CreatorProfileShortsReader
+	FanFeed              FanFeedReader
 	CreatorFollow        CreatorFollowWriter
 	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
 	CreatorRegistration  ViewerCreatorRegistrationWriter
@@ -101,6 +116,7 @@ type HandlerConfig struct {
 	FanProfileOverview   FanProfileOverviewReader
 	FanAuth              FanAuthService
 	AuthCookie           AuthCookieConfig
+	ShortDisplayAssets   ShortDisplayAssetResolver
 	ViewerActiveMode     ViewerActiveModeSwitcher
 	ViewerBootstrap      ViewerBootstrapReader
 	Dependencies         []Dependency
@@ -164,7 +180,8 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.ViewerBootstrap)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ViewerBootstrap)
+	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)
+	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.CreatorAvatarUpload, config.ViewerActiveMode, config.ViewerBootstrap)
 
 	return router

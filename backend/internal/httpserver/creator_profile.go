@@ -12,6 +12,8 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -74,6 +76,7 @@ func registerCreatorProfileRoutes(
 	profileReader CreatorProfileReader,
 	shortsReader CreatorProfileShortsReader,
 	followWriter CreatorFollowWriter,
+	shortDisplayAssets ShortDisplayAssetResolver,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	if profileReader != nil {
@@ -83,7 +86,7 @@ func registerCreatorProfileRoutes(
 	}
 	if shortsReader != nil {
 		router.GET("/api/fan/creators/:creatorId/shorts", func(c *gin.Context) {
-			handleCreatorProfileShorts(c, shortsReader)
+			handleCreatorProfileShorts(c, shortsReader, shortDisplayAssets)
 		})
 	}
 	if followWriter != nil && viewerBootstrap != nil {
@@ -199,7 +202,7 @@ func handleCreatorFollowMutation(
 }
 
 // handleCreatorProfileShorts は creator profile short grid を返します。
-func handleCreatorProfileShorts(c *gin.Context, reader CreatorProfileShortsReader) {
+func handleCreatorProfileShorts(c *gin.Context, reader CreatorProfileShortsReader, shortDisplayAssets ShortDisplayAssetResolver) {
 	creatorID := strings.TrimSpace(c.Param("creatorId"))
 	cursor := decodeCreatorProfileShortGridCursor(strings.TrimSpace(c.Query("cursor")))
 
@@ -216,7 +219,7 @@ func handleCreatorProfileShorts(c *gin.Context, reader CreatorProfileShortsReade
 
 	responseItems := make([]creatorProfileShortGridItem, 0, len(items))
 	for _, item := range items {
-		responseItem, buildErr := buildCreatorProfileShortGridItem(item)
+		responseItem, buildErr := buildCreatorProfileShortGridItem(item, shortDisplayAssets)
 		if buildErr != nil {
 			writeInternalServerError(c, "creator_profile_shorts")
 			return
@@ -239,24 +242,41 @@ func handleCreatorProfileShorts(c *gin.Context, reader CreatorProfileShortsReade
 	})
 }
 
-func buildCreatorProfileShortGridItem(item creator.PublicProfileShort) (creatorProfileShortGridItem, error) {
+func buildCreatorProfileShortGridItem(item creator.PublicProfileShort, shortDisplayAssets ShortDisplayAssetResolver) (creatorProfileShortGridItem, error) {
 	if strings.TrimSpace(item.MediaURL) == "" {
-		return creatorProfileShortGridItem{}, fmt.Errorf("creator profile short grid item に必要な media url がありません")
+		if shortDisplayAssets == nil {
+			return creatorProfileShortGridItem{}, fmt.Errorf("creator profile short grid item に必要な media url がありません")
+		}
 	}
 
-	durationSeconds := item.PreviewDurationSeconds
+	var mediaPayload mediaAsset
+	if shortDisplayAssets != nil {
+		displayAsset, err := shortDisplayAssets.ResolveShortDisplayAsset(media.ShortDisplaySource{
+			AssetID:    item.MediaAssetID,
+			ShortID:    item.ID,
+			DurationMS: item.PreviewDurationSeconds * 1000,
+		}, media.AccessBoundaryPublic)
+		if err != nil {
+			return creatorProfileShortGridItem{}, err
+		}
 
-	return creatorProfileShortGridItem{
-		CanonicalMainID: mainPublicID(item.CanonicalMainID),
-		CreatorID:       creator.FormatPublicID(item.CreatorUserID),
-		ID:              shortPublicID(item.ID),
-		Media: mediaAsset{
+		mediaPayload = buildVideoMediaAsset(displayAsset)
+	} else {
+		durationSeconds := item.PreviewDurationSeconds
+		mediaPayload = mediaAsset{
 			DurationSeconds: &durationSeconds,
 			ID:              mediaAssetPublicID(item.MediaAssetID),
 			Kind:            "video",
 			PosterURL:       nil,
 			URL:             item.MediaURL,
-		},
+		}
+	}
+
+	return creatorProfileShortGridItem{
+		CanonicalMainID:        shorts.FormatPublicMainID(item.CanonicalMainID),
+		CreatorID:              creator.FormatPublicID(item.CreatorUserID),
+		ID:                     shorts.FormatPublicShortID(item.ID),
+		Media:                  mediaPayload,
 		PreviewDurationSeconds: item.PreviewDurationSeconds,
 	}, nil
 }
@@ -308,14 +328,6 @@ func encodeCreatorProfileShortGridCursor(cursor *creator.PublicProfileShortCurso
 
 	encoded := base64.RawURLEncoding.EncodeToString(payload)
 	return &encoded
-}
-
-func shortPublicID(shortID uuid.UUID) string {
-	return fmt.Sprintf("short_%s", strings.ReplaceAll(shortID.String(), "-", ""))
-}
-
-func mainPublicID(mainID uuid.UUID) string {
-	return fmt.Sprintf("main_%s", strings.ReplaceAll(mainID.String(), "-", ""))
 }
 
 func mediaAssetPublicID(mediaAssetID uuid.UUID) string {
