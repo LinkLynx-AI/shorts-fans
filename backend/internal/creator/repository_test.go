@@ -32,6 +32,14 @@ func (s stubQueries) GetCreatorWorkspaceOverviewMetrics(context.Context, pgtype.
 	return sqlc.GetCreatorWorkspaceOverviewMetricsRow{}, nil
 }
 
+func (s stubQueries) ListCreatorWorkspaceTopMainCandidatesByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error) {
+	return nil, nil
+}
+
+func (s stubQueries) ListCreatorWorkspaceTopShortCandidatesByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error) {
+	return nil, nil
+}
+
 func (s stubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
 	return nil, nil
 }

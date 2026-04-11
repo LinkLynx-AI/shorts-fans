@@ -20,6 +20,10 @@ import { useFanModeEntry } from "@/features/creator-entry";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
+  CreatorWorkspaceTopMainPerformer,
+  CreatorWorkspaceTopShortPerformer,
+} from "../api/get-creator-workspace-top-performers";
+import type {
   CreatorWorkspacePreviewMainItem,
   CreatorWorkspacePreviewShortItem,
 } from "../api/get-creator-workspace-preview-collections";
@@ -36,9 +40,11 @@ import type {
 } from "../model/approved-creator-workspace";
 import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
 import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
+import type { CreatorWorkspaceTopPerformersState } from "../model/creator-workspace-top-performers";
 import type { CreatorModeShellState } from "../model/creator-mode-shell";
 import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-workspace-preview-collections";
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
+import { useCreatorWorkspaceTopPerformers } from "../model/use-creator-workspace-top-performers";
 
 type CreatorWorkspaceDetailSelection = {
   kind: "mock";
@@ -483,52 +489,210 @@ function createPosterStyle(poster: ApprovedCreatorWorkspacePoster): CSSPropertie
   } as CSSProperties;
 }
 
-function CreatorWorkspacePosterThumb({ poster }: { poster: ApprovedCreatorWorkspacePoster }) {
+function createTopPerformerPosterStyle(posterUrl: string): CSSProperties {
+  return {
+    backgroundImage: `url("${posterUrl}")`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
+}
+
+function formatUnlockMetric(value: number): string {
+  return `${formatCount(value)} unlocks`;
+}
+
+function CreatorWorkspaceTopPerformerThumb({ posterUrl }: { posterUrl: string }) {
   return (
     <span
       aria-hidden="true"
-      className="block h-10 w-[30px] shrink-0 rounded-[8px] bg-[linear-gradient(180deg,var(--creator-workspace-tile-top),var(--creator-workspace-tile-mid)_42%,var(--creator-workspace-tile-bottom)_100%)] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.56)]"
-      style={createPosterStyle(poster)}
+      className="block h-10 w-[30px] shrink-0 rounded-[8px] bg-[#dbeaf2] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.56)]"
+      style={createTopPerformerPosterStyle(posterUrl)}
     />
   );
 }
 
+function CreatorWorkspaceTopPerformerRow({
+  index,
+  label,
+  metric,
+  onOpenDetail,
+  posterUrl,
+  selection,
+}: {
+  index: number;
+  label: string;
+  metric: string;
+  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  posterUrl: string;
+  selection: CreatorWorkspaceDetailSelection | null;
+}) {
+  return (
+    <button
+      aria-label={label}
+      className={`flex min-h-[58px] w-full items-center justify-between gap-[14px] bg-transparent px-0 text-left text-foreground disabled:cursor-default disabled:opacity-100 ${
+        index === 0 ? "" : "border-t border-[rgba(167,220,249,0.32)]"
+      }`}
+      disabled={selection === null}
+      onClick={() => {
+        if (selection) {
+          onOpenDetail(selection);
+        }
+      }}
+      type="button"
+    >
+      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted">{label}</span>
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="text-sm font-bold leading-[1.3] text-foreground">{metric}</span>
+        <CreatorWorkspaceTopPerformerThumb posterUrl={posterUrl} />
+      </span>
+    </button>
+  );
+}
+
+function CreatorWorkspaceTopPerformersLoading() {
+  return (
+    <section aria-label="Top performers" className="mt-[18px] border-y border-[rgba(167,220,249,0.48)]">
+      {["Top main", "Top short"].map((label, index) => (
+        <button
+          aria-label={label}
+          className={`flex min-h-[58px] w-full items-center justify-between gap-[14px] bg-transparent px-0 text-left text-foreground disabled:cursor-default disabled:opacity-100 ${
+            index === 0 ? "" : "border-t border-[rgba(167,220,249,0.32)]"
+          }`}
+          disabled
+          key={label}
+          type="button"
+        >
+          <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted">{label}</span>
+          <span className="flex min-w-0 items-center gap-3">
+            <span aria-hidden="true" className="h-4 w-20 animate-pulse rounded-full bg-[rgba(167,220,249,0.28)]" />
+            <span aria-hidden="true" className="block h-10 w-[30px] animate-pulse rounded-[8px] bg-[rgba(167,220,249,0.28)]" />
+          </span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function CreatorWorkspaceTopPerformersError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="mt-[18px] rounded-[20px] border border-[rgba(167,220,249,0.4)] bg-[#f8fbfd] px-4 py-4 text-foreground">
+      <p className="text-sm leading-6 text-muted" role="alert">
+        {message}
+      </p>
+      <div className="mt-3">
+        <Button onClick={onRetry} size="sm" type="button" variant="secondary">
+          再読み込み
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function buildTopPerformerRows(
+  topMain: CreatorWorkspaceTopMainPerformer | null,
+  topShort: CreatorWorkspaceTopShortPerformer | null,
+  previewCollectionsState: CreatorWorkspacePreviewCollectionsState,
+  workspace: ApprovedCreatorWorkspaceState,
+): readonly {
+  label: string;
+  metric: string;
+  posterUrl: string;
+  selection: CreatorWorkspaceDetailSelection | null;
+}[] {
+  const rows: {
+    label: string;
+    metric: string;
+    posterUrl: string;
+    selection: CreatorWorkspaceDetailSelection | null;
+  }[] = [];
+  const readyCollections = previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null;
+
+  if (topMain) {
+    const leadShortID = readyCollections?.mains.items.find((item) => item.id === topMain.id)?.leadShortId ?? null;
+
+    rows.push({
+      label: "Top main",
+      metric: formatUnlockMetric(topMain.unlockCount),
+      posterUrl: topMain.media.posterUrl,
+      selection: leadShortID && workspace.detailsByTab.main[leadShortID]
+        ? {
+            kind: "mock",
+            shortId: leadShortID,
+            tab: "main",
+          }
+        : null,
+    });
+  }
+
+  if (topShort) {
+    rows.push({
+      label: "Top short",
+      metric: formatUnlockMetric(topShort.attributedUnlockCount),
+      posterUrl: topShort.media.posterUrl,
+      selection: workspace.detailsByTab.shorts[topShort.id]
+        ? {
+            kind: "mock",
+            shortId: topShort.id,
+            tab: "shorts",
+          }
+        : null,
+    });
+  }
+
+  return rows;
+}
+
 function CreatorWorkspaceTopPerformers({
   onOpenDetail,
+  previewCollectionsState,
+  onRetry,
+  state,
   workspace,
 }: {
   onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
+  onRetry: () => void;
+  state: CreatorWorkspaceTopPerformersState;
   workspace: ApprovedCreatorWorkspaceState;
 }) {
-  if (workspace.topPerformers.length === 0) {
+  if (state.kind === "loading") {
+    return <CreatorWorkspaceTopPerformersLoading />;
+  }
+
+  if (state.kind === "error") {
+    return <CreatorWorkspaceTopPerformersError message={state.message} onRetry={onRetry} />;
+  }
+
+  const rows = buildTopPerformerRows(
+    state.topPerformers.topMain,
+    state.topPerformers.topShort,
+    previewCollectionsState,
+    workspace,
+  );
+
+  if (rows.length === 0) {
     return null;
   }
 
   return (
     <section aria-label="Top performers" className="mt-[18px] border-y border-[rgba(167,220,249,0.48)]">
-      {workspace.topPerformers.map((item, index) => {
-        const poster = workspace.posters[item.shortId];
-
-        return (
-          <button
-            aria-label={item.label}
-            className={`flex min-h-[58px] w-full items-center justify-between gap-[14px] bg-transparent px-0 text-left text-foreground disabled:cursor-default disabled:opacity-100 ${
-              index === 0 ? "" : "border-t border-[rgba(167,220,249,0.32)]"
-            }`}
-            key={`${item.kind}:${item.shortId}`}
-            onClick={() => {
-              onOpenDetail({ kind: "mock", shortId: item.shortId, tab: item.kind });
-            }}
-            type="button"
-          >
-            <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted">{item.label}</span>
-            <span className="flex min-w-0 items-center gap-3">
-              <span className="text-sm font-bold leading-[1.3] text-foreground">{item.metric}</span>
-              {poster ? <CreatorWorkspacePosterThumb poster={poster} /> : null}
-            </span>
-          </button>
-        );
-      })}
+      {rows.map((item, index) => (
+        <CreatorWorkspaceTopPerformerRow
+          index={index}
+          key={item.label}
+          label={item.label}
+          metric={item.metric}
+          onOpenDetail={onOpenDetail}
+          posterUrl={item.posterUrl}
+          selection={item.selection}
+        />
+      ))}
     </section>
   );
 }
@@ -1225,8 +1389,10 @@ function CreatorWorkspaceDashboard({
   onOpenPreviewDetail,
   onRetryPreviewCollections,
   onRetrySummary,
+  onRetryTopPerformers,
   previewCollectionsState,
   summaryState,
+  topPerformersState,
   state,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
@@ -1238,6 +1404,8 @@ function CreatorWorkspaceDashboard({
   onRetrySummary: () => void;
   previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
   summaryState: CreatorWorkspaceSummaryState;
+  topPerformersState: CreatorWorkspaceTopPerformersState;
+  onRetryTopPerformers: () => void;
   state: Extract<CreatorModeShellState, { kind: "ready" }>;
 }) {
   return (
@@ -1245,7 +1413,13 @@ function CreatorWorkspaceDashboard({
       <h1 className="sr-only">{creator.displayName} creator workspace</h1>
       <CreatorWorkspaceTopBar />
       <CreatorWorkspaceSummarySection onRetry={onRetrySummary} state={summaryState} />
-      <CreatorWorkspaceTopPerformers onOpenDetail={onOpenDetail} workspace={state.workspace} />
+      <CreatorWorkspaceTopPerformers
+        onOpenDetail={onOpenDetail}
+        previewCollectionsState={previewCollectionsState}
+        onRetry={onRetryTopPerformers}
+        state={topPerformersState}
+        workspace={state.workspace}
+      />
       <CreatorWorkspaceManagedPosts
         activeTab={activeTab}
         onChangeTab={onChangeTab}
@@ -1269,10 +1443,15 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
     retry: retryPreviewCollections,
     state: previewCollectionsState,
   } = useCreatorWorkspacePreviewCollections();
+  const {
+    blockedState: topPerformersBlockedState,
+    retry: retryTopPerformers,
+    state: topPerformersState,
+  } = useCreatorWorkspaceTopPerformers();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailSelection | CreatorWorkspacePreviewDetailSelection | null>(null);
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
-  const blockedState = summaryBlockedState ?? previewBlockedState;
+  const blockedState = summaryBlockedState ?? topPerformersBlockedState ?? previewBlockedState;
 
   if (blockedState) {
     return <CreatorShellBlockedState state={blockedState} />;
@@ -1309,8 +1488,10 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
           }}
           onRetryPreviewCollections={retryPreviewCollections}
           onRetrySummary={retrySummary}
+          onRetryTopPerformers={retryTopPerformers}
           previewCollectionsState={previewCollectionsState}
           summaryState={summaryState}
+          topPerformersState={topPerformersState}
           state={state}
         />
       )}

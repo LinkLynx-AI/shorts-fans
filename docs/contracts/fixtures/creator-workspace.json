@@ -153,5 +153,113 @@
         }
       }
     }
+  },
+  "GET /api/creator/workspace/top-performers": {
+    "top_performers_normal": {
+      "status": 200,
+      "body": {
+        "data": {
+          "topPerformers": {
+            "topMain": {
+              "id": "main_quiet_rooftop",
+              "media": {
+                "id": "asset_main_quiet_rooftop",
+                "kind": "video",
+                "posterUrl": "https://signed.example.com/mains/quiet-rooftop.jpg",
+                "durationSeconds": 720
+              },
+              "unlockCount": 238
+            },
+            "topShort": {
+              "id": "short_quiet_rooftop",
+              "media": {
+                "id": "asset_short_quiet_rooftop",
+                "kind": "video",
+                "posterUrl": "https://cdn.example.com/shorts/quiet-rooftop.jpg",
+                "durationSeconds": 16
+              },
+              "attributedUnlockCount": 238
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "top_performers_empty": {
+      "status": 200,
+      "body": {
+        "data": {
+          "topPerformers": {
+            "topMain": null,
+            "topShort": null
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_002",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "creator workspace requires authentication"
+        }
+      }
+    },
+    "creator_mode_unavailable": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_forbidden_001",
+          "page": null
+        },
+        "error": {
+          "code": "creator_mode_unavailable",
+          "message": "creator mode is not available"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator workspace was not found"
+        }
+      }
+    },
+    "internal_error": {
+      "status": 500,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_top_performers_500_001",
+          "page": null
+        },
+        "error": {
+          "code": "internal_error",
+          "message": "creator workspace could not be loaded"
+        }
+      }
+    }
   }
 }
