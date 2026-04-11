@@ -93,6 +93,7 @@ export function buildFeedSurfaceFromApiItem(item: FanFeedItem): FeedShortSurface
   return {
     ...buildShortSurfaceBase(item),
     viewer: {
+      isFollowingCreator: item.viewer.isFollowingCreator,
       isPinned: item.viewer.isPinned,
     },
   };

@@ -38,6 +38,7 @@ describe("getFanFeedPage", () => {
                   state: "unlock_available",
                 },
                 viewer: {
+                  isFollowingCreator: true,
                   isPinned: true,
                 },
               },
@@ -96,6 +97,7 @@ describe("getFanFeedPage", () => {
             state: "unlock_available",
           },
           viewer: {
+            isFollowingCreator: true,
             isPinned: true,
           },
         },
@@ -149,6 +151,7 @@ describe("getFanFeedPage", () => {
                   state: "unlock_available",
                 },
                 viewer: {
+                  isFollowingCreator: false,
                   isPinned: false,
                 },
               },

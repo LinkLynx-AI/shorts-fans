@@ -34,7 +34,16 @@ SELECT
     CASE
         WHEN sqlc.narg(viewer_user_id)::uuid IS NULL THEN FALSE
         ELSE sqlc.narg(viewer_user_id)::uuid = s.creator_user_id
-    END AS is_owner
+    END AS is_owner,
+    CASE
+        WHEN sqlc.narg(viewer_user_id)::uuid IS NULL THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.creator_follows AS creator_follow
+            WHERE creator_follow.user_id = sqlc.narg(viewer_user_id)::uuid
+                AND creator_follow.creator_user_id = s.creator_user_id
+        )
+    END AS is_following_creator
 FROM app.public_shorts AS s
 JOIN app.media_assets AS short_media
     ON short_media.id = s.media_asset_id
@@ -82,7 +91,8 @@ SELECT
         WHERE main_unlock.user_id = sqlc.arg(viewer_user_id)
             AND main_unlock.main_id = s.canonical_main_id
     ) AS is_unlocked,
-    sqlc.arg(viewer_user_id) = s.creator_user_id AS is_owner
+    sqlc.arg(viewer_user_id) = s.creator_user_id AS is_owner,
+    TRUE AS is_following_creator
 FROM app.public_shorts AS s
 JOIN app.media_assets AS short_media
     ON short_media.id = s.media_asset_id
