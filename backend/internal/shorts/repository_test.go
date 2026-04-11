@@ -66,6 +66,14 @@ func (s stubQueries) GetPublicShortByID(context.Context, pgtype.UUID) (sqlc.AppP
 	return sqlc.AppPublicShort{}, nil
 }
 
+func (s stubQueries) PutPinnedShort(context.Context, sqlc.PutPinnedShortParams) error {
+	return nil
+}
+
+func (s stubQueries) DeletePinnedShort(context.Context, sqlc.DeletePinnedShortParams) error {
+	return nil
+}
+
 func (s stubQueries) ListShortsByCanonicalMainID(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
 	return nil, nil
 }

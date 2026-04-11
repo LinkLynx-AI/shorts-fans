@@ -91,6 +91,22 @@ func (q *Queries) CreateShort(ctx context.Context, arg CreateShortParams) (AppSh
 	return i, err
 }
 
+const deletePinnedShort = `-- name: DeletePinnedShort :exec
+DELETE FROM app.pinned_shorts
+WHERE user_id = $1
+  AND short_id = $2
+`
+
+type DeletePinnedShortParams struct {
+	UserID  pgtype.UUID
+	ShortID pgtype.UUID
+}
+
+func (q *Queries) DeletePinnedShort(ctx context.Context, arg DeletePinnedShortParams) error {
+	_, err := q.db.Exec(ctx, deletePinnedShort, arg.UserID, arg.ShortID)
+	return err
+}
+
 const getPublicShortByID = `-- name: GetPublicShortByID :one
 SELECT id, creator_user_id, canonical_main_id, media_asset_id, caption, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at
 FROM app.public_shorts
@@ -356,6 +372,27 @@ func (q *Queries) PublishShort(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.Caption,
 	)
 	return i, err
+}
+
+const putPinnedShort = `-- name: PutPinnedShort :exec
+INSERT INTO app.pinned_shorts (
+    user_id,
+    short_id
+) VALUES (
+    $1,
+    $2
+)
+ON CONFLICT (user_id, short_id) DO NOTHING
+`
+
+type PutPinnedShortParams struct {
+	UserID  pgtype.UUID
+	ShortID pgtype.UUID
+}
+
+func (q *Queries) PutPinnedShort(ctx context.Context, arg PutPinnedShortParams) error {
+	_, err := q.db.Exec(ctx, putPinnedShort, arg.UserID, arg.ShortID)
+	return err
 }
 
 const updateShortState = `-- name: UpdateShortState :one
