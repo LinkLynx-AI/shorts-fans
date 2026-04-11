@@ -11,16 +11,34 @@ type stubMainURLSigner struct {
 	bucket  string
 	key     string
 	expires time.Duration
+	calls   []presignCall
 	url     string
+	urls    map[string]string
 	err     error
+}
+
+type presignCall struct {
+	bucket  string
+	key     string
+	expires time.Duration
 }
 
 func (s *stubMainURLSigner) PresignGetObject(_ context.Context, bucket string, key string, expires time.Duration) (string, error) {
 	s.bucket = bucket
 	s.key = key
 	s.expires = expires
+	s.calls = append(s.calls, presignCall{
+		bucket:  bucket,
+		key:     key,
+		expires: expires,
+	})
 	if s.err != nil {
 		return "", s.err
+	}
+	if s.urls != nil {
+		if resolvedURL, ok := s.urls[key]; ok {
+			return resolvedURL, nil
+		}
 	}
 
 	return s.url, nil
@@ -189,5 +207,136 @@ func TestMainSignedURLPropagatesErrors(t *testing.T) {
 
 	if _, err := delivery.MainSignedURL(context.Background(), "probe/main.m3u8", time.Minute); !errors.Is(err, signerErr) {
 		t.Fatalf("MainSignedURL() error got %v want %v", err, signerErr)
+	}
+}
+
+func TestResolveShortDisplayAsset(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	shortID := mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	assetID := mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	got, err := delivery.ResolveShortDisplayAsset(ShortDisplaySource{
+		AssetID:    assetID,
+		ShortID:    shortID,
+		DurationMS: 42001,
+	}, AccessBoundaryPublic)
+	if err != nil {
+		t.Fatalf("ResolveShortDisplayAsset() error = %v, want nil", err)
+	}
+
+	if got.ID != assetID {
+		t.Fatalf("ResolveShortDisplayAsset() id got %s want %s", got.ID, assetID)
+	}
+	if got.Kind != "video" {
+		t.Fatalf("ResolveShortDisplayAsset() kind got %q want %q", got.Kind, "video")
+	}
+	if got.URL != "https://cdn.example.com/media/shorts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/playback.mp4" {
+		t.Fatalf("ResolveShortDisplayAsset() playback url got %q", got.URL)
+	}
+	if got.PosterURL != "https://cdn.example.com/media/shorts/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster.jpg" {
+		t.Fatalf("ResolveShortDisplayAsset() poster url got %q", got.PosterURL)
+	}
+	if got.DurationSeconds != 43 {
+		t.Fatalf("ResolveShortDisplayAsset() duration got %d want %d", got.DurationSeconds, 43)
+	}
+}
+
+func TestResolveShortDisplayAssetRejectsUnsupportedBoundary(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	source := ShortDisplaySource{
+		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+		ShortID:    mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		DurationMS: 1,
+	}
+
+	for _, boundary := range []AccessBoundary{AccessBoundaryPrivate, AccessBoundaryOwner} {
+		if _, err := delivery.ResolveShortDisplayAsset(source, boundary); err == nil {
+			t.Fatalf("ResolveShortDisplayAsset() boundary=%s error = nil, want error", boundary)
+		}
+	}
+}
+
+func TestResolveMainDisplayAsset(t *testing.T) {
+	t.Parallel()
+
+	signer := &stubMainURLSigner{
+		urls: map[string]string{
+			"mains/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/playback.mp4": "https://signed.example.com/main-playback",
+			"mains/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/poster.jpg":   "https://signed.example.com/main-poster",
+		},
+	}
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, signer)
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	assetID := mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	mainID := mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	got, err := delivery.ResolveMainDisplayAsset(context.Background(), MainDisplaySource{
+		AssetID:    assetID,
+		MainID:     mainID,
+		DurationMS: 120000,
+	}, AccessBoundaryPrivate, 0)
+	if err != nil {
+		t.Fatalf("ResolveMainDisplayAsset() error = %v, want nil", err)
+	}
+
+	if got.ID != assetID {
+		t.Fatalf("ResolveMainDisplayAsset() id got %s want %s", got.ID, assetID)
+	}
+	if got.URL != "https://signed.example.com/main-playback" {
+		t.Fatalf("ResolveMainDisplayAsset() playback url got %q", got.URL)
+	}
+	if got.PosterURL != "https://signed.example.com/main-poster" {
+		t.Fatalf("ResolveMainDisplayAsset() poster url got %q", got.PosterURL)
+	}
+	if got.DurationSeconds != 120 {
+		t.Fatalf("ResolveMainDisplayAsset() duration got %d want %d", got.DurationSeconds, 120)
+	}
+	if len(signer.calls) != 2 {
+		t.Fatalf("ResolveMainDisplayAsset() signer call count got %d want %d", len(signer.calls), 2)
+	}
+	if signer.calls[0].expires != DefaultSignedURLTTL || signer.calls[1].expires != DefaultSignedURLTTL {
+		t.Fatalf("ResolveMainDisplayAsset() expires got %#v want all %s", signer.calls, DefaultSignedURLTTL)
+	}
+}
+
+func TestResolveMainDisplayAssetRejectsUnsupportedBoundary(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	if _, err := delivery.ResolveMainDisplayAsset(context.Background(), MainDisplaySource{
+		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+		MainID:     mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		DurationMS: 1,
+	}, AccessBoundaryPublic, time.Second); err == nil {
+		t.Fatal("ResolveMainDisplayAsset() error = nil, want error")
 	}
 }

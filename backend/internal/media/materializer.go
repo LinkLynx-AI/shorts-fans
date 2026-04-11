@@ -129,15 +129,17 @@ func (m *Materializer) Materialize(ctx context.Context, req MaterializeRequest) 
 func (m *Materializer) outputLocation(req MaterializeRequest) (bucket string, playbackKey string, posterKey string, posterTempBaseKey string, err error) {
 	switch req.Role {
 	case roleMain:
-		playbackKey = fmt.Sprintf("mains/%s/playback.mp4", req.MainID)
-		posterKey = fmt.Sprintf("mains/%s/poster.jpg", req.MainID)
-		posterTempBaseKey = fmt.Sprintf("mains/%s/poster-temp", req.MainID)
-		return m.mainPrivateBucketName, playbackKey, posterKey, posterTempBaseKey, nil
+		keys, err := BuildMainDeliveryObjectKeys(req.MainID)
+		if err != nil {
+			return "", "", "", "", err
+		}
+		return m.mainPrivateBucketName, keys.Playback, keys.Poster, keys.PosterTempBase, nil
 	case roleShort:
-		playbackKey = fmt.Sprintf("shorts/%s/playback.mp4", req.ShortID)
-		posterKey = fmt.Sprintf("shorts/%s/poster.jpg", req.ShortID)
-		posterTempBaseKey = fmt.Sprintf("shorts/%s/poster-temp", req.ShortID)
-		return m.shortPublicBucketName, playbackKey, posterKey, posterTempBaseKey, nil
+		keys, err := BuildShortDeliveryObjectKeys(req.ShortID)
+		if err != nil {
+			return "", "", "", "", err
+		}
+		return m.shortPublicBucketName, keys.Playback, keys.Poster, keys.PosterTempBase, nil
 	default:
 		return "", "", "", "", fmt.Errorf("unsupported asset role: %s", req.Role)
 	}
