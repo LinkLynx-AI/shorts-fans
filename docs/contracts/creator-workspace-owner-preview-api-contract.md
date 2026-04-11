@@ -65,6 +65,17 @@
 | `durationSeconds` | `number` | main length |
 | `priceJpy` | `number` | reference price |
 
+### `WorkspacePreviewShortDetailItem`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | short identifier |
+| `canonicalMainId` | `string` | linked canonical main |
+| `creatorId` | `string` | short owner |
+| `caption` | `string` | owner preview 用 caption。未設定時は empty string |
+| `media` | `VideoDisplayAsset` | owner preview 用 short playback asset |
+| `previewDurationSeconds` | `number` | short 自身の長さ |
+
 ## Request Contract
 
 ### `GET /api/creator/workspace/shorts`
@@ -103,7 +114,7 @@
 
 #### Response
 
-- `data.preview.short`: `ShortSummary`
+- `data.preview.short`: `WorkspacePreviewShortDetailItem`
 - `data.preview.creator`: `CreatorSummary`
 - `data.preview.access`: `MainAccessState`
 - `data.preview.access.status` は `owner` 固定
@@ -120,14 +131,13 @@
 #### Response
 
 - `data.preview.main.id`: `string`
-- `data.preview.main.title`: `string`
 - `data.preview.main.media`: `VideoDisplayAsset`
 - `data.preview.main.durationSeconds`: `number`
 - `data.preview.main.priceJpy`: `number`
 - `data.preview.creator`: `CreatorSummary`
 - `data.preview.access`: `MainAccessState`
 - `data.preview.access.status` は `owner` 固定
-- `data.preview.entryShort`: `ShortSummary`
+- `data.preview.entryShort`: `WorkspacePreviewShortDetailItem`
 - `meta.page = null`
 
 ## Response Rules
@@ -138,6 +148,8 @@
 - list endpoint は `delivery-ready` な owner 自身の `short` / `main` を返し、public publish / unlock state とは独立に判定して構いません。
 - owner preview では `MainAccessState.reason = owner_preview` を使い、`unlocked` と混ぜません。
 - list endpoint は poster 中心の preview card を返し、detail endpoint だけ full playback 用 `url` を返します。
+- short detail / entryShort は `title` を含めず、`WorkspacePreviewShortDetailItem` の shape を返します。
+- main detail は `id / media / durationSeconds / priceJpy` だけを返し、title を追加しません。
 
 ## Error Contract
 

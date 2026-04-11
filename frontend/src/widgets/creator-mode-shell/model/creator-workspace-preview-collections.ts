@@ -55,3 +55,29 @@ export function buildErrorCreatorWorkspacePreviewCollectionsState(
     message: creatorWorkspacePreviewCollectionsErrorMessage,
   };
 }
+
+/**
+ * preview main item に保存済み price の override を反映する。
+ */
+export function applyCreatorWorkspaceMainPriceOverrides(
+  state: CreatorWorkspacePreviewCollectionsState,
+  priceByMainId: Readonly<Record<string, number>>,
+): CreatorWorkspacePreviewCollectionsState {
+  if (state.kind !== "ready") {
+    return state;
+  }
+
+  return {
+    collections: {
+      mains: {
+        ...state.collections.mains,
+        items: state.collections.mains.items.map((item) => ({
+          ...item,
+          priceJpy: priceByMainId[item.id] ?? item.priceJpy,
+        })),
+      },
+      shorts: state.collections.shorts,
+    },
+    kind: "ready",
+  };
+}

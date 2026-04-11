@@ -3,6 +3,10 @@ import type {
   CreatorWorkspacePreviewShortItem,
 } from "../api/get-creator-workspace-preview-collections";
 import type {
+  CreatorWorkspacePreviewMainDetail,
+  CreatorWorkspacePreviewShortDetail,
+} from "../api/get-creator-workspace-preview-detail";
+import type {
   ApprovedCreatorWorkspaceDetailMetric,
   ApprovedCreatorWorkspaceDetailSetting,
   ApprovedCreatorWorkspaceManagedItemTone,
@@ -19,16 +23,24 @@ export type CreatorWorkspaceDetailSelection = {
 
 export type CreatorWorkspacePreviewDetailSelection =
   | {
-      index: number;
-      item: CreatorWorkspacePreviewMainItem;
+      id: string;
       kind: "preview-main";
       tab: "main";
     }
   | {
-      index: number;
-      item: CreatorWorkspacePreviewShortItem;
+      id: string;
       kind: "preview-short";
       tab: "shorts";
+    };
+
+export type CreatorWorkspacePreviewDetailData =
+  | {
+      detail: CreatorWorkspacePreviewMainDetail;
+      kind: "preview-main";
+    }
+  | {
+      detail: CreatorWorkspacePreviewShortDetail;
+      kind: "preview-short";
     };
 
 export type CreatorWorkspaceLinkedPreviewItems =

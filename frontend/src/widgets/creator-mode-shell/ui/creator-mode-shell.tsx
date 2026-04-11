@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import type { ApprovedCreatorWorkspaceManagedTab } from "../model/approved-creator-workspace";
+import { applyCreatorWorkspaceMainPriceOverrides } from "../model/creator-workspace-preview-collections";
 import type {
   CreatorModeShellReadyState,
   CreatorModeShellState,
@@ -33,8 +34,10 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
   } = useCreatorWorkspaceTopPerformers();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailViewSelection | null>(null);
+  const [mainPriceByMainId, setMainPriceByMainId] = useState<Record<string, number>>({});
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
   const blockedState = summaryBlockedState ?? topPerformersBlockedState ?? previewBlockedState;
+  const resolvedPreviewCollectionsState = applyCreatorWorkspaceMainPriceOverrides(previewCollectionsState, mainPriceByMainId);
 
   function handleOpenDetail(selection: CreatorWorkspaceDetailViewSelection) {
     setActiveTab(selection.tab);
@@ -54,8 +57,14 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
           onBack={() => {
             setDetailSelection(null);
           }}
+          onMainPriceSaved={(mainId, priceJpy) => {
+            setMainPriceByMainId((currentState) => ({
+              ...currentState,
+              [mainId]: priceJpy,
+            }));
+          }}
           onOpenDetail={handleOpenDetail}
-          previewCollections={previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null}
+          previewCollections={resolvedPreviewCollectionsState.kind === "ready" ? resolvedPreviewCollectionsState.collections : null}
           state={state}
         />
       ) : (
@@ -67,7 +76,7 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
           onRetryPreviewCollections={retryPreviewCollections}
           onRetrySummary={retrySummary}
           onRetryTopPerformers={retryTopPerformers}
-          previewCollectionsState={previewCollectionsState}
+          previewCollectionsState={resolvedPreviewCollectionsState}
           state={state}
           summaryState={summaryState}
           topPerformersState={topPerformersState}

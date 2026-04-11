@@ -70,7 +70,6 @@
               "id": "short_aoi_balcony_cut",
               "canonicalMainId": "main_aoi_blue_balcony",
               "creatorId": "creator_aoi_n",
-              "title": "balcony cut preview",
               "caption": "blue tone の balcony preview。",
               "media": {
                 "id": "asset_short_aoi_balcony_cut",
@@ -117,7 +116,6 @@
           "preview": {
             "main": {
               "id": "main_aoi_blue_balcony",
-              "title": "blue balcony main",
               "media": {
                 "id": "asset_main_aoi_blue_balcony_preview",
                 "kind": "video",
@@ -150,7 +148,6 @@
               "id": "short_aoi_balcony_cut",
               "canonicalMainId": "main_aoi_blue_balcony",
               "creatorId": "creator_aoi_n",
-              "title": "balcony cut preview",
               "caption": "blue tone の balcony preview。",
               "media": {
                 "id": "asset_short_aoi_balcony_cut",

@@ -9,6 +9,7 @@ import Link from "next/link";
 
 import { useFanModeEntry } from "@/features/creator-entry";
 import type { CreatorSummary } from "@/entities/creator";
+import { BottomSheetDialogContent } from "@/shared/ui";
 
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
 import type {
@@ -45,19 +46,10 @@ function CreatorWorkspaceAccountMenu() {
           <Menu aria-hidden="true" className="size-5" strokeWidth={1.9} />
         </button>
       </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
-        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
-          <Dialog.Title className="sr-only">アカウントメニュー</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            creator workspace から fan mode へ戻るメニュー
-          </Dialog.Description>
-
-          <div
-            aria-hidden="true"
-            className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
-          />
-
+      <BottomSheetDialogContent
+        description="creator workspace から fan mode へ戻るメニュー"
+        title="アカウントメニュー"
+      >
           <div className="rounded-[24px] bg-[#f3f6f8] py-1">
             <Dialog.Close asChild>
               <Link
@@ -90,8 +82,7 @@ function CreatorWorkspaceAccountMenu() {
               {errorMessage}
             </p>
           ) : null}
-        </Dialog.Content>
-      </Dialog.Portal>
+      </BottomSheetDialogContent>
     </Dialog.Root>
   );
 }
@@ -201,7 +192,6 @@ export function CreatorWorkspaceDashboard({
       <CreatorWorkspaceTopPerformers
         onOpenDetail={onOpenPreviewDetail}
         onRetry={onRetryTopPerformers}
-        previewCollectionsState={previewCollectionsState}
         state={topPerformersState}
       />
       <CreatorWorkspaceManagedPosts

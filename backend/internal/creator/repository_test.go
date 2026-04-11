@@ -52,8 +52,20 @@ func (s stubQueries) GetMediaAssetByID(context.Context, pgtype.UUID) (sqlc.AppMe
 	return sqlc.AppMediaAsset{}, nil
 }
 
+func (s stubQueries) GetMainByID(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+	return sqlc.AppMain{}, nil
+}
+
+func (s stubQueries) GetShortByID(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+	return sqlc.AppShort{}, nil
+}
+
 func (s stubQueries) UpdateCreatorCapabilityState(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
 	return sqlc.AppCreatorCapability{}, nil
+}
+
+func (s stubQueries) UpdateCreatorWorkspaceMainPrice(context.Context, sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.AppMain, error) {
+	return sqlc.AppMain{}, nil
 }
 
 func (s stubQueries) CreateCreatorProfile(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
@@ -106,6 +118,10 @@ func (s stubQueries) PutCreatorFollow(context.Context, sqlc.PutCreatorFollowPara
 
 func (s stubQueries) SearchPublicCreatorProfiles(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error) {
 	return nil, nil
+}
+
+func (s stubQueries) UpdateCreatorWorkspaceShortCaption(context.Context, sqlc.UpdateCreatorWorkspaceShortCaptionParams) (sqlc.AppShort, error) {
+	return sqlc.AppShort{}, nil
 }
 
 func (s stubQueries) UpdateCreatorProfile(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {

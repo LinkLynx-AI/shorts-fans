@@ -102,8 +102,7 @@ function CreatorWorkspacePreviewShortTile({
       ariaLabel={buildPreviewShortAriaLabel(item, index)}
       onClick={() => {
         onOpenDetail({
-          index,
-          item,
+          id: item.id,
           kind: "preview-short",
           tab: "shorts",
         });
@@ -133,8 +132,7 @@ function CreatorWorkspacePreviewMainTile({
       ariaLabel={buildPreviewMainAriaLabel(item, index)}
       onClick={() => {
         onOpenDetail({
-          index,
-          item,
+          id: item.id,
           kind: "preview-main",
           tab: "main",
         });

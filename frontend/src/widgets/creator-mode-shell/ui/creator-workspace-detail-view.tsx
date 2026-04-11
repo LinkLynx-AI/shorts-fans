@@ -2,6 +2,7 @@
 
 import { ArrowLeft } from "lucide-react";
 import type { ReactNode } from "react";
+import { useState } from "react";
 
 import {
   CreatorAvatar,
@@ -9,57 +10,28 @@ import {
 } from "@/entities/creator";
 import { Button } from "@/shared/ui";
 
+import { formatJpy, createPosterStyle, createVideoPosterStyle, formatDurationLabel } from "../lib/creator-mode-shell-ui";
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
+import { useCreatorWorkspacePreviewDetail } from "../model/use-creator-workspace-preview-detail";
 import type {
   ApprovedCreatorWorkspaceDetailMetric,
   ApprovedCreatorWorkspaceDetailSetting,
   ApprovedCreatorWorkspaceManagedTab,
   ApprovedCreatorWorkspaceState,
 } from "../model/approved-creator-workspace";
-import {
-  buildPreviewMainDetailSettings,
-  buildPreviewShortDetailSettings,
-  createPosterStyle,
-  createVideoPosterStyle,
-  formatDurationLabel,
-} from "../lib/creator-mode-shell-ui";
 import type {
   CreatorWorkspaceDetailPoster,
   CreatorWorkspaceDetailSelection,
   CreatorWorkspaceDetailViewSelection,
   CreatorWorkspaceLinkedPreviewItems,
+  CreatorWorkspacePreviewDetailData,
   CreatorWorkspacePreviewDetailSelection,
   CreatorWorkspaceReadyPreviewCollections,
   CreatorWorkspaceResolvedDetailState,
 } from "./creator-mode-shell.types";
 import { CreatorWorkspaceManagedTile } from "./creator-workspace-managed-tile";
+import { CreatorWorkspaceMetadataEditSheet } from "./creator-workspace-metadata-edit-sheet";
 import { CreatorWorkspacePreviewDetailLinkedGrid } from "./creator-workspace-preview-grid";
-
-function CreatorWorkspaceActionButton({
-  ariaLabel,
-  children,
-  className,
-  disabled = true,
-  onClick,
-}: {
-  ariaLabel: string;
-  children: ReactNode;
-  className: string;
-  disabled?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      aria-label={ariaLabel}
-      className={className}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {children}
-    </button>
-  );
-}
 
 function CreatorWorkspaceDetailMedia({
   detail,
@@ -214,102 +186,85 @@ function CreatorWorkspaceDetailLinkedGrid({
   );
 }
 
-function resolvePreviewDetailState(
-  detailSelection: CreatorWorkspacePreviewDetailSelection,
-  previewCollections: CreatorWorkspaceReadyPreviewCollections,
-): {
-  detail: CreatorWorkspaceResolvedDetailState;
-  linkedPreviewItems: CreatorWorkspaceLinkedPreviewItems;
-  poster: CreatorWorkspaceDetailPoster;
-} {
-  if (detailSelection.kind === "preview-main") {
+function buildPreviewShortResolvedDetailState(
+  detail: CreatorWorkspacePreviewDetailData,
+): CreatorWorkspaceResolvedDetailState {
+  if (detail.kind === "preview-main") {
     return {
-      detail: {
-        durationLabel: formatDurationLabel(detailSelection.item.durationSeconds),
-        kindLabel: "本編",
-        linkedMainShortId: null,
-        linkedShortIds: [],
-        metrics: [],
-        settings: buildPreviewMainDetailSettings(detailSelection.item),
-        statusLabel: null,
-        statusTone: null,
-        summary: "owner preview 一覧から取得した本編データです。",
-      },
-      linkedPreviewItems: previewCollections.shorts.items.filter((item) => item.canonicalMainId === detailSelection.item.id),
-      poster: {
-        kind: "preview",
-        posterUrl: detailSelection.item.media.posterUrl,
-      },
+      durationLabel: formatDurationLabel(detail.detail.main.durationSeconds),
+      kindLabel: "本編",
+      linkedMainShortId: null,
+      linkedShortIds: [],
+      metrics: [],
+      settings: [
+        { label: "価格", value: formatJpy(detail.detail.main.priceJpy) },
+        { label: "長さ", value: formatDurationLabel(detail.detail.main.durationSeconds) },
+      ],
+      statusLabel: null,
+      statusTone: null,
+      summary: detail.detail.entryShort.caption.trim()
+        ? `${detail.detail.entryShort.caption.trim()}から流入する本編です。`
+        : "owner preview 用の本編です。",
     };
   }
 
   return {
-    detail: {
-      durationLabel: formatDurationLabel(detailSelection.item.previewDurationSeconds),
-      kindLabel: "ショート",
-      linkedMainShortId: null,
-      linkedShortIds: [],
-      metrics: [],
-      settings: buildPreviewShortDetailSettings(detailSelection.item),
-      statusLabel: null,
-      statusTone: null,
-      summary: "owner preview 一覧から取得したショートデータです。",
-    },
-    linkedPreviewItems: previewCollections.mains.items.filter((item) => item.id === detailSelection.item.canonicalMainId),
-    poster: {
-      kind: "preview",
-      posterUrl: detailSelection.item.media.posterUrl,
-    },
+    durationLabel: formatDurationLabel(detail.detail.short.previewDurationSeconds),
+    kindLabel: "ショート",
+    linkedMainShortId: null,
+    linkedShortIds: [],
+    metrics: [],
+    settings: [
+      { label: "長さ", value: formatDurationLabel(detail.detail.short.previewDurationSeconds) },
+    ],
+    statusLabel: null,
+    statusTone: null,
+    summary: detail.detail.short.caption.trim() || "caption はまだ設定されていません。",
   };
 }
 
-export function CreatorWorkspaceDetailView({
+function resolvePreviewDetailPoster(detail: CreatorWorkspacePreviewDetailData): CreatorWorkspaceDetailPoster {
+  return detail.kind === "preview-main"
+    ? {
+        kind: "preview",
+        posterUrl: detail.detail.main.media.posterUrl ?? "",
+      }
+    : {
+        kind: "preview",
+        posterUrl: detail.detail.short.media.posterUrl ?? "",
+      };
+}
+
+function resolvePreviewLinkedItems(
+  detail: CreatorWorkspacePreviewDetailData,
+  previewCollections: CreatorWorkspaceReadyPreviewCollections | null,
+): CreatorWorkspaceLinkedPreviewItems {
+  if (!previewCollections) {
+    return [];
+  }
+
+  if (detail.kind === "preview-main") {
+    return previewCollections.shorts.items.filter((item) => item.canonicalMainId === detail.detail.main.id);
+  }
+
+  return previewCollections.mains.items.filter((item) => item.id === detail.detail.short.canonicalMainId);
+}
+
+function CreatorWorkspaceDetailScreen({
+  actionSlot,
   creator,
-  detailSelection,
+  detail,
+  linkedContent,
   onBack,
-  onOpenDetail,
-  previewCollections,
-  state,
+  poster,
 }: {
+  actionSlot?: ReactNode;
   creator: CreatorSummary;
-  detailSelection: CreatorWorkspaceDetailViewSelection;
+  detail: CreatorWorkspaceResolvedDetailState;
+  linkedContent: ReactNode;
   onBack: () => void;
-  onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
-  previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
-  state: CreatorModeShellReadyState;
+  poster: CreatorWorkspaceDetailPoster;
 }) {
-  let detail: CreatorWorkspaceResolvedDetailState | null = null;
-  let linkedPreviewItems: CreatorWorkspaceLinkedPreviewItems = [];
-  let poster: CreatorWorkspaceDetailPoster | null = null;
-
-  if (detailSelection.kind === "mock") {
-    const mockDetail = state.workspace.detailsByTab[detailSelection.tab][detailSelection.shortId];
-    const mockPoster = state.workspace.posters[detailSelection.shortId];
-
-    if (!mockDetail || !mockPoster) {
-      return null;
-    }
-
-    detail = mockDetail;
-    poster = {
-      kind: "mock",
-      poster: mockPoster,
-    };
-  } else {
-    if (!previewCollections) {
-      return null;
-    }
-
-    const previewDetail = resolvePreviewDetailState(detailSelection, previewCollections);
-    detail = previewDetail.detail;
-    linkedPreviewItems = previewDetail.linkedPreviewItems;
-    poster = previewDetail.poster;
-  }
-
-  if (detail === null || poster === null) {
-    return null;
-  }
-
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
       <div className="flex items-center justify-between gap-3">
@@ -317,14 +272,7 @@ export function CreatorWorkspaceDetailView({
           <span className="sr-only">Back</span>
           <ArrowLeft className="size-5" strokeWidth={2.1} />
         </Button>
-        <CreatorWorkspaceActionButton
-          ariaLabel="投稿操作"
-          className="inline-flex min-h-8 min-w-7 items-center justify-center gap-1 bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
-        >
-          <span className="size-1 rounded-full bg-current" />
-          <span className="size-1 rounded-full bg-current" />
-          <span className="size-1 rounded-full bg-current" />
-        </CreatorWorkspaceActionButton>
+        {actionSlot ?? <span aria-hidden="true" className="block min-h-8 min-w-7" />}
       </div>
 
       <section className="mt-[18px] grid gap-[18px] pb-10">
@@ -352,34 +300,172 @@ export function CreatorWorkspaceDetailView({
           </CreatorWorkspaceDetailSection>
         ) : null}
 
-        {detailSelection.kind === "mock" && detailSelection.tab === "main" && detail.linkedShortIds.length > 0 ? (
-          <CreatorWorkspaceDetailSection title="紐づくショート">
-            <CreatorWorkspaceDetailLinkedGrid
-              items={detail.linkedShortIds}
-              onOpenDetail={onOpenDetail}
-              tab="shorts"
-              workspace={state.workspace}
-            />
-          </CreatorWorkspaceDetailSection>
-        ) : null}
-
-        {detailSelection.kind === "mock" && detailSelection.tab === "shorts" && detail.linkedMainShortId ? (
-          <CreatorWorkspaceDetailSection title="紐づく本編">
-            <CreatorWorkspaceDetailLinkedGrid
-              items={[detail.linkedMainShortId]}
-              onOpenDetail={onOpenDetail}
-              tab="main"
-              workspace={state.workspace}
-            />
-          </CreatorWorkspaceDetailSection>
-        ) : null}
-
-        {detailSelection.kind !== "mock" && linkedPreviewItems.length > 0 ? (
-          <CreatorWorkspaceDetailSection title={detailSelection.kind === "preview-main" ? "紐づくショート" : "紐づく本編"}>
-            <CreatorWorkspacePreviewDetailLinkedGrid items={linkedPreviewItems} onOpenDetail={onOpenDetail} />
-          </CreatorWorkspaceDetailSection>
-        ) : null}
+        {linkedContent}
       </section>
     </section>
+  );
+}
+
+function CreatorWorkspacePreviewDetailPane({
+  detailSelection,
+  onBack,
+  onMainPriceSaved,
+  onOpenDetail,
+  previewCollections,
+}: {
+  detailSelection: CreatorWorkspacePreviewDetailSelection;
+  onBack: () => void;
+  onMainPriceSaved: (mainId: string, priceJpy: number) => void;
+  onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
+  previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
+}) {
+  const { retry, state } = useCreatorWorkspacePreviewDetail(detailSelection);
+  const [savedDetail, setSavedDetail] = useState<CreatorWorkspacePreviewDetailData | null>(null);
+
+  if (state.kind === "loading") {
+    return (
+      <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
+        <div className="flex items-center justify-between gap-3">
+          <Button className="-ml-2" onClick={onBack} size="icon" variant="ghost">
+            <span className="sr-only">Back</span>
+            <ArrowLeft className="size-5" strokeWidth={2.1} />
+          </Button>
+          <span aria-hidden="true" className="block min-h-8 min-w-7" />
+        </div>
+
+        <div className="mt-[18px] grid gap-4">
+          <p className="m-0 text-sm text-muted" role="status">
+            動画詳細を読み込んでいます...
+          </p>
+          <div aria-hidden="true" className="aspect-[4/5] animate-pulse rounded-[32px] bg-[rgba(167,220,249,0.28)]" />
+          <div aria-hidden="true" className="h-20 animate-pulse rounded-[24px] bg-[rgba(167,220,249,0.16)]" />
+        </div>
+      </section>
+    );
+  }
+
+  if (state.kind === "error") {
+    return (
+      <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
+        <div className="flex items-center justify-between gap-3">
+          <Button className="-ml-2" onClick={onBack} size="icon" variant="ghost">
+            <span className="sr-only">Back</span>
+            <ArrowLeft className="size-5" strokeWidth={2.1} />
+          </Button>
+          <span aria-hidden="true" className="block min-h-8 min-w-7" />
+        </div>
+
+        <section className="mt-[18px] rounded-[24px] border border-[rgba(167,220,249,0.4)] bg-[#f8fbfd] px-4 py-5">
+          <p className="m-0 text-sm leading-6 text-muted" role="alert">
+            {state.message}
+          </p>
+          <div className="mt-3">
+            <Button onClick={retry} size="sm" type="button" variant="secondary">
+              再読み込み
+            </Button>
+          </div>
+        </section>
+      </section>
+    );
+  }
+
+  const previewDetail = savedDetail ?? state.detail;
+  const resolvedDetail = buildPreviewShortResolvedDetailState(previewDetail);
+  const linkedPreviewItems = resolvePreviewLinkedItems(previewDetail, previewCollections);
+
+  return (
+    <CreatorWorkspaceDetailScreen
+      actionSlot={(
+        <CreatorWorkspaceMetadataEditSheet
+          detail={previewDetail}
+          onDetailSaved={setSavedDetail}
+          onMainPriceSaved={onMainPriceSaved}
+        />
+      )}
+      creator={previewDetail.detail.creator}
+      detail={resolvedDetail}
+      linkedContent={linkedPreviewItems.length > 0 ? (
+        <CreatorWorkspaceDetailSection title={previewDetail.kind === "preview-main" ? "紐づくショート" : "紐づく本編"}>
+          <CreatorWorkspacePreviewDetailLinkedGrid items={linkedPreviewItems} onOpenDetail={onOpenDetail} />
+        </CreatorWorkspaceDetailSection>
+      ) : null}
+      onBack={onBack}
+      poster={resolvePreviewDetailPoster(previewDetail)}
+    />
+  );
+}
+
+export function CreatorWorkspaceDetailView({
+  creator,
+  detailSelection,
+  onBack,
+  onMainPriceSaved,
+  onOpenDetail,
+  previewCollections,
+  state,
+}: {
+  creator: CreatorSummary;
+  detailSelection: CreatorWorkspaceDetailViewSelection;
+  onBack: () => void;
+  onMainPriceSaved: (mainId: string, priceJpy: number) => void;
+  onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
+  previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
+  state: CreatorModeShellReadyState;
+}) {
+  if (detailSelection.kind !== "mock") {
+    return (
+      <CreatorWorkspacePreviewDetailPane
+        detailSelection={detailSelection}
+        key={`${detailSelection.kind}:${detailSelection.id}`}
+        onBack={onBack}
+        onMainPriceSaved={onMainPriceSaved}
+        onOpenDetail={onOpenDetail}
+        previewCollections={previewCollections}
+      />
+    );
+  }
+
+  const mockDetail = state.workspace.detailsByTab[detailSelection.tab][detailSelection.shortId];
+  const mockPoster = state.workspace.posters[detailSelection.shortId];
+
+  if (!mockDetail || !mockPoster) {
+    return null;
+  }
+
+  return (
+    <CreatorWorkspaceDetailScreen
+      creator={creator}
+      detail={mockDetail}
+      linkedContent={(
+        <>
+          {detailSelection.tab === "main" && mockDetail.linkedShortIds.length > 0 ? (
+            <CreatorWorkspaceDetailSection title="紐づくショート">
+              <CreatorWorkspaceDetailLinkedGrid
+                items={mockDetail.linkedShortIds}
+                onOpenDetail={onOpenDetail}
+                tab="shorts"
+                workspace={state.workspace}
+              />
+            </CreatorWorkspaceDetailSection>
+          ) : null}
+
+          {detailSelection.tab === "shorts" && mockDetail.linkedMainShortId ? (
+            <CreatorWorkspaceDetailSection title="紐づく本編">
+              <CreatorWorkspaceDetailLinkedGrid
+                items={[mockDetail.linkedMainShortId]}
+                onOpenDetail={onOpenDetail}
+                tab="main"
+                workspace={state.workspace}
+              />
+            </CreatorWorkspaceDetailSection>
+          ) : null}
+        </>
+      )}
+      onBack={onBack}
+      poster={{
+        kind: "mock",
+        poster: mockPoster,
+      }}
+    />
   );
 }

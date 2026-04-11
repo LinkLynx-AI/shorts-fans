@@ -1,0 +1,77 @@
+{
+  "PUT /api/creator/workspace/mains/{mainId}/price": {
+    "request": {
+      "priceJpy": 2400
+    },
+    "success": {
+      "status": 204
+    },
+    "validation_error": {
+      "status": 400,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_main_price_validation_001",
+          "page": null
+        },
+        "error": {
+          "code": "validation_error",
+          "message": "priceJpy must be positive"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_main_price_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator workspace preview was not found"
+        }
+      }
+    }
+  },
+  "PUT /api/creator/workspace/shorts/{shortId}/caption": {
+    "request": {
+      "caption": "updated caption"
+    },
+    "request_clear": {
+      "caption": "   "
+    },
+    "success": {
+      "status": 204
+    },
+    "invalid_request": {
+      "status": 400,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_short_caption_invalid_001",
+          "page": null
+        },
+        "error": {
+          "code": "invalid_request",
+          "message": "creator workspace metadata request is invalid"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_short_caption_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "creator workspace preview was not found"
+        }
+      }
+    }
+  }
+}

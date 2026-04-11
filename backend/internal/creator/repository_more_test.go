@@ -23,7 +23,10 @@ type repositoryStubQueries struct {
 	listWorkspacePreviewMainsByCreator func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	getRevisionSummary                 func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	getMediaAsset                      func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
+	getMainByID                        func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
+	getShortByID                       func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 	updateCapability                   func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
+	updateWorkspaceMainPrice           func(context.Context, sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.AppMain, error)
 	countPublicShorts                  func(context.Context, pgtype.UUID) (int64, error)
 	deleteCreatorFollow                func(context.Context, sqlc.DeleteCreatorFollowParams) error
 	createProfile                      func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
@@ -37,6 +40,7 @@ type repositoryStubQueries struct {
 	listShortsByCreator                func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
 	putCreatorFollow                   func(context.Context, sqlc.PutCreatorFollowParams) error
 	searchPublic                       func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	updateWorkspaceShortCaption        func(context.Context, sqlc.UpdateCreatorWorkspaceShortCaptionParams) (sqlc.AppShort, error)
 	updateProfile                      func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	publishProfile                     func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
@@ -104,11 +108,32 @@ func (s repositoryStubQueries) GetMediaAssetByID(ctx context.Context, id pgtype.
 	return s.getMediaAsset(ctx, id)
 }
 
+func (s repositoryStubQueries) GetMainByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
+	if s.getMainByID == nil {
+		return sqlc.AppMain{}, nil
+	}
+	return s.getMainByID(ctx, id)
+}
+
+func (s repositoryStubQueries) GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+	if s.getShortByID == nil {
+		return sqlc.AppShort{}, nil
+	}
+	return s.getShortByID(ctx, id)
+}
+
 func (s repositoryStubQueries) UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
 	if s.updateCapability == nil {
 		return sqlc.AppCreatorCapability{}, nil
 	}
 	return s.updateCapability(ctx, arg)
+}
+
+func (s repositoryStubQueries) UpdateCreatorWorkspaceMainPrice(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.AppMain, error) {
+	if s.updateWorkspaceMainPrice == nil {
+		return sqlc.AppMain{}, nil
+	}
+	return s.updateWorkspaceMainPrice(ctx, arg)
 }
 
 func (s repositoryStubQueries) CreateCreatorProfile(ctx context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
@@ -200,6 +225,13 @@ func (s repositoryStubQueries) SearchPublicCreatorProfiles(ctx context.Context, 
 		return nil, nil
 	}
 	return s.searchPublic(ctx, arg)
+}
+
+func (s repositoryStubQueries) UpdateCreatorWorkspaceShortCaption(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceShortCaptionParams) (sqlc.AppShort, error) {
+	if s.updateWorkspaceShortCaption == nil {
+		return sqlc.AppShort{}, nil
+	}
+	return s.updateWorkspaceShortCaption(ctx, arg)
 }
 
 func (s repositoryStubQueries) UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {

@@ -109,25 +109,26 @@ type FanProfileFollowingReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	AppEnv               string
-	CreatorSearch        CreatorSearchReader
-	CreatorWorkspace     CreatorWorkspaceReader
-	CreatorUpload        CreatorUploadHandler
-	CreatorProfile       CreatorProfileReader
-	CreatorProfileShorts CreatorProfileShortsReader
-	FanFeed              FanFeedReader
-	FanShortPin          FanShortPinWriter
-	CreatorFollow        CreatorFollowWriter
-	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
-	CreatorRegistration  ViewerCreatorRegistrationWriter
-	FanProfileFollowing  FanProfileFollowingReader
-	FanProfileOverview   FanProfileOverviewReader
-	FanAuth              FanAuthService
-	AuthCookie           AuthCookieConfig
-	ShortDisplayAssets   ShortDisplayAssetResolver
-	ViewerActiveMode     ViewerActiveModeSwitcher
-	ViewerBootstrap      ViewerBootstrapReader
-	Dependencies         []Dependency
+	AppEnv                 string
+	CreatorSearch          CreatorSearchReader
+	CreatorWorkspace       CreatorWorkspaceReader
+	CreatorWorkspaceWriter CreatorWorkspaceWriter
+	CreatorUpload          CreatorUploadHandler
+	CreatorProfile         CreatorProfileReader
+	CreatorProfileShorts   CreatorProfileShortsReader
+	FanFeed                FanFeedReader
+	FanShortPin            FanShortPinWriter
+	CreatorFollow          CreatorFollowWriter
+	CreatorAvatarUpload    ViewerCreatorAvatarUploadHandler
+	CreatorRegistration    ViewerCreatorRegistrationWriter
+	FanProfileFollowing    FanProfileFollowingReader
+	FanProfileOverview     FanProfileOverviewReader
+	FanAuth                FanAuthService
+	AuthCookie             AuthCookieConfig
+	ShortDisplayAssets     ShortDisplayAssetResolver
+	ViewerActiveMode       ViewerActiveModeSwitcher
+	ViewerBootstrap        ViewerBootstrapReader
+	Dependencies           []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -185,7 +186,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.ViewerBootstrap)
-	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.ViewerBootstrap)
+	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.CreatorWorkspaceWriter, config.ViewerBootstrap)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)

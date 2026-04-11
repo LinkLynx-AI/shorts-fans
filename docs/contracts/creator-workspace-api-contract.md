@@ -202,6 +202,7 @@
 - `activeMode` や mode switch CTA 情報は返しません。
 - review detail list や analytics breakdown は返しません。
 - owner preview list/detail は `docs/contracts/creator-workspace-owner-preview-api-contract.md` に分離します。
+- owner preview からの main price / short caption mutation は `docs/contracts/creator-workspace-metadata-edit-api-contract.md` に分離します。
 - public creator profile をこの endpoint で代替しません。
 
 ## Fixture Reference

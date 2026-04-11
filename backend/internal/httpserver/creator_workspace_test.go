@@ -18,14 +18,40 @@ import (
 )
 
 type stubCreatorWorkspaceReader struct {
-	getWorkspace              func(context.Context, uuid.UUID) (creator.Workspace, error)
-	getWorkspaceTopPerformers func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error)
-	listWorkspacePreviewMain  func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
-	listWorkspacePreviewShort func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
+	getWorkspace                   func(context.Context, uuid.UUID) (creator.Workspace, error)
+	getWorkspacePreviewMainDetail  func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewMainDetail, error)
+	getWorkspacePreviewShortDetail func(context.Context, uuid.UUID, uuid.UUID) (creator.WorkspacePreviewShortDetail, error)
+	getWorkspaceTopPerformers      func(context.Context, uuid.UUID) (creator.WorkspaceTopPerformers, error)
+	listWorkspacePreviewMain       func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
+	listWorkspacePreviewShort      func(context.Context, uuid.UUID, *creator.WorkspacePreviewCursor, int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
 }
 
 func (s stubCreatorWorkspaceReader) GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (creator.Workspace, error) {
 	return s.getWorkspace(ctx, viewerUserID)
+}
+
+func (s stubCreatorWorkspaceReader) GetWorkspacePreviewMainDetail(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	mainID uuid.UUID,
+) (creator.WorkspacePreviewMainDetail, error) {
+	if s.getWorkspacePreviewMainDetail == nil {
+		return creator.WorkspacePreviewMainDetail{}, nil
+	}
+
+	return s.getWorkspacePreviewMainDetail(ctx, viewerUserID, mainID)
+}
+
+func (s stubCreatorWorkspaceReader) GetWorkspacePreviewShortDetail(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	shortID uuid.UUID,
+) (creator.WorkspacePreviewShortDetail, error) {
+	if s.getWorkspacePreviewShortDetail == nil {
+		return creator.WorkspacePreviewShortDetail{}, nil
+	}
+
+	return s.getWorkspacePreviewShortDetail(ctx, viewerUserID, shortID)
 }
 
 func (s stubCreatorWorkspaceReader) GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error) {
@@ -60,6 +86,37 @@ func (s stubCreatorWorkspaceReader) ListWorkspacePreviewShorts(
 	}
 
 	return s.listWorkspacePreviewShort(ctx, viewerUserID, cursor, limit)
+}
+
+type stubCreatorWorkspaceWriter struct {
+	updateMainPrice    func(context.Context, uuid.UUID, uuid.UUID, int64) error
+	updateShortCaption func(context.Context, uuid.UUID, uuid.UUID, *string) error
+}
+
+func (s stubCreatorWorkspaceWriter) UpdateWorkspaceMainPrice(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	mainID uuid.UUID,
+	priceJpy int64,
+) error {
+	if s.updateMainPrice == nil {
+		return nil
+	}
+
+	return s.updateMainPrice(ctx, viewerUserID, mainID, priceJpy)
+}
+
+func (s stubCreatorWorkspaceWriter) UpdateWorkspaceShortCaption(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	shortID uuid.UUID,
+	caption *string,
+) error {
+	if s.updateShortCaption == nil {
+		return nil
+	}
+
+	return s.updateShortCaption(ctx, viewerUserID, shortID, caption)
 }
 
 func TestCreatorWorkspaceRoute(t *testing.T) {
@@ -859,6 +916,441 @@ func TestCreatorWorkspaceTopPerformersRouteReturnsInternalError(t *testing.T) {
 	}
 	if response.Error == nil || response.Error.Code != "internal_error" {
 		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	}
+}
+
+func TestCreatorWorkspacePreviewShortDetailRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-2222-3333-4444-555555555555")
+	shortID := uuid.MustParse("66666666-7777-8888-9999-000000000000")
+	mainID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+	assetID := uuid.MustParse("ffffffff-1111-2222-3333-444444444444")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewShortDetail: func(_ context.Context, gotViewerUserID uuid.UUID, gotShortID uuid.UUID) (creator.WorkspacePreviewShortDetail, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("GetWorkspacePreviewShortDetail() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotShortID != shortID {
+					t.Fatalf("GetWorkspacePreviewShortDetail() shortID got %s want %s", gotShortID, shortID)
+				}
+
+				return creator.WorkspacePreviewShortDetail{
+					Creator: creator.Profile{
+						UserID:      viewerID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						Bio:         "owner preview bio",
+					},
+					Short: creator.WorkspacePreviewShortDetailItem{
+						Caption:                "blue tone の balcony preview。",
+						CanonicalMainID:        mainID,
+						CreatorUserID:          viewerID,
+						ID:                     shortID,
+						Media:                  media.VideoDisplayAsset{DurationSeconds: 16, ID: assetID, Kind: "video", PosterURL: "https://cdn.example.com/shorts/poster.jpg", URL: "https://cdn.example.com/shorts/playback.mp4"},
+						PreviewDurationSeconds: 16,
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/shorts/{shortId}/preview status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspacePreviewShortDetailResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want preview detail")
+	}
+	if response.Data.Preview.Short.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.Preview.Short.ID got %q want %q", response.Data.Preview.Short.ID, shortPublicID(shortID))
+	}
+	if response.Data.Preview.Access.MainID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.Preview.Access.MainID got %q want %q", response.Data.Preview.Access.MainID, mainPublicID(mainID))
+	}
+	if response.Data.Preview.Access.Status != "owner" || response.Data.Preview.Access.Reason != "owner_preview" {
+		t.Fatalf("response.Data.Preview.Access got %#v want owner owner_preview", response.Data.Preview.Access)
+	}
+	if response.Data.Preview.Short.Media.URL != "https://cdn.example.com/shorts/playback.mp4" {
+		t.Fatalf("response.Data.Preview.Short.Media.URL got %q want playback url", response.Data.Preview.Short.Media.URL)
+	}
+	if response.Meta.Page != nil {
+		t.Fatalf("response.Meta.Page got %#v want nil", response.Meta.Page)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspacePreviewMainDetailRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("12121212-2222-3333-4444-555555555555")
+	mainID := uuid.MustParse("67676767-7777-8888-9999-000000000000")
+	shortID := uuid.MustParse("abababab-bbbb-cccc-dddd-eeeeeeeeeeee")
+	mainAssetID := uuid.MustParse("cdcdcdcd-1111-2222-3333-444444444444")
+	shortAssetID := uuid.MustParse("efefefef-1111-2222-3333-444444444444")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{
+			getWorkspacePreviewMainDetail: func(_ context.Context, gotViewerUserID uuid.UUID, gotMainID uuid.UUID) (creator.WorkspacePreviewMainDetail, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("GetWorkspacePreviewMainDetail() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotMainID != mainID {
+					t.Fatalf("GetWorkspacePreviewMainDetail() mainID got %s want %s", gotMainID, mainID)
+				}
+
+				return creator.WorkspacePreviewMainDetail{
+					Creator: creator.Profile{
+						UserID:      viewerID,
+						DisplayName: stringPtr("Mina Rei"),
+						Handle:      stringPtr("minarei"),
+						Bio:         "owner preview bio",
+					},
+					EntryShort: creator.WorkspacePreviewShortDetailItem{
+						Caption:                "quiet rooftop preview。",
+						CanonicalMainID:        mainID,
+						CreatorUserID:          viewerID,
+						ID:                     shortID,
+						Media:                  media.VideoDisplayAsset{DurationSeconds: 16, ID: shortAssetID, Kind: "video", PosterURL: "https://cdn.example.com/shorts/poster.jpg", URL: "https://cdn.example.com/shorts/playback.mp4"},
+						PreviewDurationSeconds: 16,
+					},
+					Main: creator.WorkspacePreviewMainDetailItem{
+						DurationSeconds: 720,
+						ID:              mainID,
+						Media:           media.VideoDisplayAsset{DurationSeconds: 720, ID: mainAssetID, Kind: "video", PosterURL: "https://signed.example.com/mains/poster.jpg", URL: "https://signed.example.com/mains/playback.mp4"},
+						PriceJpy:        2200,
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/preview", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/creator/workspace/mains/{mainId}/preview status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspacePreviewMainDetailResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want preview detail")
+	}
+	if response.Data.Preview.Main.ID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.Preview.Main.ID got %q want %q", response.Data.Preview.Main.ID, mainPublicID(mainID))
+	}
+	if response.Data.Preview.Main.PriceJpy != 2200 {
+		t.Fatalf("response.Data.Preview.Main.PriceJpy got %d want %d", response.Data.Preview.Main.PriceJpy, 2200)
+	}
+	if response.Data.Preview.EntryShort.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.Preview.EntryShort.ID got %q want %q", response.Data.Preview.EntryShort.ID, shortPublicID(shortID))
+	}
+	if response.Data.Preview.Main.Media.URL != "https://signed.example.com/mains/playback.mp4" {
+		t.Fatalf("response.Data.Preview.Main.Media.URL got %q want playback url", response.Data.Preview.Main.Media.URL)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceUpdateMainPriceRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("13131313-2222-3333-4444-555555555555")
+	mainID := uuid.MustParse("14141414-7777-8888-9999-000000000000")
+
+	var (
+		gotMainID   uuid.UUID
+		gotPrice    int64
+		gotViewerID uuid.UUID
+	)
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceWriter: stubCreatorWorkspaceWriter{
+			updateMainPrice: func(_ context.Context, viewerUserID uuid.UUID, gotID uuid.UUID, priceJpy int64) error {
+				gotViewerID = viewerUserID
+				gotMainID = gotID
+				gotPrice = priceJpy
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/price", strings.NewReader(`{"priceJpy":2400}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT /api/creator/workspace/mains/{mainId}/price status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	if gotViewerID != viewerID {
+		t.Fatalf("UpdateWorkspaceMainPrice() viewerUserID got %s want %s", gotViewerID, viewerID)
+	}
+	if gotMainID != mainID {
+		t.Fatalf("UpdateWorkspaceMainPrice() mainID got %s want %s", gotMainID, mainID)
+	}
+	if gotPrice != 2400 {
+		t.Fatalf("UpdateWorkspaceMainPrice() price got %d want %d", gotPrice, 2400)
+	}
+}
+
+func TestCreatorWorkspaceUpdateMainPriceRouteValidatesPositivePrice(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceWriter: stubCreatorWorkspaceWriter{
+			updateMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) error {
+				writerCalled = true
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("15151515-2222-3333-4444-555555555555"),
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("16161616-7777-8888-9999-000000000000"))+"/price", strings.NewReader(`{"priceJpy":0}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/mains/{mainId}/price status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceMainPrice() writerCalled = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "validation_error" {
+		t.Fatalf("response.Error got %#v want validation_error", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceUpdateShortCaptionRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("17171717-2222-3333-4444-555555555555")
+	shortID := uuid.MustParse("18181818-7777-8888-9999-000000000000")
+
+	var (
+		gotCaption  *string
+		gotShortID  uuid.UUID
+		gotViewerID uuid.UUID
+	)
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceWriter: stubCreatorWorkspaceWriter{
+			updateShortCaption: func(_ context.Context, viewerUserID uuid.UUID, gotID uuid.UUID, caption *string) error {
+				gotViewerID = viewerUserID
+				gotShortID = gotID
+				gotCaption = caption
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption", strings.NewReader(`{"caption":"quiet rooftop preview"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	if gotViewerID != viewerID {
+		t.Fatalf("UpdateWorkspaceShortCaption() viewerUserID got %s want %s", gotViewerID, viewerID)
+	}
+	if gotShortID != shortID {
+		t.Fatalf("UpdateWorkspaceShortCaption() shortID got %s want %s", gotShortID, shortID)
+	}
+	if gotCaption == nil || *gotCaption != "quiet rooftop preview" {
+		t.Fatalf("UpdateWorkspaceShortCaption() caption got %#v want quiet rooftop preview", gotCaption)
+	}
+}
+
+func TestCreatorWorkspaceUpdateShortCaptionRouteAllowsNullCaption(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("19191919-2222-3333-4444-555555555555")
+	shortID := uuid.MustParse("20202020-7777-8888-9999-000000000000")
+
+	var (
+		gotCaption  *string
+		gotShortID  uuid.UUID
+		gotViewerID uuid.UUID
+	)
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceWriter: stubCreatorWorkspaceWriter{
+			updateShortCaption: func(_ context.Context, viewerUserID uuid.UUID, gotID uuid.UUID, caption *string) error {
+				gotViewerID = viewerUserID
+				gotShortID = gotID
+				gotCaption = caption
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption", strings.NewReader(`{"caption":null}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	if gotViewerID != viewerID {
+		t.Fatalf("UpdateWorkspaceShortCaption() viewerUserID got %s want %s", gotViewerID, viewerID)
+	}
+	if gotShortID != shortID {
+		t.Fatalf("UpdateWorkspaceShortCaption() shortID got %s want %s", gotShortID, shortID)
+	}
+	if gotCaption != nil {
+		t.Fatalf("UpdateWorkspaceShortCaption() caption got %#v want nil", gotCaption)
+	}
+}
+
+func TestCreatorWorkspaceUpdateShortCaptionRouteRequiresCaptionField(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceWriter: stubCreatorWorkspaceWriter{
+			updateShortCaption: func(context.Context, uuid.UUID, uuid.UUID, *string) error {
+				writerCalled = true
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("21212121-2222-3333-4444-555555555555"),
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/shorts/"+shortPublicID(uuid.MustParse("22222222-7777-8888-9999-000000000000"))+"/caption", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceShortCaption() writerCalled = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "invalid_request" {
+		t.Fatalf("response.Error got %#v want invalid_request", response.Error)
 	}
 }
 

@@ -6,7 +6,6 @@ import type {
   CreatorWorkspaceTopMainPerformer,
   CreatorWorkspaceTopShortPerformer,
 } from "../api/get-creator-workspace-top-performers";
-import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
 import type { CreatorWorkspaceTopPerformersState } from "../model/creator-workspace-top-performers";
 import {
   createVideoPosterStyle,
@@ -110,7 +109,6 @@ function CreatorWorkspaceTopPerformersError({
 function buildTopPerformerRows(
   topMain: CreatorWorkspaceTopMainPerformer | null,
   topShort: CreatorWorkspaceTopShortPerformer | null,
-  previewCollectionsState: CreatorWorkspacePreviewCollectionsState,
 ): readonly {
   label: string;
   metric: string;
@@ -123,43 +121,30 @@ function buildTopPerformerRows(
     posterUrl: string;
     selection: CreatorWorkspacePreviewDetailSelection | null;
   }[] = [];
-  const readyCollections = previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null;
 
   if (topMain) {
-    const previewMainIndex = readyCollections?.mains.items.findIndex((item) => item.id === topMain.id) ?? -1;
-    const previewMain = previewMainIndex >= 0 ? readyCollections?.mains.items[previewMainIndex] ?? null : null;
-
     rows.push({
       label: "Top main",
       metric: formatUnlockMetric(topMain.unlockCount),
       posterUrl: topMain.media.posterUrl,
-      selection: previewMain
-        ? {
-            index: previewMainIndex,
-            item: previewMain,
-            kind: "preview-main",
-            tab: "main",
-          }
-        : null,
+      selection: {
+        id: topMain.id,
+        kind: "preview-main",
+        tab: "main",
+      },
     });
   }
 
   if (topShort) {
-    const previewShortIndex = readyCollections?.shorts.items.findIndex((item) => item.id === topShort.id) ?? -1;
-    const previewShort = previewShortIndex >= 0 ? readyCollections?.shorts.items[previewShortIndex] ?? null : null;
-
     rows.push({
       label: "Top short",
       metric: formatUnlockMetric(topShort.attributedUnlockCount),
       posterUrl: topShort.media.posterUrl,
-      selection: previewShort
-        ? {
-            index: previewShortIndex,
-            item: previewShort,
-            kind: "preview-short",
-            tab: "shorts",
-          }
-        : null,
+      selection: {
+        id: topShort.id,
+        kind: "preview-short",
+        tab: "shorts",
+      },
     });
   }
 
@@ -169,12 +154,10 @@ function buildTopPerformerRows(
 export function CreatorWorkspaceTopPerformers({
   onOpenDetail,
   onRetry,
-  previewCollectionsState,
   state,
 }: {
   onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetry: () => void;
-  previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
   state: CreatorWorkspaceTopPerformersState;
 }) {
   if (state.kind === "loading") {
@@ -185,11 +168,7 @@ export function CreatorWorkspaceTopPerformers({
     return <CreatorWorkspaceTopPerformersError message={state.message} onRetry={onRetry} />;
   }
 
-  const rows = buildTopPerformerRows(
-    state.topPerformers.topMain,
-    state.topPerformers.topShort,
-    previewCollectionsState,
-  );
+  const rows = buildTopPerformerRows(state.topPerformers.topMain, state.topPerformers.topShort);
 
   if (rows.length === 0) {
     return null;

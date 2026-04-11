@@ -40,7 +40,10 @@ type queries interface {
 	ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error)
+	GetMainByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error)
+	GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
+	UpdateCreatorWorkspaceMainPrice(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.AppMain, error)
 	CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	DeleteCreatorFollow(ctx context.Context, arg sqlc.DeleteCreatorFollowParams) error
 	CreateCreatorProfile(ctx context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
@@ -54,6 +57,7 @@ type queries interface {
 	ListShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppShort, error)
 	PutCreatorFollow(ctx context.Context, arg sqlc.PutCreatorFollowParams) error
 	SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	UpdateCreatorWorkspaceShortCaption(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceShortCaptionParams) (sqlc.AppShort, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	PublishCreatorProfile(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
