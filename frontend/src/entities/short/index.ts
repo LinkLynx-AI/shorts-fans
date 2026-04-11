@@ -7,11 +7,20 @@ export type {
 export {
   getPublicShortDetail,
 } from "./api/get-public-short-detail";
+export {
+  ShortPinApiError,
+  updateShortPin,
+} from "./api/update-short-pin";
 export type {
   FanFeedItem,
   FanFeedTab,
   PublicShortDetail,
 } from "./api/contracts";
+export type {
+  ShortPinAction,
+  ShortPinApiErrorCode,
+  ShortPinMutationResult,
+} from "./api/update-short-pin";
 export {
   publicShortSummarySchema,
   shortVideoDisplayAssetSchema,

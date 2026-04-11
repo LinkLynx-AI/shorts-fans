@@ -3,6 +3,12 @@ import { z } from "zod";
 import { creatorSummarySchema } from "@/entities/creator";
 
 export const fanFeedTabSchema = z.enum(["following", "recommended"]);
+export const shortPinErrorCodeSchema = z.enum(["auth_required", "internal_error", "not_found"]);
+export const shortPinMutationResultSchema = z.object({
+  viewer: z.object({
+    isPinned: z.boolean(),
+  }),
+});
 
 export const shortVideoDisplayAssetSchema = z.object({
   durationSeconds: z.number().int().positive().nullable(),

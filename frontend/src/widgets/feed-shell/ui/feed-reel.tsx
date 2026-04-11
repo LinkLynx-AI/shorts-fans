@@ -7,6 +7,8 @@ import { ImmersiveShortSurface } from "@/widgets/immersive-short-surface";
 import type { FeedShortSurface } from "@/widgets/immersive-short-surface";
 import type { FeedTab } from "@/entities/short";
 
+import { useFeedPinState } from "../model/use-feed-pin-state";
+
 type FeedReelProps = {
   activeTab: FeedTab;
   surfaces: readonly FeedShortSurface[];
@@ -20,6 +22,7 @@ export function FeedReel({ activeTab, surfaces }: FeedReelProps) {
   const activeIndexRef = useRef(0);
   const wheelLockRef = useRef(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const { resolvePinState } = useFeedPinState({ surfaces });
 
   useEffect(() => {
     const container = containerRef.current;
@@ -101,6 +104,7 @@ export function FeedReel({ activeTab, surfaces }: FeedReelProps) {
             activeTab={activeTab}
             isActive={index === activeIndex}
             mode="feed"
+            pin={resolvePinState(surface)}
             surface={surface}
           />
         </div>

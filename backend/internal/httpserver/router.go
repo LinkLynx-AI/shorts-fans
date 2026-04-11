@@ -18,6 +18,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -54,6 +55,12 @@ type FanFeedReader interface {
 	GetDetail(ctx context.Context, shortID uuid.UUID, viewerUserID *uuid.UUID) (feed.Detail, error)
 	ListFollowing(ctx context.Context, viewerUserID uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
 	ListRecommended(ctx context.Context, viewerUserID *uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
+}
+
+// FanShortPinWriter は public short pin mutation を表します。
+type FanShortPinWriter interface {
+	PinPublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.PinMutationResult, error)
+	UnpinPublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.PinMutationResult, error)
 }
 
 // ShortDisplayAssetResolver は short 向け display asset 解決を表します。
@@ -123,6 +130,7 @@ type HandlerConfig struct {
 	CreatorProfileShorts CreatorProfileShortsReader
 	FanFeed              FanFeedReader
 	FanUnlockMain        FanUnlockMainService
+	FanShortPin          FanShortPinWriter
 	CreatorFollow        CreatorFollowWriter
 	CreatorAvatarUpload  ViewerCreatorAvatarUploadHandler
 	CreatorRegistration  ViewerCreatorRegistrationWriter
@@ -197,6 +205,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerFanUnlockMainRoutes(router, config.FanUnlockMain, config.ShortDisplayAssets, config.MainDisplayAssets, config.ViewerBootstrap)
+	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.CreatorAvatarUpload, config.ViewerActiveMode, config.ViewerBootstrap)
 

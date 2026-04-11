@@ -2,19 +2,19 @@
 
 ## 位置づけ
 
-- この文書は `/creator` の approved creator workspace における非動画領域の read 契約を固定します。
-- 対象は `creator info / overview metrics / revision requested summary` に限定し、`top main / top shorts / managed collections / detail modal` は含めません。
+- この文書は `/creator` の approved creator workspace における `summary` と `top performers` の read 契約を固定します。
+- `GET /api/creator/workspace` は `creator info / overview metrics / revision requested summary` に限定し、`top performers` 自体は別 endpoint に分離します。
 - actual transport 実装より先に、frontend mock と backend read boundary の責務を揃えることを目的にします。
 
 ## Goals
 
 - `/creator` header に表示する creator 自身の情報を private workspace 契約として固定する。
 - overview の最小指標を UI copy ではなく raw 値で返す。
+- `Top main` / `Top short` セクションを summary endpoint と分離した dedicated read surface で返す。
 - review / analytics / media collection が混ざりやすい `/creator` mock state から、今回の対象を明確に切り出す。
 
 ## Non-goals
 
-- `top main` / `top shorts`
 - `main` / `shorts` grid
 - item detail modal
 - upload / linkage / review queue 自体の API
@@ -36,8 +36,9 @@
 | method | path | auth | notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/creator/workspace` | required | creator private workspace の overview と creator info |
+| `GET` | `/api/creator/workspace/top-performers` | required | creator private workspace の top main / top short |
 
-## Response Contract
+## `GET /api/creator/workspace` Response Contract
 
 - `meta.page = null`
 - 正常系は `error = null`
@@ -112,6 +113,68 @@
 }
 ```
 
+## `GET /api/creator/workspace/top-performers` Response Contract
+
+- `meta.page = null`
+- 正常系は `error = null`
+- `topMain` / `topShort` は、それぞれ preview 可能な候補がない場合 `null` を返します。
+
+### `data.topPerformers.topMain`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | main public id |
+| `media` | `PreviewCardVideoAsset` | preview card 表示用 poster |
+| `unlockCount` | `number` | canonical main の unlock 件数 |
+
+### `data.topPerformers.topShort`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | short public id |
+| `media` | `PreviewCardVideoAsset` | preview card 表示用 poster |
+| `attributedUnlockCount` | `number` | MVP 暫定として canonical main の unlock 件数を proxy attribution として返す |
+
+- `Top main` は `main_unlocks` 件数の降順、同率時は `created_at DESC, id DESC` で決めます。
+- `Top short` は true attribution ではなく、linked canonical main の unlock 件数を proxy attribution として降順で決めます。同率時は `created_at DESC, id DESC` を使います。
+- display 不可な candidate は skip し、次順位候補を使います。
+
+### Top Performers Success Example
+
+```json
+{
+  "data": {
+    "topPerformers": {
+      "topMain": {
+        "id": "main_quiet_rooftop",
+        "media": {
+          "id": "asset_main_quiet_rooftop",
+          "kind": "video",
+          "posterUrl": "https://signed.example.com/mains/quiet-rooftop.jpg",
+          "durationSeconds": 720
+        },
+        "unlockCount": 238
+      },
+      "topShort": {
+        "id": "short_quiet_rooftop",
+        "media": {
+          "id": "asset_short_quiet_rooftop",
+          "kind": "video",
+          "posterUrl": "https://cdn.example.com/shorts/quiet-rooftop.jpg",
+          "durationSeconds": 16
+        },
+        "attributedUnlockCount": 238
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_creator_workspace_top_performers_001",
+    "page": null
+  },
+  "error": null
+}
+```
+
 ## Response Rules
 
 - caller は authenticated viewer である必要があります。
@@ -120,6 +183,8 @@
 - `handle` は `/creator` header での表示前提で必須とします。
 - `avatar = null` は error ではなく、creator registration 時に custom avatar を設定しなかったか、既存 avatar が未設定であることを表します。
 - ただし `handle` を creator registration 時にいつ確定させるかは別 PR の責務とし、この文書は approved creator workspace read に必要な shape だけを固定します。
+- `GET /api/creator/workspace/top-performers` も同じ auth / creator capability 制約を使います。
+- `GET /api/creator/workspace/top-performers` は `managedCollections` や detail view state を返しません。
 
 ## Error Contract
 
@@ -132,7 +197,8 @@
 
 ## Boundary Guardrails
 
-- `topPerformers`、`managedCollections`、`posters`、detail view 用 state は返しません。
+- `GET /api/creator/workspace` は `topPerformers`、`managedCollections`、`posters`、detail view 用 state を返しません。
+- `GET /api/creator/workspace/top-performers` は `managedCollections`、`posters`、detail view 用 state を返しません。
 - `activeMode` や mode switch CTA 情報は返しません。
 - review detail list や analytics breakdown は返しません。
 - owner preview list/detail は `docs/contracts/creator-workspace-owner-preview-api-contract.md` に分離します。

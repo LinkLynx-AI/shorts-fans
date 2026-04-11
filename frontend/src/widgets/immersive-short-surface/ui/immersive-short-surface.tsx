@@ -49,6 +49,12 @@ export type ImmersiveShortSurfaceProps =
       activeTab: FeedTab;
       isActive?: boolean;
       mode: "feed";
+      pin?: {
+        errorMessage: string | null;
+        isPending: boolean;
+        isPinned: boolean;
+        onToggle: () => void;
+      };
       surface: FeedShortSurface;
     }
   | {
@@ -99,24 +105,29 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
 }
 
 type PinRailProps = {
+  disabled?: boolean;
+  onToggle?: () => void;
   pinned: boolean;
 };
 
 /**
  * short の pin 状態を表す操作レールを表示する。
  */
-function PinRail({ pinned }: PinRailProps) {
+function PinRail({ disabled = false, onToggle, pinned }: PinRailProps) {
   const label = pinned ? "Pinned short" : "Pin short";
 
   return (
     <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "204px" }}>
       <button
         aria-label={label}
+        aria-busy={disabled || undefined}
         aria-pressed={pinned}
         className={cn(
-          "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent",
+          "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:cursor-wait disabled:hover:text-accent-strong/72",
           pinned && "text-accent",
         )}
+        disabled={disabled}
+        onClick={onToggle}
         type="button"
       >
         <svg
@@ -302,7 +313,8 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
   const isActive = props.isActive ?? true;
-  const pinned = viewer.isPinned;
+  const feedPinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : null;
+  const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : viewer.isPinned;
   const resolvedFeedUnlock =
     resolvedFeedUnlockState?.shortId === short.id ? resolvedFeedUnlockState.unlock : null;
   const activeUnlock = resolvedFeedUnlock ?? unlock;
@@ -539,7 +551,25 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       <div className="relative h-full">
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <ShortSurfaceHeader {...props} />
-        <PinRail pinned={pinned} />
+        <PinRail
+          pinned={pinned}
+          {...(mode === "feed" && props.pin
+            ? {
+                disabled: props.pin.isPending,
+                onToggle: props.pin.onToggle,
+              }
+            : {})}
+        />
+        {feedPinErrorMessage ? (
+          <p
+            aria-live="polite"
+            className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
+            role="alert"
+            style={{ bottom: "258px" }}
+          >
+            {feedPinErrorMessage}
+          </p>
+        ) : null}
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
           <UnlockCta
             className="w-full"

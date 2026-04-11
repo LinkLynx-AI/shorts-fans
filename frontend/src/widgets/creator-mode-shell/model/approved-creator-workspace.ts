@@ -24,13 +24,6 @@ export type ApprovedCreatorWorkspaceRevisionRequestedSummary = {
   totalCount: number;
 };
 
-export type ApprovedCreatorWorkspaceTopPerformer = {
-  kind: ApprovedCreatorWorkspaceManagedTab;
-  label: string;
-  metric: string;
-  shortId: string;
-};
-
 export type ApprovedCreatorWorkspaceManagedItemTone =
   | "approved"
   | "hidden"
@@ -84,7 +77,6 @@ export type ApprovedCreatorWorkspaceState = {
   overviewMetrics: ApprovedCreatorWorkspaceOverviewMetrics;
   posters: Readonly<Record<string, ApprovedCreatorWorkspacePoster>>;
   revisionRequestedSummary: ApprovedCreatorWorkspaceRevisionRequestedSummary | null;
-  topPerformers: readonly ApprovedCreatorWorkspaceTopPerformer[];
 };
 
 const dashboardTabs = [
@@ -101,7 +93,7 @@ const dashboardTabs = [
 const minaWorkspace = {
   detailsByTab: {
     main: {
-      mirror: {
+      short_hotel_mirror: {
         durationLabel: "11分",
         kindLabel: "本編",
         linkedMainShortId: null,
@@ -117,16 +109,16 @@ const minaWorkspace = {
           { label: "価格", value: "¥2,400" },
           { label: "最終更新", value: "今日 09:18" },
         ],
-        shortId: "mirror",
+        shortId: "short_hotel_mirror",
         statusLabel: "審査中",
         statusTone: "pending",
         summary: "paywall を開いたあとに unlock へつながる本編として再レビュー待ちです。",
       },
-      rooftop: {
+      short_quiet_rooftop: {
         durationLabel: "8分",
         kindLabel: "本編",
         linkedMainShortId: null,
-        linkedShortIds: ["rooftop", "rooftopside"],
+        linkedShortIds: ["short_quiet_rooftop", "short_quiet_rooftop_side"],
         metrics: [
           { label: "paywall views", value: "2.4K" },
           { label: "unlocks", value: "238" },
@@ -138,17 +130,17 @@ const minaWorkspace = {
           { label: "価格", value: "¥1,800" },
           { label: "最終更新", value: "昨日 21:05" },
         ],
-        shortId: "rooftop",
+        shortId: "short_quiet_rooftop",
         statusLabel: "公開中",
         statusTone: "approved",
         summary: "linked short からの流入を unlock に変えている本編です。",
       },
     },
     shorts: {
-      mirror: {
+      short_hotel_mirror: {
         durationLabel: "11分",
         kindLabel: "ショート",
-        linkedMainShortId: "mirror",
+        linkedMainShortId: "short_hotel_mirror",
         linkedShortIds: [],
         metrics: [
           { label: "plays", value: "94K" },
@@ -162,15 +154,15 @@ const minaWorkspace = {
           { label: "公開状態", value: "非公開" },
           { label: "最終更新", value: "今日 09:18" },
         ],
-        shortId: "mirror",
+        shortId: "short_hotel_mirror",
         statusLabel: "審査中",
         statusTone: "pending",
         summary: "main への handoff を調整中で、差し戻し対応が残っているショートです。",
       },
-      rooftop: {
+      short_quiet_rooftop: {
         durationLabel: "8分",
         kindLabel: "ショート",
-        linkedMainShortId: "rooftop",
+        linkedMainShortId: "short_quiet_rooftop",
         linkedShortIds: [],
         metrics: [
           { label: "plays", value: "128K" },
@@ -184,15 +176,15 @@ const minaWorkspace = {
           { label: "公開状態", value: "公開" },
           { label: "最終更新", value: "今日 12:24" },
         ],
-        shortId: "rooftop",
+        shortId: "short_quiet_rooftop",
         statusLabel: "公開中",
         statusTone: "approved",
         summary: "handoff と paywall open が強く、main unlock に最もつながっているショートです。",
       },
-      rooftopside: {
+      short_quiet_rooftop_side: {
         durationLabel: "8分",
         kindLabel: "ショート",
-        linkedMainShortId: "rooftop",
+        linkedMainShortId: "short_quiet_rooftop",
         linkedShortIds: [],
         metrics: [
           { label: "plays", value: "62K" },
@@ -206,7 +198,7 @@ const minaWorkspace = {
           { label: "公開状態", value: "公開" },
           { label: "最終更新", value: "昨日 19:12" },
         ],
-        shortId: "rooftopside",
+        shortId: "short_quiet_rooftop_side",
         statusLabel: "公開中",
         statusTone: "approved",
         summary: "同じ main に送る別導線として比較しているショートです。",
@@ -220,7 +212,7 @@ const minaWorkspace = {
         {
           detail: "2 linked shorts",
           metric: "¥48K",
-          shortId: "rooftop",
+          shortId: "short_quiet_rooftop",
           status: "Approved",
           title: "quiet rooftop main",
           tone: "approved",
@@ -228,7 +220,7 @@ const minaWorkspace = {
         {
           detail: "unlock review running",
           metric: "Queue",
-          shortId: "mirror",
+          shortId: "short_hotel_mirror",
           status: "Pending",
           title: "hotel mirror main",
           tone: "pending",
@@ -238,7 +230,7 @@ const minaWorkspace = {
         {
           detail: "paywall views 1.2K",
           metric: "¥48K",
-          shortId: "rooftop",
+          shortId: "short_quiet_rooftop",
           status: "Approved",
           title: "quiet rooftop",
           tone: "approved",
@@ -246,7 +238,7 @@ const minaWorkspace = {
         {
           detail: "save rate 8.2%",
           metric: "¥22K",
-          shortId: "rooftopside",
+          shortId: "short_quiet_rooftop_side",
           status: "Approved",
           title: "rooftop side",
           tone: "approved",
@@ -254,7 +246,7 @@ const minaWorkspace = {
         {
           detail: "review ETA today",
           metric: "¥36K",
-          shortId: "mirror",
+          shortId: "short_hotel_mirror",
           status: "Pending",
           title: "hotel mirror",
           tone: "pending",
@@ -269,8 +261,8 @@ const minaWorkspace = {
     unlockCount: 238,
   },
   posters: {
-    mirror: {
-      shortId: "mirror",
+    short_hotel_mirror: {
+      shortId: "short_hotel_mirror",
       tile: {
         bottom: "#081521",
         mid: "#629bde",
@@ -278,8 +270,8 @@ const minaWorkspace = {
       },
       title: "hotel mirror preview",
     },
-    rooftop: {
-      shortId: "rooftop",
+    short_quiet_rooftop: {
+      shortId: "short_quiet_rooftop",
       tile: {
         bottom: "#0f2234",
         mid: "#4cc0eb",
@@ -287,8 +279,8 @@ const minaWorkspace = {
       },
       title: "quiet rooftop preview",
     },
-    rooftopside: {
-      shortId: "rooftopside",
+    short_quiet_rooftop_side: {
+      shortId: "short_quiet_rooftop_side",
       tile: {
         bottom: "#11253a",
         mid: "#77b8e8",
@@ -302,10 +294,6 @@ const minaWorkspace = {
     shortCount: 1,
     totalCount: 1,
   },
-  topPerformers: [
-    { kind: "main", label: "Top main", metric: "¥84K", shortId: "rooftop" },
-    { kind: "shorts", label: "Top short", metric: "186 unlocks", shortId: "rooftop" },
-  ],
 } as const satisfies ApprovedCreatorWorkspaceState;
 
 const workspaceByCreatorID: Readonly<Record<CreatorId, ApprovedCreatorWorkspaceState>> = {

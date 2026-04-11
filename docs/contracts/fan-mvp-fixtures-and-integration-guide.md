@@ -13,6 +13,7 @@
 | `SHO-39` | `docs/contracts/viewer-bootstrap-api-contract.md` | `docs/contracts/fixtures/viewer-bootstrap.json` |
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
+| `SHO-161` | `docs/contracts/fan-short-pin-api-contract.md` | `docs/contracts/fixtures/fan-short-pin.json` |
 | `SHO-113` | `docs/contracts/fan-creator-follow-api-contract.md` | `docs/contracts/fixtures/fan-creator-follow.json` |
 | `SHO-18` | `docs/contracts/fan-unlock-main-api-contract.md` | `docs/contracts/fixtures/fan-unlock-main.json` |
 | `SHO-19` | `docs/contracts/fan-profile-api-contract.md` | `docs/contracts/fixtures/fan-profile.json` |
@@ -29,14 +30,17 @@
    - `GET /api/fan/creators/search`
    - `GET /api/fan/creators/{creatorId}`
    - `GET /api/fan/creators/{creatorId}/shorts`
-3. `SHO-113`
+3. `SHO-161`
+   - `PUT /api/fan/shorts/{shortId}/pin`
+   - `DELETE /api/fan/shorts/{shortId}/pin`
+4. `SHO-113`
    - `PUT /api/fan/creators/{creatorId}/follow`
    - `DELETE /api/fan/creators/{creatorId}/follow`
-4. `SHO-18`
+5. `SHO-18`
    - `GET /api/fan/shorts/{shortId}/unlock`
    - `POST /api/fan/mains/{mainId}/access-entry`
    - `GET /api/fan/mains/{mainId}/playback`
-5. `SHO-19`
+6. `SHO-19`
    - `GET /api/fan/profile`
    - `GET /api/fan/profile/following`
    - `GET /api/fan/profile/pinned-shorts`
@@ -58,11 +62,15 @@
    - unauthenticated bootstrap 時は `currentViewer = null`
 3. `SHO-17` 以降の public surface
    - viewer 自身の state ではなく resource relation state だけを参照する
-4. `SHO-113`
+4. `SHO-161`
+   - `PUT /api/fan/shorts/{shortId}/pin`
+   - `DELETE /api/fan/shorts/{shortId}/pin`
+   - bootstrap 済みの authenticated fan session を前提にし、success では `viewer.isPinned` だけを返す
+5. `SHO-113`
    - `PUT /api/fan/creators/{creatorId}/follow`
    - `DELETE /api/fan/creators/{creatorId}/follow`
    - bootstrap 済みの authenticated fan session を前提にし、success では relation state と `fanCount` だけを返す
-5. `SHO-19`
+6. `SHO-19`
    - private hub は bootstrap 済みの current viewer を前提に接続する
 
 ## Frontend Connection Order
@@ -71,6 +79,7 @@
 | --- | --- | --- | --- |
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
+| `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-115` | `creator profile follow CTA` | `fan-creator-follow-api-contract.md` | `follow_success`, `follow_auth_required`, `follow_not_found`, `follow_repeat`, `unfollow_success`, `unfollow_auth_required`, `unfollow_not_found`, `unfollow_repeat` |
 | `SHO-8` | `mini setup / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `unlocked`, `owner`, `locked`, `not_found`, `access_entry_issued`, `playback_unlocked`, `playback_owner` |
@@ -78,6 +87,7 @@
 
 - `SHO-6` の creator profile 初回表示では `GET /api/fan/creators/{creatorId}` と `GET /api/fan/creators/{creatorId}/shorts` を並列取得します。
 - `SHO-6` の short grid 追加取得では `GET /api/fan/creators/{creatorId}/shorts?cursor=...` だけを再度呼びます。
+- `SHO-163` の feed pin CTA は `PUT / DELETE /api/fan/shorts/{shortId}/pin` を使い、success body の `viewer.isPinned` で current surface state を更新できます。
 - `SHO-115` の creator profile follow CTA は `PUT / DELETE /api/fan/creators/{creatorId}/follow` を使い、success body の `viewer.isFollowing` と `stats.fanCount` で header state を更新できます。
 - `SHO-8` の `Unlock` CTA は `GET /api/fan/shorts/{shortId}/unlock` で setup state を読み、条件を満たしたら `POST /api/fan/mains/{mainId}/access-entry` で main route へ遷移します。
 - `SHO-7` の初回表示では `GET /api/fan/profile` で counts を取得し、default tab の `GET /api/fan/profile/pinned-shorts` を別で呼びます。

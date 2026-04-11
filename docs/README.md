@@ -23,6 +23,7 @@
 - [contracts/creator-upload-api-contract.md](contracts/creator-upload-api-contract.md): creator-private な new-package upload の initiation / completion 契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
+- [contracts/fan-short-pin-api-contract.md](contracts/fan-short-pin-api-contract.md): `feed` からの `pin / unpin` mutation 契約
 - [contracts/fan-creator-follow-api-contract.md](contracts/fan-creator-follow-api-contract.md): `creator profile` からの `follow / unfollow` mutation 契約
 - [contracts/fan-unlock-main-api-contract.md](contracts/fan-unlock-main-api-contract.md): `unlock / main player` の read 契約
 - [contracts/fan-profile-api-contract.md](contracts/fan-profile-api-contract.md): `fan profile private hub` の read 契約

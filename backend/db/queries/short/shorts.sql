@@ -102,3 +102,18 @@ SELECT *
 FROM app.public_shorts
 WHERE id = $1
 LIMIT 1;
+
+-- name: PutPinnedShort :exec
+INSERT INTO app.pinned_shorts (
+    user_id,
+    short_id
+) VALUES (
+    sqlc.arg(user_id),
+    sqlc.arg(short_id)
+)
+ON CONFLICT (user_id, short_id) DO NOTHING;
+
+-- name: DeletePinnedShort :exec
+DELETE FROM app.pinned_shorts
+WHERE user_id = sqlc.arg(user_id)
+  AND short_id = sqlc.arg(short_id);

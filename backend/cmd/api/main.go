@@ -149,6 +149,7 @@ func main() {
 			CreatorProfileShorts: creatorRepository,
 			FanFeed:              feedRepository,
 			FanUnlockMain:        fanUnlockMainService,
+			FanShortPin:          shortsRepository,
 			CreatorFollow:        creatorRepository,
 			CreatorAvatarUpload:  creatorAvatarService,
 			CreatorRegistration:  creatorRepository,
