@@ -6,6 +6,8 @@ import {
   ViewerSessionProvider,
 } from "@/entities/viewer";
 import { FanAuthDialogProvider } from "@/features/fan-auth";
+import { createApiUrl } from "@/shared/api";
+import { getClientEnv } from "@/shared/config";
 import { getFeedSurfaceByTab } from "@/widgets/immersive-short-surface";
 
 import { FeedReel } from "./feed-reel";
@@ -123,7 +125,7 @@ describe("FeedReel", () => {
 
     await waitFor(() => {
       expect(fetcher).toHaveBeenCalledWith(
-        new URL("http://localhost:8080/api/fan/shorts/softlight/pin"),
+        createApiUrl(getClientEnv().NEXT_PUBLIC_API_BASE_URL, "/api/fan/shorts/softlight/pin"),
         {
           credentials: "include",
           headers: {
