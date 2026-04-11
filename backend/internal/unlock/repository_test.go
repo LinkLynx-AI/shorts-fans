@@ -20,6 +20,10 @@ func (stubQueries) CreateMainUnlock(context.Context, sqlc.CreateMainUnlockParams
 	}
 }
 
+func (stubQueries) EnsureMainUnlock(context.Context, sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error) {
+	return sqlc.EnsureMainUnlockRow{}, nil
+}
+
 func (stubQueries) GetMainUnlockByUserIDAndMainID(context.Context, sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error) {
 	return sqlc.AppMainUnlock{}, nil
 }

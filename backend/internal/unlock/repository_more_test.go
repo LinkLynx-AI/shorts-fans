@@ -16,12 +16,17 @@ import (
 
 type repositoryStubQueries struct {
 	createUnlock func(context.Context, sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error)
+	ensureUnlock func(context.Context, sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error)
 	getUnlock    func(context.Context, sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error)
 	listUnlocks  func(context.Context, pgtype.UUID) ([]pgtype.UUID, error)
 }
 
 func (s repositoryStubQueries) CreateMainUnlock(ctx context.Context, arg sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error) {
 	return s.createUnlock(ctx, arg)
+}
+
+func (s repositoryStubQueries) EnsureMainUnlock(ctx context.Context, arg sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error) {
+	return s.ensureUnlock(ctx, arg)
 }
 
 func (s repositoryStubQueries) GetMainUnlockByUserIDAndMainID(ctx context.Context, arg sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error) {
@@ -42,10 +47,15 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	row := testMainUnlockRow(userID, mainID, now, purchaseRef)
 
 	var createArg sqlc.CreateMainUnlockParams
+	var ensureArg sqlc.EnsureMainUnlockParams
 	repo := newRepository(repositoryStubQueries{
 		createUnlock: func(_ context.Context, arg sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error) {
 			createArg = arg
 			return row, nil
+		},
+		ensureUnlock: func(_ context.Context, arg sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error) {
+			ensureArg = arg
+			return sqlc.EnsureMainUnlockRow(row), nil
 		},
 		getUnlock: func(_ context.Context, arg sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error) {
 			if arg.UserID != pgUUID(userID) || arg.MainID != pgUUID(mainID) {
@@ -76,6 +86,21 @@ func TestRepositorySuccessPaths(t *testing.T) {
 	if createArg.UserID != pgUUID(userID) || createArg.MainID != pgUUID(mainID) {
 		t.Fatalf("RecordMainUnlock() args got %#v", createArg)
 	}
+	ensured, err := repo.EnsureMainUnlock(context.Background(), RecordMainUnlockInput{
+		UserID:                     userID,
+		MainID:                     mainID,
+		PaymentProviderPurchaseRef: purchaseRef,
+		PurchasedAt:                timePtr(now),
+	})
+	if err != nil {
+		t.Fatalf("EnsureMainUnlock() error = %v, want nil", err)
+	}
+	if !reflect.DeepEqual(ensured, wantMainUnlock(userID, mainID, now, purchaseRef)) {
+		t.Fatalf("EnsureMainUnlock() got %#v want %#v", ensured, wantMainUnlock(userID, mainID, now, purchaseRef))
+	}
+	if ensureArg.UserID != pgUUID(userID) || ensureArg.MainID != pgUUID(mainID) {
+		t.Fatalf("EnsureMainUnlock() args got %#v", ensureArg)
+	}
 
 	got, err := repo.GetMainUnlock(context.Background(), userID, mainID)
 	if err != nil {
@@ -104,6 +129,9 @@ func TestRepositoryErrorPaths(t *testing.T) {
 		createUnlock: func(context.Context, sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error) {
 			return sqlc.AppMainUnlock{}, genericErr
 		},
+		ensureUnlock: func(context.Context, sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error) {
+			return sqlc.EnsureMainUnlockRow{}, genericErr
+		},
 		getUnlock: func(context.Context, sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error) {
 			return sqlc.AppMainUnlock{}, pgx.ErrNoRows
 		},
@@ -114,6 +142,9 @@ func TestRepositoryErrorPaths(t *testing.T) {
 
 	if _, err := repo.RecordMainUnlock(context.Background(), RecordMainUnlockInput{UserID: userID, MainID: mainID}); !errors.Is(err, genericErr) {
 		t.Fatalf("RecordMainUnlock() error got %v want wrapped %v", err, genericErr)
+	}
+	if _, err := repo.EnsureMainUnlock(context.Background(), RecordMainUnlockInput{UserID: userID, MainID: mainID}); !errors.Is(err, genericErr) {
+		t.Fatalf("EnsureMainUnlock() error got %v want wrapped %v", err, genericErr)
 	}
 	if _, err := repo.GetMainUnlock(context.Background(), userID, mainID); !errors.Is(err, ErrMainUnlockNotFound) {
 		t.Fatalf("GetMainUnlock() error got %v want %v", err, ErrMainUnlockNotFound)
@@ -136,6 +167,9 @@ func TestRepositoryConversionErrors(t *testing.T) {
 		createUnlock: func(context.Context, sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error) {
 			return invalidRow, nil
 		},
+		ensureUnlock: func(context.Context, sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error) {
+			return sqlc.EnsureMainUnlockRow(invalidRow), nil
+		},
 		getUnlock: func(context.Context, sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error) {
 			return invalidRow, nil
 		},
@@ -146,6 +180,9 @@ func TestRepositoryConversionErrors(t *testing.T) {
 
 	if _, err := repo.RecordMainUnlock(context.Background(), RecordMainUnlockInput{UserID: userID, MainID: mainID}); err == nil {
 		t.Fatal("RecordMainUnlock() error = nil, want conversion error")
+	}
+	if _, err := repo.EnsureMainUnlock(context.Background(), RecordMainUnlockInput{UserID: userID, MainID: mainID}); err == nil {
+		t.Fatal("EnsureMainUnlock() error = nil, want conversion error")
 	}
 	if _, err := repo.GetMainUnlock(context.Background(), userID, mainID); err == nil {
 		t.Fatal("GetMainUnlock() error = nil, want conversion error")

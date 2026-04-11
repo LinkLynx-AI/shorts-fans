@@ -23,6 +23,7 @@ var ErrAlreadyUnlocked = errors.New("main はすでに unlock 済みです")
 
 type queries interface {
 	CreateMainUnlock(ctx context.Context, arg sqlc.CreateMainUnlockParams) (sqlc.AppMainUnlock, error)
+	EnsureMainUnlock(ctx context.Context, arg sqlc.EnsureMainUnlockParams) (sqlc.EnsureMainUnlockRow, error)
 	GetMainUnlockByUserIDAndMainID(ctx context.Context, arg sqlc.GetMainUnlockByUserIDAndMainIDParams) (sqlc.AppMainUnlock, error)
 	ListUnlockedMainIDsByUserID(ctx context.Context, userID pgtype.UUID) ([]pgtype.UUID, error)
 }
@@ -77,6 +78,26 @@ func (r *Repository) RecordMainUnlock(ctx context.Context, input RecordMainUnloc
 	mainUnlock, err := mapMainUnlock(row)
 	if err != nil {
 		return MainUnlock{}, fmt.Errorf("main unlock 記録結果の変換 user=%s main=%s: %w", input.UserID, input.MainID, err)
+	}
+
+	return mainUnlock, nil
+}
+
+// EnsureMainUnlock は main の購入記録が存在する状態を保証します。
+func (r *Repository) EnsureMainUnlock(ctx context.Context, input RecordMainUnlockInput) (MainUnlock, error) {
+	row, err := r.queries.EnsureMainUnlock(ctx, sqlc.EnsureMainUnlockParams{
+		UserID:                     postgres.UUIDToPG(input.UserID),
+		MainID:                     postgres.UUIDToPG(input.MainID),
+		PaymentProviderPurchaseRef: postgres.TextToPG(input.PaymentProviderPurchaseRef),
+		PurchasedAt:                postgres.TimeToPG(input.PurchasedAt),
+	})
+	if err != nil {
+		return MainUnlock{}, fmt.Errorf("main unlock 確保 user=%s main=%s: %w", input.UserID, input.MainID, err)
+	}
+
+	mainUnlock, err := mapEnsuredMainUnlock(row)
+	if err != nil {
+		return MainUnlock{}, fmt.Errorf("main unlock 確保結果の変換 user=%s main=%s: %w", input.UserID, input.MainID, err)
 	}
 
 	return mainUnlock, nil
@@ -149,6 +170,16 @@ func mapMainUnlock(row sqlc.AppMainUnlock) (MainUnlock, error) {
 		PurchasedAt:                purchasedAt,
 		CreatedAt:                  createdAt,
 	}, nil
+}
+
+func mapEnsuredMainUnlock(row sqlc.EnsureMainUnlockRow) (MainUnlock, error) {
+	return mapMainUnlock(sqlc.AppMainUnlock{
+		UserID:                     row.UserID,
+		MainID:                     row.MainID,
+		PaymentProviderPurchaseRef: row.PaymentProviderPurchaseRef,
+		PurchasedAt:                row.PurchasedAt,
+		CreatedAt:                  row.CreatedAt,
+	})
 }
 
 func isAlreadyUnlockedError(err error) bool {

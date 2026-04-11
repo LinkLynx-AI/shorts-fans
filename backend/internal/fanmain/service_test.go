@@ -30,15 +30,15 @@ func (s stubMainReader) GetUnlockableMain(ctx context.Context, id uuid.UUID) (sh
 }
 
 type stubUnlockRecorder struct {
-	recordMainUnlock func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
+	ensureMainUnlock func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
-func (s stubUnlockRecorder) RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
-	if s.recordMainUnlock == nil {
+func (s stubUnlockRecorder) EnsureMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+	if s.ensureMainUnlock == nil {
 		return unlock.MainUnlock{}, nil
 	}
 
-	return s.recordMainUnlock(ctx, input)
+	return s.ensureMainUnlock(ctx, input)
 }
 
 func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
@@ -105,10 +105,10 @@ func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 			},
 		},
 		stubUnlockRecorder{
-			recordMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+			ensureMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
 				recordCallCount++
 				if input.UserID != viewerID || input.MainID != mainID {
-					t.Fatalf("RecordMainUnlock() input got %+v want viewer=%s main=%s", input, viewerID, mainID)
+					t.Fatalf("EnsureMainUnlock() input got %+v want viewer=%s main=%s", input, viewerID, mainID)
 				}
 
 				return unlock.MainUnlock{
@@ -220,7 +220,7 @@ func TestServiceIssueAccessEntryRejectsInvalidToken(t *testing.T) {
 	}
 }
 
-func TestServiceIssueAccessEntryAllowsAlreadyUnlockedRecord(t *testing.T) {
+func TestServiceIssueAccessEntryAllowsExistingUnlockRecord(t *testing.T) {
 	t.Parallel()
 
 	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -260,9 +260,14 @@ func TestServiceIssueAccessEntryAllowsAlreadyUnlockedRecord(t *testing.T) {
 			},
 		},
 		stubUnlockRecorder{
-			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+			ensureMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
 				recordCallCount++
-				return unlock.MainUnlock{}, unlock.ErrAlreadyUnlocked
+				return unlock.MainUnlock{
+					UserID:      viewerID,
+					MainID:      mainID,
+					PurchasedAt: now,
+					CreatedAt:   now,
+				}, nil
 			},
 		},
 	)
@@ -328,7 +333,7 @@ func TestServiceIssueAccessEntrySkipsOwnerPersistence(t *testing.T) {
 			},
 		},
 		stubUnlockRecorder{
-			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+			ensureMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
 				recordCallCount++
 				return unlock.MainUnlock{}, nil
 			},
@@ -397,7 +402,7 @@ func TestServiceIssueAccessEntryFailsWhenPersistenceFails(t *testing.T) {
 			},
 		},
 		stubUnlockRecorder{
-			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+			ensureMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
 				return unlock.MainUnlock{}, recordErr
 			},
 		},

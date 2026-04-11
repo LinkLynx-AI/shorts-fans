@@ -43,7 +43,7 @@ type mainReader interface {
 }
 
 type unlockRecorder interface {
-	RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
+	EnsureMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
 // Service は fan unlock / main playback 導線を扱います。
@@ -231,7 +231,7 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 		return AccessEntryResult{}, ErrMainLocked
 	}
 
-	if err := s.recordMainUnlockIfNeeded(ctx, grantKind, input.ViewerID, input.MainID); err != nil {
+	if err := s.ensureMainUnlockIfNeeded(ctx, grantKind, input.ViewerID, input.MainID); err != nil {
 		return AccessEntryResult{}, err
 	}
 
@@ -252,7 +252,7 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 	}, nil
 }
 
-func (s *Service) recordMainUnlockIfNeeded(
+func (s *Service) ensureMainUnlockIfNeeded(
 	ctx context.Context,
 	grantKind MainPlaybackGrantKind,
 	viewerID uuid.UUID,
@@ -266,11 +266,11 @@ func (s *Service) recordMainUnlockIfNeeded(
 		return fmt.Errorf("fan main unlock recorder が初期化されていません")
 	}
 
-	_, err := s.unlockRecorder.RecordMainUnlock(ctx, unlock.RecordMainUnlockInput{
+	_, err := s.unlockRecorder.EnsureMainUnlock(ctx, unlock.RecordMainUnlockInput{
 		UserID: viewerID,
 		MainID: mainID,
 	})
-	if err == nil || errors.Is(err, unlock.ErrAlreadyUnlocked) {
+	if err == nil {
 		return nil
 	}
 
