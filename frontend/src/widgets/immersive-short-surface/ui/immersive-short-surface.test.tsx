@@ -31,10 +31,8 @@ describe("ImmersiveShortSurface", () => {
   const continueMainSurface = getShortSurfaceById("softlight");
   const directUnlockSurface = getShortSurfaceById("afterrain");
   const ownerPreviewSurface = getShortSurfaceById("balcony");
-  const feedDialogTitle = `${feedSurface.short.caption.trim().replace(/[。.!?]+$/u, "")} の続きを見る`;
-  const detailDialogTitle = detailSurface
-    ? `${detailSurface.short.caption.trim().replace(/[。.!?]+$/u, "")} の続きを見る`
-    : "";
+  const feedDialogTitle = "quiet rooftop preview の続きを見る";
+  const detailDialogTitle = detailSurface ? "quiet rooftop preview の続きを見る" : "";
 
   afterEach(() => {
     push.mockReset();

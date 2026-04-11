@@ -13,12 +13,15 @@ export type {
   PublicShortDetail,
 } from "./api/contracts";
 export {
+  buildShortContinuationCopy,
+  buildShortPaywallTitle,
   getFeedShortForTab,
   getShortById,
   getShortIds,
   getShortThemeStyle,
   getShortsByCreatorId,
   listShorts,
+  normalizeShortCaptionForTitle,
 } from "./model/short";
 export type {
   FeedTab,

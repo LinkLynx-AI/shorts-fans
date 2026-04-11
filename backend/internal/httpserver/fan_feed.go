@@ -81,7 +81,7 @@ func registerFanFeedRoutes(
 	shortDisplayAssets ShortDisplayAssetResolver,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
-	if reader == nil {
+	if router == nil || reader == nil || shortDisplayAssets == nil {
 		return
 	}
 

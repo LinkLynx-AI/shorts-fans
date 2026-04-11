@@ -155,6 +155,12 @@ func TestFanFeedFollowingRouteRequiresAuth(t *testing.T) {
 				return nil, nil, nil
 			},
 		},
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
+				return media.VideoDisplayAsset{}, nil
+			},
+		},
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=following", nil)
@@ -170,6 +176,32 @@ func TestFanFeedFollowingRouteRequiresAuth(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"auth_required"`) {
 		t.Fatalf("GET /api/fan/feed?tab=following body got %q want auth_required", rec.Body.String())
+	}
+}
+
+func TestFanFeedRouteIsNotRegisteredWithoutShortDisplayAssets(t *testing.T) {
+	t.Parallel()
+
+	readerCalled := false
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listRecommended: func(context.Context, *uuid.UUID, *feed.Cursor, int) ([]feed.Item, *feed.Cursor, error) {
+				readerCalled = true
+				return nil, nil, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=recommended", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/fan/feed?tab=recommended status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if readerCalled {
+		t.Fatal("GET /api/fan/feed?tab=recommended readerCalled = true, want false")
 	}
 }
 

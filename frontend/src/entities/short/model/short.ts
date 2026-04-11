@@ -264,6 +264,22 @@ export function getShortsByCreatorId(creatorId: string): readonly ShortPreviewMe
   return shorts.filter((short) => short.creatorId === creatorId);
 }
 
+export function normalizeShortCaptionForTitle(caption: string): string {
+  return caption.trim().replace(/[。.!?]+$/u, "");
+}
+
+export function buildShortPaywallTitle(caption: string): string {
+  const normalizedCaption = normalizeShortCaptionForTitle(caption);
+
+  return normalizedCaption ? `${normalizedCaption} の続きを見る` : "この short の続きを見る";
+}
+
+export function buildShortContinuationCopy(caption: string): string {
+  const normalizedCaption = normalizeShortCaptionForTitle(caption);
+
+  return normalizedCaption ? `${normalizedCaption} の続き。` : "short の続きから再生中。";
+}
+
 /**
  * short 背景用の CSS variable style を返す。
  */

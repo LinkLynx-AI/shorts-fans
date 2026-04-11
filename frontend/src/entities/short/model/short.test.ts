@@ -1,9 +1,12 @@
 import {
+  buildShortContinuationCopy,
+  buildShortPaywallTitle,
   getFeedShortForTab,
   getShortById,
   getShortIds,
   getShortThemeStyle,
   getShortsByCreatorId,
+  normalizeShortCaptionForTitle,
 } from "@/entities/short";
 
 describe("short model", () => {
@@ -40,5 +43,13 @@ describe("short model", () => {
       "--short-bg-mid": expect.any(String),
       "--short-tile-top": expect.any(String),
     });
+  });
+
+  it("normalizes caption-based copy and falls back when caption is empty", () => {
+    expect(normalizeShortCaptionForTitle(" quiet rooftop preview。 ")).toBe("quiet rooftop preview");
+    expect(buildShortPaywallTitle(" quiet rooftop preview。 ")).toBe("quiet rooftop preview の続きを見る");
+    expect(buildShortPaywallTitle("   ")).toBe("この short の続きを見る");
+    expect(buildShortContinuationCopy(" quiet rooftop preview。 ")).toBe("quiet rooftop preview の続き。");
+    expect(buildShortContinuationCopy("   ")).toBe("short の続きから再生中。");
   });
 });

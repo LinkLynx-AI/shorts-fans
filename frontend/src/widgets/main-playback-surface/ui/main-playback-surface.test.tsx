@@ -43,9 +43,7 @@ describe("MainPlaybackSurface", () => {
       "href",
       "/creators/creator_aoi_n",
     );
-    expect(
-      screen.getByText(`${surface.entryShort?.caption.trim().replace(/[。.!?]+$/u, "")} の続き。`),
-    ).toBeInTheDocument();
+    expect(screen.getByText("soft light の preview の続き。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
@@ -77,5 +75,32 @@ describe("MainPlaybackSurface", () => {
 
     expect(back).toHaveBeenCalled();
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it("falls back to a generic continuation copy when the entry short caption is empty", () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    render(
+      <MainPlaybackSurface
+        fallbackHref="/shorts/softlight"
+        surface={{
+          ...surface,
+          entryShort: surface.entryShort
+            ? {
+                ...surface.entryShort,
+                caption: "   ",
+              }
+            : surface.entryShort,
+        }}
+      />,
+    );
+
+    expect(screen.getByText("short の続きから再生中。")).toBeInTheDocument();
   });
 });
