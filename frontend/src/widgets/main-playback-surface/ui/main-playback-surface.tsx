@@ -63,6 +63,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
   const statusCopy = getMainPlaybackStatusCopy(surface);
   const statusMeta = getMainPlaybackStatusMeta(surface);
   const continuationCopy = surface.entryShort ? buildShortContinuationCopy(surface.entryShort.caption) : "short の続きから再生中。";
+  const playbackHeading = surface.entryShort?.caption.trim() || "Main playback";
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -79,7 +80,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
 
       <div className="relative h-full">
-        <h1 className="sr-only">{surface.main.title}</h1>
+        <h1 className="sr-only">{playbackHeading}</h1>
         <div className="relative z-10 px-4 pt-4">
           <Button
             aria-label="Back"

@@ -2,14 +2,18 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getShortById } from "@/entities/short";
+import { viewerSessionCookieName } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { parseMockMainPlaybackGrantContext } from "@/features/unlock-entry";
+import { ApiError } from "@/shared/api";
 import { readMockSignedToken } from "@/shared/lib/mock-signed-token";
+import { cookies } from "next/headers";
 import {
   getMainPlaybackSurfaceById,
   MainPlaybackLockedState,
   MainPlaybackSurface,
+  requestMainPlaybackSurface,
 } from "@/widgets/main-playback-surface";
 
 const mainPlaybackParamsSchema = z.object({
@@ -78,13 +82,43 @@ export default async function MainPlaybackPage({
   const { fromShortId: normalizedFromShortId, grant: normalizedGrant } =
     parseMainPlaybackSearchParams(rawSearchParams);
 
+  const fallbackHref = `/shorts/${normalizedFromShortId}`;
+
+  if (normalizedFromShortId.startsWith("short_")) {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(viewerSessionCookieName)?.value;
+    let surface: Awaited<ReturnType<typeof requestMainPlaybackSurface>>;
+
+    try {
+      surface = await requestMainPlaybackSurface({
+        fromShortId: normalizedFromShortId,
+        grant: normalizedGrant,
+        mainId,
+        sessionToken,
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "http") {
+        if (error.status === 403) {
+          return <MainPlaybackLockedState fallbackHref={fallbackHref} />;
+        }
+
+        if (error.status === 404) {
+          notFound();
+        }
+      }
+
+      throw error;
+    }
+
+    return <MainPlaybackSurface fallbackHref={fallbackHref} surface={surface} />;
+  }
+
   const entryShort = getShortById(normalizedFromShortId);
 
   if (!entryShort || entryShort.canonicalMainId !== mainId) {
     notFound();
   }
 
-  const fallbackHref = `/shorts/${normalizedFromShortId}`;
   const grantPayload = readMockSignedToken(normalizedGrant);
   const parsedGrantContext = grantPayload
     ? parseMockMainPlaybackGrantContext(grantPayload.context)

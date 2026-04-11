@@ -7,7 +7,11 @@ import {
 } from "@/entities/creator";
 import { ViewerSessionProvider } from "@/entities/viewer";
 import { useFanAuthDialog } from "@/features/fan-auth";
-import { getFeedSurfaceByTab, getShortSurfaceById } from "@/widgets/immersive-short-surface";
+import {
+  buildFeedSurfaceFromApiItem,
+  getFeedSurfaceByTab,
+  getShortSurfaceById,
+} from "@/widgets/immersive-short-surface";
 
 import { ImmersiveShortSurface } from "./immersive-short-surface";
 
@@ -50,6 +54,42 @@ function renderWithViewerSession(
       {ui}
     </ViewerSessionProvider>,
   );
+}
+
+function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
+  return buildFeedSurfaceFromApiItem({
+    creator: {
+      avatar: null,
+      bio: "night preview specialist",
+      displayName: "Mina Rei",
+      handle: "@minarei",
+      id: "creator_mina_rei",
+    },
+    short: {
+      caption: "quiet rooftop preview",
+      canonicalMainId: "main_mina_quiet_rooftop",
+      creatorId: "creator_mina_rei",
+      id: "short_mina_rooftop",
+      media: {
+        durationSeconds: 16,
+        id: "asset_short_mina_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/shorts/poster.jpg",
+        url: "https://cdn.example.com/shorts/playback.mp4",
+      },
+      previewDurationSeconds: 16,
+    },
+    unlockCta: {
+      mainDurationSeconds: 480,
+      priceJpy: 1800,
+      resumePositionSeconds: state === "continue_main" ? 120 : null,
+      state,
+    },
+    viewer: {
+      isFollowingCreator: false,
+      isPinned: true,
+    },
+  });
 }
 
 describe("ImmersiveShortSurface", () => {
@@ -98,6 +138,199 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+  });
+
+  it("resolves the unlock surface before opening paywall for API-backed feed content", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            access: {
+              mainId: "main_mina_quiet_rooftop",
+              reason: "unlock_required",
+              status: "locked",
+            },
+            creator: {
+              avatar: null,
+              bio: "night preview specialist",
+              displayName: "Mina Rei",
+              handle: "@minarei",
+              id: "creator_mina_rei",
+            },
+            main: {
+              durationSeconds: 480,
+              id: "main_mina_quiet_rooftop",
+              priceJpy: 1800,
+            },
+            mainAccessEntry: {
+              routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+              token: "signed-rooftop-token",
+            },
+            setup: {
+              required: true,
+              requiresAgeConfirmation: true,
+              requiresTermsAcceptance: true,
+            },
+            short: {
+              caption: "quiet rooftop preview",
+              canonicalMainId: "main_mina_quiet_rooftop",
+              creatorId: "creator_mina_rei",
+              id: "short_mina_rooftop",
+              media: {
+                durationSeconds: 16,
+                id: "asset_short_mina_rooftop",
+                kind: "video",
+                posterUrl: "https://cdn.example.com/shorts/poster.jpg",
+                url: "https://cdn.example.com/shorts/playback.mp4",
+              },
+              previewDurationSeconds: 16,
+            },
+            unlockCta: {
+              mainDurationSeconds: 480,
+              priceJpy: 1800,
+              resumePositionSeconds: null,
+              state: "setup_required",
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_unlock_001",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("setup_required")} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+    expect(fetchMock.mock.calls[0]?.[0].toString()).toContain("/api/fan/shorts/short_mina_rooftop/unlock");
+    expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+  });
+
+  it("resolves the unlock surface before opening the paywall and main for API-backed direct unlock feed content", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              access: {
+                mainId: "main_mina_quiet_rooftop",
+                reason: "unlock_required",
+                status: "locked",
+              },
+              creator: {
+                avatar: null,
+                bio: "night preview specialist",
+                displayName: "Mina Rei",
+                handle: "@minarei",
+                id: "creator_mina_rei",
+              },
+              main: {
+                durationSeconds: 480,
+                id: "main_mina_quiet_rooftop",
+                priceJpy: 1800,
+              },
+              mainAccessEntry: {
+                routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+                token: "signed-rooftop-token",
+              },
+              setup: {
+                required: false,
+                requiresAgeConfirmation: false,
+                requiresTermsAcceptance: false,
+              },
+              short: {
+                caption: "quiet rooftop preview",
+                canonicalMainId: "main_mina_quiet_rooftop",
+                creatorId: "creator_mina_rei",
+                id: "short_mina_rooftop",
+                media: {
+                  durationSeconds: 16,
+                  id: "asset_short_mina_rooftop",
+                  kind: "video",
+                  posterUrl: "https://cdn.example.com/shorts/poster.jpg",
+                  url: "https://cdn.example.com/shorts/playback.mp4",
+                },
+                previewDurationSeconds: 16,
+              },
+              unlockCta: {
+                mainDurationSeconds: 480,
+                priceJpy: 1800,
+                resumePositionSeconds: null,
+                state: "unlock_available",
+              },
+            },
+            error: null,
+            meta: {
+              page: null,
+              requestId: "req_short_unlock_001",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              href: "/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant",
+            },
+            error: null,
+            meta: {
+              page: null,
+              requestId: "req_main_access_entry_001",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      );
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("unlock_available")} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Unlock ¥1,800/ }));
+
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant");
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[0]?.[0].toString()).toContain("/api/fan/shorts/short_mina_rooftop/unlock");
+    expect(fetchMock.mock.calls[1]?.[0].toString()).toContain("/api/fan/mains/main_mina_quiet_rooftop/access-entry");
   });
 
   it("updates the feed follow CTA after an authenticated follow succeeds", async () => {
@@ -348,18 +581,12 @@ describe("ImmersiveShortSurface", () => {
       short: {
         ...feedSurface.short,
         caption: "",
-        title: "",
       },
       unlock: {
         ...feedSurface.unlock,
-        main: {
-          ...feedSurface.unlock.main,
-          title: "",
-        },
         short: {
           ...feedSurface.unlock.short,
           caption: "",
-          title: "",
         },
       },
     };

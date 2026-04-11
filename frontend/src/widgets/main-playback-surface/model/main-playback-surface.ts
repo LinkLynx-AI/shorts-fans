@@ -1,19 +1,21 @@
 import type { CreatorSummary } from "@/entities/creator";
-import type { MainMediaAsset, MainSummary } from "@/entities/main";
-import type { ShortPreviewMeta } from "@/entities/short";
-import type { MainAccessState } from "@/features/unlock-entry";
+import type { MainMediaAsset } from "@/entities/main";
+import type { MainAccessState, UnlockSurfaceModel } from "@/features/unlock-entry";
 
-export type MainPlaybackSurfaceMain = MainSummary & {
+export type MainPlaybackSurfaceMain = {
+  durationSeconds: number;
+  id: string;
   media: MainMediaAsset;
+  priceJpy: number;
 };
 
 export type MainPlaybackSurface = {
   access: MainAccessState;
   creator: CreatorSummary;
-  entryShort: ShortPreviewMeta | null;
+  entryShort: UnlockSurfaceModel["short"] | null;
   main: MainPlaybackSurfaceMain;
   resumePositionSeconds: number | null;
-  themeShort: ShortPreviewMeta;
+  themeShort: UnlockSurfaceModel["short"];
   viewer: {
     isPinned: boolean;
   };

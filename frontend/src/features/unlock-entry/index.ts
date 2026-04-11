@@ -1,4 +1,10 @@
 export { getUnlockSurfaceByShortId } from "./api/mock-unlock-entry";
+export { requestMainAccessEntry } from "./api/request-main-access-entry";
+export { requestUnlockSurfaceByShortId } from "./api/request-unlock-surface";
+export {
+  mainAccessStateSchema,
+  unlockShortSummarySchema,
+} from "./api/contracts";
 export {
   getUnlockCtaLabel,
   getUnlockCtaMeta,
