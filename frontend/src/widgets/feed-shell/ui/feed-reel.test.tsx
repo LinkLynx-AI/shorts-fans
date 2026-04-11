@@ -35,10 +35,38 @@ function renderWithViewerSession(
   );
 }
 
+function buildPublicFeedSurface(tab: Parameters<typeof getFeedSurfaceByTab>[0], shortId: `short_${string}`) {
+  const surface = getFeedSurfaceByTab(tab);
+
+  return {
+    ...surface,
+    short: {
+      ...surface.short,
+      id: shortId,
+    },
+    unlock: {
+      ...surface.unlock,
+      mainAccessEntry: {
+        ...surface.unlock.mainAccessEntry,
+        token: `disabled-${shortId}`,
+      },
+      short: {
+        ...surface.unlock.short,
+        id: shortId,
+      },
+    },
+  };
+}
+
 describe("FeedReel", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://localhost:8080");
+  });
+
   afterEach(() => {
     push.mockReset();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("scrolls by one viewport when wheeling to the next short", () => {
@@ -92,6 +120,7 @@ describe("FeedReel", () => {
 
   it("pins a feed short and updates the local viewer state", async () => {
     const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -117,7 +146,7 @@ describe("FeedReel", () => {
     vi.stubGlobal("fetch", fetcher);
 
     renderWithViewerSession(
-      <FeedReel activeTab="following" surfaces={[getFeedSurfaceByTab("following")]} />,
+      <FeedReel activeTab="following" surfaces={[surface]} />,
       { hasSession: true },
     );
 
@@ -125,7 +154,7 @@ describe("FeedReel", () => {
 
     await waitFor(() => {
       expect(fetcher).toHaveBeenCalledWith(
-        createApiUrl(getClientEnv().NEXT_PUBLIC_API_BASE_URL, "/api/fan/shorts/softlight/pin"),
+        createApiUrl(getClientEnv().NEXT_PUBLIC_API_BASE_URL, "/api/fan/shorts/short_softlight/pin"),
         {
           credentials: "include",
           headers: {
@@ -140,7 +169,7 @@ describe("FeedReel", () => {
   });
 
   it("syncs the pin state when refreshed feed data changes the same short", () => {
-    const initialSurface = getFeedSurfaceByTab("following");
+    const initialSurface = buildPublicFeedSurface("following", "short_softlight");
     const refreshedSurface = {
       ...initialSurface,
       viewer: {
@@ -171,7 +200,7 @@ describe("FeedReel", () => {
 
   it("keeps the successful local pin state until refreshed feed data catches up", async () => {
     const user = userEvent.setup();
-    const initialSurface = getFeedSurfaceByTab("following");
+    const initialSurface = buildPublicFeedSurface("following", "short_softlight");
     const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -241,11 +270,79 @@ describe("FeedReel", () => {
     expect(screen.getByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("drops stale local pin state after the short leaves the feed and re-enters", async () => {
+    const user = userEvent.setup();
+    const initialSurface = buildPublicFeedSurface("following", "short_softlight");
+    const replacementSurface = {
+      ...buildPublicFeedSurface("recommended", "short_rooftop"),
+      viewer: {
+        ...buildPublicFeedSurface("recommended", "short_rooftop").viewer,
+        isPinned: false,
+      },
+    };
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            viewer: {
+              isPinned: true,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_pin_put_success_004",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    const { rerender } = renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[initialSurface]} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Pin short" }));
+    expect(await screen.findByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel activeTab="following" surfaces={[replacementSurface]} />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel activeTab="following" surfaces={[initialSurface]} />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
+
+    expect(await screen.findByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
+  });
+
   it("redirects unauthenticated viewers to login when pin is tapped", async () => {
     const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
 
     renderWithViewerSession(
-      <FeedReel activeTab="following" surfaces={[getFeedSurfaceByTab("following")]} />,
+      <FeedReel activeTab="following" surfaces={[surface]} />,
       { hasSession: false },
     );
 
@@ -256,6 +353,7 @@ describe("FeedReel", () => {
 
   it("redirects to login when the backend returns auth_required for pin", async () => {
     const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>().mockResolvedValue(
@@ -282,7 +380,7 @@ describe("FeedReel", () => {
     );
 
     renderWithViewerSession(
-      <FeedReel activeTab="following" surfaces={[getFeedSurfaceByTab("following")]} />,
+      <FeedReel activeTab="following" surfaces={[surface]} />,
       { hasSession: true },
     );
 
@@ -295,6 +393,7 @@ describe("FeedReel", () => {
 
   it("shows an inline alert when pin mutation fails", async () => {
     const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
     vi.stubGlobal(
       "fetch",
       vi.fn<typeof fetch>().mockResolvedValue(
@@ -321,7 +420,34 @@ describe("FeedReel", () => {
     );
 
     renderWithViewerSession(
-      <FeedReel activeTab="following" surfaces={[getFeedSurfaceByTab("following")]} />,
+      <FeedReel activeTab="following" surfaces={[surface]} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Pin short" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。",
+    );
+  });
+
+  it("shows a generic retry alert when the error response cannot be parsed", async () => {
+    const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response("upstream unavailable", {
+          headers: {
+            "Content-Type": "text/plain",
+          },
+          status: 500,
+        }),
+      ),
+    );
+
+    renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[surface]} />,
       { hasSession: true },
     );
 
@@ -334,6 +460,7 @@ describe("FeedReel", () => {
 
   it("ignores repeated pin taps while the request is pending", async () => {
     const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
     const pendingResponse = {
       resolve: null as ((value: Response) => void) | null,
     };
@@ -346,7 +473,7 @@ describe("FeedReel", () => {
     vi.stubGlobal("fetch", fetcher);
 
     renderWithViewerSession(
-      <FeedReel activeTab="following" surfaces={[getFeedSurfaceByTab("following")]} />,
+      <FeedReel activeTab="following" surfaces={[surface]} />,
       { hasSession: true },
     );
 

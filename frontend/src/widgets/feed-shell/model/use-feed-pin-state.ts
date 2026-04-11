@@ -46,14 +46,18 @@ function buildFeedPinStateByShortId(surfaces: readonly FeedPinSurface[]): Record
   );
 }
 
+function buildTrackedShortIds(surfaces: readonly FeedPinSurface[]): Set<string> {
+  return new Set(surfaces.map((surface) => surface.short.id));
+}
+
 function mergeFeedPinState(
   currentStateByShortId: Record<string, FeedPinItemState>,
   surfaces: readonly FeedPinSurface[],
 ): Record<string, FeedPinItemState> {
-  const nextStateByShortId = { ...currentStateByShortId };
+  const nextStateByShortId: Record<string, FeedPinItemState> = {};
 
   for (const surface of surfaces) {
-    const currentState = nextStateByShortId[surface.short.id];
+    const currentState = currentStateByShortId[surface.short.id];
 
     if (!currentState) {
       nextStateByShortId[surface.short.id] = buildFeedPinItemState(surface.viewer.isPinned);
@@ -61,16 +65,18 @@ function mergeFeedPinState(
     }
 
     if (currentState.isPending) {
+      nextStateByShortId[surface.short.id] = currentState;
       continue;
     }
 
     if (currentState.hasLocalOverride) {
-      if (surface.viewer.isPinned === currentState.isPinned) {
-        nextStateByShortId[surface.short.id] = {
-          ...currentState,
-          hasLocalOverride: false,
-        };
-      }
+      nextStateByShortId[surface.short.id] =
+        surface.viewer.isPinned === currentState.isPinned
+          ? {
+              ...currentState,
+              hasLocalOverride: false,
+            }
+          : currentState;
       continue;
     }
 
@@ -97,7 +103,11 @@ function getFeedPinErrorMessage(error: unknown): string {
   }
 
   if (error instanceof ApiError) {
-    return "pin 状態を更新できませんでした。通信状態を確認してから再度お試しください。";
+    if (error.code === "network") {
+      return "pin 状態を更新できませんでした。通信状態を確認してから再度お試しください。";
+    }
+
+    return "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。";
   }
 
   return "pin 状態を更新できませんでした。少し時間を置いてから再度お試しください。";
@@ -111,10 +121,12 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
 } {
   const hasViewerSession = useHasViewerSession();
   const pendingShortIdsRef = useRef<Set<string>>(new Set());
+  const trackedShortIdsRef = useRef<Set<string>>(buildTrackedShortIds(surfaces));
   const router = useRouter();
   const [pinStateByShortId, setPinStateByShortId] = useState<Record<string, FeedPinItemState>>(() =>
     buildFeedPinStateByShortId(surfaces),
   );
+  trackedShortIdsRef.current = buildTrackedShortIds(surfaces);
 
   useEffect(() => {
     setPinStateByShortId((currentStateByShortId) => mergeFeedPinState(currentStateByShortId, surfaces));
@@ -128,26 +140,38 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
     }
 
     if (!hasViewerSession) {
-      setPinStateByShortId((currentStateByShortId) => ({
-        ...currentStateByShortId,
-        [shortId]: {
-          ...currentState,
-          errorMessage: null,
-        },
-      }));
+      setPinStateByShortId((currentStateByShortId) => {
+        if (!trackedShortIdsRef.current.has(shortId)) {
+          return currentStateByShortId;
+        }
+
+        return {
+          ...currentStateByShortId,
+          [shortId]: {
+            ...currentState,
+            errorMessage: null,
+          },
+        };
+      });
       router.push(buildFanLoginHref());
       return;
     }
 
     pendingShortIdsRef.current.add(shortId);
-    setPinStateByShortId((currentStateByShortId) => ({
-      ...currentStateByShortId,
-      [shortId]: {
-        ...(currentStateByShortId[shortId] ?? currentState),
-        errorMessage: null,
-        isPending: true,
-      },
-    }));
+    setPinStateByShortId((currentStateByShortId) => {
+      if (!trackedShortIdsRef.current.has(shortId)) {
+        return currentStateByShortId;
+      }
+
+      return {
+        ...currentStateByShortId,
+        [shortId]: {
+          ...(currentStateByShortId[shortId] ?? currentState),
+          errorMessage: null,
+          isPending: true,
+        },
+      };
+    });
 
     try {
       const result = await updateShortPin({
@@ -155,38 +179,56 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
         shortId,
       });
 
-      setPinStateByShortId((currentStateByShortId) => ({
-        ...currentStateByShortId,
-        [shortId]: {
-          errorMessage: null,
-          hasLocalOverride: true,
-          isPending: false,
-          isPinned: result.viewer.isPinned,
-        },
-      }));
-    } catch (error) {
-      if (error instanceof ShortPinApiError && error.code === "auth_required") {
-        setPinStateByShortId((currentStateByShortId) => ({
+      setPinStateByShortId((currentStateByShortId) => {
+        if (!trackedShortIdsRef.current.has(shortId)) {
+          return currentStateByShortId;
+        }
+
+        return {
           ...currentStateByShortId,
           [shortId]: {
-            ...(currentStateByShortId[shortId] ?? currentState),
             errorMessage: null,
+            hasLocalOverride: true,
             isPending: false,
+            isPinned: result.viewer.isPinned,
           },
-        }));
+        };
+      });
+    } catch (error) {
+      if (error instanceof ShortPinApiError && error.code === "auth_required") {
+        setPinStateByShortId((currentStateByShortId) => {
+          if (!trackedShortIdsRef.current.has(shortId)) {
+            return currentStateByShortId;
+          }
+
+          return {
+            ...currentStateByShortId,
+            [shortId]: {
+              ...(currentStateByShortId[shortId] ?? currentState),
+              errorMessage: null,
+              isPending: false,
+            },
+          };
+        });
         router.push(buildFanLoginHref());
         return;
       }
 
-      setPinStateByShortId((currentStateByShortId) => ({
-        ...currentStateByShortId,
-        [shortId]: {
-          ...(currentStateByShortId[shortId] ?? currentState),
-          errorMessage: getFeedPinErrorMessage(error),
-          isPending: false,
-          isPinned: currentState.isPinned,
-        },
-      }));
+      setPinStateByShortId((currentStateByShortId) => {
+        if (!trackedShortIdsRef.current.has(shortId)) {
+          return currentStateByShortId;
+        }
+
+        return {
+          ...currentStateByShortId,
+          [shortId]: {
+            ...(currentStateByShortId[shortId] ?? currentState),
+            errorMessage: getFeedPinErrorMessage(error),
+            isPending: false,
+            isPinned: currentState.isPinned,
+          },
+        };
+      });
     } finally {
       pendingShortIdsRef.current.delete(shortId);
     }
