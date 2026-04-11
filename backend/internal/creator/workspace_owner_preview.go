@@ -12,6 +12,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -102,33 +103,49 @@ func (r *Repository) GetWorkspacePreviewShortDetail(
 		return WorkspacePreviewShortDetail{}, fmt.Errorf("creator workspace short preview detail 取得 user=%s short=%s: delivery is nil", viewerUserID, shortID)
 	}
 
-	shortRows, err := r.queries.ListShortsByCreatorUserID(ctx, postgres.UUIDToPG(viewerUserID))
+	row, err := r.queries.GetShortByID(ctx, postgres.UUIDToPG(shortID))
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return WorkspacePreviewShortDetail{}, fmt.Errorf(
+				"creator workspace short preview detail 取得 user=%s short=%s: %w",
+				viewerUserID,
+				shortID,
+				ErrWorkspacePreviewNotFound,
+			)
+		}
 		return WorkspacePreviewShortDetail{}, fmt.Errorf("creator workspace short preview detail 取得 user=%s short=%s: %w", viewerUserID, shortID, err)
+	}
+	rowCreatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
+	if err != nil {
+		return WorkspacePreviewShortDetail{}, fmt.Errorf("creator workspace short preview detail 取得 user=%s short=%s creator 変換: %w", viewerUserID, shortID, err)
+	}
+	if rowCreatorUserID != viewerUserID {
+		return WorkspacePreviewShortDetail{}, fmt.Errorf(
+			"creator workspace short preview detail 取得 user=%s short=%s: %w",
+			viewerUserID,
+			shortID,
+			ErrWorkspacePreviewNotFound,
+		)
 	}
 
 	assetCache := map[uuid.UUID]sqlc.AppMediaAsset{}
-	for _, row := range shortRows {
-		summary, ok, buildErr := r.buildWorkspacePreviewShortSummary(ctx, row, assetCache)
-		if buildErr != nil {
-			return WorkspacePreviewShortDetail{}, fmt.Errorf("creator workspace short preview detail 取得 user=%s short=%s: %w", viewerUserID, shortID, buildErr)
-		}
-		if !ok || summary.ID != shortID {
-			continue
-		}
-
-		return WorkspacePreviewShortDetail{
-			Creator: profile,
-			Short:   summary,
-		}, nil
+	summary, ok, buildErr := r.buildWorkspacePreviewShortSummary(ctx, row, assetCache)
+	if buildErr != nil {
+		return WorkspacePreviewShortDetail{}, fmt.Errorf("creator workspace short preview detail 取得 user=%s short=%s: %w", viewerUserID, shortID, buildErr)
+	}
+	if !ok {
+		return WorkspacePreviewShortDetail{}, fmt.Errorf(
+			"creator workspace short preview detail 取得 user=%s short=%s: %w",
+			viewerUserID,
+			shortID,
+			ErrWorkspacePreviewNotFound,
+		)
 	}
 
-	return WorkspacePreviewShortDetail{}, fmt.Errorf(
-		"creator workspace short preview detail 取得 user=%s short=%s: %w",
-		viewerUserID,
-		shortID,
-		ErrWorkspacePreviewNotFound,
-	)
+	return WorkspacePreviewShortDetail{
+		Creator: profile,
+		Short:   summary,
+	}, nil
 }
 
 // GetWorkspacePreviewMainDetail は current viewer 自身の main preview detail を返します。
@@ -565,7 +582,7 @@ func (r *Repository) buildWorkspacePreviewShortSummary(
 		AssetID:    mediaAssetID,
 		ShortID:    shortID,
 		DurationMS: *durationMS,
-	}, media.AccessBoundaryPublic)
+	}, media.AccessBoundaryOwner)
 	if err != nil {
 		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail display asset 解決 short=%s: %w", shortID, err)
 	}

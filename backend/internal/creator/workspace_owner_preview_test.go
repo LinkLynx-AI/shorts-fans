@@ -11,6 +11,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -292,10 +293,11 @@ func TestGetWorkspacePreviewShortDetail(t *testing.T) {
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
-			return []sqlc.AppShort{
-				testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")),
-			}, nil
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
+			}
+			return testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")), nil
 		},
 		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
 			if id != pgUUID(assetID) {
@@ -332,10 +334,7 @@ func TestGetWorkspacePreviewShortDetailReturnsNotFoundWhenShortMissing(t *testin
 
 	now := time.Unix(1710000000, 0).UTC()
 	viewerUserID := uuid.MustParse("3b3b3b3b-1111-1111-1111-111111111111")
-	mainID := uuid.MustParse("3c3c3c3c-1111-1111-1111-111111111111")
 	shortID := uuid.MustParse("3d3d3d3d-1111-1111-1111-111111111111")
-	otherShortID := uuid.MustParse("3e3e3e3e-1111-1111-1111-111111111111")
-	assetID := uuid.MustParse("3f3f3f3f-1111-1111-1111-111111111111")
 
 	delivery := newWorkspacePreviewDelivery(t)
 	repo := newRepository(repositoryStubQueries{
@@ -345,16 +344,11 @@ func TestGetWorkspacePreviewShortDetailReturnsNotFoundWhenShortMissing(t *testin
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
-			return []sqlc.AppShort{
-				testWorkspacePreviewShortRowWithCaption(otherShortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")),
-			}, nil
-		},
-		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
-			if id != pgUUID(assetID) {
-				t.Fatalf("GetMediaAssetByID() id got %v want %v", id, pgUUID(assetID))
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
 			}
-			return testWorkspacePreviewAssetRow(assetID, viewerUserID, now, int64Ptr(16000), workspacePreviewAssetReadyState), nil
+			return sqlc.AppShort{}, pgx.ErrNoRows
 		},
 	})
 	repo.delivery = delivery
@@ -382,10 +376,11 @@ func TestGetWorkspacePreviewShortDetailReturnsNotFoundWhenShortIsNotPreviewable(
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
-			return []sqlc.AppShort{
-				testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")),
-			}, nil
+		getShortByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+			if id != pgUUID(shortID) {
+				t.Fatalf("GetShortByID() id got %v want %v", id, pgUUID(shortID))
+			}
+			return testWorkspacePreviewShortRowWithCaption(shortID, viewerUserID, mainID, assetID, now, "approved_for_publish", stringPtr("quiet rooftop preview.")), nil
 		},
 		getMediaAsset: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
 			if id != pgUUID(assetID) {
@@ -624,6 +619,7 @@ func newWorkspacePreviewDelivery(t *testing.T) *media.Delivery {
 
 	delivery, err := media.NewDelivery(media.DeliveryConfig{
 		ShortPublicBaseURL:    "https://cdn.example.com/shorts",
+		ShortPublicBucketName: "short-public-bucket",
 		MainPrivateBucketName: "main-private-bucket",
 	}, workspacePreviewSignerStub{})
 	if err != nil {

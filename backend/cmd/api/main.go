@@ -78,6 +78,7 @@ func main() {
 
 	delivery, err := media.NewDelivery(media.DeliveryConfig{
 		ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+		ShortPublicBucketName: cfg.MediaShortPublicBucketName,
 		MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
 	}, s3Client)
 	if err != nil {
@@ -97,6 +98,7 @@ func main() {
 	shortDisplayDelivery, err := media.NewDelivery(
 		media.DeliveryConfig{
 			ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+			ShortPublicBucketName: cfg.MediaShortPublicBucketName,
 			MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
 		},
 		s3Client,

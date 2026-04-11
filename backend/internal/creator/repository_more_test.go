@@ -23,6 +23,7 @@ type repositoryStubQueries struct {
 	listWorkspacePreviewMainsByCreator func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	getRevisionSummary                 func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	getMediaAsset                      func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
+	getShortByID                       func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 	updateCapability                   func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	countPublicShorts                  func(context.Context, pgtype.UUID) (int64, error)
 	deleteCreatorFollow                func(context.Context, sqlc.DeleteCreatorFollowParams) error
@@ -102,6 +103,13 @@ func (s repositoryStubQueries) GetMediaAssetByID(ctx context.Context, id pgtype.
 		return sqlc.AppMediaAsset{}, nil
 	}
 	return s.getMediaAsset(ctx, id)
+}
+
+func (s repositoryStubQueries) GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+	if s.getShortByID == nil {
+		return sqlc.AppShort{}, nil
+	}
+	return s.getShortByID(ctx, id)
 }
 
 func (s repositoryStubQueries) UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {

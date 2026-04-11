@@ -40,6 +40,7 @@ type queries interface {
 	ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
 	GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error)
+	GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	CountPublicShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) (int64, error)
 	DeleteCreatorFollow(ctx context.Context, arg sqlc.DeleteCreatorFollowParams) error

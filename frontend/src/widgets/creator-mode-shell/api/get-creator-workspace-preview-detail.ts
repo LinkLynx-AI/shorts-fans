@@ -18,6 +18,7 @@ const creatorWorkspacePreviewShortSummarySchema = z.object({
   id: z.string().min(1),
   media: creatorWorkspacePreviewVideoDisplayAssetSchema,
   previewDurationSeconds: z.number().int().positive(),
+  title: z.string(),
 });
 
 const creatorWorkspacePreviewAccessSchema = z.object({
