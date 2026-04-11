@@ -9,6 +9,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
 	"github.com/google/uuid"
 )
 
@@ -28,6 +29,18 @@ func (s stubMainReader) GetUnlockableMain(ctx context.Context, id uuid.UUID) (sh
 	return s.getUnlockableMain(ctx, id)
 }
 
+type stubUnlockRecorder struct {
+	recordMainUnlock func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
+}
+
+func (s stubUnlockRecorder) RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+	if s.recordMainUnlock == nil {
+		return unlock.MainUnlock{}, nil
+	}
+
+	return s.recordMainUnlock(ctx, input)
+}
+
 func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 	t.Parallel()
 
@@ -37,6 +50,8 @@ func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 	shortAssetID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
 	mainAssetID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
 	now := time.Unix(1_710_000_000, 0).UTC()
+	recordedAt := now.Add(30 * time.Second)
+	recordCallCount := 0
 
 	service := NewService(
 		stubFeedReader{
@@ -89,6 +104,21 @@ func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 				}, nil
 			},
 		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				recordCallCount++
+				if input.UserID != viewerID || input.MainID != mainID {
+					t.Fatalf("RecordMainUnlock() input got %+v want viewer=%s main=%s", input, viewerID, mainID)
+				}
+
+				return unlock.MainUnlock{
+					UserID:      viewerID,
+					MainID:      mainID,
+					PurchasedAt: recordedAt,
+					CreatedAt:   recordedAt,
+				}, nil
+			},
+		},
 	)
 	service.now = func() time.Time { return now }
 
@@ -121,6 +151,9 @@ func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 	}
 	if issued.GrantKind != MainPlaybackGrantKindUnlocked {
 		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindUnlocked)
+	}
+	if recordCallCount != 1 {
+		t.Fatalf("IssueAccessEntry() record call count got %d want %d", recordCallCount, 1)
 	}
 
 	playback, err := service.GetPlaybackSurface(context.Background(), viewerID, sessionBinding, mainID, shortID, issued.GrantToken)
@@ -172,6 +205,7 @@ func TestServiceIssueAccessEntryRejectsInvalidToken(t *testing.T) {
 				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
 			},
 		},
+		stubUnlockRecorder{},
 	)
 	service.now = func() time.Time { return now }
 
@@ -183,6 +217,206 @@ func TestServiceIssueAccessEntryRejectsInvalidToken(t *testing.T) {
 	})
 	if !errors.Is(err, ErrMainLocked) {
 		t.Fatalf("IssueAccessEntry() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestServiceIssueAccessEntryAllowsAlreadyUnlockedRecord(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	recordCallCount := 0
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							IsUnlocked:          true,
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				recordCallCount++
+				return unlock.MainUnlock{}, unlock.ErrAlreadyUnlocked
+			},
+		},
+	)
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	issued, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindUnlocked {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindUnlocked)
+	}
+	if recordCallCount != 1 {
+		t.Fatalf("IssueAccessEntry() record call count got %d want %d", recordCallCount, 1)
+	}
+}
+
+func TestServiceIssueAccessEntrySkipsOwnerPersistence(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	recordCallCount := 0
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Aoi N",
+							Handle:      "aoina",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							IsOwner: true,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				recordCallCount++
+				return unlock.MainUnlock{}, nil
+			},
+		},
+	)
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	issued, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindOwner {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindOwner)
+	}
+	if recordCallCount != 0 {
+		t.Fatalf("IssueAccessEntry() record call count got %d want %d", recordCallCount, 0)
+	}
+}
+
+func TestServiceIssueAccessEntryFailsWhenPersistenceFails(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	recordErr := errors.New("write failed")
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				return unlock.MainUnlock{}, recordErr
+			},
+		},
+	)
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	_, err = service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	})
+	if !errors.Is(err, recordErr) {
+		t.Fatalf("IssueAccessEntry() error got %v want wrapped %v", err, recordErr)
 	}
 }
 
@@ -208,6 +442,7 @@ func TestServiceMapsNotFoundErrors(t *testing.T) {
 					return shorts.Main{}, nil
 				},
 			},
+			stubUnlockRecorder{},
 		)
 
 		_, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
@@ -231,6 +466,7 @@ func TestServiceMapsNotFoundErrors(t *testing.T) {
 					return shorts.Main{}, nil
 				},
 			},
+			stubUnlockRecorder{},
 		)
 
 		_, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
@@ -259,6 +495,7 @@ func TestServiceMapsNotFoundErrors(t *testing.T) {
 					return shorts.Main{}, nil
 				},
 			},
+			stubUnlockRecorder{},
 		)
 
 		_, err := service.GetPlaybackSurface(context.Background(), viewerID, "session-hash", mainID, shortID, "ignored")
@@ -306,6 +543,7 @@ func TestServiceRejectsMismatchedIdentifiers(t *testing.T) {
 				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
 			},
 		},
+		stubUnlockRecorder{},
 	)
 	service.now = func() time.Time { return now }
 

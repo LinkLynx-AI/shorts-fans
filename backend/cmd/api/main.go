@@ -25,6 +25,7 @@ import (
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
 )
 
 func main() {
@@ -90,7 +91,8 @@ func main() {
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
-	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository)
+	unlockRepository := unlock.NewRepository(pool)
+	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)

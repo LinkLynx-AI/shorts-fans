@@ -44,7 +44,7 @@
 ### Main Playback
 
 - main は locked/private delivery を前提にし、current session で検証済みの access entry がある場合だけ `url` と `posterUrl` を返します。
-- actual billing は別 leaf に分離し、この phase では `access-entry` による temporary grant だけを扱います。
+- actual billing は別 leaf に分離し、この phase では `access-entry` による unlock access 記録と temporary grant 発行を扱います。
 - main playback grant は library 永続化や purchase ledger と同義にしません。
 
 ### Owner Preview
