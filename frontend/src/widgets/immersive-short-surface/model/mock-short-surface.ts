@@ -16,12 +16,12 @@ import type {
 } from "./short-surface";
 
 const feedViewerStateByShortId: Record<string, FeedSurfaceViewerState> = {
-  afterrain: { isPinned: true },
-  balcony: { isPinned: true },
-  mirror: { isPinned: false },
-  poolcut: { isPinned: false },
-  rooftop: { isPinned: true },
-  softlight: { isPinned: false },
+  afterrain: { isFollowingCreator: true, isPinned: true },
+  balcony: { isFollowingCreator: true, isPinned: true },
+  mirror: { isFollowingCreator: true, isPinned: false },
+  poolcut: { isFollowingCreator: true, isPinned: false },
+  rooftop: { isFollowingCreator: false, isPinned: true },
+  softlight: { isFollowingCreator: true, isPinned: false },
 };
 
 const detailViewerStateByShortId: Record<string, DetailSurfaceViewerState> = {

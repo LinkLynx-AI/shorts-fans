@@ -55,7 +55,8 @@ type feedShortSummary struct {
 }
 
 type feedViewerPayload struct {
-	IsPinned bool `json:"isPinned"`
+	IsFollowingCreator bool `json:"isFollowingCreator"`
+	IsPinned           bool `json:"isPinned"`
 }
 
 type shortDetailViewer struct {
@@ -217,7 +218,8 @@ func buildFanFeedItemPayload(item feed.Item, shortDisplayAssets ShortDisplayAsse
 		Short:     short,
 		UnlockCta: buildUnlockCtaStatePayload(item),
 		Viewer: feedViewerPayload{
-			IsPinned: item.Viewer.IsPinned,
+			IsFollowingCreator: item.Viewer.IsFollowingCreator,
+			IsPinned:           item.Viewer.IsPinned,
 		},
 	}, nil
 }

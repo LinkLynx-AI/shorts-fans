@@ -73,7 +73,8 @@ type Item struct {
 	Short   ShortSummary
 	Unlock  UnlockPreview
 	Viewer  struct {
-		IsPinned bool
+		IsFollowingCreator bool
+		IsPinned           bool
 	}
 }
 
@@ -185,22 +186,23 @@ func mapRecommendedPage(rows []sqlc.ListRecommendedPublicFeedItemsRow, limit int
 
 		item, err := mapFeedItem(
 			mapFeedRow{
-				AvatarUrl:       row.AvatarUrl,
-				Bio:             row.Bio,
-				CanonicalMainID: row.CanonicalMainID,
-				Caption:         row.Caption,
-				CreatorUserID:   row.CreatorUserID,
-				DisplayName:     row.DisplayName,
-				Handle:          row.Handle,
-				ID:              row.ID,
-				IsOwner:         row.IsOwner,
-				IsPinned:        row.IsPinned,
-				IsUnlocked:      row.IsUnlocked,
-				MainDurationMs:  row.MainDurationMs,
-				MainPriceMinor:  row.MainPriceMinor,
-				MediaAssetID:    row.MediaAssetID,
-				PublishedAt:     row.PublishedAt,
-				ShortDurationMs: row.ShortDurationMs,
+				AvatarUrl:          row.AvatarUrl,
+				Bio:                row.Bio,
+				CanonicalMainID:    row.CanonicalMainID,
+				Caption:            row.Caption,
+				CreatorUserID:      row.CreatorUserID,
+				DisplayName:        row.DisplayName,
+				Handle:             row.Handle,
+				ID:                 row.ID,
+				IsOwner:            row.IsOwner,
+				IsPinned:           row.IsPinned,
+				IsUnlocked:         row.IsUnlocked,
+				IsFollowingCreator: row.IsFollowingCreator,
+				MainDurationMs:     row.MainDurationMs,
+				MainPriceMinor:     row.MainPriceMinor,
+				MediaAssetID:       row.MediaAssetID,
+				PublishedAt:        row.PublishedAt,
+				ShortDurationMs:    row.ShortDurationMs,
 			},
 		)
 		if err != nil {
@@ -222,22 +224,23 @@ func mapFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit int, la
 
 		item, err := mapFeedItem(
 			mapFeedRow{
-				AvatarUrl:       row.AvatarUrl,
-				Bio:             row.Bio,
-				CanonicalMainID: row.CanonicalMainID,
-				Caption:         row.Caption,
-				CreatorUserID:   row.CreatorUserID,
-				DisplayName:     row.DisplayName,
-				Handle:          row.Handle,
-				ID:              row.ID,
-				IsOwner:         row.IsOwner,
-				IsPinned:        row.IsPinned,
-				IsUnlocked:      row.IsUnlocked,
-				MainDurationMs:  row.MainDurationMs,
-				MainPriceMinor:  row.MainPriceMinor,
-				MediaAssetID:    row.MediaAssetID,
-				PublishedAt:     row.PublishedAt,
-				ShortDurationMs: row.ShortDurationMs,
+				AvatarUrl:          row.AvatarUrl,
+				Bio:                row.Bio,
+				CanonicalMainID:    row.CanonicalMainID,
+				Caption:            row.Caption,
+				CreatorUserID:      row.CreatorUserID,
+				DisplayName:        row.DisplayName,
+				Handle:             row.Handle,
+				ID:                 row.ID,
+				IsOwner:            row.IsOwner,
+				IsPinned:           row.IsPinned,
+				IsUnlocked:         row.IsUnlocked,
+				IsFollowingCreator: row.IsFollowingCreator,
+				MainDurationMs:     row.MainDurationMs,
+				MainPriceMinor:     row.MainPriceMinor,
+				MediaAssetID:       row.MediaAssetID,
+				PublishedAt:        row.PublishedAt,
+				ShortDurationMs:    row.ShortDurationMs,
 			},
 		)
 		if err != nil {
@@ -281,22 +284,23 @@ func lengthOfRows(rows any) int {
 }
 
 type mapFeedRow struct {
-	AvatarUrl       pgtype.Text
-	Bio             string
-	CanonicalMainID pgtype.UUID
-	Caption         pgtype.Text
-	CreatorUserID   pgtype.UUID
-	DisplayName     pgtype.Text
-	Handle          string
-	ID              pgtype.UUID
-	IsOwner         any
-	IsPinned        any
-	IsUnlocked      any
-	MainDurationMs  pgtype.Int8
-	MainPriceMinor  pgtype.Int8
-	MediaAssetID    pgtype.UUID
-	PublishedAt     pgtype.Timestamptz
-	ShortDurationMs pgtype.Int8
+	AvatarUrl          pgtype.Text
+	Bio                string
+	CanonicalMainID    pgtype.UUID
+	Caption            pgtype.Text
+	CreatorUserID      pgtype.UUID
+	DisplayName        pgtype.Text
+	Handle             string
+	ID                 pgtype.UUID
+	IsOwner            any
+	IsPinned           any
+	IsUnlocked         any
+	IsFollowingCreator any
+	MainDurationMs     pgtype.Int8
+	MainPriceMinor     pgtype.Int8
+	MediaAssetID       pgtype.UUID
+	PublishedAt        pgtype.Timestamptz
+	ShortDurationMs    pgtype.Int8
 }
 
 func mapFeedItem(row mapFeedRow) (Item, error) {
@@ -355,6 +359,10 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 	if err != nil {
 		return Item{}, fmt.Errorf("public short item の is_unlocked 変換: %w", err)
 	}
+	isFollowingCreator, err := boolFromAny(row.IsFollowingCreator)
+	if err != nil {
+		return Item{}, fmt.Errorf("public short item の is_following_creator 変換: %w", err)
+	}
 
 	item := Item{
 		Creator: CreatorSummary{
@@ -380,6 +388,7 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 			PriceJPY:            row.MainPriceMinor.Int64,
 		},
 	}
+	item.Viewer.IsFollowingCreator = isFollowingCreator
 	item.Viewer.IsPinned = isPinned
 
 	return item, nil
@@ -388,22 +397,23 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 func mapDetail(row sqlc.GetPublicShortDetailItemRow) (Detail, error) {
 	item, err := mapFeedItem(
 		mapFeedRow{
-			AvatarUrl:       row.AvatarUrl,
-			Bio:             row.Bio,
-			CanonicalMainID: row.CanonicalMainID,
-			Caption:         row.Caption,
-			CreatorUserID:   row.CreatorUserID,
-			DisplayName:     row.DisplayName,
-			Handle:          row.Handle,
-			ID:              row.ID,
-			IsOwner:         row.IsOwner,
-			IsPinned:        row.IsPinned,
-			IsUnlocked:      row.IsUnlocked,
-			MainDurationMs:  row.MainDurationMs,
-			MainPriceMinor:  row.MainPriceMinor,
-			MediaAssetID:    row.MediaAssetID,
-			PublishedAt:     row.PublishedAt,
-			ShortDurationMs: row.ShortDurationMs,
+			AvatarUrl:          row.AvatarUrl,
+			Bio:                row.Bio,
+			CanonicalMainID:    row.CanonicalMainID,
+			Caption:            row.Caption,
+			CreatorUserID:      row.CreatorUserID,
+			DisplayName:        row.DisplayName,
+			Handle:             row.Handle,
+			ID:                 row.ID,
+			IsOwner:            row.IsOwner,
+			IsPinned:           row.IsPinned,
+			IsUnlocked:         row.IsUnlocked,
+			IsFollowingCreator: row.IsFollowingCreator,
+			MainDurationMs:     row.MainDurationMs,
+			MainPriceMinor:     row.MainPriceMinor,
+			MediaAssetID:       row.MediaAssetID,
+			PublishedAt:        row.PublishedAt,
+			ShortDurationMs:    row.ShortDurationMs,
 		},
 	)
 	if err != nil {
@@ -418,6 +428,7 @@ func mapDetail(row sqlc.GetPublicShortDetailItemRow) (Detail, error) {
 		return Detail{}, fmt.Errorf("public short detail の is_following_creator 変換: %w", err)
 	}
 	detail.Item.Creator.IsFollowing = isFollowingCreator
+	detail.Item.Viewer.IsFollowingCreator = isFollowingCreator
 	detail.Viewer.IsFollowingCreator = isFollowingCreator
 
 	return detail, nil

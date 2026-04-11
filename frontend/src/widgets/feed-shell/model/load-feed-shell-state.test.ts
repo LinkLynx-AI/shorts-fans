@@ -72,6 +72,7 @@ describe("loadFeedShellState", () => {
         state: "unlock_available" as const,
       },
       viewer: {
+        isFollowingCreator: true,
         isPinned: true,
       },
     };
@@ -111,6 +112,7 @@ describe("loadFeedShellState", () => {
         unlockCta: apiItem.unlockCta,
       },
       viewer: {
+        isFollowingCreator: true,
         isPinned: true,
       },
     };

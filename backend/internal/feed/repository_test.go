@@ -142,8 +142,8 @@ func TestMapFeedItem(t *testing.T) {
 	if item.Unlock.MainDurationSeconds != 481 {
 		t.Fatalf("mapFeedItem() mainDurationSeconds got %d want %d", item.Unlock.MainDurationSeconds, 481)
 	}
-	if !item.Unlock.IsOwner || !item.Unlock.IsUnlocked || !item.Viewer.IsPinned {
-		t.Fatalf("mapFeedItem() booleans got owner=%t unlocked=%t pinned=%t want true/true/true", item.Unlock.IsOwner, item.Unlock.IsUnlocked, item.Viewer.IsPinned)
+	if !item.Unlock.IsOwner || !item.Unlock.IsUnlocked || !item.Viewer.IsFollowingCreator || !item.Viewer.IsPinned {
+		t.Fatalf("mapFeedItem() booleans got owner=%t unlocked=%t following=%t pinned=%t want true/true/true/true", item.Unlock.IsOwner, item.Unlock.IsUnlocked, item.Viewer.IsFollowingCreator, item.Viewer.IsPinned)
 	}
 	if !item.GetPublishedAt().Equal(row.PublishedAt.Time) {
 		t.Fatalf("item.GetPublishedAt() got %s want %s", item.GetPublishedAt(), row.PublishedAt.Time)
@@ -537,64 +537,67 @@ func TestOptionalUUIDToPGAndBoolFromAny(t *testing.T) {
 
 func makeMapFeedRow() mapFeedRow {
 	return mapFeedRow{
-		AvatarUrl:       makeText("https://cdn.example.com/avatar.jpg"),
-		Bio:             "night preview specialist",
-		CanonicalMainID: makeUUID("33333333-3333-3333-3333-333333333333"),
-		Caption:         makeText("quiet rooftop preview"),
-		CreatorUserID:   makeUUID("11111111-1111-1111-1111-111111111111"),
-		DisplayName:     makeText("Mina Rei"),
-		Handle:          "minarei",
-		ID:              makeUUID("22222222-2222-2222-2222-222222222222"),
-		IsOwner:         true,
-		IsPinned:        true,
-		IsUnlocked:      true,
-		MainDurationMs:  makeInt8(480500),
-		MainPriceMinor:  makeInt8(1800),
-		MediaAssetID:    makeUUID("44444444-4444-4444-4444-444444444444"),
-		PublishedAt:     makeTimestamp(time.Unix(1710000000, 0).UTC()),
-		ShortDurationMs: makeInt8(16500),
+		AvatarUrl:          makeText("https://cdn.example.com/avatar.jpg"),
+		Bio:                "night preview specialist",
+		CanonicalMainID:    makeUUID("33333333-3333-3333-3333-333333333333"),
+		Caption:            makeText("quiet rooftop preview"),
+		CreatorUserID:      makeUUID("11111111-1111-1111-1111-111111111111"),
+		DisplayName:        makeText("Mina Rei"),
+		Handle:             "minarei",
+		ID:                 makeUUID("22222222-2222-2222-2222-222222222222"),
+		IsOwner:            true,
+		IsPinned:           true,
+		IsUnlocked:         true,
+		IsFollowingCreator: true,
+		MainDurationMs:     makeInt8(480500),
+		MainPriceMinor:     makeInt8(1800),
+		MediaAssetID:       makeUUID("44444444-4444-4444-4444-444444444444"),
+		PublishedAt:        makeTimestamp(time.Unix(1710000000, 0).UTC()),
+		ShortDurationMs:    makeInt8(16500),
 	}
 }
 
 func makeFollowingRow(shortID uuid.UUID, publishedAt time.Time) sqlc.ListFollowingPublicFeedItemsRow {
 	return sqlc.ListFollowingPublicFeedItemsRow{
-		ID:              makeUUID(shortID.String()),
-		CreatorUserID:   makeUUID("11111111-1111-1111-1111-111111111111"),
-		CanonicalMainID: makeUUID("33333333-3333-3333-3333-333333333333"),
-		MediaAssetID:    makeUUID("44444444-4444-4444-4444-444444444444"),
-		Caption:         makeText("quiet rooftop preview"),
-		PublishedAt:     makeTimestamp(publishedAt),
-		ShortDurationMs: makeInt8(16500),
-		DisplayName:     makeText("Mina Rei"),
-		Handle:          "minarei",
-		AvatarUrl:       makeText("https://cdn.example.com/avatar.jpg"),
-		Bio:             "night preview specialist",
-		MainPriceMinor:  makeInt8(1800),
-		MainDurationMs:  makeInt8(480500),
-		IsPinned:        true,
-		IsUnlocked:      false,
-		IsOwner:         false,
+		ID:                 makeUUID(shortID.String()),
+		CreatorUserID:      makeUUID("11111111-1111-1111-1111-111111111111"),
+		CanonicalMainID:    makeUUID("33333333-3333-3333-3333-333333333333"),
+		MediaAssetID:       makeUUID("44444444-4444-4444-4444-444444444444"),
+		Caption:            makeText("quiet rooftop preview"),
+		PublishedAt:        makeTimestamp(publishedAt),
+		ShortDurationMs:    makeInt8(16500),
+		DisplayName:        makeText("Mina Rei"),
+		Handle:             "minarei",
+		AvatarUrl:          makeText("https://cdn.example.com/avatar.jpg"),
+		Bio:                "night preview specialist",
+		MainPriceMinor:     makeInt8(1800),
+		MainDurationMs:     makeInt8(480500),
+		IsPinned:           true,
+		IsUnlocked:         false,
+		IsOwner:            false,
+		IsFollowingCreator: true,
 	}
 }
 
 func makeRecommendedRow(shortID uuid.UUID, publishedAt time.Time) sqlc.ListRecommendedPublicFeedItemsRow {
 	return sqlc.ListRecommendedPublicFeedItemsRow{
-		ID:              makeUUID(shortID.String()),
-		CreatorUserID:   makeUUID("11111111-1111-1111-1111-111111111111"),
-		CanonicalMainID: makeUUID("33333333-3333-3333-3333-333333333333"),
-		MediaAssetID:    makeUUID("44444444-4444-4444-4444-444444444444"),
-		Caption:         makeText("quiet rooftop preview"),
-		PublishedAt:     makeTimestamp(publishedAt),
-		ShortDurationMs: makeInt8(16500),
-		DisplayName:     makeText("Mina Rei"),
-		Handle:          "minarei",
-		AvatarUrl:       makeText("https://cdn.example.com/avatar.jpg"),
-		Bio:             "night preview specialist",
-		MainPriceMinor:  makeInt8(1800),
-		MainDurationMs:  makeInt8(480500),
-		IsPinned:        true,
-		IsUnlocked:      true,
-		IsOwner:         false,
+		ID:                 makeUUID(shortID.String()),
+		CreatorUserID:      makeUUID("11111111-1111-1111-1111-111111111111"),
+		CanonicalMainID:    makeUUID("33333333-3333-3333-3333-333333333333"),
+		MediaAssetID:       makeUUID("44444444-4444-4444-4444-444444444444"),
+		Caption:            makeText("quiet rooftop preview"),
+		PublishedAt:        makeTimestamp(publishedAt),
+		ShortDurationMs:    makeInt8(16500),
+		DisplayName:        makeText("Mina Rei"),
+		Handle:             "minarei",
+		AvatarUrl:          makeText("https://cdn.example.com/avatar.jpg"),
+		Bio:                "night preview specialist",
+		MainPriceMinor:     makeInt8(1800),
+		MainDurationMs:     makeInt8(480500),
+		IsPinned:           true,
+		IsUnlocked:         true,
+		IsOwner:            false,
+		IsFollowingCreator: true,
 	}
 }
 

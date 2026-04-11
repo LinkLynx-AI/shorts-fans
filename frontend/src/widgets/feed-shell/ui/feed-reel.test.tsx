@@ -1,5 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+} from "@/entities/viewer";
+import { FanAuthDialogProvider } from "@/features/fan-auth";
 import { getFeedSurfaceByTab } from "@/widgets/immersive-short-surface";
 
 import { FeedReel } from "./feed-reel";
@@ -27,7 +32,13 @@ describe("FeedReel", () => {
     };
 
     const { container } = render(
-      <FeedReel activeTab="recommended" surfaces={[firstSurface, secondSurface]} />,
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel activeTab="recommended" surfaces={[firstSurface, secondSurface]} />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
     );
 
     const reel = container.firstElementChild;
