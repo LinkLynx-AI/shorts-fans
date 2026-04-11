@@ -51,6 +51,66 @@ func (q *Queries) CreateMainUnlock(ctx context.Context, arg CreateMainUnlockPara
 	return i, err
 }
 
+const ensureMainUnlock = `-- name: EnsureMainUnlock :one
+WITH inserted AS (
+    INSERT INTO app.main_unlocks (
+        user_id,
+        main_id,
+        payment_provider_purchase_ref,
+        purchased_at
+    ) VALUES (
+        $1,
+        $2,
+        $3,
+        COALESCE($4::timestamptz, CURRENT_TIMESTAMP)
+    )
+    ON CONFLICT (user_id, main_id) DO NOTHING
+    RETURNING user_id, main_id, payment_provider_purchase_ref, purchased_at, created_at
+)
+SELECT user_id, main_id, payment_provider_purchase_ref, purchased_at, created_at
+FROM inserted
+UNION ALL
+SELECT user_id, main_id, payment_provider_purchase_ref, purchased_at, created_at
+FROM app.main_unlocks
+WHERE NOT EXISTS (SELECT 1 FROM inserted)
+    AND user_id = $1
+    AND main_id = $2
+LIMIT 1
+`
+
+type EnsureMainUnlockParams struct {
+	UserID                     pgtype.UUID
+	MainID                     pgtype.UUID
+	PaymentProviderPurchaseRef pgtype.Text
+	PurchasedAt                pgtype.Timestamptz
+}
+
+type EnsureMainUnlockRow struct {
+	UserID                     pgtype.UUID
+	MainID                     pgtype.UUID
+	PaymentProviderPurchaseRef pgtype.Text
+	PurchasedAt                pgtype.Timestamptz
+	CreatedAt                  pgtype.Timestamptz
+}
+
+func (q *Queries) EnsureMainUnlock(ctx context.Context, arg EnsureMainUnlockParams) (EnsureMainUnlockRow, error) {
+	row := q.db.QueryRow(ctx, ensureMainUnlock,
+		arg.UserID,
+		arg.MainID,
+		arg.PaymentProviderPurchaseRef,
+		arg.PurchasedAt,
+	)
+	var i EnsureMainUnlockRow
+	err := row.Scan(
+		&i.UserID,
+		&i.MainID,
+		&i.PaymentProviderPurchaseRef,
+		&i.PurchasedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getMainUnlockByUserIDAndMainID = `-- name: GetMainUnlockByUserIDAndMainID :one
 SELECT user_id, main_id, payment_provider_purchase_ref, purchased_at, created_at
 FROM app.main_unlocks

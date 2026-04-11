@@ -91,7 +91,7 @@
 | --- | --- |
 | `public` | public surface をそのまま閲覧できる正常系 |
 | `locked` | canonical main は存在するが viewer は再生できない |
-| `unlocked` | viewer が current session で canonical main へ進める |
+| `unlocked` | viewer が canonical main access を持ち main へ進める |
 | `owner` | viewer が creator owner として preview access を持つ |
 | `empty` | request 自体は成功したが items が 0 件 |
 | `not_found` | 対象 resource が存在しない、または見せるべきではない |
@@ -157,7 +157,7 @@
 | --- | --- | --- |
 | `mainId` | `string` | canonical main identifier |
 | `status` | `"locked" \| "unlocked" \| "owner"` | playback 可否に使う state |
-| `reason` | `"unlock_required" \| "session_unlocked" \| "owner_preview"` | `status` の解釈を固定する最小 field |
+| `reason` | `"unlock_required" \| "session_unlocked" \| "owner_preview"` | `status` の解釈を固定する最小 field。`session_unlocked` は既存 wire 名を維持しつつ unlock 済み fan access を表す |
 
 ### `UnlockCtaState`
 
@@ -166,7 +166,7 @@
 | `state` | `"unlock_available" \| "setup_required" \| "continue_main" \| "owner_preview" \| "unavailable"` | frontend はこの state から CTA label を組み立てる |
 | `priceJpy` | `number \| null` | `setup_required` と `unlock_available` で必須。現段階では reference price としてだけ使う |
 | `mainDurationSeconds` | `number \| null` | `setup_required` と `unlock_available` で必須 |
-| `resumePositionSeconds` | `number \| null` | `continue_main` で使う。その他は `null` |
+| `resumePositionSeconds` | `number \| null` | `continue_main` で使う。viewer がすでに main access を持つ場合の再開 UI 用。その他は `null` |
 
 ### `CursorPageInfo`
 

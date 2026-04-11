@@ -8,6 +8,7 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
 	"github.com/google/uuid"
 )
 
@@ -41,13 +42,18 @@ type mainReader interface {
 	GetUnlockableMain(ctx context.Context, id uuid.UUID) (shorts.Main, error)
 }
 
+type unlockRecorder interface {
+	EnsureMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
+}
+
 // Service は fan unlock / main playback 導線を扱います。
 type Service struct {
-	feedReader feedReader
-	mainReader mainReader
-	now        func() time.Time
-	tokenTTL   time.Duration
-	grantTTL   time.Duration
+	feedReader     feedReader
+	mainReader     mainReader
+	unlockRecorder unlockRecorder
+	now            func() time.Time
+	tokenTTL       time.Duration
+	grantTTL       time.Duration
 }
 
 // CreatorSummary は unlock / playback surface で使う creator 表示情報です。
@@ -146,13 +152,14 @@ type PlaybackSurface struct {
 }
 
 // NewService は fan unlock / main playback service を構築します。
-func NewService(feedReader feedReader, mainReader mainReader) *Service {
+func NewService(feedReader feedReader, mainReader mainReader, unlockRecorder unlockRecorder) *Service {
 	return &Service{
-		feedReader: feedReader,
-		mainReader: mainReader,
-		now:        time.Now,
-		tokenTTL:   defaultTokenTTL,
-		grantTTL:   defaultGrantTTL,
+		feedReader:     feedReader,
+		mainReader:     mainReader,
+		unlockRecorder: unlockRecorder,
+		now:            time.Now,
+		tokenTTL:       defaultTokenTTL,
+		grantTTL:       defaultGrantTTL,
 	}
 }
 
@@ -224,6 +231,10 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 		return AccessEntryResult{}, ErrMainLocked
 	}
 
+	if err := s.ensureMainUnlockIfNeeded(ctx, grantKind, input.ViewerID, input.MainID); err != nil {
+		return AccessEntryResult{}, err
+	}
+
 	grantToken, err := issueSignedToken(sessionBinding, s.now().UTC(), s.grantTTL, signedTokenPayload{
 		GrantKind:   grantKind,
 		Kind:        playbackTokenKind,
@@ -239,6 +250,31 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 		GrantKind:  grantKind,
 		GrantToken: grantToken,
 	}, nil
+}
+
+func (s *Service) ensureMainUnlockIfNeeded(
+	ctx context.Context,
+	grantKind MainPlaybackGrantKind,
+	viewerID uuid.UUID,
+	mainID uuid.UUID,
+) error {
+	if grantKind != MainPlaybackGrantKindUnlocked {
+		return nil
+	}
+
+	if s == nil || s.unlockRecorder == nil {
+		return fmt.Errorf("fan main unlock recorder が初期化されていません")
+	}
+
+	_, err := s.unlockRecorder.EnsureMainUnlock(ctx, unlock.RecordMainUnlockInput{
+		UserID: viewerID,
+		MainID: mainID,
+	})
+	if err == nil {
+		return nil
+	}
+
+	return fmt.Errorf("main unlock 記録 viewer=%s main=%s: %w", viewerID, mainID, err)
 }
 
 // GetPlaybackSurface は temporary grant を検証して main playback surface を返します。
