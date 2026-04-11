@@ -2,43 +2,42 @@
 
 import { useEffect, useState } from "react";
 
-import { getCreatorWorkspaceSummary } from "../api/get-creator-workspace-summary";
 import { resolveCreatorWorkspaceBlockedState } from "./creator-workspace-blocked-state";
 import {
-  buildErrorCreatorWorkspaceSummaryState,
-  buildLoadingCreatorWorkspaceSummaryState,
-  type CreatorWorkspaceSummaryState,
-} from "./creator-workspace-summary";
+  buildErrorCreatorWorkspacePreviewCollectionsState,
+  buildLoadingCreatorWorkspacePreviewCollectionsState,
+  type CreatorWorkspacePreviewCollectionsState,
+} from "./creator-workspace-preview-collections";
+import { loadCreatorWorkspacePreviewCollections } from "./load-creator-workspace-preview-collections";
 import { type CreatorModeShellBlockedState } from "./creator-mode-shell";
 
-type UseCreatorWorkspaceSummaryResult = {
+type UseCreatorWorkspacePreviewCollectionsResult = {
   blockedState: CreatorModeShellBlockedState | null;
   retry: () => void;
-  state: CreatorWorkspaceSummaryState;
+  state: CreatorWorkspacePreviewCollectionsState;
 };
 
 /**
- * creator workspace summary の取得状態を client で管理する。
+ * creator workspace 下側一覧の取得状態を client で管理する。
  */
-export function useCreatorWorkspaceSummary(): UseCreatorWorkspaceSummaryResult {
+export function useCreatorWorkspacePreviewCollections(): UseCreatorWorkspacePreviewCollectionsResult {
   const [blockedState, setBlockedState] = useState<CreatorModeShellBlockedState | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [state, setState] = useState<CreatorWorkspaceSummaryState>(buildLoadingCreatorWorkspaceSummaryState());
+  const [state, setState] = useState<CreatorWorkspacePreviewCollectionsState>(
+    buildLoadingCreatorWorkspacePreviewCollectionsState(),
+  );
 
   useEffect(() => {
     const controller = new AbortController();
 
-    void getCreatorWorkspaceSummary({
-      credentials: "include",
-      signal: controller.signal,
-    }).then((summary) => {
+    void loadCreatorWorkspacePreviewCollections(controller.signal).then((collections) => {
       if (controller.signal.aborted) {
         return;
       }
 
       setState({
+        collections,
         kind: "ready",
-        summary,
       });
     }).catch((error: unknown) => {
       if (controller.signal.aborted) {
@@ -52,7 +51,7 @@ export function useCreatorWorkspaceSummary(): UseCreatorWorkspaceSummaryResult {
         return;
       }
 
-      setState(buildErrorCreatorWorkspaceSummaryState(error));
+      setState(buildErrorCreatorWorkspacePreviewCollectionsState(error));
     });
 
     return () => {
@@ -64,7 +63,7 @@ export function useCreatorWorkspaceSummary(): UseCreatorWorkspaceSummaryResult {
     blockedState,
     retry: () => {
       setBlockedState(null);
-      setState(buildLoadingCreatorWorkspaceSummaryState());
+      setState(buildLoadingCreatorWorkspacePreviewCollectionsState());
       setRetryCount((currentCount) => currentCount + 1);
     },
     state,

@@ -17,6 +17,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
@@ -73,7 +74,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	creatorRepository := creator.NewRepository(pool)
+	delivery, err := media.NewDelivery(media.DeliveryConfig{
+		ShortPublicBaseURL:    cfg.MediaShortPublicBaseURL,
+		MainPrivateBucketName: cfg.MediaMainPrivateBucketName,
+	}, s3Client)
+	if err != nil {
+		logger.Error("failed to initialize media delivery helper", "error", err)
+		os.Exit(1)
+	}
+
+	creatorRepository := creator.NewRepository(pool, delivery)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)

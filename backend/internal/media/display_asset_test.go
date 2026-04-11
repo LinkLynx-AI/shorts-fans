@@ -67,6 +67,53 @@ func TestBuildVideoDisplayAssetRejectsInvalidInput(t *testing.T) {
 	}
 }
 
+func TestBuildVideoPreviewCardAssetRejectsInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	validAssetID := mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+	tests := []struct {
+		name       string
+		assetID    string
+		posterURL  string
+		durationMS int64
+	}{
+		{
+			name:       "missing asset id",
+			assetID:    "00000000-0000-0000-0000-000000000000",
+			posterURL:  "https://cdn.example.com/poster.jpg",
+			durationMS: 1000,
+		},
+		{
+			name:       "missing poster url",
+			assetID:    validAssetID.String(),
+			posterURL:  "",
+			durationMS: 1000,
+		},
+		{
+			name:       "invalid duration",
+			assetID:    validAssetID.String(),
+			posterURL:  "https://cdn.example.com/poster.jpg",
+			durationMS: 0,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if _, err := buildVideoPreviewCardAsset(
+				mustUUID(tt.assetID),
+				tt.posterURL,
+				tt.durationMS,
+			); err == nil {
+				t.Fatalf("buildVideoPreviewCardAsset() error = nil for %s, want error", tt.name)
+			}
+		})
+	}
+}
+
 func TestDurationSecondsFromMS(t *testing.T) {
 	t.Parallel()
 
@@ -192,6 +239,31 @@ func TestResolveShortDisplayAssetPropagatesPlaybackResolutionError(t *testing.T)
 	}
 }
 
+func TestResolveShortPreviewCardAssetPropagatesPosterResolutionError(t *testing.T) {
+	t.Parallel()
+
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stubMainURLSigner{})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+	delivery.shortPublicBaseURL = "http://%"
+
+	_, err = delivery.ResolveShortPreviewCardAsset(ShortDisplaySource{
+		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+		ShortID:    mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		DurationMS: 1000,
+	})
+	if err == nil {
+		t.Fatal("ResolveShortPreviewCardAsset() error = nil, want error")
+	}
+	if !strings.Contains(err.Error(), "resolve short preview poster url") {
+		t.Fatalf("ResolveShortPreviewCardAsset() error got %q want poster resolution context", err)
+	}
+}
+
 type stepSigner struct {
 	urls []string
 	errs []error
@@ -231,5 +303,28 @@ func TestResolveMainDisplayAssetPropagatesPosterResolutionError(t *testing.T) {
 		DurationMS: 120000,
 	}, AccessBoundaryPrivate, 0); !errors.Is(err, posterErr) {
 		t.Fatalf("ResolveMainDisplayAsset() error got %v want %v", err, posterErr)
+	}
+}
+
+func TestResolveMainPreviewCardAssetPropagatesPosterResolutionError(t *testing.T) {
+	t.Parallel()
+
+	posterErr := errors.New("poster sign failed")
+	delivery, err := NewDelivery(DeliveryConfig{
+		ShortPublicBaseURL:    "https://cdn.example.com/media",
+		MainPrivateBucketName: "main-bucket",
+	}, &stepSigner{
+		errs: []error{posterErr},
+	})
+	if err != nil {
+		t.Fatalf("NewDelivery() error = %v, want nil", err)
+	}
+
+	if _, err := delivery.ResolveMainPreviewCardAsset(context.Background(), MainDisplaySource{
+		AssetID:    mustUUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
+		MainID:     mustUUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+		DurationMS: 120000,
+	}, 0); !errors.Is(err, posterErr) {
+		t.Fatalf("ResolveMainPreviewCardAsset() error got %v want %v", err, posterErr)
 	}
 }

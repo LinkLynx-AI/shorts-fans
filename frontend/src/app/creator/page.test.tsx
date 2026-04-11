@@ -9,6 +9,10 @@ import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-view
 import { ApiError } from "@/shared/api";
 import { getCreatorWorkspaceSummary } from "@/widgets/creator-mode-shell/api/get-creator-workspace-summary";
 import {
+  getCreatorWorkspacePreviewMains,
+  getCreatorWorkspacePreviewShorts,
+} from "@/widgets/creator-mode-shell/api/get-creator-workspace-preview-collections";
+import {
   CreatorModeShell,
   getMockCreatorModeShellState,
 } from "@/widgets/creator-mode-shell";
@@ -50,7 +54,14 @@ vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-summary", () => 
   getCreatorWorkspaceSummary: vi.fn(),
 }));
 
+vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-preview-collections", () => ({
+  getCreatorWorkspacePreviewMains: vi.fn(),
+  getCreatorWorkspacePreviewShorts: vi.fn(),
+}));
+
 type CreatorWorkspaceSummary = Awaited<ReturnType<typeof getCreatorWorkspaceSummary>>;
+type CreatorWorkspacePreviewShorts = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShorts>>;
+type CreatorWorkspacePreviewMains = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMains>>;
 
 function createDeferredPromise<TResult = void>() {
   let resolvePromise: (value: TResult | PromiseLike<TResult>) => void = () => {};
@@ -98,6 +109,59 @@ function createCreatorWorkspaceSummary(
   };
 }
 
+function createCreatorWorkspacePreviewShorts(
+  overrides: Partial<CreatorWorkspacePreviewShorts> = {},
+): CreatorWorkspacePreviewShorts {
+  return {
+    items: [
+      {
+        canonicalMainId: "main_quiet_rooftop",
+        id: "short_quiet_rooftop",
+        media: {
+          durationSeconds: 16,
+          id: "asset_short_quiet_rooftop",
+          kind: "video",
+          posterUrl: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg",
+        },
+        previewDurationSeconds: 16,
+      },
+    ],
+    page: {
+      hasNext: false,
+      nextCursor: null,
+    },
+    requestId: "req_creator_workspace_shorts_001",
+    ...overrides,
+  };
+}
+
+function createCreatorWorkspacePreviewMains(
+  overrides: Partial<CreatorWorkspacePreviewMains> = {},
+): CreatorWorkspacePreviewMains {
+  return {
+    items: [
+      {
+        durationSeconds: 720,
+        id: "main_quiet_rooftop",
+        leadShortId: "short_quiet_rooftop",
+        media: {
+          durationSeconds: 720,
+          id: "asset_main_quiet_rooftop",
+          kind: "video",
+          posterUrl: "https://cdn.example.com/creator/preview/mains/quiet-rooftop-poster.jpg",
+        },
+        priceJpy: 1800,
+      },
+    ],
+    page: {
+      hasNext: false,
+      nextCursor: null,
+    },
+    requestId: "req_creator_workspace_mains_001",
+    ...overrides,
+  };
+}
+
 describe("CreatorPage", () => {
   beforeEach(() => {
     mockedRouter.back.mockReset();
@@ -108,7 +172,11 @@ describe("CreatorPage", () => {
     mockedRouter.replace.mockReset();
     vi.mocked(switchViewerActiveMode).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockReset();
+    vi.mocked(getCreatorWorkspacePreviewMains).mockReset();
+    vi.mocked(getCreatorWorkspacePreviewShorts).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(createCreatorWorkspaceSummary());
+    vi.mocked(getCreatorWorkspacePreviewShorts).mockResolvedValue(createCreatorWorkspacePreviewShorts());
+    vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
   });
 
   it("renders contract-backed summary data for creator-mode viewers", async () => {
@@ -163,6 +231,7 @@ describe("CreatorPage", () => {
     expect(screen.getByText("差し戻しが2件あります")).toBeInTheDocument();
     expect(screen.getByText("short 1件 / main 1件を確認してください")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+    expect(await screen.findByTestId("creator-workspace-preview-tile")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Top main" }));
 
@@ -301,6 +370,8 @@ describe("CreatorPage", () => {
   it("shows a summary loading state while the workspace request is pending", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const deferred = createDeferredPromise<CreatorWorkspaceSummary>();
+    const previewShortsDeferred = createDeferredPromise<CreatorWorkspacePreviewShorts>();
+    const previewMainsDeferred = createDeferredPromise<CreatorWorkspacePreviewMains>();
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
       currentViewer: {
@@ -311,12 +382,73 @@ describe("CreatorPage", () => {
       hasSession: true,
     });
     vi.mocked(getCreatorWorkspaceSummary).mockReturnValue(deferred.promise);
+    vi.mocked(getCreatorWorkspacePreviewShorts).mockReturnValue(previewShortsDeferred.promise);
+    vi.mocked(getCreatorWorkspacePreviewMains).mockReturnValue(previewMainsDeferred.promise);
 
     render(await CreatorPage());
 
-    expect(screen.getByRole("status")).toHaveTextContent("workspace summary を読み込んでいます...");
+    expect(screen.getByText("workspace summary を読み込んでいます...")).toBeInTheDocument();
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+  });
+
+  it("renders contract-backed preview lists and keeps lower cards non-interactive", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+
+    render(await CreatorPage());
+
+    expect(await screen.findByText("0:16")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "quiet rooftop preview" })).not.toBeInTheDocument();
+
+    const previewTiles = screen.getAllByTestId("creator-workspace-preview-tile");
+    expect(previewTiles).toHaveLength(1);
+
+    await user.click(screen.getByRole("tab", { name: "Main" }));
+
+    expect(await screen.findByText("12:00")).toBeInTheDocument();
+    expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("linked short からの流入を unlock に変えている本編です。")).not.toBeInTheDocument();
+  });
+
+  it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspacePreviewShorts)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(createCreatorWorkspacePreviewShorts());
+    vi.mocked(getCreatorWorkspacePreviewMains)
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(createCreatorWorkspacePreviewMains());
+
+    render(await CreatorPage());
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "動画一覧を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
+    );
+    expect(screen.getByRole("button", { name: "Top main" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "再読み込み" }));
+
+    expect(await screen.findByText("0:16")).toBeInTheDocument();
   });
 
   it("shows a local summary error and retries without hiding managed mock sections", async () => {

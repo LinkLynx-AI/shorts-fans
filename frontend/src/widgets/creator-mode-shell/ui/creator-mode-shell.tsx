@@ -20,6 +20,10 @@ import { useFanModeEntry } from "@/features/creator-entry";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type {
+  CreatorWorkspacePreviewMainItem,
+  CreatorWorkspacePreviewShortItem,
+} from "../api/get-creator-workspace-preview-collections";
+import type {
   ApprovedCreatorWorkspaceOverviewMetrics,
   ApprovedCreatorWorkspaceDetailState,
   ApprovedCreatorWorkspaceManagedItem,
@@ -30,7 +34,9 @@ import type {
   ApprovedCreatorWorkspaceState,
 } from "../model/approved-creator-workspace";
 import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
+import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
 import type { CreatorModeShellState } from "../model/creator-mode-shell";
+import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-workspace-preview-collections";
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 
 type CreatorWorkspaceDetailSelection = {
@@ -44,6 +50,18 @@ function formatCount(value: number): string {
 
 function formatJpy(value: number): string {
   return `¥${value.toLocaleString("ja-JP")}`;
+}
+
+function formatDurationLabel(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
+  }
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
 function buildRevisionRequestedDetail({
@@ -543,20 +561,22 @@ function CreatorWorkspaceManagedTile({
 function CreatorWorkspaceManagedPosts({
   activeTab,
   onChangeTab,
-  onOpenDetail,
+  onRetry,
+  state,
   workspace,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
-  onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onRetry: () => void;
+  state: CreatorWorkspacePreviewCollectionsState;
   workspace: ApprovedCreatorWorkspaceState;
 }) {
-  const activeItems = workspace.managedCollections.itemsByTab[activeTab];
+  const activeTabLabel = activeTab === "shorts" ? "ショート" : "本編";
 
   return (
     <>
       <div
-        aria-label="Managed posts"
+        aria-label="Your videos"
         className="mt-[18px] grid grid-cols-2 border-t border-[rgba(167,220,249,0.48)]"
         role="tablist"
       >
@@ -583,24 +603,172 @@ function CreatorWorkspaceManagedPosts({
         })}
       </div>
 
-      <div className="mt-[18px] grid grid-cols-3 gap-[3px]">
-        {activeItems.flatMap((item) => {
-          const poster = workspace.posters[item.shortId];
-
-          return poster
-            ? [
-                <CreatorWorkspaceManagedTile
-                  item={item}
-                  key={`${activeTab}:${item.shortId}`}
-                  onOpenDetail={onOpenDetail}
-                  poster={poster}
-                  tab={activeTab}
-                />,
-              ]
-            : [];
-        })}
-      </div>
+      <CreatorWorkspacePreviewGrid
+        activeTab={activeTab}
+        activeTabLabel={activeTabLabel}
+        onRetry={onRetry}
+        state={state}
+      />
     </>
+  );
+}
+
+function createVideoPosterStyle(posterUrl: string): CSSProperties {
+  return {
+    backgroundImage: `url("${posterUrl}")`,
+    backgroundPosition: "center",
+    backgroundSize: "cover",
+  };
+}
+
+function CreatorWorkspacePreviewTileFrame({
+  badge,
+  bottomLeft,
+  bottomRight,
+  posterUrl,
+}: {
+  badge: string;
+  bottomLeft: string | null;
+  bottomRight: string;
+  posterUrl: string;
+}) {
+  return (
+    <article
+      className="relative overflow-hidden rounded-[4px] bg-[#dbeaf2]"
+      data-testid="creator-workspace-preview-tile"
+    >
+      <span
+        aria-hidden="true"
+        className="block aspect-[3/4] bg-[#dbeaf2]"
+        style={createVideoPosterStyle(posterUrl)}
+      />
+      <div className="absolute inset-0 flex flex-col justify-between bg-[linear-gradient(180deg,rgba(6,21,33,0.12)_0%,rgba(6,21,33,0.03)_34%,rgba(6,21,33,0.66)_100%)] p-2.5">
+        <div className="flex items-start justify-between gap-2">
+          <span className="inline-flex min-h-6 items-center justify-center rounded-full bg-white/16 px-2.5 text-[10px] font-bold uppercase tracking-[0.12em] text-white backdrop-blur-[10px]">
+            {badge}
+          </span>
+          <span className="sr-only">{badge}</span>
+        </div>
+        <div className="flex items-end justify-between gap-2">
+          {bottomLeft ? (
+            <span className="inline-flex min-h-6 items-center justify-center rounded-full bg-white/16 px-2.5 text-[10px] font-bold tracking-[0.02em] text-white backdrop-blur-[10px]">
+              {bottomLeft}
+            </span>
+          ) : <span />}
+          <span className="inline-flex min-h-6 items-center justify-center rounded-full bg-white/16 px-2.5 text-[10px] font-bold tracking-[0.02em] text-white backdrop-blur-[10px]">
+            {bottomRight}
+          </span>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CreatorWorkspacePreviewShortTile({ item }: { item: CreatorWorkspacePreviewShortItem }) {
+  return (
+    <CreatorWorkspacePreviewTileFrame
+      badge="Short"
+      bottomLeft={null}
+      bottomRight={formatDurationLabel(item.previewDurationSeconds)}
+      posterUrl={item.media.posterUrl}
+    />
+  );
+}
+
+function CreatorWorkspacePreviewMainTile({ item }: { item: CreatorWorkspacePreviewMainItem }) {
+  return (
+    <CreatorWorkspacePreviewTileFrame
+      badge="Main"
+      bottomLeft={formatJpy(item.priceJpy)}
+      bottomRight={formatDurationLabel(item.durationSeconds)}
+      posterUrl={item.media.posterUrl}
+    />
+  );
+}
+
+function CreatorWorkspacePreviewLoading() {
+  return (
+    <section className="mt-[18px]">
+      <p className="sr-only" role="status">
+        workspace video list を読み込んでいます...
+      </p>
+      <div className="grid grid-cols-3 gap-[3px]">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            aria-hidden="true"
+            className="aspect-[3/4] animate-pulse rounded-[4px] bg-[rgba(167,220,249,0.28)]"
+            key={index}
+          />
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function CreatorWorkspacePreviewError({
+  message,
+  onRetry,
+}: {
+  message: string;
+  onRetry: () => void;
+}) {
+  return (
+    <section className="mt-[18px] rounded-[20px] border border-[rgba(167,220,249,0.4)] bg-[#f8fbfd] px-4 py-4 text-foreground">
+      <p className="text-sm leading-6 text-muted" role="alert">
+        {message}
+      </p>
+      <div className="mt-3">
+        <Button onClick={onRetry} size="sm" type="button" variant="secondary">
+          再読み込み
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function CreatorWorkspacePreviewEmpty({ activeTabLabel }: { activeTabLabel: string }) {
+  return (
+    <section className="mt-[18px] rounded-[20px] border border-dashed border-[rgba(167,220,249,0.5)] bg-[#fbfdff] px-4 py-6 text-center text-sm leading-6 text-muted">
+      表示できる{activeTabLabel}動画はまだありません。
+    </section>
+  );
+}
+
+function CreatorWorkspacePreviewGrid({
+  activeTab,
+  activeTabLabel,
+  onRetry,
+  state,
+}: {
+  activeTab: ApprovedCreatorWorkspaceManagedTab;
+  activeTabLabel: string;
+  onRetry: () => void;
+  state: CreatorWorkspacePreviewCollectionsState;
+}) {
+  if (state.kind === "loading") {
+    return <CreatorWorkspacePreviewLoading />;
+  }
+
+  if (state.kind === "error") {
+    return <CreatorWorkspacePreviewError message={state.message} onRetry={onRetry} />;
+  }
+
+  const activeItems = activeTab === "shorts" ? state.collections.shorts.items : state.collections.mains.items;
+
+  if (activeItems.length === 0) {
+    return <CreatorWorkspacePreviewEmpty activeTabLabel={activeTabLabel} />;
+  }
+
+  return (
+    <section className="mt-[18px] grid grid-cols-3 gap-[3px]">
+      {activeTab === "shorts"
+        ? state.collections.shorts.items.map((item) => (
+            <CreatorWorkspacePreviewShortTile item={item} key={item.id} />
+          ))
+        : state.collections.mains.items.map((item) => (
+            <CreatorWorkspacePreviewMainTile item={item} key={item.id} />
+          ))}
+    </section>
   );
 }
 
@@ -841,7 +1009,9 @@ function CreatorWorkspaceDashboard({
   creator,
   onChangeTab,
   onOpenDetail,
+  onRetryPreviewCollections,
   onRetrySummary,
+  previewCollectionsState,
   summaryState,
   state,
 }: {
@@ -849,7 +1019,9 @@ function CreatorWorkspaceDashboard({
   creator: CreatorSummary;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailSelection) => void;
+  onRetryPreviewCollections: () => void;
   onRetrySummary: () => void;
+  previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
   summaryState: CreatorWorkspaceSummaryState;
   state: Extract<CreatorModeShellState, { kind: "ready" }>;
 }) {
@@ -862,7 +1034,8 @@ function CreatorWorkspaceDashboard({
       <CreatorWorkspaceManagedPosts
         activeTab={activeTab}
         onChangeTab={onChangeTab}
-        onOpenDetail={onOpenDetail}
+        onRetry={onRetryPreviewCollections}
+        state={previewCollectionsState}
         workspace={state.workspace}
       />
     </section>
@@ -871,13 +1044,19 @@ function CreatorWorkspaceDashboard({
 
 function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShellState, { kind: "ready" }> }) {
   const {
-    blockedState,
-    retry,
+    blockedState: summaryBlockedState,
+    retry: retrySummary,
     state: summaryState,
   } = useCreatorWorkspaceSummary();
+  const {
+    blockedState: previewBlockedState,
+    retry: retryPreviewCollections,
+    state: previewCollectionsState,
+  } = useCreatorWorkspacePreviewCollections();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailSelection | null>(null);
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
+  const blockedState = summaryBlockedState ?? previewBlockedState;
 
   if (blockedState) {
     return <CreatorShellBlockedState state={blockedState} />;
@@ -904,7 +1083,9 @@ function CreatorWorkspaceReadyState({ state }: { state: Extract<CreatorModeShell
             setActiveTab(selection.tab);
             setDetailSelection(selection);
           }}
-          onRetrySummary={retry}
+          onRetryPreviewCollections={retryPreviewCollections}
+          onRetrySummary={retrySummary}
+          previewCollectionsState={previewCollectionsState}
           summaryState={summaryState}
           state={state}
         />

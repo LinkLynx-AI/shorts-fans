@@ -33,23 +33,32 @@ type Workspace struct {
 	RevisionRequestedSummary *RevisionRequestedSummary
 }
 
-// GetWorkspace は current viewer 自身の creator workspace summary を返します。
-func (r *Repository) GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (Workspace, error) {
+func (r *Repository) getApprovedWorkspaceProfile(ctx context.Context, viewerUserID uuid.UUID) (Profile, error) {
 	capability, err := r.GetCapability(ctx, viewerUserID)
 	if err != nil {
 		if errors.Is(err, ErrCapabilityNotFound) {
-			return Workspace{}, fmt.Errorf("creator workspace 取得 user=%s: %w", viewerUserID, ErrCreatorModeUnavailable)
+			return Profile{}, fmt.Errorf("creator workspace 取得 user=%s: %w", viewerUserID, ErrCreatorModeUnavailable)
 		}
 
-		return Workspace{}, fmt.Errorf("creator workspace capability 取得 user=%s: %w", viewerUserID, err)
+		return Profile{}, fmt.Errorf("creator workspace capability 取得 user=%s: %w", viewerUserID, err)
 	}
 	if capability.State != "approved" {
-		return Workspace{}, fmt.Errorf("creator workspace 取得 user=%s capability_state=%s: %w", viewerUserID, capability.State, ErrCreatorModeUnavailable)
+		return Profile{}, fmt.Errorf("creator workspace 取得 user=%s capability_state=%s: %w", viewerUserID, capability.State, ErrCreatorModeUnavailable)
 	}
 
 	profile, err := r.GetProfile(ctx, viewerUserID)
 	if err != nil {
-		return Workspace{}, fmt.Errorf("creator workspace profile 取得 user=%s: %w", viewerUserID, err)
+		return Profile{}, fmt.Errorf("creator workspace profile 取得 user=%s: %w", viewerUserID, err)
+	}
+
+	return profile, nil
+}
+
+// GetWorkspace は current viewer 自身の creator workspace summary を返します。
+func (r *Repository) GetWorkspace(ctx context.Context, viewerUserID uuid.UUID) (Workspace, error) {
+	profile, err := r.getApprovedWorkspaceProfile(ctx, viewerUserID)
+	if err != nil {
+		return Workspace{}, err
 	}
 
 	overviewMetricsRow, err := r.queries.GetCreatorWorkspaceOverviewMetrics(ctx, postgres.UUIDToPG(viewerUserID))

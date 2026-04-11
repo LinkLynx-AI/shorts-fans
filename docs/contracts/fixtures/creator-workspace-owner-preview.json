@@ -8,11 +8,9 @@
             {
               "id": "short_aoi_balcony_cut",
               "canonicalMainId": "main_aoi_blue_balcony",
-              "title": "balcony cut preview",
               "media": {
                 "id": "asset_short_aoi_balcony_cut",
                 "kind": "video",
-                "url": "https://cdn.example.com/creator/preview/shorts/aoi-balcony.mp4",
                 "posterUrl": "https://cdn.example.com/creator/preview/shorts/aoi-balcony-poster.jpg",
                 "durationSeconds": 15
               },
@@ -40,11 +38,9 @@
             {
               "id": "main_aoi_blue_balcony",
               "leadShortId": "short_aoi_balcony_cut",
-              "title": "blue balcony main",
               "media": {
                 "id": "asset_main_aoi_blue_balcony_preview",
                 "kind": "video",
-                "url": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony.mp4",
                 "posterUrl": "https://cdn.example.com/creator/preview/mains/aoi-blue-balcony-poster.jpg",
                 "durationSeconds": 720
               },

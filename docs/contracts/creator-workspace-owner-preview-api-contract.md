@@ -37,14 +37,22 @@
 
 ## Surface-specific Payloads
 
+### `PreviewCardVideoAsset`
+
+| field | type | notes |
+| --- | --- | --- |
+| `id` | `string` | asset identifier |
+| `kind` | `"video"` | video 固定 |
+| `posterUrl` | `string` | preview card 表示用 poster |
+| `durationSeconds` | `number` | rounded-up seconds |
+
 ### `WorkspacePreviewShortItem`
 
 | field | type | notes |
 | --- | --- | --- |
 | `id` | `string` | short identifier |
 | `canonicalMainId` | `string` | linked canonical main |
-| `title` | `string` | owner preview list title |
-| `media` | `VideoDisplayAsset` | poster を含む preview asset |
+| `media` | `PreviewCardVideoAsset` | poster-only preview asset |
 | `previewDurationSeconds` | `number` | short length |
 
 ### `WorkspacePreviewMainItem`
@@ -53,8 +61,7 @@
 | --- | --- | --- |
 | `id` | `string` | main identifier |
 | `leadShortId` | `string` | preview card の lead short context |
-| `title` | `string` | owner preview list title |
-| `media` | `VideoDisplayAsset` | poster を含む preview asset |
+| `media` | `PreviewCardVideoAsset` | poster-only preview asset |
 | `durationSeconds` | `number` | main length |
 | `priceJpy` | `number` | reference price |
 
@@ -128,6 +135,7 @@
 - caller は authenticated viewer である必要があります。
 - caller は approved creator capability を持つ必要があります。
 - caller は preview 対象の owner 自身である必要があります。
+- list endpoint は `delivery-ready` な owner 自身の `short` / `main` を返し、public publish / unlock state とは独立に判定して構いません。
 - owner preview では `MainAccessState.reason = owner_preview` を使い、`unlocked` と混ぜません。
 - list endpoint は poster 中心の preview card を返し、detail endpoint だけ full playback 用 `url` を返します。
 
