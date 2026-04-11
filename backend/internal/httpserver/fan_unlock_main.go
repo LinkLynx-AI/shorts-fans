@@ -20,7 +20,7 @@ const (
 	fanShortUnlockRequestScope     = "fan_short_unlock"
 	fanMainAccessEntryRequestScope = "fan_main_access_entry"
 	fanMainPlaybackRequestScope    = "fan_main_playback"
-	fanMainAuthRequiredMessage     = "main playback requires authentication"
+	fanMainAuthRequiredMessage     = "authentication required"
 )
 
 type unlockSurfaceResponseData struct {

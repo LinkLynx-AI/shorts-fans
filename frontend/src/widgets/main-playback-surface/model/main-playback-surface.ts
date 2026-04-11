@@ -6,7 +6,6 @@ export type MainPlaybackSurfaceMain = {
   durationSeconds: number;
   id: string;
   media: MainMediaAsset;
-  priceJpy: number;
 };
 
 export type MainPlaybackSurface = {
@@ -17,7 +16,7 @@ export type MainPlaybackSurface = {
   resumePositionSeconds: number | null;
   themeShort: UnlockSurfaceModel["short"];
   viewer: {
-    isPinned: boolean;
+    isPinned: boolean | null;
   };
 };
 

@@ -75,13 +75,12 @@ describe("requestMainPlaybackSurface", () => {
       },
       main: {
         id: "main_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        priceJpy: 0,
       },
       themeShort: {
         id: "short_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
       },
       viewer: {
-        isPinned: false,
+        isPinned: null,
       },
     });
 

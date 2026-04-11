@@ -24,7 +24,6 @@ const playbackMainSchema = z.object({
   durationSeconds: z.number().int().positive(),
   id: z.string().min(1),
   media: mainMediaSchema,
-  priceJpy: z.number().int().positive(),
 });
 
 const mediaSchema = z.object({
@@ -170,7 +169,6 @@ export function getMainPlaybackSurfaceById(
       durationSeconds: main.durationSeconds,
       id: main.id,
       media: main.media,
-      priceJpy: main.priceJpy,
     },
     resumePositionSeconds: playbackState.resumePositionSeconds,
     themeShort,

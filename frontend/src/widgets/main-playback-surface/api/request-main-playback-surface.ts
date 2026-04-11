@@ -85,14 +85,11 @@ export async function requestMainPlaybackSurface({
     access: response.data.access,
     creator: response.data.creator,
     entryShort: response.data.entryShort,
-    main: {
-      ...response.data.main,
-      priceJpy: 0,
-    },
+    main: response.data.main,
     resumePositionSeconds: response.data.resumePositionSeconds,
     themeShort: response.data.entryShort,
     viewer: {
-      isPinned: false,
+      isPinned: null,
     },
   };
 }
