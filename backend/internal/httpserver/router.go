@@ -130,6 +130,11 @@ type FanProfilePinnedShortsReader interface {
 	ListPinnedShorts(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.PinnedShortCursor, limit int) ([]fanprofile.PinnedShortItem, *fanprofile.PinnedShortCursor, error)
 }
 
+// FanProfileLibraryReader は fan profile library 用の read 操作を表します。
+type FanProfileLibraryReader interface {
+	ListLibrary(ctx context.Context, viewerID uuid.UUID, cursor *fanprofile.LibraryCursor, limit int) ([]fanprofile.LibraryItem, *fanprofile.LibraryCursor, error)
+}
+
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv                    string
@@ -145,6 +150,7 @@ type HandlerConfig struct {
 	CreatorFollow             CreatorFollowWriter
 	CreatorAvatarUpload       ViewerCreatorAvatarUploadHandler
 	CreatorRegistration       ViewerCreatorRegistrationWriter
+	FanProfileLibrary         FanProfileLibraryReader
 	FanProfileFollowing       FanProfileFollowingReader
 	FanProfilePinnedShorts    FanProfilePinnedShortsReader
 	FanProfileOverview        FanProfileOverviewReader
@@ -211,7 +217,15 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	}
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
-	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.FanProfilePinnedShorts, config.ShortDisplayAssets, config.ViewerBootstrap)
+	registerFanProfileRoutes(
+		router,
+		config.FanProfileOverview,
+		config.FanProfileFollowing,
+		config.FanProfilePinnedShorts,
+		config.FanProfileLibrary,
+		config.ShortDisplayAssets,
+		config.ViewerBootstrap,
+	)
 	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.CreatorWorkspaceMainPrice, config.ViewerBootstrap)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)

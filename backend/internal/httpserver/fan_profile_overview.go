@@ -36,6 +36,7 @@ func registerFanProfileRoutes(
 	overviewReader FanProfileOverviewReader,
 	followingReader FanProfileFollowingReader,
 	pinnedShortsReader FanProfilePinnedShortsReader,
+	libraryReader FanProfileLibraryReader,
 	shortDisplayAssets ShortDisplayAssetResolver,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
@@ -69,6 +70,16 @@ func registerFanProfileRoutes(
 			buildProtectedFanAuthGuard(viewerBootstrap, fanProfilePinnedShortsRequestScope, fanProfileAuthRequiredMessage),
 			func(c *gin.Context) {
 				handleFanProfilePinnedShorts(c, pinnedShortsReader, shortDisplayAssets)
+			},
+		)
+	}
+
+	if libraryReader != nil && shortDisplayAssets != nil {
+		router.GET(
+			"/api/fan/profile/library",
+			buildProtectedFanAuthGuard(viewerBootstrap, fanProfileLibraryRequestScope, fanProfileAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleFanProfileLibrary(c, libraryReader, shortDisplayAssets)
 			},
 		)
 	}

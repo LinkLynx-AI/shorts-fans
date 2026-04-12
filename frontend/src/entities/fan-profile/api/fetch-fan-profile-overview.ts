@@ -1,8 +1,8 @@
 import { z } from "zod";
 
 import { requestJson } from "@/shared/api";
-import { viewerSessionCookieName } from "@/entities/viewer";
 
+import { buildFanProfileRequestHeaders } from "./shared";
 import type { FanProfileOverview } from "../model/fan-profile";
 
 const fanProfileOverviewResponseSchema = z.object({
@@ -37,18 +37,12 @@ export async function fetchFanProfileOverview({
   fetcher,
   sessionToken,
 }: FetchFanProfileOverviewOptions = {}): Promise<FanProfileOverview> {
-  const headers = new Headers();
-
-  if (sessionToken) {
-    headers.set("Cookie", `${viewerSessionCookieName}=${sessionToken}`);
-  }
-
   const response = await requestJson({
     ...(baseUrl ? { baseUrl } : {}),
     ...(fetcher ? { fetcher } : {}),
     init: {
       cache: "no-store",
-      headers,
+      headers: buildFanProfileRequestHeaders(sessionToken),
     },
     path: "/api/fan/profile",
     schema: fanProfileOverviewResponseSchema,
