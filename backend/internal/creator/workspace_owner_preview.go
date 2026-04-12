@@ -160,7 +160,7 @@ func (r *Repository) GetWorkspacePreviewMainDetail(
 		return WorkspacePreviewMainDetail{}, fmt.Errorf("creator workspace main preview detail 取得 user=%s main=%s: delivery is nil", viewerUserID, mainID)
 	}
 
-	mainRows, err := r.queries.ListMainsByCreatorUserID(ctx, postgres.UUIDToPG(viewerUserID))
+	mainRows, err := r.queries.ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx, postgres.UUIDToPG(viewerUserID))
 	if err != nil {
 		return WorkspacePreviewMainDetail{}, fmt.Errorf("creator workspace main preview detail 取得 user=%s main=%s: %w", viewerUserID, mainID, err)
 	}
@@ -169,12 +169,25 @@ func (r *Repository) GetWorkspacePreviewMainDetail(
 	var mainSummary WorkspacePreviewMainSummary
 	mainFound := false
 	for _, row := range mainRows {
-		summary, ok, buildErr := r.buildWorkspacePreviewMainSummary(ctx, row, assetCache)
+		rowMainID, parseErr := postgres.UUIDFromPG(row.ID)
+		if parseErr != nil {
+			return WorkspacePreviewMainDetail{}, fmt.Errorf(
+				"creator workspace main preview detail 取得 user=%s main=%s main id 変換: %w",
+				viewerUserID,
+				mainID,
+				parseErr,
+			)
+		}
+		if rowMainID != mainID {
+			continue
+		}
+
+		summary, ok, buildErr := r.buildWorkspacePreviewMainSummary(ctx, workspacePreviewMainRowToRecord(row), assetCache)
 		if buildErr != nil {
 			return WorkspacePreviewMainDetail{}, fmt.Errorf("creator workspace main preview detail 取得 user=%s main=%s: %w", viewerUserID, mainID, buildErr)
 		}
-		if !ok || summary.ID != mainID {
-			continue
+		if !ok {
+			break
 		}
 
 		mainSummary = summary
@@ -645,6 +658,24 @@ func (r *Repository) buildWorkspacePreviewMainSummary(
 		Media:           displayAsset,
 		PriceJpy:        row.PriceMinor,
 	}, true, nil
+}
+
+func workspacePreviewMainRowToRecord(row sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow) sqlc.AppMain {
+	return sqlc.AppMain{
+		ID:                  row.ID,
+		CreatorUserID:       row.CreatorUserID,
+		MediaAssetID:        row.MediaAssetID,
+		State:               row.State,
+		ReviewReasonCode:    row.ReviewReasonCode,
+		PostReportState:     row.PostReportState,
+		PriceMinor:          row.PriceMinor,
+		CurrencyCode:        row.CurrencyCode,
+		OwnershipConfirmed:  row.OwnershipConfirmed,
+		ConsentConfirmed:    row.ConsentConfirmed,
+		ApprovedForUnlockAt: row.ApprovedForUnlockAt,
+		CreatedAt:           row.CreatedAt,
+		UpdatedAt:           row.UpdatedAt,
+	}
 }
 
 func workspacePreviewAssetReady(asset sqlc.AppMediaAsset) bool {

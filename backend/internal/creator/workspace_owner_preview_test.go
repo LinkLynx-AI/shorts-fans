@@ -412,10 +412,14 @@ func TestGetWorkspacePreviewMainDetail(t *testing.T) {
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
-			return []sqlc.AppMain{
-				testWorkspacePreviewMainRecord(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+		listWorkspacePreviewMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+			return []sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
+				testWorkspacePreviewMainRow(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
 			}, nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			t.Fatal("ListMainsByCreatorUserID() should not be called")
+			return nil, nil
 		},
 		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
 			return []sqlc.AppShort{
@@ -468,10 +472,14 @@ func TestGetWorkspacePreviewMainDetailReturnsNotFoundWhenMainMissing(t *testing.
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
-			return []sqlc.AppMain{
-				testWorkspacePreviewMainRecord(otherMainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+		listWorkspacePreviewMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+			return []sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
+				testWorkspacePreviewMainRow(otherMainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
 			}, nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			t.Fatal("ListMainsByCreatorUserID() should not be called")
+			return nil, nil
 		},
 	})
 	repo.delivery = delivery
@@ -500,10 +508,14 @@ func TestGetWorkspacePreviewMainDetailReturnsNotFoundWithoutPreviewableEntryShor
 		getProfile: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
 			return testProfileRow(viewerUserID, now, stringPtr("Mina Rei"), stringPtr("minarei"), nil, nil), nil
 		},
-		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
-			return []sqlc.AppMain{
-				testWorkspacePreviewMainRecord(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
+		listWorkspacePreviewMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error) {
+			return []sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow{
+				testWorkspacePreviewMainRow(mainID, viewerUserID, mainAssetID, now, "approved_for_unlock", 1800, workspacePreviewCurrencyCode),
 			}, nil
+		},
+		listMainsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error) {
+			t.Fatal("ListMainsByCreatorUserID() should not be called")
+			return nil, nil
 		},
 		listShortsByCreator: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
 			return []sqlc.AppShort{
