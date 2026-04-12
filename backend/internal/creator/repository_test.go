@@ -44,6 +44,10 @@ func (s stubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(context.Con
 	return nil, nil
 }
 
+func (s stubQueries) UpdateCreatorWorkspaceMainPrice(context.Context, sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.UpdateCreatorWorkspaceMainPriceRow, error) {
+	return sqlc.UpdateCreatorWorkspaceMainPriceRow{}, nil
+}
+
 func (s stubQueries) GetCreatorWorkspaceRevisionRequestedSummary(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {
 	return sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow{}, nil
 }

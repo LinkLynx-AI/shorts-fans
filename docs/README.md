@@ -21,6 +21,7 @@
 - [contracts/viewer-creator-entry-api-contract.md](contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [contracts/creator-workspace-api-contract.md](contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
 - [contracts/creator-workspace-owner-preview-api-contract.md](contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail の read 契約
+- [contracts/creator-workspace-main-price-api-contract.md](contracts/creator-workspace-main-price-api-contract.md): creator owner が本編価格を変更する private mutation 契約
 - [contracts/creator-upload-api-contract.md](contracts/creator-upload-api-contract.md): creator-private な new-package upload の initiation / completion 契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約

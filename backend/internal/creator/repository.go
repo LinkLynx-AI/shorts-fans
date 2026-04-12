@@ -38,6 +38,7 @@ type queries interface {
 	ListCreatorWorkspaceTopMainCandidatesByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error)
 	ListCreatorWorkspaceTopShortCandidatesByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error)
 	ListCreatorWorkspacePreviewMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
+	UpdateCreatorWorkspaceMainPrice(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.UpdateCreatorWorkspaceMainPriceRow, error)
 	GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error)
 	GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)

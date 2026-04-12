@@ -1,10 +1,12 @@
 package httpserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -17,13 +19,14 @@ import (
 )
 
 const (
-	creatorWorkspaceAuthRequiredMessage     = "creator workspace requires authentication"
-	creatorWorkspaceMainDetailRequestScope  = "creator_workspace_main_preview_detail"
-	creatorWorkspaceMainListRequestScope    = "creator_workspace_mains"
-	creatorWorkspaceRequestScope            = "creator_workspace"
-	creatorWorkspaceShortDetailRequestScope = "creator_workspace_short_preview_detail"
-	creatorWorkspaceShortListRequestScope   = "creator_workspace_shorts"
-	creatorWorkspaceTopPerformersScope      = "creator_workspace_top_performers"
+	creatorWorkspaceAuthRequiredMessage         = "creator workspace requires authentication"
+	creatorWorkspaceMainDetailRequestScope      = "creator_workspace_main_preview_detail"
+	creatorWorkspaceMainListRequestScope        = "creator_workspace_mains"
+	creatorWorkspaceMainPriceUpdateRequestScope = "creator_workspace_main_price_update"
+	creatorWorkspaceRequestScope                = "creator_workspace"
+	creatorWorkspaceShortDetailRequestScope     = "creator_workspace_short_preview_detail"
+	creatorWorkspaceShortListRequestScope       = "creator_workspace_shorts"
+	creatorWorkspaceTopPerformersScope          = "creator_workspace_top_performers"
 )
 
 type creatorWorkspaceResponseData struct {
@@ -66,6 +69,19 @@ type creatorWorkspacePreviewMainDetailResponseData struct {
 
 type creatorWorkspaceTopPerformersResponseData struct {
 	TopPerformers creatorWorkspaceTopPerformersPayload `json:"topPerformers"`
+}
+
+type creatorWorkspaceMainPriceUpdateRequest struct {
+	PriceJpy json.RawMessage `json:"priceJpy"`
+}
+
+type creatorWorkspaceMainPriceUpdateResponseData struct {
+	Main creatorWorkspaceMainPricePayload `json:"main"`
+}
+
+type creatorWorkspaceMainPricePayload struct {
+	ID       string `json:"id"`
+	PriceJpy int64  `json:"priceJpy"`
 }
 
 type creatorWorkspaceTopPerformersPayload struct {
@@ -151,6 +167,7 @@ type creatorWorkspacePreviewCursorPayload struct {
 func registerCreatorWorkspaceRoutes(
 	router gin.IRouter,
 	reader CreatorWorkspaceReader,
+	writer CreatorWorkspaceMainPriceWriter,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	if router == nil || reader == nil || viewerBootstrap == nil {
@@ -199,6 +216,15 @@ func registerCreatorWorkspaceRoutes(
 			handleCreatorWorkspaceTopPerformers(c, reader)
 		},
 	)
+	if writer != nil {
+		router.PUT(
+			"/api/creator/workspace/mains/:mainId/price",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainPriceUpdateRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceMainPriceUpdate(c, writer)
+			},
+		)
+	}
 }
 
 func handleCreatorWorkspace(c *gin.Context, reader CreatorWorkspaceReader) {
@@ -450,6 +476,134 @@ func handleCreatorWorkspaceTopPerformers(c *gin.Context, reader CreatorWorkspace
 	})
 }
 
+func handleCreatorWorkspaceMainPriceUpdate(c *gin.Context, writer CreatorWorkspaceMainPriceWriter) {
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusInternalServerError,
+			"internal_error",
+			"creator workspace main price could not be updated",
+		)
+		return
+	}
+
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusNotFound,
+			"not_found",
+			"creator workspace main was not found",
+		)
+		return
+	}
+
+	var request creatorWorkspaceMainPriceUpdateRequest
+	if !decodeCreatorWorkspaceJSON(c, &request, "creator workspace main price request is invalid", creatorWorkspaceMainPriceUpdateRequestScope) {
+		return
+	}
+
+	priceJpy, err := parseCreatorWorkspaceMainPriceJpy(request.PriceJpy)
+	if err != nil {
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusUnprocessableEntity,
+			"validation_error",
+			"priceJpy must be a positive integer",
+		)
+		return
+	}
+
+	result, err := writer.UpdateWorkspaceMainPrice(c.Request.Context(), viewerUserID, mainID, priceJpy)
+	if err != nil {
+		switch {
+		case errors.Is(err, creator.ErrInvalidWorkspaceMainPrice):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusUnprocessableEntity,
+				"validation_error",
+				"priceJpy must be a positive integer",
+			)
+			return
+		case errors.Is(err, creator.ErrCreatorModeUnavailable):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusForbidden,
+				"creator_mode_unavailable",
+				"creator mode is not available",
+			)
+			return
+		case errors.Is(err, creator.ErrProfileNotFound), errors.Is(err, creator.ErrWorkspaceMainNotFound):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusNotFound,
+				"not_found",
+				"creator workspace main was not found",
+			)
+			return
+		default:
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusInternalServerError,
+				"internal_error",
+				"creator workspace main price could not be updated",
+			)
+			return
+		}
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceMainPriceUpdateResponseData]{
+		Data: &creatorWorkspaceMainPriceUpdateResponseData{
+			Main: creatorWorkspaceMainPricePayload{
+				ID:       mainPublicID(result.ID),
+				PriceJpy: result.PriceJpy,
+			},
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceMainPriceUpdateRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
+func parseCreatorWorkspaceMainPriceJpy(raw json.RawMessage) (int64, error) {
+	if len(raw) == 0 {
+		return 0, creator.ErrInvalidWorkspaceMainPrice
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.UseNumber()
+
+	var value json.Number
+	if err := decoder.Decode(&value); err != nil {
+		return 0, creator.ErrInvalidWorkspaceMainPrice
+	}
+
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
+		return 0, creator.ErrInvalidWorkspaceMainPrice
+	}
+	if len(extra) > 0 {
+		return 0, creator.ErrInvalidWorkspaceMainPrice
+	}
+
+	priceJpy, err := value.Int64()
+	if err != nil || priceJpy <= 0 {
+		return 0, creator.ErrInvalidWorkspaceMainPrice
+	}
+
+	return priceJpy, nil
+}
+
 func buildCreatorWorkspacePreviewShortItem(item creator.WorkspacePreviewShortItem) (creatorWorkspacePreviewShortItem, error) {
 	mediaPayload := buildCreatorWorkspacePreviewMediaAssetPayload(item.Media)
 
@@ -602,6 +756,20 @@ func writeCreatorWorkspaceListError(c *gin.Context, requestScope string, status 
 	})
 }
 
+func writeCreatorWorkspaceMutationError(c *gin.Context, requestScope string, status int, code string, message string) {
+	c.JSON(status, responseEnvelope[struct{}]{
+		Data: nil,
+		Meta: responseMeta{
+			RequestID: newRequestID(requestScope),
+			Page:      nil,
+		},
+		Error: &responseError{
+			Code:    code,
+			Message: message,
+		},
+	})
+}
+
 func writeCreatorWorkspaceError(c *gin.Context, status int, code string, message string) {
 	c.JSON(status, responseEnvelope[struct{}]{
 		Data: nil,
@@ -614,6 +782,27 @@ func writeCreatorWorkspaceError(c *gin.Context, status int, code string, message
 			Message: message,
 		},
 	})
+}
+
+func decodeCreatorWorkspaceJSON[T any](c *gin.Context, target *T, message string, requestScope string) bool {
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
+		return false
+	}
+
+	var extra json.RawMessage
+	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
+		return false
+	}
+	if len(extra) > 0 {
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
+		return false
+	}
+
+	return true
 }
 
 // CreatorWorkspaceReader は creator private workspace summary 用の read 操作を表します。

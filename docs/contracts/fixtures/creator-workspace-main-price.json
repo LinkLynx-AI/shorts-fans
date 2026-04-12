@@ -1,0 +1,48 @@
+{
+  "PUT /api/creator/workspace/mains/{mainId}/price": {
+    "updated": {
+      "status": 200,
+      "body": {
+        "data": {
+          "main": {
+            "id": "main_aoi_blue_balcony",
+            "priceJpy": 2400
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_main_price_update_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "validation_error": {
+      "status": 422,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_main_price_update_002",
+          "page": null
+        },
+        "error": {
+          "code": "validation_error",
+          "message": "priceJpy must be a positive integer"
+        }
+      }
+    },
+    "invalid_request": {
+      "status": 400,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_creator_workspace_main_price_update_003",
+          "page": null
+        },
+        "error": {
+          "code": "invalid_request",
+          "message": "creator workspace main price request is invalid"
+        }
+      }
+    }
+  }
+}

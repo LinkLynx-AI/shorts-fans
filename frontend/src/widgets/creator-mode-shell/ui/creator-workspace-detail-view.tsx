@@ -72,9 +72,16 @@ function CreatorWorkspaceActionButton({
 }
 
 type CreatorWorkspacePostActionMenuItem = {
+  action?: "change-price";
   label: string;
   tone?: "danger" | "default";
 };
+
+function canChangeCreatorWorkspaceMainPrice(
+  detailSelection: CreatorWorkspaceDetailViewSelection,
+): detailSelection is Extract<CreatorWorkspaceDetailViewSelection, { kind: "preview-main" }> {
+  return detailSelection.kind === "preview-main";
+}
 
 function resolveCreatorWorkspacePostActionMenu(
   detailSelection: CreatorWorkspaceDetailViewSelection,
@@ -97,13 +104,18 @@ function resolveCreatorWorkspacePostActionMenu(
     };
   }
 
+  const items: CreatorWorkspacePostActionMenuItem[] = [
+    { label: "非公開" },
+    { label: "削除", tone: "danger" },
+  ];
+
+  if (canChangeCreatorWorkspaceMainPrice(detailSelection)) {
+    items.unshift({ action: "change-price", label: "priceの変更" });
+  }
+
   return {
     description: "creator workspace で本編投稿の操作を選ぶメニュー",
-    items: [
-      { label: "priceの変更" },
-      { label: "非公開" },
-      { label: "削除", tone: "danger" },
-    ],
+    items,
   };
 }
 
@@ -423,6 +435,7 @@ export function CreatorWorkspaceDetailView({
   detailSelection,
   onBack,
   onOpenDetail,
+  onOpenMainPriceDialog,
   onRetryPreviewDetail,
   previewDetailState,
   previewCollections,
@@ -432,6 +445,7 @@ export function CreatorWorkspaceDetailView({
   detailSelection: CreatorWorkspaceDetailViewSelection;
   onBack: () => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
+  onOpenMainPriceDialog: (selection: Extract<CreatorWorkspaceDetailViewSelection, { kind: "preview-main" }>) => void;
   onRetryPreviewDetail: () => void;
   previewDetailState: CreatorWorkspacePreviewDetailState;
   previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
@@ -501,6 +515,11 @@ export function CreatorWorkspaceDetailView({
             {postActionMenu.items.map((item, index) => (
               <BottomSheetMenuClose asChild key={item.label}>
                 <BottomSheetMenuAction
+                  onClick={() => {
+                    if (item.action === "change-price" && canChangeCreatorWorkspaceMainPrice(detailSelection)) {
+                      onOpenMainPriceDialog(detailSelection);
+                    }
+                  }}
                   {...(item.tone ? { tone: item.tone } : {})}
                   withDivider={index > 0}
                 >
