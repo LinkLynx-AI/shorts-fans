@@ -77,6 +77,12 @@ type CreatorWorkspacePostActionMenuItem = {
   tone?: "danger" | "default";
 };
 
+function canChangeCreatorWorkspaceMainPrice(
+  detailSelection: CreatorWorkspaceDetailViewSelection,
+): detailSelection is Extract<CreatorWorkspaceDetailViewSelection, { kind: "preview-main" }> {
+  return detailSelection.kind === "preview-main";
+}
+
 function resolveCreatorWorkspacePostActionMenu(
   detailSelection: CreatorWorkspaceDetailViewSelection,
 ): {
@@ -98,13 +104,18 @@ function resolveCreatorWorkspacePostActionMenu(
     };
   }
 
+  const items: CreatorWorkspacePostActionMenuItem[] = [
+    { label: "非公開" },
+    { label: "削除", tone: "danger" },
+  ];
+
+  if (canChangeCreatorWorkspaceMainPrice(detailSelection)) {
+    items.unshift({ action: "change-price", label: "priceの変更" });
+  }
+
   return {
     description: "creator workspace で本編投稿の操作を選ぶメニュー",
-    items: [
-      { action: "change-price", label: "priceの変更" },
-      { label: "非公開" },
-      { label: "削除", tone: "danger" },
-    ],
+    items,
   };
 }
 
@@ -505,7 +516,7 @@ export function CreatorWorkspaceDetailView({
               <BottomSheetMenuClose asChild key={item.label}>
                 <BottomSheetMenuAction
                   onClick={() => {
-                    if (item.action === "change-price" && detailSelection.kind === "preview-main") {
+                    if (item.action === "change-price" && canChangeCreatorWorkspaceMainPrice(detailSelection)) {
                       onOpenMainPriceDialog(detailSelection);
                     }
                   }}

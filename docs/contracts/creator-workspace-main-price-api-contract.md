@@ -67,6 +67,7 @@
 
 | status | code | notes |
 | --- | --- | --- |
+| `400` | `invalid_request` | malformed JSON、unknown field、または request body shape が不正 |
 | `401` | `auth_required` | session 不在 |
 | `403` | `creator_mode_unavailable` | approved creator capability なし |
 | `404` | `not_found` | owner 自身の更新対象 `main` を解決できない |

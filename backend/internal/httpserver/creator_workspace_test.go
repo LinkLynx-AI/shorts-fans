@@ -14,6 +14,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -1506,6 +1507,227 @@ func TestCreatorWorkspaceMainPriceUpdateRouteRejectsInvalidJSON(t *testing.T) {
 	}
 	if response.Error.Message != "creator workspace main price request is invalid" {
 		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "creator workspace main price request is invalid")
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteRejectsUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+				writerCalled = true
+				return creator.WorkspaceMainPrice{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("7d7d7d7d-7d7d-7d7d-7d7d-7d7d7d7d7d7d"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("8e8e8e8e-8e8e-8e8e-8e8e-8e8e8e8e8e8e"))+"/price",
+		strings.NewReader(`{"priceJpy":2400,"unexpected":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceMainPrice() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "invalid_request" {
+		t.Fatalf("response.Error got %#v want invalid_request", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_price_update_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace main price update prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteRejectsInvalidMainID(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+				writerCalled = true
+				return creator.WorkspaceMainPrice{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("9f9f9f9f-9f9f-9f9f-9f9f-9f9f9f9f9f9f"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/not-a-public-main-id/price",
+		strings.NewReader(`{"priceJpy":2400}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceMainPrice() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteMapsWriterErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{
+			name:       "creator mode unavailable",
+			err:        creator.ErrCreatorModeUnavailable,
+			wantCode:   "creator_mode_unavailable",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "workspace main not found",
+			err:        creator.ErrWorkspaceMainNotFound,
+			wantCode:   "not_found",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "unexpected failure",
+			err:        errors.New("boom"),
+			wantCode:   "internal_error",
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewHandler(HandlerConfig{
+				CreatorWorkspace: stubCreatorWorkspaceReader{},
+				CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+					updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+						return creator.WorkspaceMainPrice{}, tt.err
+					},
+				},
+				ViewerBootstrap: viewerBootstrapReaderStub{
+					readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+						return auth.Bootstrap{
+							CurrentViewer: &auth.CurrentViewer{
+								CanAccessCreatorMode: true,
+								ID:                   uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+							},
+						}, nil
+					},
+				},
+			})
+
+			req := httptest.NewRequest(
+				http.MethodPut,
+				"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"))+"/price",
+				strings.NewReader(`{"priceJpy":2400}`),
+			)
+			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, tt.wantStatus)
+			}
+
+			var response responseEnvelope[struct{}]
+			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+			}
+			if response.Error == nil || response.Error.Code != tt.wantCode {
+				t.Fatalf("response.Error got %#v want %q", response.Error, tt.wantCode)
+			}
+			if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_price_update_") {
+				t.Fatalf("response.Meta.RequestID got %q want creator workspace main price update prefix", response.Meta.RequestID)
+			}
+		})
+	}
+}
+
+func TestHandleCreatorWorkspaceMainPriceUpdateReturnsInternalErrorWithoutAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc"))+"/price",
+		strings.NewReader(`{"priceJpy":2400}`),
+	)
+	ctx.Params = gin.Params{
+		{
+			Key:   "mainId",
+			Value: mainPublicID(uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")),
+		},
+	}
+
+	handleCreatorWorkspaceMainPriceUpdate(ctx, stubCreatorWorkspaceMainPriceWriter{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("handleCreatorWorkspaceMainPriceUpdate() status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_price_update_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace main price update prefix", response.Meta.RequestID)
 	}
 }
 

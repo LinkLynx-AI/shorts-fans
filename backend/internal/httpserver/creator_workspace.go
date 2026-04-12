@@ -479,13 +479,25 @@ func handleCreatorWorkspaceTopPerformers(c *gin.Context, reader CreatorWorkspace
 func handleCreatorWorkspaceMainPriceUpdate(c *gin.Context, writer CreatorWorkspaceMainPriceWriter) {
 	viewerUserID, ok := authenticatedViewerIDFromContext(c)
 	if !ok {
-		writeCreatorWorkspaceMutationError(c, http.StatusInternalServerError, "internal_error", "creator workspace main price could not be updated")
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusInternalServerError,
+			"internal_error",
+			"creator workspace main price could not be updated",
+		)
 		return
 	}
 
 	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
 	if err != nil {
-		writeCreatorWorkspaceMutationError(c, http.StatusNotFound, "not_found", "creator workspace main was not found")
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusNotFound,
+			"not_found",
+			"creator workspace main was not found",
+		)
 		return
 	}
 
@@ -496,7 +508,13 @@ func handleCreatorWorkspaceMainPriceUpdate(c *gin.Context, writer CreatorWorkspa
 
 	priceJpy, err := parseCreatorWorkspaceMainPriceJpy(request.PriceJpy)
 	if err != nil {
-		writeCreatorWorkspaceMutationError(c, http.StatusUnprocessableEntity, "validation_error", "priceJpy must be a positive integer")
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceMainPriceUpdateRequestScope,
+			http.StatusUnprocessableEntity,
+			"validation_error",
+			"priceJpy must be a positive integer",
+		)
 		return
 	}
 
@@ -504,16 +522,40 @@ func handleCreatorWorkspaceMainPriceUpdate(c *gin.Context, writer CreatorWorkspa
 	if err != nil {
 		switch {
 		case errors.Is(err, creator.ErrInvalidWorkspaceMainPrice):
-			writeCreatorWorkspaceMutationError(c, http.StatusUnprocessableEntity, "validation_error", "priceJpy must be a positive integer")
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusUnprocessableEntity,
+				"validation_error",
+				"priceJpy must be a positive integer",
+			)
 			return
 		case errors.Is(err, creator.ErrCreatorModeUnavailable):
-			writeCreatorWorkspaceMutationError(c, http.StatusForbidden, "creator_mode_unavailable", "creator mode is not available")
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusForbidden,
+				"creator_mode_unavailable",
+				"creator mode is not available",
+			)
 			return
 		case errors.Is(err, creator.ErrProfileNotFound), errors.Is(err, creator.ErrWorkspaceMainNotFound):
-			writeCreatorWorkspaceMutationError(c, http.StatusNotFound, "not_found", "creator workspace main was not found")
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusNotFound,
+				"not_found",
+				"creator workspace main was not found",
+			)
 			return
 		default:
-			writeCreatorWorkspaceMutationError(c, http.StatusInternalServerError, "internal_error", "creator workspace main price could not be updated")
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceMainPriceUpdateRequestScope,
+				http.StatusInternalServerError,
+				"internal_error",
+				"creator workspace main price could not be updated",
+			)
 			return
 		}
 	}
@@ -714,11 +756,11 @@ func writeCreatorWorkspaceListError(c *gin.Context, requestScope string, status 
 	})
 }
 
-func writeCreatorWorkspaceMutationError(c *gin.Context, status int, code string, message string) {
+func writeCreatorWorkspaceMutationError(c *gin.Context, requestScope string, status int, code string, message string) {
 	c.JSON(status, responseEnvelope[struct{}]{
 		Data: nil,
 		Meta: responseMeta{
-			RequestID: newRequestID(creatorWorkspaceMainPriceUpdateRequestScope),
+			RequestID: newRequestID(requestScope),
 			Page:      nil,
 		},
 		Error: &responseError{

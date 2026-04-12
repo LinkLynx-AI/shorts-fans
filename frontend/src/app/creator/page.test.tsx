@@ -22,6 +22,7 @@ import {
   CreatorModeShell,
   getMockCreatorModeShellState,
 } from "@/widgets/creator-mode-shell";
+import { CreatorWorkspaceDetailView } from "@/widgets/creator-mode-shell/ui/creator-workspace-detail-view";
 
 import CreatorPage from "./page";
 
@@ -756,6 +757,31 @@ describe("CreatorPage", () => {
     });
     expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
     expect(mockedRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("omits the price action from mock main details", async () => {
+    const user = userEvent.setup();
+    const state = getMockCreatorModeShellState();
+
+    render(
+      <CreatorWorkspaceDetailView
+        creator={state.creator}
+        detailSelection={{ kind: "mock", shortId: "short_quiet_rooftop", tab: "main" }}
+        onBack={() => {}}
+        onOpenDetail={() => {}}
+        onOpenMainPriceDialog={() => {}}
+        onRetryPreviewDetail={() => {}}
+        previewCollections={null}
+        previewDetailState={{ kind: "idle" }}
+        state={state}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+
+    expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "非公開" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
   });
 
   it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {
