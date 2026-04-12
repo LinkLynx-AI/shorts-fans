@@ -2,6 +2,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Slot } from "@radix-ui/react-slot";
 import type {
   ComponentPropsWithoutRef,
+  ReactElement,
   ReactNode,
 } from "react";
 
@@ -11,7 +12,7 @@ type BottomSheetMenuProps = {
   children: ReactNode;
   description: string;
   title: string;
-  trigger: ReactNode;
+  trigger: ReactElement;
 };
 
 type BottomSheetMenuGroupProps = ComponentPropsWithoutRef<"div">;
