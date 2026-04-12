@@ -602,6 +602,57 @@ describe("CreatorPage", () => {
     expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
   });
 
+  it("shows post actions that match the detail kind and closes the sheet without side effects", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+
+    render(await CreatorPage());
+
+    await screen.findByText("0:16");
+    await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+
+    expect(screen.getByRole("button", { name: "captionの変更" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "動画の非公開" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "captionの変更" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "captionの変更" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(mockedRouter.push).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Main" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+
+    expect(screen.getByRole("button", { name: "priceの変更" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "非公開" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "captionの変更" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "priceの変更" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(mockedRouter.push).not.toHaveBeenCalled();
+  });
+
   it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();

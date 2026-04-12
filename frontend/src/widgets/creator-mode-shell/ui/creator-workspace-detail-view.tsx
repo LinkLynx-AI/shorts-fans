@@ -10,7 +10,13 @@ import {
   CreatorAvatar,
   type CreatorSummary,
 } from "@/entities/creator";
-import { Button } from "@/shared/ui";
+import {
+  BottomSheetMenu,
+  BottomSheetMenuAction,
+  BottomSheetMenuClose,
+  BottomSheetMenuGroup,
+  Button,
+} from "@/shared/ui";
 
 import type { CreatorWorkspacePreviewDetailState } from "../model/use-creator-workspace-preview-detail";
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
@@ -63,6 +69,42 @@ function CreatorWorkspaceActionButton({
       {children}
     </button>
   );
+}
+
+type CreatorWorkspacePostActionMenuItem = {
+  label: string;
+  tone?: "danger" | "default";
+};
+
+function resolveCreatorWorkspacePostActionMenu(
+  detailSelection: CreatorWorkspaceDetailViewSelection,
+): {
+  description: string;
+  items: readonly CreatorWorkspacePostActionMenuItem[];
+} {
+  const isShort =
+    detailSelection.kind === "preview-short"
+    || (detailSelection.kind === "mock" && detailSelection.tab === "shorts");
+
+  if (isShort) {
+    return {
+      description: "creator workspace でショート投稿の操作を選ぶメニュー",
+      items: [
+        { label: "captionの変更" },
+        { label: "動画の非公開" },
+        { label: "削除", tone: "danger" },
+      ],
+    };
+  }
+
+  return {
+    description: "creator workspace で本編投稿の操作を選ぶメニュー",
+    items: [
+      { label: "priceの変更" },
+      { label: "非公開" },
+      { label: "削除", tone: "danger" },
+    ],
+  };
 }
 
 function CreatorWorkspacePlaybackAffordance() {
@@ -431,6 +473,7 @@ export function CreatorWorkspaceDetailView({
     detailSelection.kind === "mock"
       ? `${detailSelection.kind}:${detailSelection.tab}:${detailSelection.shortId}`
       : `${detailSelection.kind}:${detailSelection.item.id}`;
+  const postActionMenu = resolveCreatorWorkspacePostActionMenu(detailSelection);
 
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
@@ -439,14 +482,34 @@ export function CreatorWorkspaceDetailView({
           <span className="sr-only">Back</span>
           <ArrowLeft className="size-5" strokeWidth={2.1} />
         </Button>
-        <CreatorWorkspaceActionButton
-          ariaLabel="投稿操作"
-          className="inline-flex min-h-8 min-w-7 items-center justify-center gap-1 bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
+        <BottomSheetMenu
+          description={postActionMenu.description}
+          title="投稿操作"
+          trigger={
+            <CreatorWorkspaceActionButton
+              ariaLabel="投稿操作"
+              className="inline-flex min-h-8 min-w-7 items-center justify-center gap-1 bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
+              disabled={false}
+            >
+              <span className="size-1 rounded-full bg-current" />
+              <span className="size-1 rounded-full bg-current" />
+              <span className="size-1 rounded-full bg-current" />
+            </CreatorWorkspaceActionButton>
+          }
         >
-          <span className="size-1 rounded-full bg-current" />
-          <span className="size-1 rounded-full bg-current" />
-          <span className="size-1 rounded-full bg-current" />
-        </CreatorWorkspaceActionButton>
+          <BottomSheetMenuGroup>
+            {postActionMenu.items.map((item, index) => (
+              <BottomSheetMenuClose asChild key={item.label}>
+                <BottomSheetMenuAction
+                  {...(item.tone ? { tone: item.tone } : {})}
+                  withDivider={index > 0}
+                >
+                  <span>{item.label}</span>
+                </BottomSheetMenuAction>
+              </BottomSheetMenuClose>
+            ))}
+          </BottomSheetMenuGroup>
+        </BottomSheetMenu>
       </div>
 
       <section className="mt-[18px] grid gap-[18px] pb-10">

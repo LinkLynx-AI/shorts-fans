@@ -1,6 +1,5 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -16,7 +15,13 @@ import { useCreatorModeEntry } from "@/features/creator-entry";
 import { useFanLogoutEntry } from "@/features/fan-auth";
 import { buildFanProfileShortDetailHref } from "@/features/creator-navigation";
 import { getShortThemeStyle } from "@/entities/short";
-import { Button } from "@/shared/ui";
+import {
+  BottomSheetMenu,
+  BottomSheetMenuAction,
+  BottomSheetMenuClose,
+  BottomSheetMenuGroup,
+  Button,
+} from "@/shared/ui";
 
 type FanHubShellProps = {
   state: FanHubState;
@@ -200,8 +205,10 @@ export function FanHubShell({ state }: FanHubShellProps) {
             <ArrowLeft className="size-5" strokeWidth={2.1} />
           </Link>
         </Button>
-        <Dialog.Root>
-          <Dialog.Trigger asChild>
+        <BottomSheetMenu
+          description="fan profile から creator registration、creator mode、logout を操作するメニュー"
+          title="アカウントメニュー"
+          trigger={
             <button
               aria-label="Account menu"
               className="inline-flex size-[34px] items-center justify-center rounded-full text-accent-strong transition hover:bg-accent/10"
@@ -210,79 +217,62 @@ export function FanHubShell({ state }: FanHubShellProps) {
             >
               <Menu aria-hidden="true" className="size-5" strokeWidth={1.9} />
             </button>
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
-            <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
-              <Dialog.Title className="sr-only">アカウントメニュー</Dialog.Title>
-              <Dialog.Description className="sr-only">
-                fan profile から creator registration、creator mode、logout を操作するメニュー
-              </Dialog.Description>
-
-              <div
-                aria-hidden="true"
-                className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
-              />
-
-              <div className="rounded-[24px] bg-[#f3f6f8] py-1">
-                {currentViewer?.canAccessCreatorMode ? (
-                  <button
-                    className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
-                    disabled={isAccountActionPending}
-                    onClick={() => {
-                      clearLogoutError();
-                      void enterCreatorMode();
-                    }}
-                    type="button"
+          }
+        >
+          <BottomSheetMenuGroup>
+            {currentViewer?.canAccessCreatorMode ? (
+              <BottomSheetMenuAction
+                disabled={isAccountActionPending}
+                onClick={() => {
+                  clearLogoutError();
+                  void enterCreatorMode();
+                }}
+              >
+                <span>{isCreatorModeSubmitting ? "Creator mode を開いています..." : "Creator mode に切り替え"}</span>
+                <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+              </BottomSheetMenuAction>
+            ) : (
+              <BottomSheetMenuClose asChild>
+                <BottomSheetMenuAction asChild>
+                  <Link
+                    aria-disabled={isAccountActionPending}
+                    aria-label="Creator登録を始める"
+                    className={isAccountActionPending ? "pointer-events-none opacity-55" : ""}
+                    href="/fan/creator/register"
+                    onClick={clearLogoutError}
+                    tabIndex={isAccountActionPending ? -1 : undefined}
                   >
-                    <span>{isCreatorModeSubmitting ? "Creator mode を開いています..." : "Creator mode に切り替え"}</span>
+                    <span>Creator登録を始める</span>
                     <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
-                  </button>
-                ) : (
-                  <Dialog.Close asChild>
-                    <Link
-                      aria-disabled={isAccountActionPending}
-                      aria-label="Creator登録を始める"
-                      className={[
-                        "flex min-h-[54px] w-full items-center justify-between px-[18px] text-sm font-bold text-foreground transition hover:bg-white/65",
-                        isAccountActionPending ? "pointer-events-none opacity-55" : "",
-                      ].join(" ")}
-                      href="/fan/creator/register"
-                      onClick={clearLogoutError}
-                      tabIndex={isAccountActionPending ? -1 : undefined}
-                    >
-                      <span>Creator登録を始める</span>
-                      <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
-                    </Link>
-                  </Dialog.Close>
-                )}
+                  </Link>
+                </BottomSheetMenuAction>
+              </BottomSheetMenuClose>
+            )}
 
-                <button
-                  className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-[#b2394f] transition hover:bg-[#fff1f3]"
-                  disabled={isAccountActionPending}
-                  onClick={() => {
-                    clearCreatorModeError();
-                    void logout();
-                  }}
-                  type="button"
-                >
-                  <span>{isLogoutSubmitting ? "ログアウトしています..." : "ログアウト"}</span>
-                  <ChevronRight aria-hidden="true" className="size-4 text-[#d76a7f]" strokeWidth={2.2} />
-                </button>
-              </div>
+            <BottomSheetMenuAction
+              disabled={isAccountActionPending}
+              onClick={() => {
+                clearCreatorModeError();
+                void logout();
+              }}
+              tone="danger"
+              withDivider
+            >
+              <span>{isLogoutSubmitting ? "ログアウトしています..." : "ログアウト"}</span>
+              <ChevronRight aria-hidden="true" className="size-4 text-[#d76a7f]" strokeWidth={2.2} />
+            </BottomSheetMenuAction>
+          </BottomSheetMenuGroup>
 
-              {accountMenuErrorMessage ? (
-                <p
-                  aria-live="polite"
-                  className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
-                  role="alert"
-                >
-                  {accountMenuErrorMessage}
-                </p>
-              ) : null}
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+          {accountMenuErrorMessage ? (
+            <p
+              aria-live="polite"
+              className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+              role="alert"
+            >
+              {accountMenuErrorMessage}
+            </p>
+          ) : null}
+        </BottomSheetMenu>
       </div>
 
       <section className="mt-3">
