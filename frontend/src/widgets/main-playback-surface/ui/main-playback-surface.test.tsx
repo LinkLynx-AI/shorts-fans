@@ -7,6 +7,7 @@ import { MainPlaybackSurface } from "./main-playback-surface";
 
 const back = vi.fn();
 const push = vi.fn();
+const pause = vi.fn();
 const play = vi.fn<() => Promise<void>>();
 
 vi.mock("next/navigation", () => ({
@@ -18,8 +19,11 @@ vi.mock("next/navigation", () => ({
 
 describe("MainPlaybackSurface", () => {
   beforeEach(() => {
+    pause.mockReset();
+    pause.mockImplementation(() => {});
     play.mockReset();
     play.mockResolvedValue(undefined);
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(pause);
     vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(play);
   });
 
@@ -203,5 +207,20 @@ describe("MainPlaybackSurface", () => {
     );
 
     expect(screen.getByText("short の続きから再生中。")).toBeInTheDocument();
+  });
+
+  it("pauses playback while the panel is inactive", () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" isActive={false} surface={surface} />);
+
+    expect(pause).toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   });
 });

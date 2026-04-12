@@ -151,6 +151,20 @@ export function buildFanProfileShortDetailHref(
 }
 
 /**
+ * fan profile library tile 用の main reel href を組み立てる。
+ */
+export function buildFanProfileLibraryMainHref(
+  mainId: string,
+  fromShortId: ShortId,
+): string {
+  return `/mains/${mainId}${buildQueryString({
+    fanTab: "library",
+    from: "fan",
+    fromShortId,
+  })}`;
+}
+
+/**
  * short detail の戻り先 href を解決する。
  */
 export function resolveShortDetailBackHref(

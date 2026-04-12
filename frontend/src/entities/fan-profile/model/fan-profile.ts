@@ -1,4 +1,5 @@
 import { getCreatorById, type CreatorSummary } from "@/entities/creator";
+import { getMainById } from "@/entities/main";
 import {
   getShortById,
   type ShortPreviewMeta,
@@ -65,29 +66,7 @@ export type FanHubState = {
 
 const followingCreatorIds = ["aoi", "mina", "sora"] as const;
 const pinnedShortIds = ["afterrain", "balcony", "rooftop"] as const;
-const libraryDefinitions = [
-  {
-    main: {
-      durationSeconds: 720,
-      id: "main_aoi_soft_light",
-    },
-    shortId: "softlight",
-  },
-  {
-    main: {
-      durationSeconds: 600,
-      id: "main_aoi_balcony_cut",
-    },
-    shortId: "balcony",
-  },
-  {
-    main: {
-      durationSeconds: 660,
-      id: "main_mina_hotel_mirror",
-    },
-    shortId: "mirror",
-  },
-] as const;
+const libraryShortIds = ["softlight", "mirror", "rooftop"] as const;
 
 const settingsSections = [
   { available: true, key: "account", label: "Account" },
@@ -115,6 +94,16 @@ function requireShort(shortId: string): ShortPreviewMeta {
   return short;
 }
 
+function requireMain(mainId: string) {
+  const main = getMainById(mainId);
+
+  if (!main) {
+    throw new Error(`Unknown main for fan profile state: ${mainId}`);
+  }
+
+  return main;
+}
+
 const followingItems: readonly FanFollowingItem[] = followingCreatorIds.map((creatorId) => ({
   creator: requireCreator(creatorId),
   viewer: {
@@ -138,18 +127,22 @@ const pinnedItems: readonly FanPinnedShortItem[] = pinnedShortIds.map((shortId) 
   };
 });
 
-const libraryItems: readonly FanLibraryItem[] = libraryDefinitions.map((definition) => {
-  const entryShort = requireShort(definition.shortId);
+const libraryItems: readonly FanLibraryItem[] = libraryShortIds.map((shortId) => {
+  const entryShort = requireShort(shortId);
+  const main = requireMain(entryShort.canonicalMainId);
 
   return {
     access: {
-      mainId: definition.main.id,
+      mainId: main.id,
       reason: "session_unlocked" as const,
       status: "unlocked" as const,
     },
     creator: requireCreator(entryShort.creatorId),
     entryShort,
-    main: definition.main,
+    main: {
+      durationSeconds: main.durationSeconds,
+      id: main.id,
+    },
   };
 });
 

@@ -11,6 +11,8 @@ import {
   buildDetailSurfaceFromApi,
   getShortSurfaceById,
   ImmersiveShortSurface,
+  loadShortDetailReelState,
+  ShortDetailReel,
 } from "@/widgets/immersive-short-surface";
 
 const paramsSchema = z.object({
@@ -66,6 +68,49 @@ export default async function ShortDetailPage({
 
   const cookieStore = await cookies();
   const sessionToken = cookieStore?.get?.(viewerSessionCookieName)?.value;
+  const backHref = resolveShortDetailBackHref(routeState);
+
+  if (routeState.from === "creator" && routeState.creatorId) {
+    const reelState = await loadShortDetailReelState({
+      creatorId: routeState.creatorId,
+      kind: "creator",
+      sessionToken,
+      shortId,
+    }).catch(() => null);
+
+    if (reelState) {
+      return (
+        <ShortDetailReel
+          backHref={backHref}
+          initialIndex={reelState.initialIndex}
+          source="creator"
+          surfaces={reelState.surfaces}
+        />
+      );
+    }
+  }
+
+  if (routeState.from === "fan" && routeState.fanTab === "pinned") {
+    const reelState = await loadShortDetailReelState({
+      kind: "fan",
+      sessionToken,
+      shortId,
+      tab: "pinned",
+    }).catch(() => null);
+
+    if (reelState) {
+      return (
+        <ShortDetailReel
+          backHref={backHref}
+          fanTab="pinned"
+          initialIndex={reelState.initialIndex}
+          source="fan"
+          surfaces={reelState.surfaces}
+        />
+      );
+    }
+  }
+
   let detail: Awaited<ReturnType<typeof getPublicShortDetail>>;
 
   try {
@@ -83,7 +128,7 @@ export default async function ShortDetailPage({
 
   return (
     <ImmersiveShortSurface
-      backHref={resolveShortDetailBackHref(routeState)}
+      backHref={backHref}
       creatorProfileOrigin={creatorProfileOrigin}
       mode="detail"
       surface={buildDetailSurfaceFromApi(detail)}
