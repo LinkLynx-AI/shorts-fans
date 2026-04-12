@@ -50,6 +50,11 @@ type CreatorProfileShortsReader interface {
 	ListPublicProfileShorts(ctx context.Context, creatorID string, cursor *creator.PublicProfileShortCursor, limit int) ([]creator.PublicProfileShort, *creator.PublicProfileShortCursor, error)
 }
 
+// CreatorWorkspaceMainPriceWriter は creator workspace main price mutation を表します。
+type CreatorWorkspaceMainPriceWriter interface {
+	UpdateWorkspaceMainPrice(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID, priceJpy int64) (creator.WorkspaceMainPrice, error)
+}
+
 // FanFeedReader は public short feed/detail 用の read 操作を表します。
 type FanFeedReader interface {
 	GetDetail(ctx context.Context, shortID uuid.UUID, viewerUserID *uuid.UUID) (feed.Detail, error)
@@ -127,28 +132,29 @@ type FanProfilePinnedShortsReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	AppEnv                 string
-	CreatorSearch          CreatorSearchReader
-	CreatorWorkspace       CreatorWorkspaceReader
-	CreatorUpload          CreatorUploadHandler
-	CreatorProfile         CreatorProfileReader
-	CreatorProfileShorts   CreatorProfileShortsReader
-	FanFeed                FanFeedReader
-	FanUnlockMain          FanUnlockMainService
-	FanShortPin            FanShortPinWriter
-	CreatorFollow          CreatorFollowWriter
-	CreatorAvatarUpload    ViewerCreatorAvatarUploadHandler
-	CreatorRegistration    ViewerCreatorRegistrationWriter
-	FanProfileFollowing    FanProfileFollowingReader
-	FanProfilePinnedShorts FanProfilePinnedShortsReader
-	FanProfileOverview     FanProfileOverviewReader
-	FanAuth                FanAuthService
-	AuthCookie             AuthCookieConfig
-	ShortDisplayAssets     ShortDisplayAssetResolver
-	MainDisplayAssets      MainDisplayAssetResolver
-	ViewerActiveMode       ViewerActiveModeSwitcher
-	ViewerBootstrap        ViewerBootstrapReader
-	Dependencies           []Dependency
+	AppEnv                    string
+	CreatorSearch             CreatorSearchReader
+	CreatorWorkspace          CreatorWorkspaceReader
+	CreatorWorkspaceMainPrice CreatorWorkspaceMainPriceWriter
+	CreatorUpload             CreatorUploadHandler
+	CreatorProfile            CreatorProfileReader
+	CreatorProfileShorts      CreatorProfileShortsReader
+	FanFeed                   FanFeedReader
+	FanUnlockMain             FanUnlockMainService
+	FanShortPin               FanShortPinWriter
+	CreatorFollow             CreatorFollowWriter
+	CreatorAvatarUpload       ViewerCreatorAvatarUploadHandler
+	CreatorRegistration       ViewerCreatorRegistrationWriter
+	FanProfileFollowing       FanProfileFollowingReader
+	FanProfilePinnedShorts    FanProfilePinnedShortsReader
+	FanProfileOverview        FanProfileOverviewReader
+	FanAuth                   FanAuthService
+	AuthCookie                AuthCookieConfig
+	ShortDisplayAssets        ShortDisplayAssetResolver
+	MainDisplayAssets         MainDisplayAssetResolver
+	ViewerActiveMode          ViewerActiveModeSwitcher
+	ViewerBootstrap           ViewerBootstrapReader
+	Dependencies              []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -206,7 +212,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 
 	registerFanAuthRoutes(router, config.FanAuth, config.AuthCookie)
 	registerFanProfileRoutes(router, config.FanProfileOverview, config.FanProfileFollowing, config.FanProfilePinnedShorts, config.ShortDisplayAssets, config.ViewerBootstrap)
-	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.ViewerBootstrap)
+	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.CreatorWorkspaceMainPrice, config.ViewerBootstrap)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)

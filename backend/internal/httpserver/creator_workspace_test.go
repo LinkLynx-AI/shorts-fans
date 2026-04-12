@@ -88,6 +88,23 @@ func (s stubCreatorWorkspaceReader) ListWorkspacePreviewShorts(
 	return s.listWorkspacePreviewShort(ctx, viewerUserID, cursor, limit)
 }
 
+type stubCreatorWorkspaceMainPriceWriter struct {
+	updateWorkspaceMainPrice func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error)
+}
+
+func (s stubCreatorWorkspaceMainPriceWriter) UpdateWorkspaceMainPrice(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	mainID uuid.UUID,
+	priceJpy int64,
+) (creator.WorkspaceMainPrice, error) {
+	if s.updateWorkspaceMainPrice == nil {
+		return creator.WorkspaceMainPrice{}, nil
+	}
+
+	return s.updateWorkspaceMainPrice(ctx, viewerUserID, mainID, priceJpy)
+}
+
 func TestCreatorWorkspaceRoute(t *testing.T) {
 	t.Parallel()
 
@@ -1258,6 +1275,237 @@ func TestCreatorWorkspacePreviewCursorHelpers(t *testing.T) {
 	}
 	if got := decodeCreatorWorkspacePreviewCursor("not-base64"); got != nil {
 		t.Fatalf("decodeCreatorWorkspacePreviewCursor(invalid base64) got %#v want nil", got)
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("17171717-1717-1717-1717-171717171717")
+	mainID := uuid.MustParse("28282828-2828-2828-2828-282828282828")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(_ context.Context, gotViewerUserID uuid.UUID, gotMainID uuid.UUID, gotPriceJpy int64) (creator.WorkspaceMainPrice, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("UpdateWorkspaceMainPrice() viewer got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotMainID != mainID {
+					t.Fatalf("UpdateWorkspaceMainPrice() main got %s want %s", gotMainID, mainID)
+				}
+				if gotPriceJpy != 2400 {
+					t.Fatalf("UpdateWorkspaceMainPrice() price got %d want %d", gotPriceJpy, 2400)
+				}
+
+				return creator.WorkspaceMainPrice{
+					ID:       mainID,
+					PriceJpy: 2400,
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   viewerID,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(mainID)+"/price",
+		strings.NewReader(`{"priceJpy":2400}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspaceMainPriceUpdateResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want main payload")
+	}
+	if response.Data.Main.ID != mainPublicID(mainID) {
+		t.Fatalf("response.Data.Main.ID got %q want %q", response.Data.Main.ID, mainPublicID(mainID))
+	}
+	if response.Data.Main.PriceJpy != 2400 {
+		t.Fatalf("response.Data.Main.PriceJpy got %d want %d", response.Data.Main.PriceJpy, 2400)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_price_update_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace main price update prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteReturnsValidationError(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+				return creator.WorkspaceMainPrice{}, creator.ErrInvalidWorkspaceMainPrice
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("39393939-3939-3939-3939-393939393939"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("4a4a4a4a-4a4a-4a4a-4a4a-4a4a4a4a4a4a"))+"/price",
+		strings.NewReader(`{"priceJpy":0}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusUnprocessableEntity)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "validation_error" {
+		t.Fatalf("response.Error got %#v want validation_error", response.Error)
+	}
+	if response.Error.Message != "priceJpy must be a positive integer" {
+		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "priceJpy must be a positive integer")
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteReturnsValidationErrorForNonIntegerJSON(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+				writerCalled = true
+				return creator.WorkspaceMainPrice{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("5b5b5b5b-5b5b-5b5b-5b5b-5b5b5b5b5b5b"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("6c6c6c6c-6c6c-6c6c-6c6c-6c6c6c6c6c6c"))+"/price",
+		strings.NewReader(`{"priceJpy":1.5}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusUnprocessableEntity)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceMainPrice() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "validation_error" {
+		t.Fatalf("response.Error got %#v want validation_error", response.Error)
+	}
+	if response.Error.Message != "priceJpy must be a positive integer" {
+		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "priceJpy must be a positive integer")
+	}
+}
+
+func TestCreatorWorkspaceMainPriceUpdateRouteRejectsInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceMainPrice: stubCreatorWorkspaceMainPriceWriter{
+			updateWorkspaceMainPrice: func(context.Context, uuid.UUID, uuid.UUID, int64) (creator.WorkspaceMainPrice, error) {
+				writerCalled = true
+				return creator.WorkspaceMainPrice{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("5b5b5b5b-5b5b-5b5b-5b5b-5b5b5b5b5b5b"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("6c6c6c6c-6c6c-6c6c-6c6c-6c6c6c6c6c6c"))+"/price",
+		strings.NewReader(`{"priceJpy":2400`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/mains/:mainId/price status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("UpdateWorkspaceMainPrice() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "invalid_request" {
+		t.Fatalf("response.Error got %#v want invalid_request", response.Error)
+	}
+	if response.Error.Message != "creator workspace main price request is invalid" {
+		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "creator workspace main price request is invalid")
 	}
 }
 

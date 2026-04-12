@@ -21,6 +21,7 @@ type repositoryStubQueries struct {
 	listWorkspaceTopMainCandidates     func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopMainCandidatesByCreatorUserIDRow, error)
 	listWorkspaceTopShortCandidates    func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspaceTopShortCandidatesByCreatorUserIDRow, error)
 	listWorkspacePreviewMainsByCreator func(context.Context, pgtype.UUID) ([]sqlc.ListCreatorWorkspacePreviewMainsByCreatorUserIDRow, error)
+	updateWorkspaceMainPrice           func(context.Context, sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.UpdateCreatorWorkspaceMainPriceRow, error)
 	getRevisionSummary                 func(context.Context, pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error)
 	getMediaAsset                      func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
 	getShortByID                       func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
@@ -89,6 +90,13 @@ func (s repositoryStubQueries) ListCreatorWorkspacePreviewMainsByCreatorUserID(c
 		return nil, nil
 	}
 	return s.listWorkspacePreviewMainsByCreator(ctx, creatorUserID)
+}
+
+func (s repositoryStubQueries) UpdateCreatorWorkspaceMainPrice(ctx context.Context, arg sqlc.UpdateCreatorWorkspaceMainPriceParams) (sqlc.UpdateCreatorWorkspaceMainPriceRow, error) {
+	if s.updateWorkspaceMainPrice == nil {
+		return sqlc.UpdateCreatorWorkspaceMainPriceRow{}, nil
+	}
+	return s.updateWorkspaceMainPrice(ctx, arg)
 }
 
 func (s repositoryStubQueries) GetCreatorWorkspaceRevisionRequestedSummary(ctx context.Context, creatorUserID pgtype.UUID) (sqlc.GetCreatorWorkspaceRevisionRequestedSummaryRow, error) {

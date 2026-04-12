@@ -2,6 +2,11 @@
 
 import { useState } from "react";
 
+import {
+  CreatorWorkspaceMainPriceDialog,
+  type CreatorWorkspaceMainPriceMutationResult,
+} from "@/features/creator-main-price";
+
 import type { ApprovedCreatorWorkspaceManagedTab } from "../model/approved-creator-workspace";
 import type {
   CreatorModeShellReadyState,
@@ -12,7 +17,10 @@ import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-work
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 import { useCreatorWorkspaceTopPerformers } from "../model/use-creator-workspace-top-performers";
 import { CreatorShellBlockedState, CreatorModeWorkspaceFrame } from "./creator-mode-shell-blocked-state";
-import type { CreatorWorkspaceDetailViewSelection } from "./creator-mode-shell.types";
+import type {
+  CreatorWorkspaceDetailViewSelection,
+  CreatorWorkspacePreviewDetailSelection,
+} from "./creator-mode-shell.types";
 import { CreatorWorkspaceDashboard } from "./creator-workspace-dashboard";
 import { CreatorWorkspaceDetailView } from "./creator-workspace-detail-view";
 
@@ -34,6 +42,10 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
   } = useCreatorWorkspaceTopPerformers();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailViewSelection | null>(null);
+  const [mainPriceDialogState, setMainPriceDialogState] = useState<{
+    currentPriceJpy: number;
+    mainId: string;
+  } | null>(null);
   const previewDetailSelection = detailSelection?.kind === "mock" ? null : detailSelection;
   const {
     blockedState: previewDetailBlockedState,
@@ -46,6 +58,31 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
   function handleOpenDetail(selection: CreatorWorkspaceDetailViewSelection) {
     setActiveTab(selection.tab);
     setDetailSelection(selection);
+  }
+
+  function handleOpenMainPriceDialog(selection: Extract<CreatorWorkspacePreviewDetailSelection, { kind: "preview-main" }>) {
+    setMainPriceDialogState({
+      currentPriceJpy: selection.item.priceJpy,
+      mainId: selection.item.id,
+    });
+  }
+
+  function handleMainPriceUpdated(result: CreatorWorkspaceMainPriceMutationResult) {
+    setDetailSelection((currentSelection) => {
+      if (currentSelection?.kind !== "preview-main" || currentSelection.item.id !== result.main.id) {
+        return currentSelection;
+      }
+
+      return {
+        ...currentSelection,
+        item: {
+          ...currentSelection.item,
+          priceJpy: result.main.priceJpy,
+        },
+      };
+    });
+    retryPreviewCollections();
+    retryPreviewDetail();
   }
 
   if (blockedState) {
@@ -62,6 +99,7 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
             setDetailSelection(null);
           }}
           onOpenDetail={handleOpenDetail}
+          onOpenMainPriceDialog={handleOpenMainPriceDialog}
           onRetryPreviewDetail={retryPreviewDetail}
           previewDetailState={previewDetailState}
           previewCollections={previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null}
@@ -82,6 +120,17 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
           topPerformersState={topPerformersState}
         />
       )}
+      {mainPriceDialogState ? (
+        <CreatorWorkspaceMainPriceDialog
+          currentPriceJpy={mainPriceDialogState.currentPriceJpy}
+          mainId={mainPriceDialogState.mainId}
+          onClose={() => {
+            setMainPriceDialogState(null);
+          }}
+          onUpdated={handleMainPriceUpdated}
+          open
+        />
+      ) : null}
     </CreatorModeWorkspaceFrame>
   );
 }

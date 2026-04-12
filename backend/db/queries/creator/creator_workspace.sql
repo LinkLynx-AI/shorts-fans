@@ -53,6 +53,21 @@ WHERE creator_user_id = sqlc.arg(owner_user_id)
     AND currency_code IS NOT NULL
 ORDER BY created_at DESC, id DESC;
 
+-- name: UpdateCreatorWorkspaceMainPrice :one
+UPDATE app.mains
+SET
+    price_minor = sqlc.arg(price_minor),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(main_id)
+    AND creator_user_id = sqlc.arg(owner_user_id)
+    AND media_asset_id IS NOT NULL
+    AND price_minor IS NOT NULL
+    AND currency_code = 'JPY'
+RETURNING
+    id,
+    COALESCE(price_minor, 0)::bigint AS price_minor,
+    COALESCE(currency_code, '')::text AS currency_code;
+
 -- name: ListCreatorWorkspaceTopMainCandidatesByCreatorUserID :many
 SELECT
     m.id,

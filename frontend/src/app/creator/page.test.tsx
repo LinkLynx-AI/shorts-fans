@@ -6,6 +6,7 @@ import {
 import userEvent from "@testing-library/user-event";
 
 import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-viewer-active-mode";
+import { updateCreatorWorkspaceMainPrice } from "@/features/creator-main-price/api/update-creator-workspace-main-price";
 import { ApiError } from "@/shared/api";
 import { getCreatorWorkspaceSummary } from "@/widgets/creator-mode-shell/api/get-creator-workspace-summary";
 import { getCreatorWorkspaceTopPerformers } from "@/widgets/creator-mode-shell/api/get-creator-workspace-top-performers";
@@ -54,6 +55,15 @@ vi.mock("@/features/fan-auth-gate", async () => {
 vi.mock("@/features/creator-entry/api/switch-viewer-active-mode", () => ({
   switchViewerActiveMode: vi.fn(),
 }));
+
+vi.mock("@/features/creator-main-price/api/update-creator-workspace-main-price", async () => {
+  const actual = await vi.importActual<typeof import("@/features/creator-main-price/api/update-creator-workspace-main-price")>("@/features/creator-main-price/api/update-creator-workspace-main-price");
+
+  return {
+    ...actual,
+    updateCreatorWorkspaceMainPrice: vi.fn(),
+  };
+});
 
 vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-summary", () => ({
   getCreatorWorkspaceSummary: vi.fn(),
@@ -300,6 +310,7 @@ describe("CreatorPage", () => {
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
     vi.mocked(switchViewerActiveMode).mockReset();
+    vi.mocked(updateCreatorWorkspaceMainPrice).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockReset();
     vi.mocked(getCreatorWorkspaceTopPerformers).mockReset();
     vi.mocked(getCreatorWorkspacePreviewMains).mockReset();
@@ -312,6 +323,12 @@ describe("CreatorPage", () => {
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
     vi.mocked(getCreatorWorkspacePreviewShortDetail).mockResolvedValue(createCreatorWorkspacePreviewShortDetail());
     vi.mocked(getCreatorWorkspacePreviewMainDetail).mockResolvedValue(createCreatorWorkspacePreviewMainDetail());
+    vi.mocked(updateCreatorWorkspaceMainPrice).mockResolvedValue({
+      main: {
+        id: "main_quiet_rooftop",
+        priceJpy: 2400,
+      },
+    });
   });
 
   it("opens top performers with the same preview detail flow as the lower preview cards", async () => {
@@ -459,6 +476,94 @@ describe("CreatorPage", () => {
       expect(switchViewerActiveMode).toHaveBeenCalledTimes(2);
       expect(mockedRouter.push).toHaveBeenCalledWith("/");
     });
+  });
+
+  it("opens the main price dialog from detail and updates the visible price after save", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+
+    render(await CreatorPage());
+
+    await screen.findByText("@minarei");
+    await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
+
+    expect(await screen.findByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(screen.getByText("¥1,800")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+    await user.click(await screen.findByRole("button", { name: "priceの変更" }));
+
+    const priceInput = await screen.findByLabelText("価格（円）");
+    const saveButton = screen.getByRole("button", { name: "保存する" });
+
+    expect(screen.getByRole("dialog", { name: "価格を変更" })).toBeInTheDocument();
+    expect(priceInput).toHaveValue(1800);
+    expect(saveButton).toBeDisabled();
+
+    await user.clear(priceInput);
+    await user.type(priceInput, "2400");
+
+    expect(saveButton).toBeEnabled();
+
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(updateCreatorWorkspaceMainPrice).toHaveBeenCalledWith({
+        mainId: "main_quiet_rooftop",
+        priceJpy: 2400,
+      });
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "価格を変更" })).not.toBeInTheDocument();
+    });
+
+    expect(await screen.findByText("¥2,400")).toBeInTheDocument();
+  });
+
+  it("keeps the main price dialog open and shows the error when saving fails", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(updateCreatorWorkspaceMainPrice).mockRejectedValueOnce(
+      new ApiError("API request failed before a response was received.", {
+        code: "network",
+      }),
+    );
+
+    render(await CreatorPage());
+
+    await screen.findByText("@minarei");
+    await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+    await user.click(await screen.findByRole("button", { name: "priceの変更" }));
+
+    const priceInput = await screen.findByLabelText("価格（円）");
+
+    await user.clear(priceInput);
+    await user.type(priceInput, "2500");
+    await user.click(screen.getByRole("button", { name: "保存する" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "価格を更新できませんでした。通信環境を確認してからやり直してください。",
+    );
+    expect(screen.getByRole("dialog", { name: "価格を変更" })).toBeInTheDocument();
   });
 
   it("renders the login-required state for unauthenticated viewers", async () => {
