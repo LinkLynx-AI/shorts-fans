@@ -7,10 +7,13 @@ import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { parseMockMainPlaybackGrantContext } from "@/features/unlock-entry";
 import { ApiError } from "@/shared/api";
+import { getEnumQueryParam } from "@/shared/lib";
 import { readMockSignedToken } from "@/shared/lib/mock-signed-token";
 import { cookies } from "next/headers";
 import {
+  LibraryMainReel,
   getMainPlaybackSurfaceById,
+  loadLibraryMainReelState,
   MainPlaybackLockedState,
   MainPlaybackSurface,
   requestMainPlaybackSurface,
@@ -36,26 +39,18 @@ const firstSearchParamValueSchema = z
     return firstValue;
   });
 
-const mainPlaybackSearchParamsSchema = z.object({
-  fromShortId: firstSearchParamValueSchema,
-  grant: firstSearchParamValueSchema,
-});
-
-function parseMainPlaybackParams(value: unknown) {
-  const parsed = mainPlaybackParamsSchema.safeParse(value);
+function parseOptionalSearchParam(value: unknown): string | undefined {
+  const parsed = firstSearchParamValueSchema.safeParse(value);
 
   if (!parsed.success) {
-    notFound();
+    return undefined;
   }
 
   return parsed.data;
 }
 
-function parseMainPlaybackSearchParams(value: unknown): {
-  fromShortId: string;
-  grant: string;
-} {
-  const parsed = mainPlaybackSearchParamsSchema.safeParse(value);
+function parseMainPlaybackParams(value: unknown) {
+  const parsed = mainPlaybackParamsSchema.safeParse(value);
 
   if (!parsed.success) {
     notFound();
@@ -69,7 +64,12 @@ export default async function MainPlaybackPage({
   searchParams,
 }: {
   params: Promise<{ mainId: string }>;
-  searchParams: Promise<{ fromShortId?: string | string[]; grant?: string | string[] }>;
+  searchParams: Promise<{
+    fanTab?: string | string[];
+    from?: string | string[];
+    fromShortId?: string | string[];
+    grant?: string | string[];
+  }>;
 }) {
   const viewerState = await getFanAuthGateState();
 
@@ -79,8 +79,35 @@ export default async function MainPlaybackPage({
 
   const [rawParams, rawSearchParams] = await Promise.all([params, searchParams]);
   const { mainId } = parseMainPlaybackParams(rawParams);
-  const { fromShortId: normalizedFromShortId, grant: normalizedGrant } =
-    parseMainPlaybackSearchParams(rawSearchParams);
+  const normalizedFromShortId = parseOptionalSearchParam(rawSearchParams.fromShortId);
+  const normalizedGrant = parseOptionalSearchParam(rawSearchParams.grant);
+  const routeFrom = getEnumQueryParam(rawSearchParams.from, ["fan"]);
+  const routeFanTab = getEnumQueryParam(rawSearchParams.fanTab, ["library", "pinned"]);
+
+  if (routeFrom === "fan" && routeFanTab === "library" && normalizedFromShortId && !normalizedGrant) {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(viewerSessionCookieName)?.value;
+    const reelState = await loadLibraryMainReelState({
+      mainId,
+      sessionToken,
+    });
+
+    if (!reelState) {
+      notFound();
+    }
+
+    return (
+      <LibraryMainReel
+        backHref="/fan?tab=library"
+        initialIndex={reelState.initialIndex}
+        items={reelState.items}
+      />
+    );
+  }
+
+  if (!normalizedFromShortId || !normalizedGrant) {
+    notFound();
+  }
 
   const fallbackHref = `/shorts/${normalizedFromShortId}`;
 

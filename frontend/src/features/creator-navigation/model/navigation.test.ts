@@ -1,6 +1,7 @@
 import {
   buildCreatorProfileHref,
   buildCreatorShortDetailHref,
+  buildFanProfileLibraryMainHref,
   buildFanProfileShortDetailHref,
   resolveCreatorProfileBackHref,
   resolveShortDetailBackHref,
@@ -68,6 +69,9 @@ describe("creator navigation", () => {
 
   it("returns to fan profile when short detail came from pinned shorts", () => {
     expect(buildFanProfileShortDetailHref("mirror", "pinned")).toBe("/shorts/mirror?fanTab=pinned&from=fan");
+    expect(buildFanProfileLibraryMainHref("main_mina_rooftop", "mirror")).toBe(
+      "/mains/main_mina_rooftop?fanTab=library&from=fan&fromShortId=mirror",
+    );
 
     expect(
       resolveShortDetailBackHref({

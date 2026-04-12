@@ -19,6 +19,7 @@ import {
 
 export type MainPlaybackSurfaceProps = {
   fallbackHref: string;
+  isActive?: boolean;
   surface: MainPlaybackSurface;
 };
 
@@ -60,7 +61,11 @@ function PinRail({ pinned }: { pinned: boolean }) {
 /**
  * unlock 後の main 継続視聴 surface を表示する。
  */
-export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfaceProps) {
+export function MainPlaybackSurface({
+  fallbackHref,
+  isActive = true,
+  surface,
+}: MainPlaybackSurfaceProps) {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const resumeAppliedRef = useRef<string | null>(null);
@@ -83,6 +88,11 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
     const video = videoRef.current;
 
     if (!video) {
+      return;
+    }
+
+    if (!isActive) {
+      video.pause();
       return;
     }
 
@@ -135,7 +145,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
       cancelled = true;
       video.removeEventListener("loadedmetadata", handleMetadataLoaded);
     };
-  }, [surface.main.media.id, surface.main.media.url, surface.resumePositionSeconds]);
+  }, [isActive, surface.main.media.id, surface.main.media.url, surface.resumePositionSeconds]);
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(surface.themeShort)}>
@@ -143,7 +153,7 @@ export function MainPlaybackSurface({ fallbackHref, surface }: MainPlaybackSurfa
       <video
         ref={videoRef}
         aria-label={MAIN_PLAYBACK_VIDEO_LABEL}
-        autoPlay
+        autoPlay={isActive}
         className="absolute inset-0 size-full object-cover"
         controls
         playsInline

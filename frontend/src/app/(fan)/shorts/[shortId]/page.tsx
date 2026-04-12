@@ -11,11 +11,31 @@ import {
   buildDetailSurfaceFromApi,
   getShortSurfaceById,
   ImmersiveShortSurface,
+  loadShortDetailReelState,
+  ShortDetailReel,
 } from "@/widgets/immersive-short-surface";
 
 const paramsSchema = z.object({
   shortId: z.string().min(1),
 });
+
+async function loadShortDetailOrNotFound(
+  sessionToken: string | undefined,
+  shortId: string,
+) {
+  try {
+    return await getPublicShortDetail({
+      sessionToken,
+      shortId,
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "http" && error.status === 404) {
+      notFound();
+    }
+
+    throw error;
+  }
+}
 
 export default async function ShortDetailPage({
   params,
@@ -66,24 +86,60 @@ export default async function ShortDetailPage({
 
   const cookieStore = await cookies();
   const sessionToken = cookieStore?.get?.(viewerSessionCookieName)?.value;
-  let detail: Awaited<ReturnType<typeof getPublicShortDetail>>;
+  const backHref = resolveShortDetailBackHref(routeState);
 
-  try {
-    detail = await getPublicShortDetail({
+  if (routeState.from === "creator" && routeState.creatorId) {
+    const reelState = await loadShortDetailReelState({
+      creatorId: routeState.creatorId,
+      kind: "creator",
       sessionToken,
       shortId,
-    });
-  } catch (error) {
-    if (error instanceof ApiError && error.code === "http" && error.status === 404) {
-      notFound();
-    }
+    }).catch(() => null);
 
-    throw error;
+    if (reelState) {
+      const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
+
+      return (
+        <ShortDetailReel
+          backHref={backHref}
+          initialIndex={reelState.initialIndex}
+          initialSurface={buildDetailSurfaceFromApi(detail)}
+          shortIds={reelState.shortIds}
+          source="creator"
+        />
+      );
+    }
   }
+
+  if (routeState.from === "fan" && routeState.fanTab === "pinned") {
+    const reelState = await loadShortDetailReelState({
+      kind: "fan",
+      sessionToken,
+      shortId,
+      tab: "pinned",
+    }).catch(() => null);
+
+    if (reelState) {
+      const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
+
+      return (
+        <ShortDetailReel
+          backHref={backHref}
+          fanTab="pinned"
+          initialIndex={reelState.initialIndex}
+          initialSurface={buildDetailSurfaceFromApi(detail)}
+          shortIds={reelState.shortIds}
+          source="fan"
+        />
+      );
+    }
+  }
+
+  const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
 
   return (
     <ImmersiveShortSurface
-      backHref={resolveShortDetailBackHref(routeState)}
+      backHref={backHref}
       creatorProfileOrigin={creatorProfileOrigin}
       mode="detail"
       surface={buildDetailSurfaceFromApi(detail)}

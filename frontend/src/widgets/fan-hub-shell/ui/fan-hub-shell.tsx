@@ -13,7 +13,10 @@ import type { FanHubState } from "@/entities/fan-profile";
 import { useCurrentViewer } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
 import { useFanLogoutEntry } from "@/features/fan-auth";
-import { buildFanProfileShortDetailHref } from "@/features/creator-navigation";
+import {
+  buildFanProfileLibraryMainHref,
+  buildFanProfileShortDetailHref,
+} from "@/features/creator-navigation";
 import { getShortThemeStyle } from "@/entities/short";
 import {
   BottomSheetMenu,
@@ -302,7 +305,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
               {activeTab === "library"
                 ? libraryItems.map((item) => (
                     <FanMediaTile
-                      href={buildFanProfileShortDetailHref(item.entryShort.id, "library")}
+                      href={buildFanProfileLibraryMainHref(item.main.id, item.entryShort.id)}
                       key={item.main.id}
                       label={buildLibraryTileLabel(item)}
                       short={item.entryShort}

@@ -1,6 +1,7 @@
 export {
   buildCreatorProfileHref,
   buildCreatorShortDetailHref,
+  buildFanProfileLibraryMainHref,
   buildFanProfileShortDetailHref,
   resolveCreatorProfileBackHref,
   resolveShortDetailBackHref,

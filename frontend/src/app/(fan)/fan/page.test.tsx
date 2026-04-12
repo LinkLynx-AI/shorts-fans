@@ -210,7 +210,7 @@ describe("FanPage", () => {
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Mina Rei quiet rooftop preview。" })).toHaveAttribute(
       "href",
-      "/shorts/short_mina_rooftop?fanTab=library&from=fan",
+      "/mains/main_mina_quiet_rooftop?fanTab=library&from=fan&fromShortId=short_mina_rooftop",
     );
   });
 
