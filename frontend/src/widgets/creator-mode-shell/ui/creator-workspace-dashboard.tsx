@@ -1,6 +1,5 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
 import {
   ChevronRight,
   Menu,
@@ -9,6 +8,12 @@ import Link from "next/link";
 
 import { useFanModeEntry } from "@/features/creator-entry";
 import type { CreatorSummary } from "@/entities/creator";
+import {
+  BottomSheetMenu,
+  BottomSheetMenuAction,
+  BottomSheetMenuClose,
+  BottomSheetMenuGroup,
+} from "@/shared/ui";
 
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
 import type {
@@ -34,8 +39,10 @@ function CreatorWorkspaceAccountMenu() {
   } = useFanModeEntry();
 
   return (
-    <Dialog.Root>
-      <Dialog.Trigger asChild>
+    <BottomSheetMenu
+      description="creator workspace から fan mode へ戻るメニュー"
+      title="アカウントメニュー"
+      trigger={
         <button
           aria-label="Account menu"
           className="inline-flex size-[34px] items-center justify-center bg-transparent text-[#1082c8] transition hover:bg-[#1082c8]/10"
@@ -44,55 +51,39 @@ function CreatorWorkspaceAccountMenu() {
         >
           <Menu aria-hidden="true" className="size-5" strokeWidth={1.9} />
         </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
-        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
-          <Dialog.Title className="sr-only">アカウントメニュー</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            creator workspace から fan mode へ戻るメニュー
-          </Dialog.Description>
-
-          <div
-            aria-hidden="true"
-            className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
-          />
-
-          <div className="rounded-[24px] bg-[#f3f6f8] py-1">
-            <Dialog.Close asChild>
-              <Link
-                className="flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
-                href="/creator/settings/profile"
-              >
-                <span>プロフィールを編集</span>
-                <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
-              </Link>
-            </Dialog.Close>
-            <button
-              className="flex min-h-[54px] w-full items-center justify-between border-t border-[rgba(167,220,249,0.24)] px-[18px] text-left text-sm font-bold text-foreground transition hover:bg-white/65"
-              disabled={isSubmitting}
-              onClick={() => {
-                void enterFanMode();
-              }}
-              type="button"
-            >
-              <span>{isSubmitting ? "Fan mode に切り替えています..." : "Fan mode に切り替え"}</span>
+      }
+    >
+      <BottomSheetMenuGroup>
+        <BottomSheetMenuClose asChild>
+          <BottomSheetMenuAction asChild>
+            <Link href="/creator/settings/profile">
+              <span>プロフィールを編集</span>
               <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
-            </button>
-          </div>
+            </Link>
+          </BottomSheetMenuAction>
+        </BottomSheetMenuClose>
+        <BottomSheetMenuAction
+          disabled={isSubmitting}
+          onClick={() => {
+            void enterFanMode();
+          }}
+          withDivider
+        >
+          <span>{isSubmitting ? "Fan mode に切り替えています..." : "Fan mode に切り替え"}</span>
+          <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+        </BottomSheetMenuAction>
+      </BottomSheetMenuGroup>
 
-          {errorMessage ? (
-            <p
-              aria-live="polite"
-              className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
-              role="alert"
-            >
-              {errorMessage}
-            </p>
-          ) : null}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      {errorMessage ? (
+        <p
+          aria-live="polite"
+          className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+          role="alert"
+        >
+          {errorMessage}
+        </p>
+      ) : null}
+    </BottomSheetMenu>
   );
 }
 
