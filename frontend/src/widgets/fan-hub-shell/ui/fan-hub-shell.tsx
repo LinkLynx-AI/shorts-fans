@@ -25,9 +25,13 @@ type FanHubShellProps = {
 function buildLibraryTileLabel(item: FanHubState["libraryItems"][number]): string {
   const caption = item.entryShort.caption.trim();
 
-  return caption
-    ? `${item.creator.displayName} ${caption}`
-    : `${item.creator.displayName} unlocked main`;
+  if (caption) {
+    return `${item.creator.displayName} ${caption}`;
+  }
+
+  const fallbackLabel = item.access.status === "owner" ? "owner preview main" : "unlocked main";
+
+  return `${item.creator.displayName} ${fallbackLabel}`;
 }
 
 function FanProfileAvatar() {
