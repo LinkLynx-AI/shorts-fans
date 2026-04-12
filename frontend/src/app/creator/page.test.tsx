@@ -6,6 +6,7 @@ import {
 import userEvent from "@testing-library/user-event";
 
 import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-viewer-active-mode";
+import { updateCreatorWorkspaceShortCaption } from "@/features/creator-workspace-short-caption/api/update-creator-workspace-short-caption";
 import { updateCreatorWorkspaceMainPrice } from "@/features/creator-main-price/api/update-creator-workspace-main-price";
 import { ApiError } from "@/shared/api";
 import { getCreatorWorkspaceSummary } from "@/widgets/creator-mode-shell/api/get-creator-workspace-summary";
@@ -57,6 +58,9 @@ vi.mock("@/features/creator-entry/api/switch-viewer-active-mode", () => ({
   switchViewerActiveMode: vi.fn(),
 }));
 
+vi.mock("@/features/creator-workspace-short-caption/api/update-creator-workspace-short-caption", () => ({
+  updateCreatorWorkspaceShortCaption: vi.fn(),
+}));
 vi.mock("@/features/creator-main-price/api/update-creator-workspace-main-price", async () => {
   const actual = await vi.importActual<typeof import("@/features/creator-main-price/api/update-creator-workspace-main-price")>("@/features/creator-main-price/api/update-creator-workspace-main-price");
 
@@ -90,6 +94,7 @@ type CreatorWorkspacePreviewShorts = Awaited<ReturnType<typeof getCreatorWorkspa
 type CreatorWorkspacePreviewMains = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMains>>;
 type CreatorWorkspacePreviewShortDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShortDetail>>;
 type CreatorWorkspacePreviewMainDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMainDetail>>;
+type CreatorWorkspaceShortCaptionUpdate = Awaited<ReturnType<typeof updateCreatorWorkspaceShortCaption>>;
 
 function createDeferredPromise<TResult = void>() {
   let resolvePromise: (value: TResult | PromiseLike<TResult>) => void = () => {};
@@ -311,6 +316,7 @@ describe("CreatorPage", () => {
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
     vi.mocked(switchViewerActiveMode).mockReset();
+    vi.mocked(updateCreatorWorkspaceShortCaption).mockReset();
     vi.mocked(updateCreatorWorkspaceMainPrice).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockReset();
     vi.mocked(getCreatorWorkspaceTopPerformers).mockReset();
@@ -324,6 +330,13 @@ describe("CreatorPage", () => {
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
     vi.mocked(getCreatorWorkspacePreviewShortDetail).mockResolvedValue(createCreatorWorkspacePreviewShortDetail());
     vi.mocked(getCreatorWorkspacePreviewMainDetail).mockResolvedValue(createCreatorWorkspacePreviewMainDetail());
+    vi.mocked(updateCreatorWorkspaceShortCaption).mockResolvedValue({
+      requestId: "req_creator_workspace_short_caption_put_001",
+      short: {
+        caption: "quiet rooftop preview.",
+        id: "short_quiet_rooftop",
+      },
+    } satisfies CreatorWorkspaceShortCaptionUpdate);
     vi.mocked(updateCreatorWorkspaceMainPrice).mockResolvedValue({
       main: {
         id: "main_quiet_rooftop",
@@ -708,7 +721,7 @@ describe("CreatorPage", () => {
     expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
   });
 
-  it("shows post actions that match the detail kind and closes the sheet without side effects", async () => {
+  it("shows post actions that match the detail kind and opens the caption dialog only for short detail", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -734,11 +747,15 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "captionの変更" }));
 
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "captionの変更" })).not.toBeInTheDocument();
-    });
+    expect(await screen.findByRole("dialog", { name: "captionを変更" })).toBeInTheDocument();
     expect(screen.getByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
     expect(mockedRouter.push).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "閉じる" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "captionを変更" })).not.toBeInTheDocument();
+    });
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Main" }));
@@ -756,7 +773,95 @@ describe("CreatorPage", () => {
       expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
     });
     expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "captionを変更" })).not.toBeInTheDocument();
     expect(mockedRouter.push).not.toHaveBeenCalled();
+  });
+
+  it("edits the short caption in a modal and refetches the preview detail after save", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspacePreviewShortDetail)
+      .mockResolvedValueOnce(createCreatorWorkspacePreviewShortDetail())
+      .mockResolvedValueOnce(createCreatorWorkspacePreviewShortDetail({
+        short: {
+          ...createCreatorWorkspacePreviewShortDetail().short,
+          caption: "",
+        },
+      }));
+    vi.mocked(updateCreatorWorkspaceShortCaption).mockResolvedValue({
+      requestId: "req_creator_workspace_short_caption_put_002",
+      short: {
+        caption: "",
+        id: "short_quiet_rooftop",
+      },
+    });
+
+    render(await CreatorPage());
+
+    await screen.findByText("0:16");
+    await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+    await user.click(screen.getByRole("button", { name: "captionの変更" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "captionを変更" });
+    expect(dialog).toBeInTheDocument();
+
+    const captionField = screen.getByRole("textbox", { name: "caption" });
+
+    expect(captionField).toHaveValue("quiet rooftop preview.");
+
+    await user.clear(captionField);
+    await user.click(screen.getByRole("button", { name: "保存する" }));
+
+    await waitFor(() => {
+      expect(updateCreatorWorkspaceShortCaption).toHaveBeenCalledWith("short_quiet_rooftop", "");
+    });
+    await waitFor(() => {
+      expect(getCreatorWorkspacePreviewShortDetail).toHaveBeenCalledTimes(2);
+    });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "captionを変更" })).not.toBeInTheDocument();
+    });
+  });
+
+  it("disables caption editing until the preview short detail has finished loading", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const user = userEvent.setup();
+    const deferred = createDeferredPromise<CreatorWorkspacePreviewShortDetail>();
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "creator",
+        canAccessCreatorMode: true,
+        id: "viewer_creator_001",
+      },
+      hasSession: true,
+    });
+    vi.mocked(getCreatorWorkspacePreviewShortDetail).mockReturnValueOnce(deferred.promise);
+
+    render(await CreatorPage());
+
+    await screen.findByText("0:16");
+    await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
+    await user.click(screen.getByRole("button", { name: "投稿操作" }));
+
+    expect(screen.getByRole("button", { name: "captionの変更" })).toBeDisabled();
+    expect(screen.queryByRole("dialog", { name: "captionを変更" })).not.toBeInTheDocument();
+
+    deferred.resolve(createCreatorWorkspacePreviewShortDetail());
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "captionの変更" })).toBeEnabled();
+    });
   });
 
   it("omits the price action from mock main details", async () => {

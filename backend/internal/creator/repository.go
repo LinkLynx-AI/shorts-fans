@@ -56,6 +56,7 @@ type queries interface {
 	ListShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppShort, error)
 	PutCreatorFollow(ctx context.Context, arg sqlc.PutCreatorFollowParams) error
 	SearchPublicCreatorProfiles(ctx context.Context, arg sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	UpdateShortCaption(ctx context.Context, arg sqlc.UpdateShortCaptionParams) (sqlc.AppShort, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	PublishCreatorProfile(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }

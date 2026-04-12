@@ -39,6 +39,7 @@ type repositoryStubQueries struct {
 	listShortsByCreator                func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
 	putCreatorFollow                   func(context.Context, sqlc.PutCreatorFollowParams) error
 	searchPublic                       func(context.Context, sqlc.SearchPublicCreatorProfilesParams) ([]sqlc.AppPublicCreatorProfile, error)
+	updateShortCaption                 func(context.Context, sqlc.UpdateShortCaptionParams) (sqlc.AppShort, error)
 	updateProfile                      func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	publishProfile                     func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 }
@@ -216,6 +217,13 @@ func (s repositoryStubQueries) SearchPublicCreatorProfiles(ctx context.Context, 
 		return nil, nil
 	}
 	return s.searchPublic(ctx, arg)
+}
+
+func (s repositoryStubQueries) UpdateShortCaption(ctx context.Context, arg sqlc.UpdateShortCaptionParams) (sqlc.AppShort, error) {
+	if s.updateShortCaption == nil {
+		return sqlc.AppShort{}, nil
+	}
+	return s.updateShortCaption(ctx, arg)
 }
 
 func (s repositoryStubQueries) UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {

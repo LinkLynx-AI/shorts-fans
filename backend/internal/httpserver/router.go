@@ -115,6 +115,11 @@ type CreatorUploadHandler interface {
 	CreatePackage(ctx context.Context, input creatorupload.CreatePackageInput) (creatorupload.CreatePackageResult, error)
 }
 
+// CreatorWorkspaceShortCaptionWriter は creator workspace short caption mutation を表します。
+type CreatorWorkspaceShortCaptionWriter interface {
+	UpdateWorkspaceShortCaption(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID, caption string) (creator.WorkspaceShortCaptionMutationResult, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -137,30 +142,31 @@ type FanProfileLibraryReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	AppEnv                    string
-	CreatorSearch             CreatorSearchReader
-	CreatorWorkspace          CreatorWorkspaceReader
-	CreatorWorkspaceMainPrice CreatorWorkspaceMainPriceWriter
-	CreatorUpload             CreatorUploadHandler
-	CreatorProfile            CreatorProfileReader
-	CreatorProfileShorts      CreatorProfileShortsReader
-	FanFeed                   FanFeedReader
-	FanUnlockMain             FanUnlockMainService
-	FanShortPin               FanShortPinWriter
-	CreatorFollow             CreatorFollowWriter
-	CreatorAvatarUpload       ViewerCreatorAvatarUploadHandler
-	CreatorRegistration       ViewerCreatorRegistrationWriter
-	FanProfileLibrary         FanProfileLibraryReader
-	FanProfileFollowing       FanProfileFollowingReader
-	FanProfilePinnedShorts    FanProfilePinnedShortsReader
-	FanProfileOverview        FanProfileOverviewReader
-	FanAuth                   FanAuthService
-	AuthCookie                AuthCookieConfig
-	ShortDisplayAssets        ShortDisplayAssetResolver
-	MainDisplayAssets         MainDisplayAssetResolver
-	ViewerActiveMode          ViewerActiveModeSwitcher
-	ViewerBootstrap           ViewerBootstrapReader
-	Dependencies              []Dependency
+	AppEnv                       string
+	CreatorSearch                CreatorSearchReader
+	CreatorWorkspace             CreatorWorkspaceReader
+	CreatorWorkspaceMainPrice    CreatorWorkspaceMainPriceWriter
+	CreatorWorkspaceShortCaption CreatorWorkspaceShortCaptionWriter
+	CreatorUpload                CreatorUploadHandler
+	CreatorProfile               CreatorProfileReader
+	CreatorProfileShorts         CreatorProfileShortsReader
+	FanFeed                      FanFeedReader
+	FanUnlockMain                FanUnlockMainService
+	FanShortPin                  FanShortPinWriter
+	CreatorFollow                CreatorFollowWriter
+	CreatorAvatarUpload          ViewerCreatorAvatarUploadHandler
+	CreatorRegistration          ViewerCreatorRegistrationWriter
+	FanProfileLibrary            FanProfileLibraryReader
+	FanProfileFollowing          FanProfileFollowingReader
+	FanProfilePinnedShorts       FanProfilePinnedShortsReader
+	FanProfileOverview           FanProfileOverviewReader
+	FanAuth                      FanAuthService
+	AuthCookie                   AuthCookieConfig
+	ShortDisplayAssets           ShortDisplayAssetResolver
+	MainDisplayAssets            MainDisplayAssetResolver
+	ViewerActiveMode             ViewerActiveModeSwitcher
+	ViewerBootstrap              ViewerBootstrapReader
+	Dependencies                 []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -226,7 +232,13 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.ShortDisplayAssets,
 		config.ViewerBootstrap,
 	)
-	registerCreatorWorkspaceRoutes(router, config.CreatorWorkspace, config.CreatorWorkspaceMainPrice, config.ViewerBootstrap)
+	registerCreatorWorkspaceRoutes(
+		router,
+		config.CreatorWorkspace,
+		config.CreatorWorkspaceMainPrice,
+		config.CreatorWorkspaceShortCaption,
+		config.ViewerBootstrap,
+	)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)

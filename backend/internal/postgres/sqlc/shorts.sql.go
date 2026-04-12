@@ -395,6 +395,40 @@ func (q *Queries) PutPinnedShort(ctx context.Context, arg PutPinnedShortParams) 
 	return err
 }
 
+const updateShortCaption = `-- name: UpdateShortCaption :one
+UPDATE app.shorts
+SET
+    caption = $1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $2
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+`
+
+type UpdateShortCaptionParams struct {
+	Caption pgtype.Text
+	ID      pgtype.UUID
+}
+
+func (q *Queries) UpdateShortCaption(ctx context.Context, arg UpdateShortCaptionParams) (AppShort, error) {
+	row := q.db.QueryRow(ctx, updateShortCaption, arg.Caption, arg.ID)
+	var i AppShort
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.CanonicalMainID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.ApprovedForPublishAt,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Caption,
+	)
+	return i, err
+}
+
 const updateShortState = `-- name: UpdateShortState :one
 UPDATE app.shorts
 SET

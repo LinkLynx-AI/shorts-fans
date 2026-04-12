@@ -22,8 +22,9 @@ const (
 	creatorWorkspaceAuthRequiredMessage         = "creator workspace requires authentication"
 	creatorWorkspaceMainDetailRequestScope      = "creator_workspace_main_preview_detail"
 	creatorWorkspaceMainListRequestScope        = "creator_workspace_mains"
-	creatorWorkspaceMainPriceUpdateRequestScope = "creator_workspace_main_price_update"
 	creatorWorkspaceRequestScope                = "creator_workspace"
+	creatorWorkspaceShortCaptionPutRequestScope = "creator_workspace_short_caption_put"
+	creatorWorkspaceMainPriceUpdateRequestScope = "creator_workspace_main_price_update"
 	creatorWorkspaceShortDetailRequestScope     = "creator_workspace_short_preview_detail"
 	creatorWorkspaceShortListRequestScope       = "creator_workspace_shorts"
 	creatorWorkspaceTopPerformersScope          = "creator_workspace_top_performers"
@@ -65,6 +66,19 @@ type creatorWorkspacePreviewShortDetailResponseData struct {
 
 type creatorWorkspacePreviewMainDetailResponseData struct {
 	Preview creatorWorkspacePreviewMainDetailPayload `json:"preview"`
+}
+
+type creatorWorkspaceShortCaptionPutRequest struct {
+	Caption *string `json:"caption"`
+}
+
+type creatorWorkspaceShortCaptionResponseData struct {
+	Short creatorWorkspaceShortCaptionPayload `json:"short"`
+}
+
+type creatorWorkspaceShortCaptionPayload struct {
+	Caption string `json:"caption"`
+	ID      string `json:"id"`
 }
 
 type creatorWorkspaceTopPerformersResponseData struct {
@@ -167,61 +181,75 @@ type creatorWorkspacePreviewCursorPayload struct {
 func registerCreatorWorkspaceRoutes(
 	router gin.IRouter,
 	reader CreatorWorkspaceReader,
-	writer CreatorWorkspaceMainPriceWriter,
+	mainPriceWriter CreatorWorkspaceMainPriceWriter,
+	shortCaptionWriter CreatorWorkspaceShortCaptionWriter,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
-	if router == nil || reader == nil || viewerBootstrap == nil {
+	if router == nil || viewerBootstrap == nil {
 		return
 	}
 
-	router.GET(
-		"/api/creator/workspace",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceRequestScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspace(c, reader)
-		},
-	)
-	router.GET(
-		"/api/creator/workspace/shorts",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortListRequestScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspacePreviewShorts(c, reader)
-		},
-	)
-	router.GET(
-		"/api/creator/workspace/shorts/:shortId/preview",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspacePreviewShortDetail(c, reader)
-		},
-	)
-	router.GET(
-		"/api/creator/workspace/mains",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainListRequestScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspacePreviewMains(c, reader)
-		},
-	)
-	router.GET(
-		"/api/creator/workspace/mains/:mainId/preview",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspacePreviewMainDetail(c, reader)
-		},
-	)
-	router.GET(
-		"/api/creator/workspace/top-performers",
-		buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceTopPerformersScope, creatorWorkspaceAuthRequiredMessage),
-		func(c *gin.Context) {
-			handleCreatorWorkspaceTopPerformers(c, reader)
-		},
-	)
-	if writer != nil {
+	if reader != nil {
+		router.GET(
+			"/api/creator/workspace",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspace(c, reader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/shorts",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortListRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspacePreviewShorts(c, reader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/shorts/:shortId/preview",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspacePreviewShortDetail(c, reader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/mains",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainListRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspacePreviewMains(c, reader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/mains/:mainId/preview",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainDetailRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspacePreviewMainDetail(c, reader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/top-performers",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceTopPerformersScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceTopPerformers(c, reader)
+			},
+		)
+	}
+
+	if mainPriceWriter != nil {
 		router.PUT(
 			"/api/creator/workspace/mains/:mainId/price",
 			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainPriceUpdateRequestScope, creatorWorkspaceAuthRequiredMessage),
 			func(c *gin.Context) {
-				handleCreatorWorkspaceMainPriceUpdate(c, writer)
+				handleCreatorWorkspaceMainPriceUpdate(c, mainPriceWriter)
+			},
+		)
+	}
+
+	if shortCaptionWriter != nil {
+		router.PUT(
+			"/api/creator/workspace/shorts/:shortId/caption",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortCaptionPutRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceShortCaptionPut(c, shortCaptionWriter)
 			},
 		)
 	}
@@ -407,6 +435,61 @@ func handleCreatorWorkspacePreviewMains(c *gin.Context, reader CreatorWorkspaceR
 				HasNext:    nextCursor != nil,
 				NextCursor: encodeCreatorWorkspacePreviewCursor(nextCursor),
 			},
+		},
+		Error: nil,
+	})
+}
+
+func handleCreatorWorkspaceShortCaptionPut(c *gin.Context, writer CreatorWorkspaceShortCaptionWriter) {
+	shortID, err := shorts.ParsePublicShortID(c.Param("shortId"))
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortCaptionPutRequestScope, http.StatusNotFound, "not_found", "creator workspace preview was not found")
+		return
+	}
+
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortCaptionPutRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	var request creatorWorkspaceShortCaptionPutRequest
+	if !decodeViewerCreatorEntryJSON(
+		c,
+		&request,
+		"invalid_request",
+		"creator workspace short caption request is invalid",
+		creatorWorkspaceShortCaptionPutRequestScope,
+	) {
+		return
+	}
+	if request.Caption == nil {
+		writeCreatorWorkspaceListError(
+			c,
+			creatorWorkspaceShortCaptionPutRequestScope,
+			http.StatusBadRequest,
+			"invalid_request",
+			"creator workspace short caption request is invalid",
+		)
+		return
+	}
+
+	result, err := writer.UpdateWorkspaceShortCaption(c.Request.Context(), viewerUserID, shortID, *request.Caption)
+	if err != nil {
+		writeCreatorWorkspaceReadError(c, creatorWorkspaceShortCaptionPutRequestScope, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceShortCaptionResponseData]{
+		Data: &creatorWorkspaceShortCaptionResponseData{
+			Short: creatorWorkspaceShortCaptionPayload{
+				Caption: result.Caption,
+				ID:      shortPublicID(result.ShortID),
+			},
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceShortCaptionPutRequestScope),
+			Page:      nil,
 		},
 		Error: nil,
 	})
