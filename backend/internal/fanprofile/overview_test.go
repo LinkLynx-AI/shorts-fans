@@ -39,6 +39,10 @@ func (s queriesStub) ListFanProfileFollowingItems(context.Context, sqlc.ListFanP
 	return nil, nil
 }
 
+func (s queriesStub) ListFanProfileLibraryItems(context.Context, sqlc.ListFanProfileLibraryItemsParams) ([]sqlc.ListFanProfileLibraryItemsRow, error) {
+	return nil, nil
+}
+
 func (s queriesStub) ListFanProfilePinnedShortItems(context.Context, sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error) {
 	return nil, nil
 }

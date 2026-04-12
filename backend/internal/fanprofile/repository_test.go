@@ -13,6 +13,7 @@ import (
 
 type repositoryStubQueries struct {
 	listFollowing    func(context.Context, sqlc.ListFanProfileFollowingItemsParams) ([]sqlc.ListFanProfileFollowingItemsRow, error)
+	listLibrary      func(context.Context, sqlc.ListFanProfileLibraryItemsParams) ([]sqlc.ListFanProfileLibraryItemsRow, error)
 	listPinnedShorts func(context.Context, sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error)
 }
 
@@ -38,6 +39,14 @@ func (s repositoryStubQueries) ListFanProfileFollowingItems(ctx context.Context,
 	}
 
 	return s.listFollowing(ctx, arg)
+}
+
+func (s repositoryStubQueries) ListFanProfileLibraryItems(ctx context.Context, arg sqlc.ListFanProfileLibraryItemsParams) ([]sqlc.ListFanProfileLibraryItemsRow, error) {
+	if s.listLibrary == nil {
+		return nil, nil
+	}
+
+	return s.listLibrary(ctx, arg)
 }
 
 func (s repositoryStubQueries) ListFanProfilePinnedShortItems(ctx context.Context, arg sqlc.ListFanProfilePinnedShortItemsParams) ([]sqlc.ListFanProfilePinnedShortItemsRow, error) {
