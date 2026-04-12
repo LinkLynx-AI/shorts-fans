@@ -168,6 +168,7 @@
 
 | status | code | notes |
 | --- | --- | --- |
+| `400` | `invalid_request` | invalid JSON、unknown field、`caption` 欠落 |
 | `401` | `auth_required` | session 不在 |
 | `403` | `creator_mode_unavailable` | approved creator capability なし |
 | `404` | `not_found` | preview 対象を解決できない、または caller 所有の short ではない |

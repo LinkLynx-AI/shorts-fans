@@ -29,9 +29,9 @@ type UpdateCreatorWorkspaceShortCaptionOptions = {
 };
 
 function buildCreatorWorkspaceShortCaptionPath(shortId: string): `/${string}` {
-  const resolvedShortID = encodeURIComponent(shortId.trim());
+  const resolvedShortId = encodeURIComponent(shortId.trim());
 
-  return `/api/creator/workspace/shorts/${resolvedShortID}/caption`;
+  return `/api/creator/workspace/shorts/${resolvedShortId}/caption`;
 }
 
 /**
