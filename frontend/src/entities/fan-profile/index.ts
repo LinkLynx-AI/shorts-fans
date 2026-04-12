@@ -3,6 +3,10 @@ export {
 } from "./api/fetch-fan-profile-following";
 export type { FanProfileFollowingPage } from "./api/fetch-fan-profile-following";
 export {
+  fetchFanProfileLibraryPage,
+} from "./api/fetch-fan-profile-library";
+export type { FanProfileLibraryPage } from "./api/fetch-fan-profile-library";
+export {
   fetchFanProfilePinnedShortsPage,
 } from "./api/fetch-fan-profile-pinned-shorts";
 export type { FanProfilePinnedShortsPage } from "./api/fetch-fan-profile-pinned-shorts";

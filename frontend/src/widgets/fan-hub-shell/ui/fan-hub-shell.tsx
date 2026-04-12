@@ -312,6 +312,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
               {activeTab === "library"
                 ? libraryItems.map((item) => (
                     <FanMediaTile
+                      href={buildFanProfileShortDetailHref(item.entryShort.id, "library")}
                       key={item.main.id}
                       label={buildLibraryTileLabel(item)}
                       short={item.entryShort}

@@ -157,6 +157,7 @@ func main() {
 			CreatorFollow:          creatorRepository,
 			CreatorAvatarUpload:    creatorAvatarService,
 			CreatorRegistration:    creatorRepository,
+			FanProfileLibrary:      fanProfileRepository,
 			FanProfileOverview:     fanProfileRepository,
 			FanProfileFollowing:    fanProfileRepository,
 			FanProfilePinnedShorts: fanProfileRepository,

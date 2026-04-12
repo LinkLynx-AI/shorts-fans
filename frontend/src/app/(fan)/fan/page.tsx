@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 
 import {
+  fetchFanProfileLibraryPage,
   fetchFanProfilePinnedShortsPage,
   fetchFanProfileOverview,
   getFanHubState,
@@ -23,6 +24,7 @@ export default async function FanPage({
   const { tab } = await searchParams;
   const activeTab = normalizeFanHubTab(tab);
   const state = getFanHubState(activeTab);
+  let libraryItems = state.libraryItems;
   let overview;
   let pinnedItems = state.pinnedItems;
 
@@ -36,7 +38,13 @@ export default async function FanPage({
       overview = nextOverview;
       pinnedItems = pinnedPage.items;
     } else {
-      overview = await fetchFanProfileOverview({ sessionToken });
+      const [nextOverview, libraryPage] = await Promise.all([
+        fetchFanProfileOverview({ sessionToken }),
+        fetchFanProfileLibraryPage({ sessionToken }),
+      ]);
+
+      overview = nextOverview;
+      libraryItems = libraryPage.items;
     }
   } catch (error) {
     if (isAuthRequiredApiError(error)) {
@@ -46,5 +54,5 @@ export default async function FanPage({
     throw error;
   }
 
-  return <FanHubShell state={{ ...state, overview, pinnedItems }} />;
+  return <FanHubShell state={{ ...state, libraryItems, overview, pinnedItems }} />;
 }

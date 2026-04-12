@@ -1,7 +1,6 @@
 import { getCreatorById, type CreatorSummary } from "@/entities/creator";
 import {
   getShortById,
-  type ShortMediaAsset,
   type ShortPreviewMeta,
 } from "@/entities/short";
 
@@ -33,7 +32,7 @@ export type FanPinnedShortSummary = {
   canonicalMainId: string;
   creatorId: string;
   id: string;
-  media: ShortMediaAsset;
+  media: ShortPreviewMeta["media"];
   previewDurationSeconds: number;
 };
 
@@ -49,7 +48,6 @@ export type FanLibraryItem = {
     durationSeconds: number;
     id: string;
   };
-  playbackLabel: string;
 };
 
 export type FanSettingsSection = {
@@ -73,7 +71,6 @@ const libraryDefinitions = [
       durationSeconds: 720,
       id: "main_aoi_soft_light",
     },
-    playbackLabel: "3:42 left",
     shortId: "softlight",
   },
   {
@@ -81,7 +78,6 @@ const libraryDefinitions = [
       durationSeconds: 600,
       id: "main_aoi_balcony_cut",
     },
-    playbackLabel: "4:48 left",
     shortId: "balcony",
   },
   {
@@ -89,7 +85,6 @@ const libraryDefinitions = [
       durationSeconds: 660,
       id: "main_mina_hotel_mirror",
     },
-    playbackLabel: "6:26 left",
     shortId: "mirror",
   },
 ] as const;
@@ -155,7 +150,6 @@ const libraryItems: readonly FanLibraryItem[] = libraryDefinitions.map((definiti
     creator: requireCreator(entryShort.creatorId),
     entryShort,
     main: definition.main,
-    playbackLabel: definition.playbackLabel,
   };
 });
 

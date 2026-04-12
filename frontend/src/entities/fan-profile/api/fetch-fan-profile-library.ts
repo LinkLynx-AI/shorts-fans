@@ -1,38 +1,48 @@
 import { z } from "zod";
 
 import { creatorSummarySchema } from "@/entities/creator";
+import { publicShortSummarySchema } from "@/entities/short";
 import { requestJson } from "@/shared/api";
 
+import type { FanLibraryItem } from "../model/fan-profile";
 import {
   buildFanProfileCursorPath,
   buildFanProfileRequestHeaders,
   fanProfileCursorMetaSchema,
   type FanProfileCursorPage,
 } from "./shared";
-import type { FanFollowingItem } from "../model/fan-profile";
 
-const fanFollowingItemSchema = z.object({
+const mainAccessStateSchema = z.object({
+  mainId: z.string().min(1),
+  reason: z.enum(["owner_preview", "session_unlocked"]),
+  status: z.enum(["owner", "unlocked"]),
+});
+
+const fanProfileLibraryItemSchema = z.object({
+  access: mainAccessStateSchema,
   creator: creatorSummarySchema,
-  viewer: z.object({
-    isFollowing: z.literal(true),
+  entryShort: publicShortSummarySchema,
+  main: z.object({
+    durationSeconds: z.number().int().positive(),
+    id: z.string().min(1),
   }),
 });
 
-const fanProfileFollowingResponseSchema = z.object({
+const fanProfileLibraryResponseSchema = z.object({
   data: z.object({
-    items: z.array(fanFollowingItemSchema),
+    items: z.array(fanProfileLibraryItemSchema),
   }),
   error: z.null(),
   meta: fanProfileCursorMetaSchema,
 });
 
-export type FanProfileFollowingPage = {
-  items: readonly FanFollowingItem[];
+export type FanProfileLibraryPage = {
+  items: readonly FanLibraryItem[];
   page: FanProfileCursorPage;
   requestId: string;
 };
 
-type FetchFanProfileFollowingPageOptions = {
+type FetchFanProfileLibraryPageOptions = {
   baseUrl?: string | undefined;
   cursor?: string | undefined;
   fetcher?: typeof fetch | undefined;
@@ -41,15 +51,15 @@ type FetchFanProfileFollowingPageOptions = {
 };
 
 /**
- * fan profile following API から creator 一覧 1 page を取得する。
+ * fan profile library API から main 一覧 1 page を取得する。
  */
-export async function fetchFanProfileFollowingPage({
+export async function fetchFanProfileLibraryPage({
   baseUrl,
   cursor,
   fetcher,
   sessionToken,
   signal,
-}: FetchFanProfileFollowingPageOptions = {}): Promise<FanProfileFollowingPage> {
+}: FetchFanProfileLibraryPageOptions = {}): Promise<FanProfileLibraryPage> {
   const response = await requestJson({
     ...(baseUrl ? { baseUrl } : {}),
     ...(fetcher ? { fetcher } : {}),
@@ -58,8 +68,8 @@ export async function fetchFanProfileFollowingPage({
       headers: buildFanProfileRequestHeaders(sessionToken),
       ...(signal ? { signal } : {}),
     },
-    path: buildFanProfileCursorPath("/api/fan/profile/following", cursor),
-    schema: fanProfileFollowingResponseSchema,
+    path: buildFanProfileCursorPath("/api/fan/profile/library", cursor),
+    schema: fanProfileLibraryResponseSchema,
   });
 
   return {

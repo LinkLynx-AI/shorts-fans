@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 
 import { CurrentViewerProvider, ViewerSessionProvider } from "@/entities/viewer";
 import {
+  fetchFanProfileLibraryPage,
   fetchFanProfileOverview,
   fetchFanProfilePinnedShortsPage,
 } from "@/entities/fan-profile";
@@ -40,6 +41,7 @@ vi.mock("@/entities/fan-profile", async () => {
 
   return {
     ...actual,
+    fetchFanProfileLibraryPage: vi.fn(),
     fetchFanProfileOverview: vi.fn(),
     fetchFanProfilePinnedShortsPage: vi.fn(),
   };
@@ -64,6 +66,7 @@ describe("FanPage", () => {
     mockedRouter.push.mockReset();
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
+    vi.mocked(fetchFanProfileLibraryPage).mockReset();
     vi.mocked(fetchFanProfileOverview).mockReset();
     vi.mocked(fetchFanProfilePinnedShortsPage).mockReset();
   });
@@ -136,7 +139,7 @@ describe("FanPage", () => {
     expect(screen.getByText("9")).toBeInTheDocument();
   });
 
-  it("does not fetch pinned shorts when the library tab is active", async () => {
+  it("fetches overview and library items when the library tab is active", async () => {
     cookiesMock.mockResolvedValue({
       get: () => ({
         value: "valid-session",
@@ -150,6 +153,47 @@ describe("FanPage", () => {
       },
       title: "Archive from API",
     });
+    vi.mocked(fetchFanProfileLibraryPage).mockResolvedValue({
+      items: [
+        {
+          access: {
+            mainId: "main_mina_quiet_rooftop",
+            reason: "session_unlocked",
+            status: "unlocked",
+          },
+          creator: {
+            avatar: null,
+            bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+            displayName: "Mina Rei",
+            handle: "@minarei",
+            id: "creator_mina_rei",
+          },
+          entryShort: {
+            caption: "quiet rooftop preview。",
+            canonicalMainId: "main_mina_quiet_rooftop",
+            creatorId: "creator_mina_rei",
+            id: "short_mina_rooftop",
+            media: {
+              durationSeconds: 16,
+              id: "asset_short_mina_rooftop",
+              kind: "video",
+              posterUrl: "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+              url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
+            },
+            previewDurationSeconds: 16,
+          },
+          main: {
+            durationSeconds: 480,
+            id: "main_mina_quiet_rooftop",
+          },
+        },
+      ],
+      page: {
+        hasNext: false,
+        nextCursor: null,
+      },
+      requestId: "req_fan_profile_library_001",
+    });
 
     renderWithFanAuthDialog(
       await FanPage({
@@ -160,7 +204,14 @@ describe("FanPage", () => {
     );
 
     expect(fetchFanProfilePinnedShortsPage).not.toHaveBeenCalled();
+    expect(fetchFanProfileLibraryPage).toHaveBeenCalledWith({
+      sessionToken: "valid-session",
+    });
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Mina Rei quiet rooftop preview。" })).toHaveAttribute(
+      "href",
+      "/shorts/short_mina_rooftop?fanTab=library&from=fan",
+    );
   });
 
   it("opens the shared auth dialog when the overview api responds with auth_required", async () => {
@@ -221,6 +272,44 @@ describe("FanPage", () => {
     renderWithFanAuthDialog(
       await FanPage({
         searchParams: Promise.resolve({}),
+      }),
+    );
+
+    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+  });
+
+  it("opens the shared auth dialog when the library api responds with auth_required", async () => {
+    cookiesMock.mockResolvedValue({
+      get: () => ({
+        value: "valid-session",
+      }),
+    });
+    vi.mocked(fetchFanProfileOverview).mockResolvedValue({
+      counts: {
+        following: 9,
+        library: 7,
+        pinnedShorts: 8,
+      },
+      title: "Archive from API",
+    });
+    vi.mocked(fetchFanProfileLibraryPage).mockRejectedValue(
+      new ApiError("unauthorized", {
+        code: "http",
+        details: JSON.stringify({
+          error: {
+            code: "auth_required",
+            message: "fan profile requires authentication",
+          },
+        }),
+        status: 401,
+      }),
+    );
+
+    renderWithFanAuthDialog(
+      await FanPage({
+        searchParams: Promise.resolve({
+          tab: "library",
+        }),
       }),
     );
 

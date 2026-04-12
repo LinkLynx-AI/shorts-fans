@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
@@ -256,27 +255,15 @@ func buildFeedCreatorSummary(item feed.Item) (creatorSummary, error) {
 }
 
 func buildFeedShortSummary(item feed.Item, shortDisplayAssets ShortDisplayAssetResolver) (feedShortSummary, error) {
-	if shortDisplayAssets == nil {
-		return feedShortSummary{}, errors.New("short display asset resolver is required")
-	}
-
-	displayAsset, err := shortDisplayAssets.ResolveShortDisplayAsset(media.ShortDisplaySource{
-		AssetID:    item.Short.MediaAssetID,
-		ShortID:    item.Short.ID,
-		DurationMS: item.Short.PreviewDurationSeconds * 1000,
-	}, media.AccessBoundaryPublic)
-	if err != nil {
-		return feedShortSummary{}, err
-	}
-
-	return feedShortSummary{
-		Caption:                item.Short.Caption,
-		CanonicalMainID:        shorts.FormatPublicMainID(item.Short.CanonicalMainID),
-		CreatorID:              creator.FormatPublicID(item.Short.CreatorUserID),
-		ID:                     shorts.FormatPublicShortID(item.Short.ID),
-		Media:                  buildVideoMediaAsset(displayAsset),
-		PreviewDurationSeconds: item.Short.PreviewDurationSeconds,
-	}, nil
+	return buildPublicShortSummaryFields(
+		item.Short.ID,
+		item.Short.CanonicalMainID,
+		item.Short.CreatorUserID,
+		item.Short.Caption,
+		item.Short.MediaAssetID,
+		item.Short.PreviewDurationSeconds,
+		shortDisplayAssets,
+	)
 }
 
 func buildVideoMediaAsset(asset media.VideoDisplayAsset) mediaAsset {

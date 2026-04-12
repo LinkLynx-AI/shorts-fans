@@ -3,14 +3,11 @@ package httpserver
 import (
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -79,10 +76,6 @@ func buildFanProfilePinnedShortItem(
 	item fanprofile.PinnedShortItem,
 	shortDisplayAssets ShortDisplayAssetResolver,
 ) (fanProfilePinnedShortItem, error) {
-	if shortDisplayAssets == nil {
-		return fanProfilePinnedShortItem{}, errors.New("short display asset resolver is required")
-	}
-
 	creator, err := buildCreatorSummaryFields(
 		item.CreatorUserID,
 		item.CreatorDisplayName,
@@ -94,25 +87,22 @@ func buildFanProfilePinnedShortItem(
 		return fanProfilePinnedShortItem{}, err
 	}
 
-	displayAsset, err := shortDisplayAssets.ResolveShortDisplayAsset(media.ShortDisplaySource{
-		AssetID:    item.ShortMediaAssetID,
-		ShortID:    item.ShortID,
-		DurationMS: item.ShortPreviewDurationSeconds * 1000,
-	}, media.AccessBoundaryPublic)
+	short, err := buildPublicShortSummaryFields(
+		item.ShortID,
+		item.ShortCanonicalMainID,
+		item.CreatorUserID,
+		item.ShortCaption,
+		item.ShortMediaAssetID,
+		item.ShortPreviewDurationSeconds,
+		shortDisplayAssets,
+	)
 	if err != nil {
 		return fanProfilePinnedShortItem{}, err
 	}
 
 	return fanProfilePinnedShortItem{
 		Creator: creator,
-		Short: feedShortSummary{
-			Caption:                item.ShortCaption,
-			CanonicalMainID:        shorts.FormatPublicMainID(item.ShortCanonicalMainID),
-			CreatorID:              creator.ID,
-			ID:                     shorts.FormatPublicShortID(item.ShortID),
-			Media:                  buildVideoMediaAsset(displayAsset),
-			PreviewDurationSeconds: item.ShortPreviewDurationSeconds,
-		},
+		Short:   short,
 	}, nil
 }
 
