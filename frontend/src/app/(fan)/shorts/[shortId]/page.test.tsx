@@ -59,7 +59,40 @@ describe("ShortDetailPage", () => {
     });
     mockedLoadShortDetailReelState.mockResolvedValue({
       initialIndex: 1,
-      surfaces: [],
+      shortIds: ["short_mina_mirror", "short_mina_rooftop"],
+    });
+    mockedGetPublicShortDetail.mockResolvedValue({
+      creator: {
+        avatar: null,
+        bio: "quiet rooftop と hotel light の preview を軸に投稿。",
+        displayName: "Mina Rei",
+        handle: "@minarei",
+        id: "creator_mina_rei",
+      },
+      short: {
+        caption: "quiet rooftop preview",
+        canonicalMainId: "main_mina_quiet_rooftop",
+        creatorId: "creator_mina_rei",
+        id: "short_mina_rooftop",
+        media: {
+          durationSeconds: 16,
+          id: "asset_short_mina_rooftop",
+          kind: "video",
+          posterUrl: "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+          url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
+        },
+        previewDurationSeconds: 16,
+      },
+      unlockCta: {
+        mainDurationSeconds: 480,
+        priceJpy: 1200,
+        resumePositionSeconds: null,
+        state: "unlock_available",
+      },
+      viewer: {
+        isFollowingCreator: true,
+        isPinned: true,
+      },
     });
 
     render(
@@ -82,8 +115,11 @@ describe("ShortDetailPage", () => {
       sessionToken: "valid-session",
       shortId: "short_mina_rooftop",
     });
+    expect(mockedGetPublicShortDetail).toHaveBeenCalledWith({
+      sessionToken: "valid-session",
+      shortId: "short_mina_rooftop",
+    });
     expect(screen.getByTestId("short-detail-reel")).toHaveTextContent("creator:1");
-    expect(mockedGetPublicShortDetail).not.toHaveBeenCalled();
   });
 
   it("falls back to a single short detail when the fan pinned reel cannot be built", async () => {

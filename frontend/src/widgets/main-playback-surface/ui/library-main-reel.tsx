@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import type { FanLibraryItem } from "@/entities/fan-profile";
 import { getShortThemeStyle } from "@/entities/short";
+import { buildFanProfileShortDetailHref } from "@/features/creator-navigation";
 import { VerticalSnapReel } from "@/shared/ui";
 
 import { resolveLibraryMainPlaybackSurface } from "../api/resolve-library-main-playback-surface";
@@ -20,6 +21,9 @@ type LibraryMainReelProps = {
 type LibraryMainItemState =
   | {
       kind: "error";
+    }
+  | {
+      kind: "locked";
     }
   | {
       kind: "loading";
@@ -103,16 +107,23 @@ export function LibraryMainReel({
 
       const task = (async () => {
         try {
-          const surface = await resolveLibraryMainPlaybackSurface(item);
+          const resolution = await resolveLibraryMainPlaybackSurface(item);
 
           if (!isMountedRef.current) {
             return;
           }
 
-          setItemState(itemKey, {
-            kind: "ready",
-            surface,
-          });
+          setItemState(
+            itemKey,
+            resolution.kind === "ready"
+              ? {
+                  kind: "ready",
+                  surface: resolution.surface,
+                }
+              : {
+                  kind: "locked",
+                },
+          );
         } catch {
           if (!isMountedRef.current) {
             return;
@@ -146,6 +157,13 @@ export function LibraryMainReel({
                 fallbackHref={backHref}
                 isActive={isActive}
                 surface={itemState.surface}
+              />
+            ) : itemState?.kind === "locked" ? (
+              <MainPlaybackLockedState
+                description="この main は short 側の確認導線を通ってから開き直してください。"
+                fallbackHref={buildFanProfileShortDetailHref(item.entryShort.id, "library")}
+                fallbackLabel="short から開き直す"
+                title="この main を開くには確認が必要です。"
               />
             ) : itemState?.kind === "error" ? (
               <MainPlaybackLockedState

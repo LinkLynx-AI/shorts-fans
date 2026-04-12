@@ -19,6 +19,24 @@ const paramsSchema = z.object({
   shortId: z.string().min(1),
 });
 
+async function loadShortDetailOrNotFound(
+  sessionToken: string | undefined,
+  shortId: string,
+) {
+  try {
+    return await getPublicShortDetail({
+      sessionToken,
+      shortId,
+    });
+  } catch (error) {
+    if (error instanceof ApiError && error.code === "http" && error.status === 404) {
+      notFound();
+    }
+
+    throw error;
+  }
+}
+
 export default async function ShortDetailPage({
   params,
   searchParams,
@@ -79,12 +97,15 @@ export default async function ShortDetailPage({
     }).catch(() => null);
 
     if (reelState) {
+      const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
+
       return (
         <ShortDetailReel
           backHref={backHref}
           initialIndex={reelState.initialIndex}
+          initialSurface={buildDetailSurfaceFromApi(detail)}
+          shortIds={reelState.shortIds}
           source="creator"
-          surfaces={reelState.surfaces}
         />
       );
     }
@@ -99,32 +120,22 @@ export default async function ShortDetailPage({
     }).catch(() => null);
 
     if (reelState) {
+      const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
+
       return (
         <ShortDetailReel
           backHref={backHref}
           fanTab="pinned"
           initialIndex={reelState.initialIndex}
+          initialSurface={buildDetailSurfaceFromApi(detail)}
+          shortIds={reelState.shortIds}
           source="fan"
-          surfaces={reelState.surfaces}
         />
       );
     }
   }
 
-  let detail: Awaited<ReturnType<typeof getPublicShortDetail>>;
-
-  try {
-    detail = await getPublicShortDetail({
-      sessionToken,
-      shortId,
-    });
-  } catch (error) {
-    if (error instanceof ApiError && error.code === "http" && error.status === 404) {
-      notFound();
-    }
-
-    throw error;
-  }
+  const detail = await loadShortDetailOrNotFound(sessionToken, shortId);
 
   return (
     <ImmersiveShortSurface

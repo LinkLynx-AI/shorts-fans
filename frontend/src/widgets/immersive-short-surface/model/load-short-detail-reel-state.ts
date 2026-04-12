@@ -5,17 +5,11 @@ import {
   fetchFanProfilePinnedShortsPage,
   type FanHubTab,
 } from "@/entities/fan-profile";
-import {
-  getPublicShortDetail,
-} from "@/entities/short";
-
-import { buildDetailSurfaceFromApi } from "./api-short-surface";
-import type { DetailShortSurface } from "./short-surface";
 
 export type ShortDetailReelState = {
   initialIndex: number;
+  shortIds: readonly string[];
   sourceTab?: FanHubTab | undefined;
-  surfaces: readonly DetailShortSurface[];
 };
 
 type LoadShortDetailReelStateOptions =
@@ -63,18 +57,9 @@ export async function loadShortDetailReelState(
     return null;
   }
 
-  const details = await Promise.all(
-    shortIds.map((shortId) =>
-      getPublicShortDetail({
-        sessionToken: options.sessionToken,
-        shortId,
-      }),
-    ),
-  );
-
   return {
     initialIndex,
+    shortIds,
     ...(options.kind === "fan" ? { sourceTab: options.tab } : {}),
-    surfaces: details.map(buildDetailSurfaceFromApi),
   };
 }
