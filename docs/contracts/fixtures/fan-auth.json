@@ -1,42 +1,82 @@
 {
-  "signInChallengeSuccess": {
-    "status": 200,
-    "body": {
-      "data": {
-        "challengeToken": "challenge_token_sign_in_001",
-        "expiresAt": "2026-04-06T19:00:00Z"
-      },
-      "meta": {
-        "requestId": "req_fan_auth_sign_in_challenge_001",
-        "page": null
-      },
-      "error": null
-    }
-  },
-  "signUpChallengeConflict": {
-    "status": 409,
-    "body": {
-      "data": null,
-      "meta": {
-        "requestId": "req_fan_auth_sign_up_challenge_001",
-        "page": null
-      },
-      "error": {
-        "code": "email_already_registered",
-        "message": "email is already registered"
-      }
-    }
-  },
-  "signInSessionSuccess": {
-    "status": 204,
+  "signInSuccess": {
     "headers": {
       "set-cookie": "shorts_fans_session=raw-session-token; Path=/; HttpOnly; SameSite=Lax"
-    }
+    },
+    "status": 204
+  },
+  "signInInvalidCredentials": {
+    "body": {
+      "data": null,
+      "error": {
+        "code": "invalid_credentials",
+        "message": "email or password is invalid"
+      },
+      "meta": {
+        "page": null,
+        "requestId": "req_fan_auth_sign_in_invalid_credentials_001"
+      }
+    },
+    "status": 401
+  },
+  "signInConfirmationRequired": {
+    "body": {
+      "data": null,
+      "error": {
+        "code": "confirmation_required",
+        "message": "email confirmation is required"
+      },
+      "meta": {
+        "page": null,
+        "requestId": "req_fan_auth_sign_in_confirmation_required_001"
+      }
+    },
+    "status": 403
+  },
+  "signUpAccepted": {
+    "body": {
+      "data": {
+        "deliveryDestinationHint": "f***@example.com",
+        "nextStep": "confirm_sign_up"
+      },
+      "error": null,
+      "meta": {
+        "page": null,
+        "requestId": "req_fan_auth_sign_up_accepted_001"
+      }
+    },
+    "status": 200
+  },
+  "signUpConfirmSuccess": {
+    "headers": {
+      "set-cookie": "shorts_fans_session=raw-session-token; Path=/; HttpOnly; SameSite=Lax"
+    },
+    "status": 204
+  },
+  "passwordResetAccepted": {
+    "body": {
+      "data": {
+        "deliveryDestinationHint": "f***@example.com",
+        "nextStep": "confirm_password_reset"
+      },
+      "error": null,
+      "meta": {
+        "page": null,
+        "requestId": "req_fan_auth_password_reset_accepted_001"
+      }
+    },
+    "status": 200
+  },
+  "passwordResetConfirmSuccess": {
+    "status": 204
+  },
+  "reAuthSuccess": {
+    "status": 204
   },
   "logoutSuccess": {
-    "status": 204,
     "headers": {
       "set-cookie": "shorts_fans_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax"
-    }
+    },
+    "status": 204
   }
 }

@@ -17,7 +17,7 @@
 - creator search result / feed / short detail からの follow CTA
 - fan profile following list や following feed の read contract
 - notification、recommendation、creator analytics
-- login entry への具体的な UI 遷移設計
+- shared fan auth modal を超える login entry の具体的な visual 実装
 
 ## Canonical Sources
 
@@ -133,7 +133,7 @@
 - public creator profile の read contract を auth 必須にしません。
 - mutation response に `creator` summary や `stats.shortCount` を重ねて返しません。
 - `creator search`、`feed`、`short detail`、`fan profile following` の再読込 contract はこの文書で固定しません。
-- login entry への redirect 先や modal 表現は frontend task の責務とし、この文書では `401 auth_required` だけを固定します。
+- `401 auth_required` を受けた frontend は `docs/contracts/fan-auth-modal-ui-contract.md` の shared fan auth modal を primary entry とします。
 
 ## Fixture Reference
 

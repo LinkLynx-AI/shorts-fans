@@ -20,6 +20,11 @@
 - `sqlc`
 - `pgx`
 
+### Auth
+
+- `Amazon Cognito User Pools`
+- custom UI を primary にし、Hosted UI は fan auth の正規主導線にしません。
+
 ### Data / Infra
 
 - `PostgreSQL`
@@ -58,6 +63,7 @@
 
 - Frontend: `Next.js + TypeScript + PWA`
 - Backend: `Go + Gin + sqlc + pgx`
+- Auth: `Amazon Cognito User Pools (fan auth, custom UI primary)`
 - DB: `PostgreSQL`
 - Cache: `Redis`
 - Queue: `SQS`
