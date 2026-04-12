@@ -4,7 +4,7 @@ import {
   screen,
 } from "@testing-library/react";
 
-import { getFanHubState, type FanHubTab } from "@/entities/fan-profile";
+import { getFanHubState, type FanHubState, type FanHubTab } from "@/entities/fan-profile";
 import {
   CurrentViewerProvider,
   ViewerSessionProvider,
@@ -45,10 +45,18 @@ function renderFanHubShell(currentViewer: {
   canAccessCreatorMode: boolean;
   id: string;
 } | null, activeTab: FanHubTab = "library") {
+  return renderFanHubShellWithState(currentViewer, getFanHubState(activeTab));
+}
+
+function renderFanHubShellWithState(currentViewer: {
+  activeMode: "fan" | "creator";
+  canAccessCreatorMode: boolean;
+  id: string;
+} | null, state: FanHubState) {
   return render(
     <ViewerSessionProvider hasSession>
       <CurrentViewerProvider currentViewer={currentViewer}>
-        <FanHubShell state={getFanHubState(activeTab)} />
+        <FanHubShell state={state} />
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
@@ -191,5 +199,41 @@ describe("FanHubShell account menu", () => {
     expect(pinnedPoster).toHaveStyle({
       backgroundImage: 'url("https://cdn.example.com/shorts/sora-after-rain-poster.jpg")',
     });
+  });
+
+  it("uses an owner-preview fallback label when the library entry short caption is blank", () => {
+    const libraryState = getFanHubState("library");
+    const firstItem = libraryState.libraryItems[0];
+
+    if (!firstItem) {
+      throw new Error("library fixture missing");
+    }
+
+    renderFanHubShellWithState(
+      {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      {
+        ...libraryState,
+        libraryItems: [
+          {
+            ...firstItem,
+            access: {
+              ...firstItem.access,
+              reason: "owner_preview",
+              status: "owner",
+            },
+            entryShort: {
+              ...firstItem.entryShort,
+              caption: "   ",
+            },
+          },
+        ],
+      },
+    );
+
+    expect(screen.getByRole("button", { name: `${firstItem.creator.displayName} owner preview main` })).toBeInTheDocument();
   });
 });

@@ -79,10 +79,7 @@ describe("loadFeedShellState", () => {
     const surface = {
       creator: apiItem.creator,
       mainEntryEnabled: true,
-      short: {
-        ...apiItem.short,
-        title: apiItem.short.caption,
-      },
+      short: apiItem.short,
       unlock: {
         access: {
           mainId: apiItem.short.canonicalMainId,
@@ -94,7 +91,6 @@ describe("loadFeedShellState", () => {
           durationSeconds: 480,
           id: apiItem.short.canonicalMainId,
           priceJpy: 1800,
-          title: apiItem.short.caption,
         },
         mainAccessEntry: {
           routePath: `/api/fan/mains/${apiItem.short.canonicalMainId}/access-entry`,
@@ -105,10 +101,7 @@ describe("loadFeedShellState", () => {
           requiresAgeConfirmation: false,
           requiresTermsAcceptance: false,
         },
-        short: {
-          ...apiItem.short,
-          title: apiItem.short.caption,
-        },
+        short: apiItem.short,
         unlockCta: apiItem.unlockCta,
       },
       viewer: {

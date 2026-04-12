@@ -22,6 +22,18 @@ type FanHubShellProps = {
   state: FanHubState;
 };
 
+function buildLibraryTileLabel(item: FanHubState["libraryItems"][number]): string {
+  const caption = item.entryShort.caption.trim();
+
+  if (caption) {
+    return `${item.creator.displayName} ${caption}`;
+  }
+
+  const fallbackLabel = item.access.status === "owner" ? "owner preview main" : "unlocked main";
+
+  return `${item.creator.displayName} ${fallbackLabel}`;
+}
+
 function FanProfileAvatar() {
   return (
     <span
@@ -301,7 +313,7 @@ export function FanHubShell({ state }: FanHubShellProps) {
                 ? libraryItems.map((item) => (
                     <FanMediaTile
                       key={item.main.id}
-                      label={`${item.creator.displayName} ${item.main.title}`}
+                      label={buildLibraryTileLabel(item)}
                       short={item.entryShort}
                     />
                   ))

@@ -10,7 +10,6 @@ export type ApprovedCreatorWorkspaceOverviewMetrics = {
 
 export type ApprovedCreatorWorkspacePoster = {
   shortId: string;
-  title: string;
   tile: {
     bottom: string;
     mid: string;
@@ -37,7 +36,6 @@ export type ApprovedCreatorWorkspaceManagedItem = {
   metric: string;
   shortId: string;
   status: string;
-  title: string;
   tone: ApprovedCreatorWorkspaceManagedItemTone;
 };
 
@@ -214,7 +212,6 @@ const minaWorkspace = {
           metric: "¥48K",
           shortId: "short_quiet_rooftop",
           status: "Approved",
-          title: "quiet rooftop main",
           tone: "approved",
         },
         {
@@ -222,7 +219,6 @@ const minaWorkspace = {
           metric: "Queue",
           shortId: "short_hotel_mirror",
           status: "Pending",
-          title: "hotel mirror main",
           tone: "pending",
         },
       ],
@@ -232,7 +228,6 @@ const minaWorkspace = {
           metric: "¥48K",
           shortId: "short_quiet_rooftop",
           status: "Approved",
-          title: "quiet rooftop",
           tone: "approved",
         },
         {
@@ -240,7 +235,6 @@ const minaWorkspace = {
           metric: "¥22K",
           shortId: "short_quiet_rooftop_side",
           status: "Approved",
-          title: "rooftop side",
           tone: "approved",
         },
         {
@@ -248,7 +242,6 @@ const minaWorkspace = {
           metric: "¥36K",
           shortId: "short_hotel_mirror",
           status: "Pending",
-          title: "hotel mirror",
           tone: "pending",
         },
       ],
@@ -268,7 +261,6 @@ const minaWorkspace = {
         mid: "#629bde",
         top: "#edf7ff",
       },
-      title: "hotel mirror preview",
     },
     short_quiet_rooftop: {
       shortId: "short_quiet_rooftop",
@@ -277,7 +269,6 @@ const minaWorkspace = {
         mid: "#4cc0eb",
         top: "#d8f3ff",
       },
-      title: "quiet rooftop preview",
     },
     short_quiet_rooftop_side: {
       shortId: "short_quiet_rooftop_side",
@@ -286,7 +277,6 @@ const minaWorkspace = {
         mid: "#77b8e8",
         top: "#eef9ff",
       },
-      title: "rooftop side preview",
     },
   },
   revisionRequestedSummary: {

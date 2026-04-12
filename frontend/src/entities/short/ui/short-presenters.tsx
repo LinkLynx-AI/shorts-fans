@@ -11,9 +11,9 @@ type ShortMetaPillProps = {
 
 type ShortPosterProps = {
   className?: string;
+  label?: string;
   meta?: string;
   short: ShortPreviewMeta;
-  title?: string;
   variant?: "grid" | "hero" | "profile";
 };
 
@@ -38,11 +38,13 @@ export function ShortMetaPill({ children, className }: ShortMetaPillProps) {
  */
 export function ShortPoster({
   className,
+  label,
   meta,
   short,
-  title,
   variant = "grid",
 }: ShortPosterProps) {
+  const displayLabel = label ?? (short.caption.trim() || "Short preview");
+
   return (
     <div
       className={cn(
@@ -58,12 +60,12 @@ export function ShortPoster({
     >
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-tile-top)_0%,var(--short-tile-mid)_42%,var(--short-tile-bottom)_100%)]" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.24),transparent_34%)]" />
-      {variant === "profile" ? <span className="sr-only">{title ?? short.title}</span> : null}
+      {variant === "profile" ? <span className="sr-only">{displayLabel}</span> : null}
       {variant !== "profile" ? (
         <div className="absolute inset-x-0 bottom-0 space-y-2 bg-[linear-gradient(180deg,rgba(6,21,33,0)_0%,rgba(6,21,33,0.72)_100%)] px-4 pb-4 pt-10">
           {meta ? <ShortMetaPill>{meta}</ShortMetaPill> : null}
           <p className={cn("font-display leading-tight tracking-[-0.04em]", variant === "hero" ? "text-3xl" : "text-sm")}>
-            {title ?? short.title}
+            {displayLabel}
           </p>
         </div>
       ) : null}

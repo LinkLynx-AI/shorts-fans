@@ -26,7 +26,7 @@ export function CreatorWorkspaceManagedTile({
 }) {
   return (
     <button
-      aria-label={poster.title}
+      aria-label={`${tab === "main" ? "本編" : "ショート"}詳細を開く ${poster.shortId}`}
       className="relative overflow-hidden rounded-[4px] text-left transition"
       onClick={() => {
         onOpenDetail({ kind: "mock", shortId: item.shortId, tab });

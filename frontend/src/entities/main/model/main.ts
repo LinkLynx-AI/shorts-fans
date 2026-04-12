@@ -14,10 +14,9 @@ export type MainDetail = {
   leadShortId: string;
   media: MainMediaAsset;
   priceJpy: number;
-  title: string;
 };
 
-export type MainSummary = Pick<MainDetail, "durationSeconds" | "id" | "priceJpy" | "title">;
+export type MainSummary = Pick<MainDetail, "durationSeconds" | "id" | "priceJpy">;
 
 const mains = [
   {
@@ -32,7 +31,6 @@ const mains = [
       url: "https://cdn.example.com/mains/sora-after-rain.mp4",
     },
     priceJpy: 2100,
-    title: "after rain main",
   },
   {
     durationSeconds: 720,
@@ -46,7 +44,6 @@ const mains = [
       url: "https://cdn.example.com/mains/aoi-blue-balcony.mp4",
     },
     priceJpy: 2200,
-    title: "blue balcony main",
   },
   {
     durationSeconds: 660,
@@ -60,7 +57,6 @@ const mains = [
       url: "https://cdn.example.com/mains/mina-hotel-mirror.mp4",
     },
     priceJpy: 2400,
-    title: "hotel mirror main",
   },
   {
     durationSeconds: 480,
@@ -74,7 +70,6 @@ const mains = [
       url: "https://cdn.example.com/mains/sora-poolside-cut.mp4",
     },
     priceJpy: 1900,
-    title: "poolside cut main",
   },
   {
     durationSeconds: 480,
@@ -88,7 +83,6 @@ const mains = [
       url: "https://cdn.example.com/mains/mina-quiet-rooftop.mp4",
     },
     priceJpy: 1800,
-    title: "quiet rooftop main",
   },
 ] as const satisfies readonly MainDetail[];
 

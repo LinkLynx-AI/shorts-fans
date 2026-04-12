@@ -616,7 +616,6 @@ func TestCreatorWorkspacePreviewShortDetailRoute(t *testing.T) {
 						ID:                     shortID,
 						Media:                  testWorkspacePreviewDisplayAsset(assetID, 16, "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4", "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg"),
 						PreviewDurationSeconds: 16,
-						Title:                  "quiet rooftop preview",
 					},
 				}, nil
 			},
@@ -832,14 +831,12 @@ func TestCreatorWorkspacePreviewMainDetailRoute(t *testing.T) {
 						ID:                     shortID,
 						Media:                  testWorkspacePreviewDisplayAsset(shortAssetID, 16, "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4", "https://cdn.example.com/creator/preview/shorts/quiet-rooftop-poster.jpg"),
 						PreviewDurationSeconds: 16,
-						Title:                  "quiet rooftop preview",
 					},
 					Main: creator.WorkspacePreviewMainSummary{
 						DurationSeconds: 720,
 						ID:              mainID,
 						Media:           testWorkspacePreviewDisplayAsset(mainAssetID, 720, "https://signed.example.com/creator/preview/mains/quiet-rooftop.mp4", "https://signed.example.com/creator/preview/mains/quiet-rooftop-poster.jpg"),
 						PriceJpy:        1800,
-						Title:           "",
 					},
 				}, nil
 			},

@@ -113,7 +113,6 @@ type creatorWorkspacePreviewShortSummary struct {
 	ID                     string     `json:"id"`
 	Media                  mediaAsset `json:"media"`
 	PreviewDurationSeconds int64      `json:"previewDurationSeconds"`
-	Title                  string     `json:"title"`
 }
 
 type creatorWorkspacePreviewMainSummary struct {
@@ -121,7 +120,6 @@ type creatorWorkspacePreviewMainSummary struct {
 	ID              string     `json:"id"`
 	Media           mediaAsset `json:"media"`
 	PriceJpy        int64      `json:"priceJpy"`
-	Title           string     `json:"title"`
 }
 
 type creatorWorkspacePreviewShortDetailPayload struct {
@@ -555,7 +553,6 @@ func buildCreatorWorkspacePreviewShortSummary(
 		ID:                     shortPublicID(shortSummary.ID),
 		Media:                  buildVideoMediaAsset(shortSummary.Media),
 		PreviewDurationSeconds: shortSummary.PreviewDurationSeconds,
-		Title:                  shortSummary.Title,
 	}
 }
 
@@ -567,7 +564,6 @@ func buildCreatorWorkspacePreviewMainSummary(
 		ID:              mainPublicID(mainSummary.ID),
 		Media:           buildVideoMediaAsset(mainSummary.Media),
 		PriceJpy:        mainSummary.PriceJpy,
-		Title:           mainSummary.Title,
 	}
 }
 

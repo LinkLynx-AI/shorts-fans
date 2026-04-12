@@ -18,7 +18,6 @@ export type ShortSummary = {
   id: ShortId;
   media: ShortMediaAsset;
   previewDurationSeconds: number;
-  title: string;
 };
 
 export type ShortPreviewMeta = ShortSummary;
@@ -65,7 +64,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/sora-after-rain.mp4",
     },
     previewDurationSeconds: 17,
-    title: "after rain preview",
   },
   {
     caption: "blue tone の balcony preview。",
@@ -80,7 +78,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/aoi-balcony.mp4",
     },
     previewDurationSeconds: 15,
-    title: "balcony cut preview",
   },
   {
     caption: "hotel mirror の preview。",
@@ -95,7 +92,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/mina-mirror.mp4",
     },
     previewDurationSeconds: 18,
-    title: "hotel mirror preview",
   },
   {
     caption: "poolside の short cut。",
@@ -110,7 +106,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/sora-poolcut.mp4",
     },
     previewDurationSeconds: 14,
-    title: "poolside cut preview",
   },
   {
     caption: "quiet rooftop preview.",
@@ -125,7 +120,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/mina-rooftop.mp4",
     },
     previewDurationSeconds: 16,
-    title: "quiet rooftop preview",
   },
   {
     caption: "soft light の preview。",
@@ -140,7 +134,6 @@ const shorts = [
       url: "https://cdn.example.com/shorts/aoi-softlight.mp4",
     },
     previewDurationSeconds: 18,
-    title: "soft light preview",
   },
 ] as const satisfies readonly ShortSummary[];
 

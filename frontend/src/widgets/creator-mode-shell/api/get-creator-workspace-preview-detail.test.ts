@@ -35,7 +35,6 @@ describe("creator workspace preview detail fetchers", () => {
                   url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
                 },
                 previewDurationSeconds: 16,
-                title: "quiet rooftop preview",
               },
             },
           },
@@ -84,7 +83,6 @@ describe("creator workspace preview detail fetchers", () => {
           url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
         },
         previewDurationSeconds: 16,
-        title: "quiet rooftop preview",
       },
     });
 
@@ -128,7 +126,6 @@ describe("creator workspace preview detail fetchers", () => {
                   url: "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
                 },
                 previewDurationSeconds: 16,
-                title: "quiet rooftop preview",
               },
               main: {
                 durationSeconds: 720,
@@ -141,7 +138,6 @@ describe("creator workspace preview detail fetchers", () => {
                   url: "https://cdn.example.com/creator/preview/mains/quiet-rooftop.mp4",
                 },
                 priceJpy: 1800,
-                title: "quiet rooftop main",
               },
             },
           },
@@ -179,7 +175,6 @@ describe("creator workspace preview detail fetchers", () => {
           url: "https://cdn.example.com/creator/preview/mains/quiet-rooftop.mp4",
         },
         priceJpy: 1800,
-        title: "quiet rooftop main",
       },
       requestId: "req_creator_workspace_main_detail_001",
     });
