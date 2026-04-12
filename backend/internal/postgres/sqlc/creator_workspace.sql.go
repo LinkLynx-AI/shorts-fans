@@ -257,3 +257,38 @@ func (q *Queries) ListCreatorWorkspaceTopShortCandidatesByCreatorUserID(ctx cont
 	}
 	return items, nil
 }
+
+const updateCreatorWorkspaceMainPrice = `-- name: UpdateCreatorWorkspaceMainPrice :one
+UPDATE app.mains
+SET
+    price_minor = $1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $2
+    AND creator_user_id = $3
+    AND media_asset_id IS NOT NULL
+    AND price_minor IS NOT NULL
+    AND currency_code = 'JPY'
+RETURNING
+    id,
+    COALESCE(price_minor, 0)::bigint AS price_minor,
+    COALESCE(currency_code, '')::text AS currency_code
+`
+
+type UpdateCreatorWorkspaceMainPriceParams struct {
+	PriceMinor  int64
+	MainID      pgtype.UUID
+	OwnerUserID pgtype.UUID
+}
+
+type UpdateCreatorWorkspaceMainPriceRow struct {
+	ID           pgtype.UUID
+	PriceMinor   int64
+	CurrencyCode string
+}
+
+func (q *Queries) UpdateCreatorWorkspaceMainPrice(ctx context.Context, arg UpdateCreatorWorkspaceMainPriceParams) (UpdateCreatorWorkspaceMainPriceRow, error) {
+	row := q.db.QueryRow(ctx, updateCreatorWorkspaceMainPrice, arg.PriceMinor, arg.MainID, arg.OwnerUserID)
+	var i UpdateCreatorWorkspaceMainPriceRow
+	err := row.Scan(&i.ID, &i.PriceMinor, &i.CurrencyCode)
+	return i, err
+}

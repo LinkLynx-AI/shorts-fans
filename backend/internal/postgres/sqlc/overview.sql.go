@@ -45,8 +45,24 @@ func (q *Queries) CountPinnedShortsByUserID(ctx context.Context, userID pgtype.U
 
 const countUnlockedMainsByUserID = `-- name: CountUnlockedMainsByUserID :one
 SELECT COUNT(*)::bigint
-FROM app.main_unlocks
-WHERE user_id = $1
+FROM app.main_unlocks AS unlock
+JOIN app.unlockable_mains AS main
+    ON main.id = unlock.main_id
+JOIN app.media_assets AS main_media
+    ON main_media.id = main.media_asset_id
+JOIN app.public_creator_profiles AS profile
+    ON profile.user_id = main.creator_user_id
+JOIN LATERAL (
+    SELECT short.media_asset_id
+    FROM app.public_shorts AS short
+    WHERE short.canonical_main_id = main.id
+    ORDER BY short.published_at DESC, short.created_at DESC, short.id DESC
+    LIMIT 1
+) AS entry_short
+    ON TRUE
+JOIN app.media_assets AS entry_short_media
+    ON entry_short_media.id = entry_short.media_asset_id
+WHERE unlock.user_id = $1
 `
 
 func (q *Queries) CountUnlockedMainsByUserID(ctx context.Context, userID pgtype.UUID) (int64, error) {

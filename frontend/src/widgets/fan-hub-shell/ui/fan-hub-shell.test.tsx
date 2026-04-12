@@ -234,6 +234,9 @@ describe("FanHubShell account menu", () => {
       },
     );
 
-    expect(screen.getByRole("button", { name: `${firstItem.creator.displayName} owner preview main` })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: `${firstItem.creator.displayName} owner preview main` })).toHaveAttribute(
+      "href",
+      `/shorts/${firstItem.entryShort.id}?fanTab=library&from=fan`,
+    );
   });
 });
