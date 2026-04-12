@@ -1,4 +1,5 @@
-import { render, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 import { getPublicShortDetail } from "@/entities/short";
 
@@ -15,7 +16,11 @@ vi.mock("@/entities/short", async () => {
 });
 
 vi.mock("./immersive-short-surface", () => ({
-  ImmersiveShortSurface: vi.fn(() => <div data-testid="immersive-short-surface" />),
+  ImmersiveShortSurface: vi.fn(
+    ({ surface }: { surface: { short: { id: string } } }) => (
+      <div data-testid={`immersive-short-surface-${surface.short.id}`} />
+    ),
+  ),
 }));
 
 const mockedGetPublicShortDetail = vi.mocked(getPublicShortDetail);
@@ -162,6 +167,27 @@ describe("ShortDetailReel", () => {
     });
     expect(mockedGetPublicShortDetail).toHaveBeenCalledWith({
       shortId: "short_3",
+    });
+  });
+
+  it("commits prefetched shorts in StrictMode after the dev remount pass", async () => {
+    mockedGetPublicShortDetail.mockImplementation(async ({ shortId }) => createDetailPayload(shortId));
+
+    render(
+      <StrictMode>
+        <ShortDetailReel
+          backHref="/fan?tab=pinned"
+          fanTab="pinned"
+          initialIndex={1}
+          initialSurface={createInitialSurface("short_2")}
+          shortIds={["short_1", "short_2", "short_3"]}
+          source="fan"
+        />
+      </StrictMode>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("immersive-short-surface-short_3")).toBeInTheDocument();
     });
   });
 });
