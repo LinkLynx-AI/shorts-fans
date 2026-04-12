@@ -167,5 +167,39 @@
         "error": null
       }
     }
+  },
+  "PUT /api/creator/workspace/shorts/{shortId}/caption": {
+    "update_caption": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_aoi_balcony_cut",
+            "caption": "balcony light を寄せた差し替え caption。"
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_short_caption_put_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "clear_caption": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_aoi_balcony_cut",
+            "caption": ""
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_short_caption_put_002",
+          "page": null
+        },
+        "error": null
+      }
+    }
   }
 }

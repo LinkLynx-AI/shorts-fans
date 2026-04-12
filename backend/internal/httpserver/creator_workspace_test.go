@@ -88,6 +88,19 @@ func (s stubCreatorWorkspaceReader) ListWorkspacePreviewShorts(
 	return s.listWorkspacePreviewShort(ctx, viewerUserID, cursor, limit)
 }
 
+type stubCreatorWorkspaceShortCaptionWriter struct {
+	updateWorkspaceShortCaption func(context.Context, uuid.UUID, uuid.UUID, string) (creator.WorkspaceShortCaptionMutationResult, error)
+}
+
+func (s stubCreatorWorkspaceShortCaptionWriter) UpdateWorkspaceShortCaption(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	shortID uuid.UUID,
+	caption string,
+) (creator.WorkspaceShortCaptionMutationResult, error) {
+	return s.updateWorkspaceShortCaption(ctx, viewerUserID, shortID, caption)
+}
+
 func TestCreatorWorkspaceRoute(t *testing.T) {
 	t.Parallel()
 
@@ -710,6 +723,264 @@ func TestCreatorWorkspacePreviewShortDetailRouteReturnsNotFound(t *testing.T) {
 	}
 	if response.Error.Message != "creator workspace preview was not found" {
 		t.Fatalf("response.Error.Message got %q want %q", response.Error.Message, "creator workspace preview was not found")
+	}
+}
+
+func TestCreatorWorkspaceShortCaptionPutRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	requestCaption := "  updated caption  "
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceShortCaption: stubCreatorWorkspaceShortCaptionWriter{
+			updateWorkspaceShortCaption: func(
+				_ context.Context,
+				gotViewerUserID uuid.UUID,
+				gotShortID uuid.UUID,
+				gotCaption string,
+			) (creator.WorkspaceShortCaptionMutationResult, error) {
+				if gotViewerUserID != viewerID {
+					t.Fatalf("UpdateWorkspaceShortCaption() viewerUserID got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotShortID != shortID {
+					t.Fatalf("UpdateWorkspaceShortCaption() shortID got %s want %s", gotShortID, shortID)
+				}
+				if gotCaption != requestCaption {
+					t.Fatalf("UpdateWorkspaceShortCaption() caption got %q want %q", gotCaption, requestCaption)
+				}
+
+				return creator.WorkspaceShortCaptionMutationResult{
+					Caption: "updated caption",
+					ShortID: shortID,
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption",
+		strings.NewReader(`{"caption":"  updated caption  "}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[creatorWorkspaceShortCaptionResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want short payload")
+	}
+	if response.Data.Short.ID != shortPublicID(shortID) {
+		t.Fatalf("response.Data.Short.ID got %q want %q", response.Data.Short.ID, shortPublicID(shortID))
+	}
+	if response.Data.Short.Caption != "updated caption" {
+		t.Fatalf("response.Data.Short.Caption got %q want %q", response.Data.Short.Caption, "updated caption")
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_short_caption_put_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace short caption prefix", response.Meta.RequestID)
+	}
+	if response.Error != nil {
+		t.Fatalf("response.Error got %#v want nil", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceShortCaptionPutRouteRejectsInvalidRequest(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	writerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceShortCaption: stubCreatorWorkspaceShortCaptionWriter{
+			updateWorkspaceShortCaption: func(context.Context, uuid.UUID, uuid.UUID, string) (creator.WorkspaceShortCaptionMutationResult, error) {
+				writerCalled = true
+				return creator.WorkspaceShortCaptionMutationResult{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption",
+		strings.NewReader(`{"caption":"updated","extra":"field"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("PUT /api/creator/workspace/shorts/{shortId}/caption writerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestCreatorWorkspaceShortCaptionPutRouteRejectsMissingCaption(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	writerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceShortCaption: stubCreatorWorkspaceShortCaptionWriter{
+			updateWorkspaceShortCaption: func(context.Context, uuid.UUID, uuid.UUID, string) (creator.WorkspaceShortCaptionMutationResult, error) {
+				writerCalled = true
+				return creator.WorkspaceShortCaptionMutationResult{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption",
+		strings.NewReader(`{}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if writerCalled {
+		t.Fatal("PUT /api/creator/workspace/shorts/{shortId}/caption writerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestCreatorWorkspaceShortCaptionPutRouteReturnsNotFound(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceShortCaption: stubCreatorWorkspaceShortCaptionWriter{
+			updateWorkspaceShortCaption: func(context.Context, uuid.UUID, uuid.UUID, string) (creator.WorkspaceShortCaptionMutationResult, error) {
+				return creator.WorkspaceShortCaptionMutationResult{}, creator.ErrWorkspacePreviewNotFound
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   viewerID,
+						ActiveMode:           auth.ActiveModeCreator,
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/caption",
+		strings.NewReader(`{"caption":"updated"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption body got %q want not_found", rec.Body.String())
+	}
+}
+
+func TestCreatorWorkspaceShortCaptionPutRouteRejectsUnauthenticatedRequest(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspaceShortCaption: stubCreatorWorkspaceShortCaptionWriter{
+			updateWorkspaceShortCaption: func(context.Context, uuid.UUID, uuid.UUID, string) (creator.WorkspaceShortCaptionMutationResult, error) {
+				writerCalled = true
+				return creator.WorkspaceShortCaptionMutationResult{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPut, "/api/creator/workspace/shorts/short_missing/caption", strings.NewReader(`{"caption":"updated"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption status got %d want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if writerCalled {
+		t.Fatal("PUT /api/creator/workspace/shorts/{shortId}/caption writerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"auth_required"`) {
+		t.Fatalf("PUT /api/creator/workspace/shorts/{shortId}/caption body got %q want auth_required", rec.Body.String())
 	}
 }
 

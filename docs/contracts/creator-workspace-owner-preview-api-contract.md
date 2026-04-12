@@ -2,8 +2,8 @@
 
 ## 位置づけ
 
-- この文書は creator owner が自分の `short` / `main` を preview するための private read contract を固定します。
-- `/api/creator/workspace` overview 契約とは分離し、owner preview list/detail だけを対象にします。
+- この文書は creator owner が自分の `short` / `main` を preview する private contract を固定します。
+- `/api/creator/workspace` overview 契約とは分離し、owner preview list/detail と short caption mutation だけを対象にします。
 - review detail、analytics、売上、upload processing detail はこの leaf に含めません。
 
 ## Goals
@@ -11,6 +11,7 @@
 - creator owner が delivery-ready asset を preview する最小 read surface を固定する。
 - `short` preview と `main` preview の list/detail を cursor/list boundary と detail boundary で分ける。
 - public short や fan main playback と混線しない owner-only access を明示する。
+- short detail から caption を modal で更新する最小 mutation surface を固定する。
 
 ## Non-goals
 
@@ -18,6 +19,7 @@
 - upload queue、processing state、review detail
 - sales / analytics / moderation 指標
 - public publish / unlock eligibility の mutation
+- short caption 以外の post action mutation (`price`, `非公開`, `削除`)
 
 ## Canonical Sources
 
@@ -34,6 +36,7 @@
 | `GET` | `/api/creator/workspace/mains` | required | owner preview 用 main list |
 | `GET` | `/api/creator/workspace/shorts/{shortId}/preview` | required | owner preview 用 short detail |
 | `GET` | `/api/creator/workspace/mains/{mainId}/preview` | required | owner preview 用 main detail |
+| `PUT` | `/api/creator/workspace/shorts/{shortId}/caption` | required | owner preview short の caption 更新 |
 
 ## Surface-specific Payloads
 
@@ -129,6 +132,26 @@
 - `data.preview.entryShort`: `ShortSummary`
 - `meta.page = null`
 
+### `PUT /api/creator/workspace/shorts/{shortId}/caption`
+
+#### Path
+
+| field | type | required |
+| --- | --- | --- |
+| `shortId` | `string` | yes |
+
+#### Body
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `caption` | `string` | yes | modal input の raw string をそのまま送る |
+
+#### Response
+
+- `data.short.id`: `string`
+- `data.short.caption`: `string`
+- `meta.page = null`
+
 ## Response Rules
 
 - caller は authenticated viewer である必要があります。
@@ -137,14 +160,17 @@
 - list endpoint は `delivery-ready` な owner 自身の `short` / `main` を返し、public publish / unlock state とは独立に判定して構いません。
 - owner preview では `MainAccessState.reason = owner_preview` を使い、`unlocked` と混ぜません。
 - list endpoint は poster 中心の preview card を返し、detail endpoint だけ full playback 用 `url` を返します。
+- caption mutation は request body の前後空白を trim して保存し、trim 後に空文字なら DB では `null` として扱います。
+- caption mutation の read surface では `null` を返さず、empty string として返します。
+- caption mutation 成功後は caller が short detail を再取得して最新値に同期する前提にします。
 
 ## Error Contract
 
 | status | code | notes |
 | --- | --- | --- |
 | `401` | `auth_required` | session 不在 |
-| `403` | `creator_mode_unavailable` | approved creator capability なし、または owner ではない |
-| `404` | `not_found` | preview 対象を解決できない |
+| `403` | `creator_mode_unavailable` | approved creator capability なし |
+| `404` | `not_found` | preview 対象を解決できない、または caller 所有の short ではない |
 | `500` | `internal_error` | unexpected failure |
 
 ## Guardrails
@@ -153,6 +179,7 @@
 - review reason、processing state、storage ref を返しません。
 - public creator profile の代替にしません。
 - `/api/creator/workspace` overview response に list/detail payload を混ぜません。
+- caption mutation に `price`, `非公開`, `削除` を混ぜません。
 
 ## Fixture Reference
 

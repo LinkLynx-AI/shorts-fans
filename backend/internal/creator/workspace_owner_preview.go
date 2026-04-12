@@ -87,6 +87,14 @@ type previewableLinkedShort struct {
 	ID              uuid.UUID
 }
 
+type workspacePreviewShortSource struct {
+	CanonicalMainID uuid.UUID
+	Caption         string
+	DurationMS      int64
+	ID              uuid.UUID
+	MediaAssetID    uuid.UUID
+}
+
 // GetWorkspacePreviewShortDetail は current viewer 自身の short preview detail を返します。
 func (r *Repository) GetWorkspacePreviewShortDetail(
 	ctx context.Context,
@@ -563,39 +571,61 @@ func (r *Repository) buildWorkspacePreviewShortSummary(
 	row sqlc.AppShort,
 	assetCache map[uuid.UUID]sqlc.AppMediaAsset,
 ) (WorkspacePreviewShortSummary, bool, error) {
+	source, ok, err := r.resolveWorkspacePreviewShortSource(ctx, row, assetCache)
+	if err != nil {
+		return WorkspacePreviewShortSummary{}, false, err
+	}
+	if !ok {
+		return WorkspacePreviewShortSummary{}, false, nil
+	}
+
+	displayAsset, err := r.delivery.ResolveShortDisplayAsset(media.ShortDisplaySource{
+		AssetID:    source.MediaAssetID,
+		ShortID:    source.ID,
+		DurationMS: source.DurationMS,
+	}, media.AccessBoundaryOwner)
+	if err != nil {
+		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail display asset 解決 short=%s: %w", source.ID, err)
+	}
+
+	return WorkspacePreviewShortSummary{
+		CanonicalMainID:        source.CanonicalMainID,
+		Caption:                source.Caption,
+		ID:                     source.ID,
+		Media:                  displayAsset,
+		PreviewDurationSeconds: displayAsset.DurationSeconds,
+	}, true, nil
+}
+
+func (r *Repository) resolveWorkspacePreviewShortSource(
+	ctx context.Context,
+	row sqlc.AppShort,
+	assetCache map[uuid.UUID]sqlc.AppMediaAsset,
+) (workspacePreviewShortSource, bool, error) {
 	shortID, err := postgres.UUIDFromPG(row.ID)
 	if err != nil {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail id 変換: %w", err)
+		return workspacePreviewShortSource{}, false, fmt.Errorf("workspace preview short detail id 変換: %w", err)
 	}
 	canonicalMainID, err := postgres.UUIDFromPG(row.CanonicalMainID)
 	if err != nil {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail canonical main id 変換 short=%s: %w", shortID, err)
+		return workspacePreviewShortSource{}, false, fmt.Errorf("workspace preview short detail canonical main id 変換 short=%s: %w", shortID, err)
 	}
 	mediaAssetID, err := postgres.UUIDFromPG(row.MediaAssetID)
 	if err != nil {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail media asset id 変換 short=%s: %w", shortID, err)
+		return workspacePreviewShortSource{}, false, fmt.Errorf("workspace preview short detail media asset id 変換 short=%s: %w", shortID, err)
 	}
 
 	asset, err := r.getWorkspacePreviewAsset(ctx, mediaAssetID, assetCache)
 	if err != nil {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail asset 解決 short=%s: %w", shortID, err)
+		return workspacePreviewShortSource{}, false, fmt.Errorf("workspace preview short detail asset 解決 short=%s: %w", shortID, err)
 	}
 	if !workspacePreviewAssetReady(asset) {
-		return WorkspacePreviewShortSummary{}, false, nil
+		return workspacePreviewShortSource{}, false, nil
 	}
 
 	durationMS := postgres.OptionalInt64FromPG(asset.DurationMs)
 	if durationMS == nil || *durationMS <= 0 {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail duration がありません short=%s", shortID)
-	}
-
-	displayAsset, err := r.delivery.ResolveShortDisplayAsset(media.ShortDisplaySource{
-		AssetID:    mediaAssetID,
-		ShortID:    shortID,
-		DurationMS: *durationMS,
-	}, media.AccessBoundaryOwner)
-	if err != nil {
-		return WorkspacePreviewShortSummary{}, false, fmt.Errorf("workspace preview short detail display asset 解決 short=%s: %w", shortID, err)
+		return workspacePreviewShortSource{}, false, fmt.Errorf("workspace preview short detail duration がありません short=%s", shortID)
 	}
 
 	caption := ""
@@ -603,12 +633,12 @@ func (r *Repository) buildWorkspacePreviewShortSummary(
 		caption = strings.TrimSpace(*captionValue)
 	}
 
-	return WorkspacePreviewShortSummary{
-		CanonicalMainID:        canonicalMainID,
-		Caption:                caption,
-		ID:                     shortID,
-		Media:                  displayAsset,
-		PreviewDurationSeconds: displayAsset.DurationSeconds,
+	return workspacePreviewShortSource{
+		CanonicalMainID: canonicalMainID,
+		Caption:         caption,
+		DurationMS:      *durationMS,
+		ID:              shortID,
+		MediaAssetID:    mediaAssetID,
 	}, true, nil
 }
 

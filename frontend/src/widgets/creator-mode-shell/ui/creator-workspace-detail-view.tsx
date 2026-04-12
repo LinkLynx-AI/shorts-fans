@@ -1,5 +1,6 @@
 "use client";
 
+import { CreatorWorkspaceShortCaptionDialog } from "@/features/creator-workspace-short-caption";
 import { ArrowLeft } from "lucide-react";
 import {
   type ReactNode,
@@ -72,12 +73,15 @@ function CreatorWorkspaceActionButton({
 }
 
 type CreatorWorkspacePostActionMenuItem = {
+  action?: "edit-caption";
+  disabled?: boolean;
   label: string;
   tone?: "danger" | "default";
 };
 
 function resolveCreatorWorkspacePostActionMenu(
   detailSelection: CreatorWorkspaceDetailViewSelection,
+  canEditShortCaption: boolean,
 ): {
   description: string;
   items: readonly CreatorWorkspacePostActionMenuItem[];
@@ -90,7 +94,7 @@ function resolveCreatorWorkspacePostActionMenu(
     return {
       description: "creator workspace でショート投稿の操作を選ぶメニュー",
       items: [
-        { label: "captionの変更" },
+        { action: "edit-caption", disabled: !canEditShortCaption, label: "captionの変更" },
         { label: "動画の非公開" },
         { label: "削除", tone: "danger" },
       ],
@@ -196,6 +200,16 @@ function resolveCreatorWorkspacePreviewMedia(
     posterUrl: previewDetailState.detail.short.media.posterUrl,
     url: previewDetailState.detail.short.media.url,
   };
+}
+
+function resolveEditableShortCaption(
+  previewDetailState: CreatorWorkspacePreviewDetailState,
+): string {
+  if (previewDetailState.kind !== "ready" || previewDetailState.detail.kind !== "preview-short") {
+    return "";
+  }
+
+  return previewDetailState.detail.short.caption;
 }
 
 function CreatorWorkspaceDetailMedia({
@@ -437,6 +451,7 @@ export function CreatorWorkspaceDetailView({
   previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
   state: CreatorModeShellReadyState;
 }) {
+  const [isCaptionDialogOpen, setIsCaptionDialogOpen] = useState(false);
   let detail: CreatorWorkspaceResolvedDetailState | null = null;
   let linkedPreviewItems: CreatorWorkspaceLinkedPreviewItems = [];
   let poster: CreatorWorkspaceDetailPoster | null = null;
@@ -473,7 +488,13 @@ export function CreatorWorkspaceDetailView({
     detailSelection.kind === "mock"
       ? `${detailSelection.kind}:${detailSelection.tab}:${detailSelection.shortId}`
       : `${detailSelection.kind}:${detailSelection.item.id}`;
-  const postActionMenu = resolveCreatorWorkspacePostActionMenu(detailSelection);
+  const canEditShortCaption =
+    detailSelection.kind === "preview-short"
+    && previewDetailState.kind === "ready"
+    && previewDetailState.detail.kind === "preview-short";
+  const postActionMenu = resolveCreatorWorkspacePostActionMenu(detailSelection, canEditShortCaption);
+  const editableShortCaption = resolveEditableShortCaption(previewDetailState);
+  const editableShortId = canEditShortCaption ? detailSelection.item.id : null;
 
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
@@ -502,6 +523,16 @@ export function CreatorWorkspaceDetailView({
               <BottomSheetMenuClose asChild key={item.label}>
                 <BottomSheetMenuAction
                   {...(item.tone ? { tone: item.tone } : {})}
+                  disabled={item.disabled}
+                  onClick={() => {
+                    if (item.action !== "edit-caption" || editableShortId === null) {
+                      return;
+                    }
+
+                    queueMicrotask(() => {
+                      setIsCaptionDialogOpen(true);
+                    });
+                  }}
                   withDivider={index > 0}
                 >
                   <span>{item.label}</span>
@@ -571,6 +602,19 @@ export function CreatorWorkspaceDetailView({
           </CreatorWorkspaceDetailSection>
         ) : null}
       </section>
+
+      {editableShortId ? (
+        <CreatorWorkspaceShortCaptionDialog
+          initialCaption={editableShortCaption}
+          onOpenChange={setIsCaptionDialogOpen}
+          onSaved={() => {
+            setIsCaptionDialogOpen(false);
+            onRetryPreviewDetail();
+          }}
+          open={isCaptionDialogOpen}
+          shortId={editableShortId}
+        />
+      ) : null}
     </section>
   );
 }

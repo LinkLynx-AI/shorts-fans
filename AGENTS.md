@@ -39,7 +39,7 @@
 - [docs/contracts/viewer-bootstrap-api-contract.md](docs/contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [docs/contracts/viewer-creator-entry-api-contract.md](docs/contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [docs/contracts/creator-workspace-api-contract.md](docs/contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
-- [docs/contracts/creator-workspace-owner-preview-api-contract.md](docs/contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail の read 契約
+- [docs/contracts/creator-workspace-owner-preview-api-contract.md](docs/contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail と short caption 更新契約
 - [docs/contracts/creator-upload-api-contract.md](docs/contracts/creator-upload-api-contract.md): creator-private な new-package upload の initiation / completion 契約
 - [docs/contracts/fan-mvp-common-transport-contract.md](docs/contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [docs/contracts/fan-public-surface-api-contract.md](docs/contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約

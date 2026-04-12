@@ -52,6 +52,14 @@ SET
 WHERE id = sqlc.arg(id)
 RETURNING *;
 
+-- name: UpdateShortCaption :one
+UPDATE app.shorts
+SET
+    caption = sqlc.narg(caption),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
 -- name: PublishShort :one
 UPDATE app.shorts
 SET

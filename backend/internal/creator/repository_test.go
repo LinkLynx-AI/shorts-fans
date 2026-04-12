@@ -112,6 +112,10 @@ func (s stubQueries) SearchPublicCreatorProfiles(context.Context, sqlc.SearchPub
 	return nil, nil
 }
 
+func (s stubQueries) UpdateShortCaption(context.Context, sqlc.UpdateShortCaptionParams) (sqlc.AppShort, error) {
+	return sqlc.AppShort{}, nil
+}
+
 func (s stubQueries) UpdateCreatorProfile(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error) {
 	return sqlc.AppCreatorProfile{}, nil
 }
