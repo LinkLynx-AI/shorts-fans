@@ -69,8 +69,14 @@ export function LibraryMainReel({
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    const inFlightTasks = inFlightRef.current;
+
+    // Dev StrictMode re-runs mount effects, so the guard must be restored on setup.
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
+      inFlightTasks.clear();
     };
   }, []);
 
@@ -96,8 +102,14 @@ export function LibraryMainReel({
       }
 
       const itemKey = getLibraryMainItemKey(item);
+      const currentState = itemStatesRef.current[itemKey];
 
-      if (itemStatesRef.current[itemKey] || inFlightRef.current.has(itemKey)) {
+      if (
+        currentState?.kind === "ready"
+        || currentState?.kind === "locked"
+        || currentState?.kind === "error"
+        || inFlightRef.current.has(itemKey)
+      ) {
         continue;
       }
 

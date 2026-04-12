@@ -98,8 +98,14 @@ export function ShortDetailReel({
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    const inFlightTasks = inFlightRef.current;
+
+    // Dev StrictMode re-runs mount effects, so the guard must be restored on setup.
+    isMountedRef.current = true;
+
     return () => {
       isMountedRef.current = false;
+      inFlightTasks.clear();
     };
   }, []);
 
@@ -119,8 +125,14 @@ export function ShortDetailReel({
 
     for (const index of candidateIndices) {
       const shortId = shortIds[index];
+      const currentState = shortId ? itemStatesRef.current[shortId] : undefined;
 
-      if (!shortId || itemStatesRef.current[shortId] || inFlightRef.current.has(shortId)) {
+      if (
+        !shortId
+        || currentState?.kind === "ready"
+        || currentState?.kind === "error"
+        || inFlightRef.current.has(shortId)
+      ) {
         continue;
       }
 
