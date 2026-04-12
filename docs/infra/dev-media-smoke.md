@@ -5,6 +5,7 @@
 - この文書は `SHO-26 media pipeline の疎通確認と運用メモを整える` の成果物です。
 - 対象は `backend/cmd/media-smoke` による cycle1 の representative path 確認です。
 - `import -> transcode -> linkage` の full workflow を end-to-end で保証するものではありません。
+- `upload complete -> processing -> ready -> public short / main playback / creator owner preview` の verification 入口は [../contracts/mvp-media-display-fixtures-and-verification-guide.md](../contracts/mvp-media-display-fixtures-and-verification-guide.md) を参照してください。
 
 ## この smoke が確認すること
 
@@ -37,6 +38,14 @@
 - creator / fan UI からの playback
 
 つまり、cycle1 の「AWS media sandbox に local backend から到達できるか」を見る smoke であって、「media workflow 実装が完成したか」を見るものではありません。`SHO-148` で追加した creator avatar 用 bucket / CloudFront もこの smoke の対象外です。
+
+workflow-level verification が必要な場合は、この文書だけではなく、次を別で確認します。
+
+- upload acceptance: `creator-upload-api-contract.md` と backend creator upload tests
+- processing / auto-publish: backend media tests
+- public short / main playback / owner preview: transport fixture と backend/frontend consumer tests
+
+参照先は [../contracts/mvp-media-display-fixtures-and-verification-guide.md](../contracts/mvp-media-display-fixtures-and-verification-guide.md) に集約しています。
 
 ## 事前条件
 
