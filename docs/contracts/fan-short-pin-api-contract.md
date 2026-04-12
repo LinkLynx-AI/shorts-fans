@@ -17,7 +17,7 @@
 - `feed` 以外の UI wiring
 - `GET /api/fan/profile/pinned-shorts` read endpoint 実装
 - public count や social signal の追加
-- login entry の具体的な UI 遷移設計
+- shared fan auth modal を超える login entry の具体的な visual 実装
 
 ## Canonical Sources
 
@@ -128,7 +128,7 @@
 - public short read contract 自体を auth 必須にしません。
 - mutation response に `short` summary や creator summary を重ねて返しません。
 - `feed`、`short detail`、`fan profile pinned-shorts` の再読込 contract はこの文書で固定しません。
-- login entry への redirect 先や modal 表現は frontend task の責務とし、この文書では `401 auth_required` だけを固定します。
+- `401 auth_required` を受けた frontend は `docs/contracts/fan-auth-modal-ui-contract.md` の shared fan auth modal を primary entry とします。
 
 ## Fixture Reference
 

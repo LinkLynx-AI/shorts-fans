@@ -35,7 +35,8 @@
 - [docs/contracts/mvp-media-workflow-contract.md](docs/contracts/mvp-media-workflow-contract.md): MVP media workflow の状態遷移、delivery 境界、avatar 境界を整理した実装用契約
 - [docs/contracts/media-display-access-contract.md](docs/contracts/media-display-access-contract.md): delivery-ready asset を public short / main playback / owner preview に出す display/access 境界契約
 - [docs/contracts/mvp-media-display-fixtures-and-verification-guide.md](docs/contracts/mvp-media-display-fixtures-and-verification-guide.md): upload complete から public short / main playback / owner preview までの fixture と verification 入口ガイド
-- [docs/contracts/fan-auth-api-contract.md](docs/contracts/fan-auth-api-contract.md): fan sign in / sign up / session start / logout の transport 契約
+- [docs/contracts/fan-auth-api-contract.md](docs/contracts/fan-auth-api-contract.md): Cognito 前提の fan sign in / sign up / password reset / logout / re-auth transport 契約
+- [docs/contracts/fan-auth-modal-ui-contract.md](docs/contracts/fan-auth-modal-ui-contract.md): fan auth custom modal UI の state / recovery 契約
 - [docs/contracts/viewer-bootstrap-api-contract.md](docs/contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
 - [docs/contracts/viewer-creator-entry-api-contract.md](docs/contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [docs/contracts/creator-workspace-api-contract.md](docs/contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
