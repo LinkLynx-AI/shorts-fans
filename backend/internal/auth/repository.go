@@ -19,6 +19,7 @@ const (
 	loginChallengePurpose    = "login"
 	identityUniqueConstraint = "auth_identities_provider_provider_subject_key"
 	emailUniqueConstraint    = "idx_auth_identities_email_normalized"
+	userProfileHandleUnique  = "user_profiles_handle_unique_idx"
 )
 
 var (
@@ -113,7 +114,9 @@ type CreateSessionInput struct {
 
 // CreateUserWithEmailIdentityAndSessionInput は sign-up 完了時の一括作成入力です。
 type CreateUserWithEmailIdentityAndSessionInput struct {
+	DisplayName         string
 	EmailNormalized     string
+	Handle              string
 	SessionTokenHash    string
 	VerifiedAt          time.Time
 	LastAuthenticatedAt time.Time
@@ -361,10 +364,22 @@ func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, 
 			return fmt.Errorf("auth session 作成: %w", err)
 		}
 
+		if _, err := q.CreateUserProfile(ctx, sqlc.CreateUserProfileParams{
+			UserID:      user.ID,
+			DisplayName: input.DisplayName,
+			Handle:      input.Handle,
+			AvatarUrl:   postgres.TextToPG(nil),
+		}); err != nil {
+			return fmt.Errorf("user profile 作成: %w", mapUserProfileWriteError(err))
+		}
+
 		return nil
 	})
 	if err != nil {
 		if errors.Is(err, ErrIdentityAlreadyExists) {
+			return SessionRecord{}, err
+		}
+		if errors.Is(err, ErrHandleAlreadyTaken) {
 			return SessionRecord{}, err
 		}
 
@@ -636,6 +651,18 @@ func mapIdentityWriteError(err error) error {
 		switch pgErr.ConstraintName {
 		case identityUniqueConstraint, emailUniqueConstraint:
 			return ErrIdentityAlreadyExists
+		}
+	}
+
+	return err
+}
+
+func mapUserProfileWriteError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.ConstraintName {
+		case userProfileHandleUnique:
+			return ErrHandleAlreadyTaken
 		}
 	}
 

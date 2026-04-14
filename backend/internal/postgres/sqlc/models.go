@@ -216,3 +216,12 @@ type AppUser struct {
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
 }
+
+type AppUserProfile struct {
+	UserID      pgtype.UUID
+	DisplayName string
+	Handle      string
+	AvatarUrl   pgtype.Text
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}

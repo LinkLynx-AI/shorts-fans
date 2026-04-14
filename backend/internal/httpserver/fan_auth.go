@@ -18,7 +18,7 @@ type FanAuthService interface {
 	IssueSignInChallenge(ctx context.Context, email string) (auth.IssuedChallenge, error)
 	IssueSignUpChallenge(ctx context.Context, email string) (auth.IssuedChallenge, error)
 	StartSignInSession(ctx context.Context, email string, challengeToken string) (auth.AuthenticatedSession, error)
-	StartSignUpSession(ctx context.Context, email string, challengeToken string) (auth.AuthenticatedSession, error)
+	StartSignUpSession(ctx context.Context, email string, challengeToken string, displayName string, handle string) (auth.AuthenticatedSession, error)
 	Logout(ctx context.Context, rawSessionToken string) error
 }
 
@@ -34,6 +34,13 @@ type authChallengeRequest struct {
 type authSessionRequest struct {
 	ChallengeToken string `json:"challengeToken"`
 	Email          string `json:"email"`
+}
+
+type authSignUpSessionRequest struct {
+	ChallengeToken string `json:"challengeToken"`
+	DisplayName    string `json:"displayName"`
+	Email          string `json:"email"`
+	Handle         string `json:"handle"`
 }
 
 type authChallengeResponseData struct {
@@ -58,7 +65,7 @@ func registerFanAuthRoutes(router gin.IRouter, service FanAuthService, cookieCon
 		handleAuthSessionStart(c, "fan_auth_sign_in_session", service.StartSignInSession, cookieConfig)
 	})
 	authGroup.POST("/sign-up/session", func(c *gin.Context) {
-		handleAuthSessionStart(c, "fan_auth_sign_up_session", service.StartSignUpSession, cookieConfig)
+		handleAuthSignUpSessionStart(c, "fan_auth_sign_up_session", service.StartSignUpSession, cookieConfig)
 	})
 	authGroup.DELETE("/session", func(c *gin.Context) {
 		rawSessionToken, _ := c.Cookie(auth.SessionCookieName)
@@ -132,6 +139,37 @@ func handleAuthSessionStart(
 	c.Status(http.StatusNoContent)
 }
 
+func handleAuthSignUpSessionStart(
+	c *gin.Context,
+	requestScope string,
+	start func(context.Context, string, string, string, string) (auth.AuthenticatedSession, error),
+	cookieConfig AuthCookieConfig,
+) {
+	var request authSignUpSessionRequest
+	if !decodeAuthJSON(c, &request, "invalid_challenge", "challenge is invalid", requestScope) {
+		return
+	}
+
+	session, err := start(
+		c.Request.Context(),
+		request.Email,
+		request.ChallengeToken,
+		request.DisplayName,
+		request.Handle,
+	)
+	if err != nil {
+		if writeMappedAuthError(c, err, requestScope) {
+			return
+		}
+
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", requestScope)
+		return
+	}
+
+	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
+	c.Status(http.StatusNoContent)
+}
+
 func decodeAuthJSON[T any](c *gin.Context, target *T, invalidCode string, invalidMessage string, requestScope string) bool {
 	decoder := json.NewDecoder(c.Request.Body)
 	if err := decoder.Decode(target); err != nil {
@@ -156,12 +194,18 @@ func writeMappedAuthError(c *gin.Context, err error, requestScope string) bool {
 	switch {
 	case errors.Is(err, auth.ErrInvalidEmail):
 		writeAuthError(c, http.StatusBadRequest, "invalid_email", "email is invalid", requestScope)
+	case errors.Is(err, auth.ErrInvalidDisplayName):
+		writeAuthError(c, http.StatusBadRequest, "invalid_display_name", "display name is invalid", requestScope)
 	case errors.Is(err, auth.ErrEmailNotFound):
 		writeAuthError(c, http.StatusNotFound, "email_not_found", "email was not found", requestScope)
 	case errors.Is(err, auth.ErrEmailAlreadyRegistered):
 		writeAuthError(c, http.StatusConflict, "email_already_registered", "email is already registered", requestScope)
 	case errors.Is(err, auth.ErrInvalidChallenge):
 		writeAuthError(c, http.StatusBadRequest, "invalid_challenge", "challenge is invalid", requestScope)
+	case errors.Is(err, auth.ErrInvalidHandle):
+		writeAuthError(c, http.StatusBadRequest, "invalid_handle", "handle is invalid", requestScope)
+	case errors.Is(err, auth.ErrHandleAlreadyTaken):
+		writeAuthError(c, http.StatusConflict, "handle_already_taken", "handle is already taken", requestScope)
 	default:
 		return false
 	}

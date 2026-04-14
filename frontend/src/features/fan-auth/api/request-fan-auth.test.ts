@@ -28,7 +28,10 @@ describe("authenticateFanWithEmail", () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
 
     await expect(
-      authenticateFanWithEmail("sign-in", "fan@example.com", {
+      authenticateFanWithEmail({
+        email: "fan@example.com",
+        mode: "sign-in",
+      }, {
         baseUrl: "http://127.0.0.1:8080",
         fetcher,
       }),
@@ -83,7 +86,12 @@ describe("authenticateFanWithEmail", () => {
     );
 
     await expect(
-      authenticateFanWithEmail("sign-up", "fan@example.com", {
+      authenticateFanWithEmail({
+        displayName: "Mina",
+        email: "fan@example.com",
+        handle: "mina",
+        mode: "sign-up",
+      }, {
         baseUrl: "http://127.0.0.1:8080",
         fetcher,
       }),
@@ -102,7 +110,10 @@ describe("authenticateFanWithEmail", () => {
     const fetcher = vi.fn<typeof fetch>().mockRejectedValueOnce(new Error("network down"));
 
     await expect(
-      authenticateFanWithEmail("sign-in", "fan@example.com", {
+      authenticateFanWithEmail({
+        email: "fan@example.com",
+        mode: "sign-in",
+      }, {
         baseUrl: "http://127.0.0.1:8080",
         fetcher,
       }),
@@ -111,6 +122,58 @@ describe("authenticateFanWithEmail", () => {
         code: "network",
         message: "API request failed before a response was received.",
         name: "ApiError",
+      }),
+    );
+  });
+
+  it("includes displayName and handle when starting a sign-up session", async () => {
+    const fetcher = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            data: {
+              challengeToken: "challenge-token",
+              expiresAt: "2026-04-07T21:00:00+09:00",
+            },
+            error: null,
+            meta: {
+              page: null,
+              requestId: "req_sign_up_challenge_002",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 200,
+          },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    await expect(
+      authenticateFanWithEmail({
+        displayName: "Mina",
+        email: "fan@example.com",
+        handle: "@mina",
+        mode: "sign-up",
+      }, {
+        baseUrl: "http://127.0.0.1:8080",
+        fetcher,
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(fetcher).toHaveBeenNthCalledWith(
+      2,
+      new URL("http://127.0.0.1:8080/api/fan/auth/sign-up/session"),
+      expect.objectContaining({
+        body: JSON.stringify({
+          challengeToken: "challenge-token",
+          displayName: "Mina",
+          email: "fan@example.com",
+          handle: "@mina",
+        }),
       }),
     );
   });

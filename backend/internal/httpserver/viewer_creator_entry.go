@@ -9,7 +9,6 @@ import (
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
 	"github.com/gin-gonic/gin"
 )
 
@@ -20,12 +19,7 @@ const (
 	viewerCreatorRegistrationRequestScope        = "viewer_creator_registration"
 )
 
-type viewerCreatorRegistrationRequest struct {
-	AvatarUploadToken string `json:"avatarUploadToken"`
-	Bio               string `json:"bio"`
-	DisplayName       string `json:"displayName"`
-	Handle            string `json:"handle"`
-}
+type viewerCreatorRegistrationRequest struct{}
 
 type viewerActiveModeRequest struct {
 	ActiveMode string `json:"activeMode"`
@@ -35,6 +29,7 @@ func registerViewerCreatorEntryRoutes(
 	router gin.IRouter,
 	registrationWriter ViewerCreatorRegistrationWriter,
 	avatarUploadHandler ViewerCreatorAvatarUploadHandler,
+	viewerProfileReader ViewerProfileReader,
 	activeModeSwitcher ViewerActiveModeSwitcher,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
@@ -66,7 +61,7 @@ func registerViewerCreatorEntryRoutes(
 			"/creator-registration",
 			buildProtectedFanAuthGuard(viewerBootstrap, viewerCreatorRegistrationRequestScope, viewerCreatorRegistrationAuthRequiredMessage),
 			func(c *gin.Context) {
-				handleViewerCreatorRegistration(c, registrationWriter, avatarUploadHandler)
+				handleViewerCreatorRegistration(c, registrationWriter, viewerProfileReader)
 			},
 		)
 	}
@@ -85,7 +80,7 @@ func registerViewerCreatorEntryRoutes(
 func handleViewerCreatorRegistration(
 	c *gin.Context,
 	writer ViewerCreatorRegistrationWriter,
-	avatarUploads ViewerCreatorAvatarUploadHandler,
+	profileReader ViewerProfileReader,
 ) {
 	viewer, ok := authenticatedViewerFromContext(c)
 	if !ok {
@@ -98,42 +93,23 @@ func handleViewerCreatorRegistration(
 		return
 	}
 
-	var avatarURL *string
-	avatarUploadToken := strings.TrimSpace(request.AvatarUploadToken)
-	if request.AvatarUploadToken != "" && avatarUploadToken == "" {
-		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_avatar_upload_token", "avatar upload token is invalid", viewerCreatorRegistrationRequestScope)
+	if profileReader == nil {
+		writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
 		return
 	}
-	if avatarUploadToken != "" {
-		if avatarUploads == nil {
-			writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
-			return
-		}
 
-		completedAvatar, err := avatarUploads.ResolveCompletedUpload(c.Request.Context(), viewer.ID, avatarUploadToken)
-		if err != nil {
-			switch {
-			case errors.Is(err, creatoravatar.ErrUploadNotFound),
-				errors.Is(err, creatoravatar.ErrUploadIncomplete),
-				errors.Is(err, creatoravatar.ErrUploadExpired),
-				errors.Is(err, creatoravatar.ErrUploadConsumed):
-				writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_avatar_upload_token", "avatar upload token is invalid", viewerCreatorRegistrationRequestScope)
-				return
-			default:
-				writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
-				return
-			}
-		}
-
-		avatarURL = &completedAvatar.AvatarURL
+	profile, err := profileReader.GetProfile(c.Request.Context(), viewer.ID)
+	if err != nil {
+		writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
+		return
 	}
 
-	_, err := writer.RegisterApprovedCreator(c.Request.Context(), creator.SelfServeRegistrationInput{
-		AvatarURL:   avatarURL,
+	_, err = writer.RegisterApprovedCreator(c.Request.Context(), creator.SelfServeRegistrationInput{
+		AvatarURL:   profile.AvatarURL,
 		UserID:      viewer.ID,
-		DisplayName: request.DisplayName,
-		Handle:      request.Handle,
-		Bio:         request.Bio,
+		DisplayName: profile.DisplayName,
+		Handle:      profile.Handle,
+		Bio:         "",
 	})
 	if err != nil {
 		switch {
@@ -147,13 +123,6 @@ func handleViewerCreatorRegistration(
 			writeViewerCreatorEntryError(c, http.StatusConflict, "handle_already_taken", "handle is already taken", viewerCreatorRegistrationRequestScope)
 			return
 		default:
-			writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
-			return
-		}
-	}
-
-	if avatarUploadToken != "" {
-		if err := avatarUploads.ConsumeCompletedUpload(c.Request.Context(), viewer.ID, avatarUploadToken); err != nil {
 			writeInternalServerError(c, viewerCreatorRegistrationRequestScope)
 			return
 		}

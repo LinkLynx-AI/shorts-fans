@@ -22,11 +22,19 @@ export function FanAuthDialog({
   open,
 }: FanAuthDialogProps) {
   const {
+    avatar,
+    avatarInputKey,
+    clearAvatarSelection,
+    displayName,
     email,
     errorMessage,
+    handle,
     isSubmitting,
     mode,
+    selectAvatarFile,
+    setDisplayName,
     setEmail,
+    setHandle,
     submit,
     switchMode,
   } = useFanAuthEntry({
@@ -64,6 +72,10 @@ export function FanAuthDialog({
             email で sign in または sign up を始める modal
           </Dialog.Description>
           <FanAuthEntryPanel
+            avatar={avatar}
+            avatarInputKey={avatarInputKey}
+            clearAvatarSelection={clearAvatarSelection}
+            displayName={displayName}
             dismissAction={(
               <Dialog.Close asChild>
                 <Button className="w-full" disabled={isSubmitting} variant="secondary">
@@ -73,9 +85,13 @@ export function FanAuthDialog({
             )}
             email={email}
             errorMessage={errorMessage}
+            handle={handle}
             isSubmitting={isSubmitting}
             mode={mode}
+            onAvatarSelect={selectAvatarFile}
+            onDisplayNameChange={setDisplayName}
             onEmailChange={setEmail}
+            onHandleChange={setHandle}
             onModeSwitch={switchMode}
             onSubmit={submit}
           />

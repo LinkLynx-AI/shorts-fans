@@ -24,6 +24,7 @@
 ## Canonical Sources
 
 - `docs/contracts/fan-auth-api-contract.md`
+- `docs/contracts/viewer-profile-api-contract.md`
 - `docs/contracts/viewer-bootstrap-api-contract.md`
 - `docs/contracts/fan-short-pin-api-contract.md`
 - `docs/contracts/fan-creator-follow-api-contract.md`
@@ -75,15 +76,18 @@
 
 - fields:
   - `email`
+  - `displayName`
+  - `handle`
   - `password`
+  - `avatar` optional image file
 - primary action:
   - `POST /api/fan/auth/sign-up`
 - secondary actions:
   - `sign-in` への切替
 - success:
-  - modal を `confirm-sign-up` mode に遷移させます。
-  - email は preserve します。
-  - auth はまだ完了扱いにしません。
+  - sign-up 時点で `displayName / handle` を shared viewer profile の初期値として確定させます。
+  - `avatar` を選択していた場合、auth 成功後に `docs/contracts/viewer-profile-api-contract.md` の avatar upload / update flow で保存できます。
+  - current implementation では signup 完了後に別の profile 設定 page を挟まず、同じ modal で入力した値を使います。
 
 ### `confirm-sign-up`
 

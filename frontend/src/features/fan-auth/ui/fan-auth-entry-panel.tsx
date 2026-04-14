@@ -1,7 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type {
+  ComponentProps,
+  ReactNode,
+} from "react";
 
+import { SharedViewerProfileFields } from "@/features/viewer-profile";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import {
@@ -12,12 +16,20 @@ import {
 } from "../model/fan-auth";
 
 type FanAuthEntryPanelProps = {
+  avatar: ComponentProps<typeof SharedViewerProfileFields>["avatar"];
+  avatarInputKey: number;
+  clearAvatarSelection: () => void;
+  displayName: string;
   dismissAction?: ReactNode;
   email: string;
   errorMessage: string | null;
+  handle: string;
   isSubmitting: boolean;
   mode: FanAuthMode;
+  onAvatarSelect: (file: File | null) => void;
+  onDisplayNameChange: (displayName: string) => void;
   onEmailChange: (email: string) => void;
+  onHandleChange: (handle: string) => void;
   onModeSwitch: () => void;
   onSubmit: () => void | Promise<void>;
 };
@@ -26,12 +38,20 @@ type FanAuthEntryPanelProps = {
  * 共通 fan auth entry panel を表示する。
  */
 export function FanAuthEntryPanel({
+  avatar,
+  avatarInputKey,
+  clearAvatarSelection,
+  displayName,
   dismissAction,
   email,
   errorMessage,
+  handle,
   isSubmitting,
   mode,
+  onAvatarSelect,
+  onDisplayNameChange,
   onEmailChange,
+  onHandleChange,
   onModeSwitch,
   onSubmit,
 }: FanAuthEntryPanelProps) {
@@ -67,6 +87,20 @@ export function FanAuthEntryPanel({
             value={email}
           />
         </label>
+
+        {mode === "sign-up" ? (
+          <SharedViewerProfileFields
+            avatar={avatar}
+            avatarInputKey={avatarInputKey}
+            displayName={displayName}
+            handle={handle}
+            isSubmitting={isSubmitting}
+            onAvatarClear={clearAvatarSelection}
+            onAvatarSelect={onAvatarSelect}
+            onDisplayNameChange={onDisplayNameChange}
+            onHandleChange={onHandleChange}
+          />
+        ) : null}
 
         {errorMessage ? (
           <p

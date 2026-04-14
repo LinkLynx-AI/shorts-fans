@@ -90,6 +90,10 @@ describe("FanHubShell account menu", () => {
 
     await user.click(screen.getByRole("button", { name: "Account menu" }));
 
+    expect(screen.getByRole("link", { name: "プロフィールを編集" })).toHaveAttribute(
+      "href",
+      "/fan/settings/profile",
+    );
     expect(screen.getByRole("link", { name: "Creator登録を始める" })).toHaveAttribute(
       "href",
       "/fan/creator/register",
@@ -108,6 +112,10 @@ describe("FanHubShell account menu", () => {
 
     await user.click(screen.getByRole("button", { name: "Account menu" }));
 
+    expect(screen.getByRole("link", { name: "プロフィールを編集" })).toHaveAttribute(
+      "href",
+      "/fan/settings/profile",
+    );
     expect(screen.getByRole("button", { name: "Creator mode に切り替え" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "ログアウト" })).toBeInTheDocument();
   });

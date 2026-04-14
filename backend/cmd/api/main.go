@@ -26,6 +26,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
 )
 
 func main() {
@@ -96,6 +97,7 @@ func main() {
 	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
+	viewerProfileRepository := viewerprofile.NewRepository(pool)
 	viewerBootstrapReader := auth.NewReader(authRepository)
 	authLifecycle := auth.NewLifecycle(authRepository)
 	modeSwitcher := auth.NewModeSwitcher(authRepository)
@@ -149,6 +151,7 @@ func main() {
 			CreatorSearch:                creatorRepository,
 			CreatorWorkspace:             creatorRepository,
 			CreatorWorkspaceMainPrice:    creatorRepository,
+			CreatorWorkspaceProfile:      viewerProfileRepository,
 			CreatorWorkspaceShortCaption: creatorRepository,
 			CreatorUpload:                creatorUploadService,
 			CreatorProfile:               creatorRepository,
@@ -169,6 +172,8 @@ func main() {
 			MainDisplayAssets:            shortDisplayDelivery,
 			ViewerActiveMode:             modeSwitcher,
 			ViewerBootstrap:              viewerBootstrapReader,
+			ViewerProfile:                viewerProfileRepository,
+			ViewerProfileWriter:          viewerProfileRepository,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},

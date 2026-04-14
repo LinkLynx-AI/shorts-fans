@@ -223,6 +223,21 @@ export function FanHubShell({ state }: FanHubShellProps) {
           }
         >
           <BottomSheetMenuGroup>
+            <BottomSheetMenuClose asChild>
+              <BottomSheetMenuAction asChild>
+                <Link
+                  aria-disabled={isAccountActionPending}
+                  aria-label="プロフィールを編集"
+                  className={isAccountActionPending ? "pointer-events-none opacity-55" : ""}
+                  href="/fan/settings/profile"
+                  onClick={clearAccountMenuErrors}
+                  tabIndex={isAccountActionPending ? -1 : undefined}
+                >
+                  <span>プロフィールを編集</span>
+                  <ChevronRight aria-hidden="true" className="size-4 text-muted" strokeWidth={2.2} />
+                </Link>
+              </BottomSheetMenuAction>
+            </BottomSheetMenuClose>
             {currentViewer?.canAccessCreatorMode ? (
               <BottomSheetMenuAction
                 disabled={isAccountActionPending}

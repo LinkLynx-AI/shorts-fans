@@ -38,6 +38,7 @@
 - [docs/contracts/fan-auth-api-contract.md](docs/contracts/fan-auth-api-contract.md): Cognito 前提の fan sign in / sign up / password reset / logout / re-auth transport 契約
 - [docs/contracts/fan-auth-modal-ui-contract.md](docs/contracts/fan-auth-modal-ui-contract.md): fan auth custom modal UI の state / recovery 契約
 - [docs/contracts/viewer-bootstrap-api-contract.md](docs/contracts/viewer-bootstrap-api-contract.md): app shell が読む current viewer bootstrap の read 契約
+- [docs/contracts/viewer-profile-api-contract.md](docs/contracts/viewer-profile-api-contract.md): sign-up / fan settings / creator workspace で共有する viewer profile の transport 契約
 - [docs/contracts/viewer-creator-entry-api-contract.md](docs/contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [docs/contracts/creator-workspace-api-contract.md](docs/contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
 - [docs/contracts/creator-workspace-owner-preview-api-contract.md](docs/contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail と short caption 更新契約

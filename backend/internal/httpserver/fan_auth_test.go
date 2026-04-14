@@ -18,7 +18,7 @@ type fanAuthServiceStub struct {
 	issueSignInChallenge func(context.Context, string) (auth.IssuedChallenge, error)
 	issueSignUpChallenge func(context.Context, string) (auth.IssuedChallenge, error)
 	startSignInSession   func(context.Context, string, string) (auth.AuthenticatedSession, error)
-	startSignUpSession   func(context.Context, string, string) (auth.AuthenticatedSession, error)
+	startSignUpSession   func(context.Context, string, string, string, string) (auth.AuthenticatedSession, error)
 	logout               func(context.Context, string) error
 }
 
@@ -34,8 +34,14 @@ func (s fanAuthServiceStub) StartSignInSession(ctx context.Context, email string
 	return s.startSignInSession(ctx, email, challengeToken)
 }
 
-func (s fanAuthServiceStub) StartSignUpSession(ctx context.Context, email string, challengeToken string) (auth.AuthenticatedSession, error) {
-	return s.startSignUpSession(ctx, email, challengeToken)
+func (s fanAuthServiceStub) StartSignUpSession(
+	ctx context.Context,
+	email string,
+	challengeToken string,
+	displayName string,
+	handle string,
+) (auth.AuthenticatedSession, error) {
+	return s.startSignUpSession(ctx, email, challengeToken, displayName, handle)
 }
 
 func (s fanAuthServiceStub) Logout(ctx context.Context, rawSessionToken string) error {
@@ -156,6 +162,59 @@ func TestSignInSessionSetsSessionCookie(t *testing.T) {
 	}
 	if !strings.Contains(setCookie, "HttpOnly") {
 		t.Fatalf("POST /api/fan/auth/sign-in/session set-cookie got %q want HttpOnly", setCookie)
+	}
+}
+
+func TestSignUpSessionAcceptsSharedProfileFields(t *testing.T) {
+	t.Parallel()
+
+	expiresAt := time.Now().UTC().Add(time.Hour)
+	router := NewHandler(HandlerConfig{
+		FanAuth: fanAuthServiceStub{
+			startSignUpSession: func(
+				_ context.Context,
+				email string,
+				challengeToken string,
+				displayName string,
+				handle string,
+			) (auth.AuthenticatedSession, error) {
+				if email != "fan@example.com" {
+					t.Fatalf("StartSignUpSession() email got %q want %q", email, "fan@example.com")
+				}
+				if challengeToken != "challenge-token" {
+					t.Fatalf("StartSignUpSession() challengeToken got %q want %q", challengeToken, "challenge-token")
+				}
+				if displayName != "Mina" {
+					t.Fatalf("StartSignUpSession() displayName got %q want %q", displayName, "Mina")
+				}
+				if handle != "mina" {
+					t.Fatalf("StartSignUpSession() handle got %q want %q", handle, "mina")
+				}
+
+				return auth.AuthenticatedSession{
+					Token:     "raw-session-token",
+					ExpiresAt: expiresAt,
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/auth/sign-up/session",
+		bytes.NewBufferString(`{"email":"fan@example.com","challengeToken":"challenge-token","displayName":"Mina","handle":"mina"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("POST /api/fan/auth/sign-up/session status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	setCookie := rec.Header().Get("Set-Cookie")
+	if !strings.Contains(setCookie, "shorts_fans_session=raw-session-token") {
+		t.Fatalf("POST /api/fan/auth/sign-up/session set-cookie got %q want session token", setCookie)
 	}
 }
 
