@@ -106,6 +106,7 @@
 - `data.nextStep = "confirm_sign_up"` 固定です。
 - `data.deliveryDestinationHint` は safe に返せる場合だけ masked email を返し、返せない場合は `null` です。
 - accepted response は account existence や internal user 作成完了を保証しません。
+- frontend modal では `confirm_sign_up` を `confirm-sign-up` mode へ対応づけます。対応表は `docs/contracts/fan-auth-modal-ui-contract.md` を正とします。
 
 ```json
 {
@@ -154,6 +155,7 @@
 - `data.nextStep = "confirm_password_reset"` 固定です。
 - `data.deliveryDestinationHint` は safe に返せる場合だけ masked email を返し、返せない場合は `null` です。
 - accepted response は account existence を保証しません。
+- frontend modal では `confirm_password_reset` を `confirm-password-reset` mode へ対応づけます。対応表は `docs/contracts/fan-auth-modal-ui-contract.md` を正とします。
 
 ```json
 {
@@ -249,6 +251,9 @@
   }
 }
 ```
+
+- `confirmation_required` を受けた frontend modal は `confirm-sign-up` mode に遷移します。
+- sign-in から `confirmation_required` に入った場合、resend に必要な password recovery は `docs/contracts/fan-auth-modal-ui-contract.md` の modal session rule に従います。
 
 ## Boundary Guardrails
 

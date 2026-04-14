@@ -43,8 +43,17 @@
 - overlay、panel、dismiss button、fan access framing は既存 modal と同じ空気感を保ちます。
 - submit 中は close button、escape、outside click による dismiss を禁止します。
 - mode 切替時は、失って困る field をなるべく保持します。最低でも email は preserve 対象です。
+- sign-up confirmation recovery に必要な password は modal session 内の ephemeral state としてだけ保持できます。永続化や analytics 送信はしません。
 - error copy は generic に保ち、account existence を露出しません。
 - frontend は auth mutation success を current viewer 成功と同一視せず、`GET /api/viewer/bootstrap` で再確定します。
+
+## Transport To UI Mapping
+
+| transport signal | modal mode |
+| --- | --- |
+| `data.nextStep = "confirm_sign_up"` | `confirm-sign-up` |
+| `data.nextStep = "confirm_password_reset"` | `confirm-password-reset` |
+| `error.code = "confirmation_required"` | `confirm-sign-up` |
 
 ## Modal Modes
 
@@ -81,10 +90,13 @@
 - fields:
   - `email`
   - `confirmationCode`
+- optional local-only state:
+  - `pendingPassword`
 - primary action:
   - `POST /api/fan/auth/sign-up/confirm`
 - secondary actions:
-  - `POST /api/fan/auth/sign-up` の再実行による resend
+  - `pendingPassword` を保持している場合だけ `POST /api/fan/auth/sign-up` の再実行による resend
+  - `pendingPassword` が無い場合は `sign-up` mode に戻して password を再入力させてから resend
   - `sign-in` への切替
 - success:
   - bootstrap を再読し、current viewer / session state を更新して modal を閉じます。
@@ -142,6 +154,7 @@
 
 - `invalid_credentials` は current mode に留まり、inline error で扱います。
 - `confirmation_required` は `confirm-sign-up` へ進める recoverable state として扱います。
+  - `sign-in` 送信で返った場合は `email` を preserve し、送信済み password を `pendingPassword` として modal session 内にだけ保持できます。
 - `invalid_confirmation_code` と `confirmation_code_expired` は confirm mode に留まり、resend を許可します。
 - `password_policy_violation` は current mode に留まり、password field を修正できるようにします。
 - `rate_limited` は modal を閉じずに retry guidance を表示します。
