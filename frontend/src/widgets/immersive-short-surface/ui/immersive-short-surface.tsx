@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, MoreVertical, Plus, Search, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -48,6 +48,10 @@ const feedSurfaceStyle = {
   "--short-tile-top": "#d8f3ff",
 } as CSSProperties;
 
+const feedAccentColor = "#4DA8DA";
+const sharedFanNavigationInsetPx = 76;
+const feedActionRailBottomPx = sharedFanNavigationInsetPx + 128;
+
 export type ImmersiveShortSurfaceProps =
   | {
       activeTab: FeedTab;
@@ -75,18 +79,19 @@ export type ImmersiveShortSurfaceProps =
 function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
   if (props.mode === "feed") {
     return (
-      <div className="relative z-10 flex justify-center px-4 pt-6">
-        <nav aria-label="Feed sections" className="inline-flex gap-[18px]">
+      <div className="absolute top-0 z-20 flex w-full items-center justify-between px-4 pb-4 pt-14">
+        <div className="w-6" />
+        <nav aria-label="Feed sections" className="flex items-center space-x-6 text-lg font-bold drop-shadow-md">
           {[
-            { active: props.activeTab === "recommended", href: "/?tab=recommended", key: "recommended", label: "おすすめ" },
-            { active: props.activeTab === "following", href: "/?tab=following", key: "following", label: "フォロー中" },
+            { active: props.activeTab === "recommended", href: "/?tab=recommended", key: "recommended", label: "For You" },
+            { active: props.activeTab === "following", href: "/?tab=following", key: "following", label: "Following" },
           ].map((item) => (
             <Link
               key={item.key}
               aria-current={item.active ? "page" : undefined}
               className={cn(
-                "relative pb-1.5 text-[15px] font-bold tracking-[0] text-white/62 transition hover:text-white/84",
-                item.active && "text-white after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:bg-white",
+                "border-b-2 border-transparent pb-1 text-white/60 transition hover:text-white",
+                item.active && "border-white text-white",
               )}
               href={item.href}
             >
@@ -94,6 +99,13 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
             </Link>
           ))}
         </nav>
+        <Link
+          aria-label="Search"
+          className="text-white drop-shadow-md transition hover:scale-105"
+          href="/search"
+        >
+          <Search className="h-6 w-6" strokeWidth={2.1} />
+        </Link>
       </div>
     );
   }
@@ -110,26 +122,30 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
 }
 
 type PinRailProps = {
-  disabled?: boolean;
-  onToggle?: () => void;
+  disabled?: boolean | undefined;
+  onToggle?: (() => void) | undefined;
   pinned: boolean;
+  variant?: "default" | "feed" | undefined;
 };
 
 /**
  * short の pin 状態を表す操作レールを表示する。
  */
-function PinRail({ disabled = false, onToggle, pinned }: PinRailProps) {
+function PinRail({ disabled = false, onToggle, pinned, variant = "default" }: PinRailProps) {
   const label = pinned ? "Pinned short" : "Pin short";
+  const isFeedVariant = variant === "feed";
 
   return (
-    <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "204px" }}>
+    <div className="flex flex-col items-center gap-2.5">
       <button
         aria-label={label}
         aria-busy={disabled || undefined}
         aria-pressed={pinned}
         className={cn(
-          "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:cursor-wait disabled:hover:text-accent-strong/72",
-          pinned && "text-accent",
+          isFeedVariant
+            ? "inline-flex items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-wait disabled:hover:scale-100"
+            : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:cursor-wait disabled:hover:text-accent-strong/72",
+          pinned && (isFeedVariant ? "text-[#8fd1ff]" : "text-accent"),
         )}
         disabled={disabled}
         onClick={onToggle}
@@ -137,7 +153,7 @@ function PinRail({ disabled = false, onToggle, pinned }: PinRailProps) {
       >
         <svg
           aria-hidden="true"
-          className="size-[22px]"
+          className={cn("size-[22px]", isFeedVariant && "h-7 w-7")}
           fill={pinned ? "currentColor" : "none"}
           viewBox="0 0 14 18"
         >
@@ -167,17 +183,26 @@ type CreatorBlockProps = {
   followed?: boolean | undefined;
   profileHref: string;
   short: FeedShortSurface["short"];
+  variant?: "default" | "feed" | undefined;
 };
 
 /**
  * feed surface 用の creator avatar を表示し、avatar 不在時は initials fallback を描画する。
  */
-function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
+function FeedCreatorAvatar({
+  className,
+  creator,
+}: Pick<CreatorBlockProps, "creator"> & {
+  className?: string;
+}) {
   if (!creator.avatar) {
     return (
       <span
         aria-hidden="true"
-        className="flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#b2ecff_0%,#65bae0_56%,#1b4362_100%)] text-[11px] font-semibold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+        className={cn(
+          "flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-full bg-[linear-gradient(180deg,#b2ecff_0%,#65bae0_56%,#1b4362_100%)] text-[11px] font-semibold uppercase tracking-[0.08em] text-white shadow-[0_8px_20px_rgba(7,19,29,0.2)]",
+          className,
+        )}
       >
         {getCreatorInitials(creator.displayName)}
       </span>
@@ -186,19 +211,80 @@ function FeedCreatorAvatar({ creator }: Pick<CreatorBlockProps, "creator">) {
 
   return (
     <CreatorAvatar
-      className="size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
+      className={cn("size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]", className)}
       creator={creator}
     />
+  );
+}
+
+function FeedActionRail({
+  creator,
+  disabled = false,
+  onToggle,
+  pinned,
+  profileHref,
+}: {
+  creator: FeedShortSurface["creator"];
+  disabled?: boolean;
+  onToggle?: () => void;
+  pinned: boolean;
+  profileHref: string;
+}) {
+  return (
+    <div
+      className="absolute right-3 z-20 flex flex-col items-center space-y-6"
+      style={{ bottom: `${feedActionRailBottomPx}px` }}
+    >
+      <Link
+        aria-label="プロフィールへ"
+        className="relative inline-flex transition hover:scale-[1.03]"
+        href={profileHref}
+      >
+        <FeedCreatorAvatar
+          className="size-11 border-[2px] border-white shadow-[0_12px_24px_rgba(0,0,0,0.26)]"
+          creator={creator}
+        />
+        <span
+          className="absolute -bottom-2 left-1/2 inline-flex -translate-x-1/2 rounded-full p-0.5 text-white shadow-[0_8px_18px_rgba(52,118,181,0.48)]"
+          style={{ backgroundColor: feedAccentColor }}
+        >
+          <Plus className="h-3 w-3" strokeWidth={3} />
+        </span>
+      </Link>
+      <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
+      <button
+        aria-label="Share"
+        className="text-white drop-shadow-lg transition-transform hover:scale-110"
+        type="button"
+      >
+        <Share2 className="h-7 w-7" strokeWidth={2.1} />
+      </button>
+      <button
+        aria-label="More options"
+        className="text-white drop-shadow-lg transition-transform hover:scale-110"
+        type="button"
+      >
+        <MoreVertical className="h-7 w-7" strokeWidth={2.1} />
+      </button>
+    </div>
   );
 }
 
 /**
  * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
  */
-function CreatorBlock({ creator, followState, followed = false, profileHref, short }: CreatorBlockProps) {
+function CreatorBlock({
+  creator,
+  followState,
+  followed = false,
+  profileHref,
+  short,
+  variant = "default",
+}: CreatorBlockProps) {
   const caption = short.caption.trim();
   const interactiveFollowState = followState ?? null;
   const resolvedIsFollowing = followState?.isFollowing ?? followed;
+  const isFeedVariant = variant === "feed";
   const followLabel = followState
     ? followState.isPending
       ? followState.isFollowing
@@ -211,14 +297,58 @@ function CreatorBlock({ creator, followState, followed = false, profileHref, sho
       ? "Following"
       : "Follow";
   const followCtaClassName = cn(
-    "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
-    resolvedIsFollowing && "border-[#b6eaff]/78 text-[#d7f5ff]",
+    isFeedVariant
+      ? "rounded-full border border-white/80 bg-transparent px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm transition"
+      : "min-h-7 shrink-0 rounded-full border border-white/62 bg-transparent px-3 text-[11px] font-semibold text-white/92 transition",
+    resolvedIsFollowing && (isFeedVariant ? "border-white/24 bg-white/18 text-white" : "border-[#b6eaff]/78 text-[#d7f5ff]"),
   );
+
+  if (isFeedVariant) {
+    return (
+      <div className="w-[calc(100%-88px)]">
+        <div className="mb-2.5 flex w-max max-w-full items-center gap-2.5">
+          <Link
+            aria-label={creator.displayName}
+            className="inline-flex min-w-0 items-center gap-2.5 text-left text-white transition hover:opacity-90"
+            href={profileHref}
+          >
+            <FeedCreatorAvatar className="size-8 border-white/60 shadow-sm" creator={creator} />
+            <span className="truncate text-[15px] font-bold text-white">{creator.handle}</span>
+          </Link>
+          {interactiveFollowState ? (
+            <button
+              aria-busy={interactiveFollowState.isPending || undefined}
+              aria-pressed={resolvedIsFollowing}
+              className={followCtaClassName}
+              disabled={interactiveFollowState.isPending}
+              onClick={interactiveFollowState.onToggle}
+              type="button"
+            >
+              {followLabel}
+            </button>
+          ) : (
+            <span className={followCtaClassName}>{followLabel}</span>
+          )}
+        </div>
+        {caption ? (
+          <p className="pr-16 text-sm font-medium leading-snug text-white drop-shadow-md line-clamp-2">{caption}</p>
+        ) : null}
+        {followState?.errorMessage ? (
+          <p
+            className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
+            role="alert"
+          >
+            {followState.errorMessage}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
       <div className="w-[min(88%,344px)] max-w-[344px]">
-        <div className="flex w-fit max-w-full items-center gap-2.5">
+        <div className="flex w-fit max-w-full items-center gap-2">
           <Link
             className="inline-flex min-w-0 items-center gap-2 text-left text-white transition hover:opacity-90"
             href={profileHref}
@@ -266,6 +396,7 @@ function FeedCreatorBlock({
   initialIsFollowing,
   profileHref,
   short,
+  variant = "default",
 }: FeedCreatorBlockProps) {
   const { openFanAuthDialog } = useFanAuthDialog();
   const { errorMessage, isFollowing, isPending, toggleFollow } = useCreatorFollowToggle({
@@ -294,6 +425,7 @@ function FeedCreatorBlock({
       }}
       profileHref={profileHref}
       short={short}
+      variant={variant}
     />
   );
 }
@@ -329,6 +461,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     resolvedFeedUnlockState?.shortId === short.id ? resolvedFeedUnlockState.unlock : null;
   const activeUnlock = resolvedFeedUnlock ?? unlock;
   const unlockAction = getUnlockEntryAction(activeUnlock);
+  const isFeedMode = mode === "feed";
   const surfaceStyle = mode === "feed" ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
     mode === "feed"
@@ -537,6 +670,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     }
   };
 
+  const pinProps =
+    mode === "feed" && props.pin
+      ? {
+          disabled: props.pin.isPending,
+          onToggle: props.pin.onToggle,
+        }
+      : {
+          disabled: detailPinState.isPending,
+          onToggle: detailPinState.onToggle,
+        };
+
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={surfaceStyle}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
@@ -552,55 +696,110 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         preload={isActive ? "auto" : "metadata"}
         src={short.media.url}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]" />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_34%)]" />
+      <div
+        className={cn(
+          "absolute inset-0",
+          isFeedMode
+            ? "bg-[linear-gradient(180deg,rgba(3,10,18,0.08)_0%,rgba(3,10,18,0.02)_28%,rgba(3,10,18,0.34)_62%,rgba(3,10,18,0.86)_100%)]"
+            : "bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]",
+        )}
+      />
+      <div
+        className={cn(
+          "absolute inset-0",
+          isFeedMode
+            ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_22%)]"
+            : "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_34%)]",
+        )}
+      />
+      {isFeedMode ? (
+        <div
+          className="absolute inset-x-0 h-[46%] bg-[linear-gradient(180deg,rgba(7,19,29,0)_0%,rgba(7,19,29,0.18)_16%,rgba(7,19,29,0.9)_100%)]"
+          style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+        />
+      ) : null}
 
       <div className="relative h-full">
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <ShortSurfaceHeader {...props} />
-        <PinRail
-          pinned={pinned}
-          {...(mode === "feed" && props.pin
-            ? {
-                disabled: props.pin.isPending,
-                onToggle: props.pin.onToggle,
-              }
-            : {
-                disabled: detailPinState.isPending,
-                onToggle: detailPinState.onToggle,
-              })}
-        />
+        {isFeedMode ? (
+          <FeedActionRail creator={creator} pinned={pinned} profileHref={profileHref} {...pinProps} />
+        ) : (
+          <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
+            <PinRail pinned={pinned} {...pinProps} />
+          </div>
+        )}
         {pinErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: "258px" }}
+            style={{ bottom: isFeedMode ? `${feedActionRailBottomPx + 116}px` : "258px" }}
           >
             {pinErrorMessage}
           </p>
         ) : null}
-        <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
-          <UnlockCta
-            className="w-full"
-            cta={activeUnlock.unlockCta}
-            disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
-            {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
-              ? {
-                  onClick: () => {
-                    void handleActivateUnlock();
-                  },
-                }
-              : {})}
-          />
-        </div>
-        <FeedCreatorBlock
-          creator={creator}
-          hasViewerSession={hasViewerSession}
-          initialIsFollowing={viewer.isFollowingCreator}
-          profileHref={profileHref}
-          short={short}
-        />
+        {isFeedMode ? (
+          <>
+            <div
+              className="absolute left-0 z-10 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-5 pt-16"
+              style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+            >
+              <UnlockCta
+                className="mb-4 w-full"
+                cta={activeUnlock.unlockCta}
+                disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+                variant="feed"
+                {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
+                  ? {
+                      onClick: () => {
+                        void handleActivateUnlock();
+                      },
+                    }
+                  : {})}
+              />
+              <FeedCreatorBlock
+                creator={creator}
+                hasViewerSession={hasViewerSession}
+                initialIsFollowing={viewer.isFollowingCreator}
+                profileHref={profileHref}
+                short={short}
+                variant="feed"
+              />
+            </div>
+            <div
+              aria-hidden="true"
+              className="absolute left-0 z-10 h-[2px] w-full bg-white/20"
+              style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+            >
+              <div className="h-full w-1/3 rounded-r-full bg-white" />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
+              <UnlockCta
+                className="w-full"
+                cta={activeUnlock.unlockCta}
+                disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+                {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
+                  ? {
+                      onClick: () => {
+                        void handleActivateUnlock();
+                      },
+                    }
+                  : {})}
+              />
+            </div>
+            <FeedCreatorBlock
+              creator={creator}
+              hasViewerSession={hasViewerSession}
+              initialIsFollowing={viewer.isFollowingCreator}
+              profileHref={profileHref}
+              short={short}
+            />
+          </>
+        )}
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}

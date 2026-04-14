@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Lock, Play } from "lucide-react";
 
 import { cn } from "@/shared/lib";
 
@@ -14,7 +15,16 @@ export type UnlockCtaProps = {
   disabled?: boolean;
   href?: string;
   onClick?: () => void;
+  variant?: "default" | "feed";
 };
+
+function getFeedCtaText(label: string, meta: string | null): string {
+  if (!meta) {
+    return label;
+  }
+
+  return `${label} ${meta.replace(" | ", " · ")}`;
+}
 
 /**
  * short から main unlock へつなぐ CTA を表示する。
@@ -25,12 +35,25 @@ export function UnlockCta({
   disabled = false,
   href,
   onClick,
+  variant = "default",
 }: UnlockCtaProps) {
   const label = getUnlockCtaLabel(cta);
   const meta = getUnlockCtaMeta(cta);
   const isUnavailable = cta.state === "unavailable";
+  const isFeedVariant = variant === "feed";
 
-  const content = (
+  const content = isFeedVariant ? (
+    <span className="flex min-w-0 items-center justify-center gap-2.5">
+      {cta.state === "continue_main" || cta.state === "owner_preview" ? (
+        <Play aria-hidden="true" className="size-[17px] shrink-0" strokeWidth={2.1} />
+      ) : (
+        <Lock aria-hidden="true" className="size-[17px] shrink-0" strokeWidth={2.1} />
+      )}
+      <span className="truncate text-[15px] font-semibold tracking-[-0.02em]">
+        {getFeedCtaText(label, meta)}
+      </span>
+    </span>
+  ) : (
     <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
       <span className="truncate text-[15px] font-semibold tracking-[-0.01em]">{label}</span>
       {meta ? (
@@ -49,10 +72,16 @@ export function UnlockCta({
   );
 
   const classes = cn(
-    "flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#bae7ff]/90 bg-[linear-gradient(90deg,rgba(240,251,255,0.97),rgba(213,243,255,0.93))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl",
-    cta.state === "continue_main" &&
-      "border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))]",
-    isUnavailable && "border-[#d9e8f1] text-foreground/54 shadow-none",
+    isFeedVariant
+      ? "flex min-h-[44px] items-center justify-center rounded-full border px-5 text-center shadow-[0_18px_34px_rgba(7,31,58,0.34)]"
+      : "flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#bae7ff]/90 bg-[linear-gradient(90deg,rgba(240,251,255,0.97),rgba(213,243,255,0.93))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl",
+    isFeedVariant
+      ? cta.state === "continue_main" || cta.state === "owner_preview"
+        ? "border-[#2F7CAB] bg-[linear-gradient(180deg,#3A8BBC_0%,#2F7CAB_42%,#235A80_100%)] text-white"
+        : "border-[#4DA8DA] bg-[#4DA8DA] text-white"
+      : cta.state === "continue_main" &&
+          "border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))]",
+    isUnavailable && (isFeedVariant ? "border-white/18 bg-black/28 text-white/55 shadow-none" : "border-[#d9e8f1] text-foreground/54 shadow-none"),
     className,
   );
 
