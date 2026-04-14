@@ -21,9 +21,6 @@ import {
   type UpdateFollowingCreatorRelation,
 } from "../model/use-following-creator-rows";
 
-const FAN_HUB_FONT_FAMILY =
-  'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
-
 export type FollowingCreatorListProps = {
   layout?: "embedded" | "standalone";
   items: readonly FanFollowingItem[];
@@ -128,10 +125,9 @@ export function FollowingCreatorList({
   return (
     <section
       className={cn(
-        "text-foreground",
+        "font-sans text-foreground",
         isEmbedded ? "bg-white pb-8 pt-4" : "min-h-full overflow-y-auto px-4 pb-28 pt-4",
       )}
-      style={isEmbedded ? { fontFamily: FAN_HUB_FONT_FAMILY } : undefined}
     >
       {isEmbedded ? null : (
         <>
@@ -152,27 +148,18 @@ export function FollowingCreatorList({
 
       <div
         className={cn(
-          "",
           isEmbedded
             ? "mt-1 px-4"
-            : "mt-4 border-border/80 bg-white/82 shadow-[0_12px_28px_rgba(36,94,132,0.08)] backdrop-blur-md",
+            : "mt-4 rounded-2xl border border-border/80 bg-white/82 px-4 py-3 shadow-[0_12px_28px_rgba(36,94,132,0.08)] backdrop-blur-md",
         )}
       >
         <label className="relative block">
           <Search
-            className={cn(
-              "pointer-events-none absolute top-1/2 -translate-y-1/2",
-              isEmbedded ? "left-4 size-5 text-[#9ca3af]" : "left-0 size-5 text-muted",
-            )}
-            strokeWidth={isEmbedded ? 2.2 : 2}
+            className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#9ca3af]"
+            strokeWidth={2.2}
           />
           <input
-            className={cn(
-              "w-full border-0 outline-none",
-              isEmbedded
-                ? "h-[46px] rounded-full border border-black/[0.04] bg-[#f4f5f7] pl-[50px] pr-5 text-[16px] font-semibold tracking-[-0.02em] text-[#101828] shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),0_2px_10px_rgba(15,23,42,0.04)] placeholder:font-semibold placeholder:text-[#a9b0bc] focus-visible:ring-4 focus-visible:ring-ring/70"
-                : "h-6 bg-transparent pl-7 pr-0 text-sm text-foreground placeholder:text-muted",
-            )}
+            className="h-[46px] w-full rounded-full border border-black/[0.04] bg-[#f4f5f7] pl-[50px] pr-5 text-[16px] font-semibold tracking-[-0.02em] text-[#101828] outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),0_2px_10px_rgba(15,23,42,0.04)] placeholder:font-semibold placeholder:text-[#a9b0bc] focus-visible:ring-4 focus-visible:ring-ring/70"
             onChange={(event) => setQuery(event.currentTarget.value)}
             placeholder="検索"
             type="search"

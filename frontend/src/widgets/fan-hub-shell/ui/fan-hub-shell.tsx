@@ -33,8 +33,6 @@ import {
 } from "@/shared/ui";
 
 const FAN_HUB_BRAND_COLOR = "#4DA8DA";
-const FAN_HUB_FONT_FAMILY =
-  'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif';
 
 type FanHubShellProps = {
   headerProfile: {
@@ -217,8 +215,7 @@ export function FanHubShell({ headerProfile, state }: FanHubShellProps) {
 
   return (
     <section
-      className="min-h-full overflow-y-auto bg-white pb-28 text-[#1f2430]"
-      style={{ fontFamily: FAN_HUB_FONT_FAMILY }}
+      className="min-h-full overflow-y-auto bg-white pb-28 font-sans text-[#1f2430]"
     >
       <div className="sticky top-0 z-20 flex items-center justify-between bg-white px-4 pb-4 pt-5 shadow-sm">
         <span aria-hidden="true" className="block size-6" />
