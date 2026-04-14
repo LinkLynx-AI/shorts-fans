@@ -1,7 +1,9 @@
 import { z } from "zod";
 
+const viewerProfileHandlePattern = /^@[a-z0-9._]+$/;
+
 const viewerProfileHandleSchema = z.custom<`@${string}`>(
-  (value) => typeof value === "string" && value.startsWith("@"),
+  (value) => typeof value === "string" && viewerProfileHandlePattern.test(value),
 );
 
 export const viewerProfileAvatarAssetSchema = z.object({
