@@ -44,6 +44,7 @@
 
 - `user` は 1 つの login identity を持つ
 - 認証、年齢確認、決済、support 履歴の基点はこの `user` に置く
+- `display name / handle / avatar` は `fan` と `creator` で共有する viewer profile basics とし、sign-up flow で初期値を作る
 
 ### fan state
 
@@ -70,6 +71,7 @@
 ### sign up / first entry
 
 - 初回は `fan mode` をデフォルトに置く
+- sign-up flow で shared viewer profile basics として `display name / handle / avatar` を作る
 - 理由
   - public acquisition surface が `short feed` だから
   - 新規 user の大半は最初から creator 作業を始めないから

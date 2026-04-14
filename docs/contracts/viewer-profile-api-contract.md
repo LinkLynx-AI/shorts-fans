@@ -8,7 +8,7 @@
 
 ## Goals
 
-- sign-up 時点で shared viewer profile の初期値を作成できるようにする。
+- sign-up flow の完了時点で shared viewer profile の初期値を作成できるようにする。
 - authenticated viewer が `fan profile settings` から shared profile を更新できるようにする。
 - creator mode viewer が `/creator` から shared profile と creator 固有 bio を更新できるようにする。
 - shared profile 更新時に creator mirror を同期し、public / workspace 表示の `displayName / handle / avatar` を一致させる。
@@ -33,6 +33,8 @@
 ## Shared Rules
 
 - `displayName / handle / avatar` の canonical source は shared viewer profile です。
+- shared viewer profile record 自体は `docs/contracts/fan-auth-api-contract.md` の sign-up confirm boundary で初回作成されます。
+- この contract は、作成済み shared viewer profile の read / update と、sign-up flow 後段での初期 avatar 確定を扱います。
 - creator profile が存在する場合、shared viewer profile 更新時に `displayName / handle / avatar` を mirror 同期します。
 - `bio` は creator 固有情報であり shared viewer profile には含めません。
 - `displayName` は trim 後 non-empty である必要があります。
@@ -52,12 +54,13 @@
 | `GET` | `/api/viewer/profile` | required | current viewer の shared profile を返す |
 | `POST` | `/api/viewer/profile/avatar-uploads` | required | shared profile 用 avatar direct upload target を返す |
 | `POST` | `/api/viewer/profile/avatar-uploads/complete` | required | upload 済み avatar を completed token に変換する |
-| `PUT` | `/api/viewer/profile` | required | fan settings などから shared profile を更新する |
+| `PUT` | `/api/viewer/profile` | required | fan settings や sign-up flow 後段から shared profile を更新する |
 | `PUT` | `/api/creator/workspace/profile` | required creator | shared profile と creator 固有 bio を同時更新する |
 
 ## Avatar Upload Shared Rules
 
 - avatar upload は authenticated viewer 向けで、fan / creator のどちらでも利用できます。
+- sign-up flow では sign-up confirm による session 発行後、この avatar upload / update transport を直列実行して、auth boundary が作成済みの shared viewer profile に初期 avatar を確定できます。
 - upload は `Presigned PUT` を前提にし、multipart / binary / base64 を profile update request に同梱しません。
 - upload create / complete は `data / meta / error` envelope を使い、`meta.page = null` とします。
 - `avatarUploadToken` は create した viewer 自身の completed upload にだけ紐づきます。
@@ -176,6 +179,7 @@
 ### Update Rules
 
 - shared viewer profile の `displayName / handle / avatar` を更新します。
+- sign-up flow の後段でも同じ write transport を使って、既存 shared viewer profile の初期 avatar を確定できます。
 - creator profile が存在する場合、同じ transaction で `displayName / handle / avatar` を mirror 同期します。
 - `avatarUploadToken` を送る場合は same viewer の completed upload である必要があります。
 - successful update 後に `avatarUploadToken` を消費します。
@@ -242,6 +246,8 @@
 ## Boundary Guardrails
 
 - shared viewer profile transport は creator registration input を兼ねません。
+- sign-up flow で shared viewer profile を初期化しても、creator registration input をこの transport に戻しません。
+- sign-up flow における shared viewer profile record の初回作成責務はこの contract ではなく `docs/contracts/fan-auth-api-contract.md` 側にあります。
 - `bio` は `/api/viewer/profile` では扱いません。
 - avatar binary / multipart / base64 payload を profile update request に含めません。
 - profile update response に `currentViewer`、`activeMode`、workspace summary を重ねて返しません。

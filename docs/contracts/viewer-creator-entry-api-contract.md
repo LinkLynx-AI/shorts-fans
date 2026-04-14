@@ -43,7 +43,7 @@
 
 - creator registration は current viewer 自身だけを対象にします。
 - `displayName / handle / avatar` は `docs/contracts/viewer-profile-api-contract.md` の shared viewer profile から読みます。
-- current primary flow では sign-up または fan settings で shared viewer profile を準備してから creator registration に進みます。
+- current primary flow では sign-up flow または fan settings で shared viewer profile を準備してから creator registration に進みます。
 - creator registration 完了時点では `activeMode` を自動切替しません。
 - legacy な creator-registration avatar upload route が残っていても、この文書の canonical flow には含めません。
 
@@ -68,7 +68,8 @@
 - creator profile は registration transaction 内で upsert し、shared viewer profile の `displayName / handle / avatar` を mirror します。
 - creator 固有の `bio` は registration 時点では空文字で初期化し、後続の `/api/creator/workspace/profile` で更新します。
 - creator profile は暫定運用として successful registration 時に即時 public 化します。
-- shared viewer profile が既に存在する前提で動作し、registration request 自体は profile field を受け取りません。
+- shared viewer profile が sign-up flow で既に作成済み、または fan settings で準備済みである前提で動作し、registration request 自体は profile field を受け取りません。
+- `handle` の uniqueness は shared viewer profile 準備時点で解決済みとし、creator registration 側で再裁定しません。
 
 ### Error Contract
 
@@ -78,7 +79,6 @@
 | `400` | `invalid_display_name` | shared viewer profile の display name が不正 |
 | `400` | `invalid_handle` | shared viewer profile の handle が不正 |
 | `401` | `auth_required` | session 不在 |
-| `409` | `handle_already_taken` | normalized handle が既存 creator と衝突 |
 | `500` | `internal_error` | unexpected failure |
 
 ## `PUT /api/viewer/active-mode`
