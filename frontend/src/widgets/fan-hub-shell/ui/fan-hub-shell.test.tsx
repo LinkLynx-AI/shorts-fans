@@ -9,9 +9,18 @@ import {
   CurrentViewerProvider,
   ViewerSessionProvider,
 } from "@/entities/viewer";
-import { useFanLogoutEntry } from "@/features/fan-auth";
+import {
+  FanAuthDialogProvider,
+  useFanLogoutEntry,
+} from "@/features/fan-auth";
 
 import { FanHubShell } from "./fan-hub-shell";
+
+const defaultHeaderProfile = {
+  avatarUrl: null,
+  displayName: "Alex_Fan",
+  handle: "@alex_f",
+};
 
 const mockedRouter = vi.hoisted(() => ({
   back: vi.fn(),
@@ -56,7 +65,9 @@ function renderFanHubShellWithState(currentViewer: {
   return render(
     <ViewerSessionProvider hasSession>
       <CurrentViewerProvider currentViewer={currentViewer}>
-        <FanHubShell state={state} />
+        <FanAuthDialogProvider>
+          <FanHubShell headerProfile={defaultHeaderProfile} state={state} />
+        </FanAuthDialogProvider>
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
@@ -88,6 +99,9 @@ describe("FanHubShell account menu", () => {
       id: "viewer_123",
     });
 
+    expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.getByText("Alex_Fan")).toBeInTheDocument();
+    expect(screen.getByText("@alex_f")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Account menu" }));
 
     expect(screen.getByRole("link", { name: "プロフィールを編集" })).toHaveAttribute(
@@ -207,6 +221,62 @@ describe("FanHubShell account menu", () => {
     expect(pinnedPoster).toHaveStyle({
       backgroundImage: 'url("https://cdn.example.com/shorts/sora-after-rain-poster.jpg")',
     });
+  });
+
+  it("renders a fallback monogram when the viewer avatar is missing", () => {
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+
+    expect(screen.getByText("AF")).toBeInTheDocument();
+  });
+
+  it("keeps all profile sections inside the fan hub tabs", () => {
+    renderFanHubShell({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/fan?tab=following");
+    expect(screen.getByRole("link", { name: "Pinned Shorts" })).toHaveAttribute("href", "/fan?tab=pinned");
+    expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/fan?tab=library");
+  });
+
+  it("renders the following list inline when the following tab is active", () => {
+    renderFanHubShell(
+      {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      "following",
+    );
+
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByPlaceholderText("検索")).toBeInTheDocument();
+    expect(screen.getByText("all creators")).toBeInTheDocument();
+    expect(screen.getByText("Aoi N")).toBeInTheDocument();
+    expect(screen.getByText("3 creators")).toBeInTheDocument();
+  });
+
+  it("shows a CTA panel when the active tab is empty", () => {
+    renderFanHubShellWithState(
+      {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      {
+        ...getFanHubState("library"),
+        libraryItems: [],
+      },
+    );
+
+    expect(screen.getByText("Library はまだ空です")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "feed で続きを探す" })).toHaveAttribute("href", "/");
   });
 
   it("uses an owner-preview fallback label when the library entry short caption is blank", () => {

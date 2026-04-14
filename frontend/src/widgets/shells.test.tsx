@@ -30,7 +30,7 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-function renderFanHubShell(activeTab: "library" | "pinned") {
+function renderFanHubShell(activeTab: "following" | "library" | "pinned") {
   return render(
     <ViewerSessionProvider hasSession>
       <CurrentViewerProvider
@@ -40,7 +40,16 @@ function renderFanHubShell(activeTab: "library" | "pinned") {
           id: "viewer_123",
         }}
       >
-        <FanHubShell state={getFanHubState(activeTab)} />
+        <FanAuthDialogProvider>
+          <FanHubShell
+            headerProfile={{
+              avatarUrl: null,
+              displayName: "Alex_Fan",
+              handle: "@alex_f",
+            }}
+            state={getFanHubState(activeTab)}
+          />
+        </FanAuthDialogProvider>
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
@@ -132,9 +141,9 @@ describe("widgets", () => {
   it("renders fan hub content and active tabs", () => {
     const { rerender } = renderFanHubShell("library");
 
-    expect(screen.getByRole("heading", { name: "My archive" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
-    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/fan/following");
+    expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.getByText("Alex_Fan")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("href", "/fan?tab=following");
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
 
     rerender(
@@ -146,16 +155,52 @@ describe("widgets", () => {
             id: "viewer_123",
           }}
         >
-          <FanHubShell state={getFanHubState("pinned")} />
+          <FanAuthDialogProvider>
+            <FanHubShell
+              headerProfile={{
+                avatarUrl: null,
+                displayName: "Alex_Fan",
+                handle: "@alex_f",
+              }}
+              state={getFanHubState("pinned")}
+            />
+          </FanAuthDialogProvider>
         </CurrentViewerProvider>
       </ViewerSessionProvider>,
     );
 
-    expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Pinned Shorts" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: /雨上がりの balcony preview/i })).toHaveAttribute(
       "href",
       "/shorts/afterrain?fanTab=pinned&from=fan",
     );
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider
+          currentViewer={{
+            activeMode: "fan",
+            canAccessCreatorMode: false,
+            id: "viewer_123",
+          }}
+        >
+          <FanAuthDialogProvider>
+            <FanHubShell
+              headerProfile={{
+                avatarUrl: null,
+                displayName: "Alex_Fan",
+                handle: "@alex_f",
+              }}
+              state={getFanHubState("following")}
+            />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByPlaceholderText("検索")).toBeInTheDocument();
+    expect(screen.getByText("3 creators")).toBeInTheDocument();
   });
 
   it("renders the surface detail shell", () => {
