@@ -33,12 +33,12 @@ export function CreatorSearchPanel({
       <div className="relative">
         <Search
           aria-hidden="true"
-          className="pointer-events-none absolute left-4 top-1/2 size-[15px] -translate-y-1/2 text-accent-strong/54"
-          strokeWidth={2}
+          className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-[#9ca3af]"
+          strokeWidth={2.2}
         />
         <input
           aria-label="クリエイターを検索"
-          className="h-[46px] w-full rounded-[18px] border border-[rgba(186,231,255,0.9)] bg-white/94 pl-11 pr-4 text-sm text-foreground outline-none shadow-[0_12px_32px_rgba(26,69,98,0.12)] placeholder:text-muted focus-visible:ring-4 focus-visible:ring-ring/70"
+          className="h-[46px] w-full rounded-full border border-black/[0.04] bg-[#f4f5f7] pl-[50px] pr-5 text-[16px] font-semibold tracking-[-0.02em] text-[#101828] outline-none shadow-[inset_0_1px_2px_rgba(15,23,42,0.04),0_2px_10px_rgba(15,23,42,0.04)] placeholder:font-semibold placeholder:text-[#a9b0bc] focus-visible:ring-4 focus-visible:ring-ring/70"
           onChange={(event) => {
             setQuery(event.currentTarget.value);
           }}
