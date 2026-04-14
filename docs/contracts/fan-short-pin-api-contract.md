@@ -21,6 +21,7 @@
 
 ## Canonical Sources
 
+- `docs/contracts/fan-auth-modal-ui-contract.md`
 - `docs/contracts/fan-public-surface-api-contract.md`
 - `docs/contracts/fan-profile-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
