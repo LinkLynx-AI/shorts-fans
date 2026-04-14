@@ -130,7 +130,7 @@ describe("ImmersiveShortSurface", () => {
       { hasSession: true },
     );
 
-    expect(screen.getByRole("link", { name: /おすすめ/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: /For You/i })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
       "href",
@@ -138,6 +138,8 @@ describe("ImmersiveShortSurface", () => {
     );
     expect(screen.queryByRole("link", { name: /Back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "More options" })).toBeDisabled();
     expect(screen.getByText("Follow")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
@@ -492,7 +494,7 @@ describe("ImmersiveShortSurface", () => {
       "href",
       "/creators/creator_mina_rei?from=short&shortFanTab=pinned&shortId=rooftop",
     );
-    expect(screen.queryByRole("link", { name: /おすすめ/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /For You/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Following" })).toBeInTheDocument();
@@ -684,7 +686,7 @@ describe("ImmersiveShortSurface", () => {
       { hasSession: true },
     );
 
-    expect(screen.getByText("MR")).toBeInTheDocument();
+    expect(screen.getAllByText("MR").length).toBeGreaterThan(0);
   });
 
   it("falls back to a generic paywall title when the short has no caption", async () => {
@@ -735,7 +737,7 @@ describe("ImmersiveShortSurface", () => {
       { hasSession: true },
     );
 
-    expect(screen.getByRole("link", { name: /おすすめ/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /For You/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
   });
 });
