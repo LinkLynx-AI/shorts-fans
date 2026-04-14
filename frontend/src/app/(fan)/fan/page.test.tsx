@@ -1,4 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 
 import { CurrentViewerProvider, ViewerSessionProvider } from "@/entities/viewer";
 import {
@@ -314,5 +319,50 @@ describe("FanPage", () => {
     );
 
     expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+  });
+
+  it("returns to the previous route when the auth-required fan dialog is dismissed", async () => {
+    const user = userEvent.setup();
+
+    window.history.pushState({}, "", "/");
+    window.history.pushState({}, "", "/fan");
+
+    cookiesMock.mockResolvedValue({
+      get: () => ({
+        value: "valid-session",
+      }),
+    });
+    vi.mocked(fetchFanProfileOverview).mockRejectedValue(
+      new ApiError("unauthorized", {
+        code: "http",
+        details: JSON.stringify({
+          error: {
+            code: "auth_required",
+            message: "fan profile requires authentication",
+          },
+        }),
+        status: 401,
+      }),
+    );
+    vi.mocked(fetchFanProfilePinnedShortsPage).mockResolvedValue({
+      items: [],
+      page: {
+        hasNext: false,
+        nextCursor: null,
+      },
+      requestId: "req_fan_profile_pinned_shorts_002",
+    });
+
+    renderWithFanAuthDialog(
+      await FanPage({
+        searchParams: Promise.resolve({}),
+      }),
+    );
+
+    await user.click(await screen.findByRole("button", { name: "閉じる" }));
+
+    await waitFor(() => {
+      expect(mockedRouter.back).toHaveBeenCalledTimes(1);
+    });
   });
 });

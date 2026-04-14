@@ -17,8 +17,11 @@ import {
 
 import { FanAuthDialog } from "../ui/fan-auth-dialog";
 
+type FanAuthDialogCloseBehavior = "back" | "stay";
+
 type OpenFanAuthDialogOptions = {
   afterAuthenticatedHref?: string;
+  closeBehavior?: FanAuthDialogCloseBehavior;
 };
 
 type FanAuthDialogContextValue = {
@@ -37,15 +40,32 @@ export function FanAuthDialogProvider({ children }: { children: ReactNode }) {
   const setCurrentViewer = useSetCurrentViewer();
   const setViewerSession = useSetViewerSession();
   const [afterAuthenticatedHref, setAfterAuthenticatedHref] = useState<string | null>(null);
+  const [closeBehavior, setCloseBehavior] = useState<FanAuthDialogCloseBehavior>("stay");
   const [isFanAuthDialogOpen, setIsFanAuthDialogOpen] = useState(false);
 
-  const closeFanAuthDialog = () => {
+  const resetFanAuthDialogState = () => {
     setIsFanAuthDialogOpen(false);
     setAfterAuthenticatedHref(null);
+    setCloseBehavior("stay");
+  };
+
+  const closeFanAuthDialog = () => {
+    const shouldReturnToPreviousRoute = closeBehavior === "back";
+
+    resetFanAuthDialogState();
+
+    if (!shouldReturnToPreviousRoute) {
+      return;
+    }
+
+    startTransition(() => {
+      router.back();
+    });
   };
 
   const openFanAuthDialog = (options?: OpenFanAuthDialogOptions) => {
     setAfterAuthenticatedHref(options?.afterAuthenticatedHref ?? null);
+    setCloseBehavior(options?.closeBehavior ?? "stay");
     setIsFanAuthDialogOpen(true);
   };
 
@@ -64,7 +84,7 @@ export function FanAuthDialogProvider({ children }: { children: ReactNode }) {
 
     setCurrentViewer(currentViewer);
     setViewerSession(currentViewer !== null);
-    closeFanAuthDialog();
+    resetFanAuthDialogState();
 
     startTransition(() => {
       if (nextHref) {

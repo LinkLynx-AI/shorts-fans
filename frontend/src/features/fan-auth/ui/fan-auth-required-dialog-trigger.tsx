@@ -20,7 +20,9 @@ export function FanAuthRequiredDialogTrigger() {
     }
 
     hasOpenedRef.current = true;
-    openFanAuthDialog();
+    openFanAuthDialog({
+      closeBehavior: "back",
+    });
   }, [openFanAuthDialog]);
 
   return null;
