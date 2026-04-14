@@ -14,6 +14,21 @@ describe("FanAuthDialog", () => {
     authenticateFanWithEmailMock.mockReset();
   });
 
+  it("renders a viewport-bounded scrollable shell for long sign-up content", () => {
+    render(<FanAuthDialog onAuthenticated={vi.fn()} onOpenChange={vi.fn()} open />);
+
+    const dialog = screen.getByRole("dialog");
+    const scrollShell = dialog.querySelector("div.max-h-full");
+
+    expect(dialog).toHaveClass("inset-y-4", "items-start");
+    expect(scrollShell).not.toBeNull();
+    expect(scrollShell).toHaveClass(
+      "max-h-full",
+      "overflow-y-auto",
+      "overscroll-contain",
+    );
+  });
+
   it("disables closing affordances while auth submission is in flight", async () => {
     const user = userEvent.setup();
 

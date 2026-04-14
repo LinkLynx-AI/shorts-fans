@@ -55,7 +55,7 @@ export function FanAuthDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-[#061521]/36 backdrop-blur-[2px]" />
         <Dialog.Content
-          className="fixed inset-x-4 top-1/2 z-50 mx-auto w-full max-w-[376px] -translate-y-1/2"
+          className="fixed inset-x-4 inset-y-4 z-50 mx-auto flex w-full max-w-[376px] items-start outline-none sm:items-center"
           onEscapeKeyDown={(event) => {
             if (isSubmitting) {
               event.preventDefault();
@@ -71,30 +71,32 @@ export function FanAuthDialog({
           <Dialog.Description className="sr-only">
             email で sign in または sign up を始める modal
           </Dialog.Description>
-          <FanAuthEntryPanel
-            avatar={avatar}
-            avatarInputKey={avatarInputKey}
-            clearAvatarSelection={clearAvatarSelection}
-            displayName={displayName}
-            dismissAction={(
-              <Dialog.Close asChild>
-                <Button className="w-full" disabled={isSubmitting} variant="secondary">
-                  閉じる
-                </Button>
-              </Dialog.Close>
-            )}
-            email={email}
-            errorMessage={errorMessage}
-            handle={handle}
-            isSubmitting={isSubmitting}
-            mode={mode}
-            onAvatarSelect={selectAvatarFile}
-            onDisplayNameChange={setDisplayName}
-            onEmailChange={setEmail}
-            onHandleChange={setHandle}
-            onModeSwitch={switchMode}
-            onSubmit={submit}
-          />
+          <div className="max-h-full w-full overflow-y-auto overscroll-contain">
+            <FanAuthEntryPanel
+              avatar={avatar}
+              avatarInputKey={avatarInputKey}
+              clearAvatarSelection={clearAvatarSelection}
+              displayName={displayName}
+              dismissAction={(
+                <Dialog.Close asChild>
+                  <Button className="w-full" disabled={isSubmitting} variant="secondary">
+                    閉じる
+                  </Button>
+                </Dialog.Close>
+              )}
+              email={email}
+              errorMessage={errorMessage}
+              handle={handle}
+              isSubmitting={isSubmitting}
+              mode={mode}
+              onAvatarSelect={selectAvatarFile}
+              onDisplayNameChange={setDisplayName}
+              onEmailChange={setEmail}
+              onHandleChange={setHandle}
+              onModeSwitch={switchMode}
+              onSubmit={submit}
+            />
+          </div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
