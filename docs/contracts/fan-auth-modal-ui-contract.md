@@ -45,6 +45,7 @@
 - submit 中は close button、escape、outside click による dismiss を禁止します。
 - mode 切替時は、失って困る field をなるべく保持します。最低でも email は preserve 対象です。
 - sign-up confirmation recovery に必要な password は modal session 内の ephemeral state としてだけ保持できます。永続化や analytics 送信はしません。
+- `sign-up -> confirm-sign-up` の間は `displayName / handle / avatar` の draft も modal session 内に保持し、resend / recovery と optional avatar 初期化に使います。
 - error copy は generic に保ち、account existence を露出しません。
 - frontend は auth mutation success を current viewer 成功と同一視せず、`GET /api/viewer/bootstrap` で再確定します。
 
@@ -85,8 +86,7 @@
 - secondary actions:
   - `sign-in` への切替
 - success:
-  - sign-up 時点で `displayName / handle` を shared viewer profile の初期値として確定させます。
-  - `avatar` を選択していた場合、auth 成功後に `docs/contracts/viewer-profile-api-contract.md` の avatar upload / update flow で保存できます。
+  - `displayName / handle / avatar` draft を pending sign-up draft として保持したまま `confirm-sign-up` へ進みます。
   - current implementation では signup 完了後に別の profile 設定 page を挟まず、同じ modal で入力した値を使います。
 
 ### `confirm-sign-up`
@@ -96,6 +96,7 @@
   - `confirmationCode`
 - optional local-only state:
   - `pendingPassword`
+  - `pendingSignUpDraft`
 - primary action:
   - `POST /api/fan/auth/sign-up/confirm`
 - secondary actions:
@@ -103,7 +104,9 @@
   - `pendingPassword` が無い場合は `sign-up` mode に戻して password を再入力させてから resend
   - `sign-in` への切替
 - success:
-  - bootstrap を再読し、current viewer / session state を更新して modal を閉じます。
+  - bootstrap を再読し、current viewer / session state を更新します。
+  - backend が sign-up request で受けた `displayName / handle` を使って shared viewer profile を作成済みである前提で進みます。
+  - `pendingSignUpDraft` に avatar がある場合だけ `docs/contracts/viewer-profile-api-contract.md` の avatar upload / update flow をこの時点で直列実行してから modal を閉じます。
   - current route や opener context は維持します。
 
 ### `password-reset-request`
@@ -160,7 +163,10 @@
 - `confirmation_required` は `confirm-sign-up` へ進める recoverable state として扱います。
   - `sign-in` 送信で返った場合は `email` を preserve し、送信済み password を `pendingPassword` として modal session 内にだけ保持できます。
 - `invalid_confirmation_code` と `confirmation_code_expired` は confirm mode に留まり、resend を許可します。
+- `handle_already_taken` は `sign-up` mode に留まり、`handle` field に紐づく inline error として扱います。
+- `confirm-sign-up` は受理済み sign-up draft を消費する boundary であり、`handle_already_taken` は想定しません。
 - `password_policy_violation` は current mode に留まり、password field を修正できるようにします。
+- sign-up confirm 後の optional avatar 初期化に失敗した場合は modal を閉じず、`displayName / handle / avatar` draft を保持したまま recoverable error として扱います。
 - `rate_limited` は modal を閉じずに retry guidance を表示します。
 - `auth_required` と `fresh_auth_required` は modal open trigger の責務であり、surface payload 自体に viewer self state を重ねません。
 

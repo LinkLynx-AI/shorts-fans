@@ -8,8 +8,7 @@
 ## 現時点の推奨
 
 - `MVP` では `approved 前は read-only onboarding surface` を基本に置く
-- ただし、`profile basics draft` だけは private に許可する
-- `profile basics draft` の範囲は `display name / avatar / bio` に固定する
+- ただし、shared viewer profile basics の preview と creator 固有の `bio` draft だけは private に許可する
 - `approved 前` の creator preview は `static mock` を基本に置く
 - つまり、creator capability を持たない user や onboarding 審査中の user には、`full creator dashboard / upload / submission package editor` は解放しない
 
@@ -44,11 +43,11 @@
 - ここで半端な dashboard shell を出すと、`押せない UI` や `空の table` が増え、未承認 state の価値より frustration が大きくなりやすい
 - `static mock` なら、`approval 後に何が解放されるか` を見せつつ、今は onboarding が主目的だと明確にできる
 
-### 5. profile basics だけ先に作れると friction を下げられるため
+### 5. shared viewer profile と creator 固有情報を分けると friction を下げられるため
 
-- `display name / avatar / bio` のような low-risk 情報は、approval 前でも下書きできる
-- これにより onboarding 完了後の初期設定負荷を下げられる
-- 一方で upload や publish は開けないため、trust & safety の gate は維持できる
+- `display name / handle / avatar` は fan / creator 共通の viewer profile basics として sign-up flow で先に揃えておける
+- approval 前の onboarding では、その shared viewer profile を preview しつつ、creator 固有の `bio` だけを足せれば十分である
+- これにより onboarding 完了後の初期設定負荷を下げつつ、upload や publish は開けないため trust & safety の gate は維持できる
 
 ## surface の分け方
 
@@ -74,7 +73,8 @@
   - creator onboarding の入力中
   - submitted 後の審査待ち
 - 見せるもの
-  - private な `profile basics draft`
+  - shared viewer profile basics の preview
+  - creator 固有の `bio` draft
   - onboarding checklist
   - required docs / status
   - review status
@@ -111,21 +111,20 @@
 
 - creator onboarding は `access unlock flow`
 - creator dashboard は `approved 後の workspace`
-- approval 前に見せる creator UI は `read-only onboarding surface + private profile basics draft` に限定する
+- approval 前に見せる creator UI は `read-only onboarding surface + shared viewer profile preview + creator bio draft` に限定する
 
-## profile basics draft の範囲
+## approval 前に扱う profile 項目
 
 - allow
-  - `display name`
-  - `avatar`
+  - sign-up 済み shared viewer profile の `display name / handle / avatar` を preview すること
   - `bio`
 - disallow
+  - creator onboarding surface で shared viewer profile の `display name / handle / avatar` を creator 専用情報として再作成すること
   - public profile publish
-  - handle / URL の確定公開
   - content upload
   - submission package 作成
 
-- つまり、`creator profile の見た目の下書き` は許すが、`creator profile の公開面そのもの` は approval 後まで作らない
+- つまり、shared viewer profile basics は signup / account profile 側で管理し、onboarding 側では preview と creator 固有 `bio` だけを扱う
 
 ## creator preview の持ち方
 
@@ -138,8 +137,8 @@
   - `analytics`
 - ただしこれらは `使える UI` ではなく、`approval 後にこういう workspace が解放される` と説明するための固定表示に留める
 - `disabled button` や `empty state table` のような、触れそうに見える疑似 UI は極力避ける
-- 例外として、`display name / avatar / bio` は user 自身の draft を反映した `light profile preview` として見せてもよい
-- つまり、`creator dashboard preview` は static、`profile basics preview` だけ軽く personalize する
+- 例外として、shared viewer profile の `display name / handle / avatar` と creator 固有 `bio` は user 自身の current value / draft を反映した `light profile preview` として見せてもよい
+- つまり、`creator dashboard preview` は static、`shared profile preview + creator bio draft` だけ軽く personalize する
 
 ## rejected 時の resubmit flow
 
@@ -159,7 +158,7 @@
 - 不足書類
 - 書類の画質や判別性の不足
 - payout 情報の不備
-- name / profile basics の軽微な不整合
+- shared viewer profile basics の軽微な不整合
 - onboarding checklist の未完了
 
 ### support-only にするもの
@@ -181,7 +180,8 @@
 
 - onboarding 入力情報
 - required docs の再提出
-- `display name / avatar / bio`
+- creator 固有の `bio`
+- shared viewer profile の `display name / handle / avatar` は account profile 側で更新し、その結果を onboarding preview に反映する
 
 ### self-serve resubmit でも開けないもの
 
@@ -204,7 +204,7 @@
 
 - MVP では `tool を先に触らせる` より `審査条件を理解させる` 方が離脱や混乱を減らしやすい
 - creator 候補 user に対しては、dynamic な dashboard より `static mock + 明確な checklist` の方が十分価値がある
-- `profile basics draft` は low-risk な供給 friction 低減策として機能する可能性が高い
+- shared viewer profile basics を sign-up flow で先に揃え、approval 前は `bio` だけ下書きできる構成は low-risk な供給 friction 低減策として機能する可能性が高い
 - `rejected` を全部 manual support に寄せるより、fixable なものだけ self-serve resubmit にした方が onboarding ops を軽くしやすい
 - 初期は `cooldown` より `少数回まで即時にやり直せる` 方が supply friction を下げやすい
 - supply を増やしたくなった後で、必要なら `pre-approval draft` を解放してもよい

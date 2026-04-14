@@ -10,6 +10,7 @@
 ## Goals
 
 - unauthenticated viewer が custom modal UI から `email + password` の fan auth を完了できるようにする。
+- sign-up flow の完了時点で shared viewer profile の `displayName / handle / avatar` を初期化できるようにする。
 - sign in と sign up confirm 成功時に `shorts_fans_session` cookie を発行し、bootstrap が current viewer を継続して読めるようにする。
 - password reset と fresh re-auth を Hosted UI ではなく app 既存導線上で扱えるようにする。
 - Cognito が担当する認証責務と app 側が保持する internal user / mode / purchase / unlock / creator capability の境界を明確にする。
@@ -59,8 +60,10 @@
 - `fan` と `creator` を別 identity に分けません。新規 session の `activeMode` は常に `fan` で開始します。
 - custom modal UI が primary entry です。`/login` route を後続実装で残す場合も secondary fallback 扱いとし、別の auth contract を持ち込みません。
 - login / logout / re-auth 成功 body に viewer state は返しません。成功後の current viewer は `GET /api/viewer/bootstrap` から読みます。
-- sign up 時点で shared viewer profile の `displayName / handle` を確定させ、creator registration 時には同じ値を再入力しません。
-- sign up 時の avatar は optional であり、保存 transport は `docs/contracts/viewer-profile-api-contract.md` を正とします。
+- sign-up flow では shared viewer profile の `displayName / handle / avatar` を初期化し、creator registration 時には同じ値を再入力しません。
+- `displayName` と `handle` は sign-up request で受け、sign-up confirm 成功時に shared viewer profile の初期値として保存します。
+- `handle` の collision 判定は `POST /api/fan/auth/sign-up` boundary で行い、confirm boundary は受理済み sign-up draft を消費するだけに留めます。
+- sign-up 時の avatar は optional であり、選択された場合は sign-up confirm 後に `docs/contracts/viewer-profile-api-contract.md` の avatar upload / update transport を同じ sign-up flow の一部として直列実行し、既に作成済みの shared viewer profile に反映します。
 - sign in は `missing email` と `wrong password` を wire 上で区別しません。
 - sign up と password reset の開始 endpoint は、valid request から account existence を推測できないように扱います。
 - sign up / password reset の開始 endpoint を再度呼ぶことは resend として扱えます。response shape は変えません。
@@ -99,16 +102,26 @@
 ```json
 {
   "email": "fan@example.com",
+  "displayName": "Mina Rei",
+  "handle": "@minarei",
   "password": "VeryStrongPass123!"
 }
 ```
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `email` | `string` | yes | sign-up 対象 email |
+| `displayName` | `string` | yes | shared viewer profile の初期 display name |
+| `handle` | `string` | yes | shared viewer profile の初期 handle。先頭 `@` 任意 |
+| `password` | `string` | yes | Cognito sign-up password |
 
 #### Success
 
 - `200`
 - `data.nextStep = "confirm_sign_up"` 固定です。
 - `data.deliveryDestinationHint` は safe に返せる場合だけ masked email を返し、返せない場合は `null` です。
-- accepted response は account existence や internal user 作成完了を保証しません。
+- accepted response は account existence、internal user 作成完了、shared viewer profile 初期化完了を保証しません。
+- accepted sign-up draft は confirm でそのまま消費される前提で、`handle` の collision はこの boundary で解決します。
 - frontend modal では `confirm_sign_up` を `confirm-sign-up` mode へ対応づけます。対応表は `docs/contracts/fan-auth-modal-ui-contract.md` を正とします。
 
 ```json
@@ -141,6 +154,9 @@
 - `204`
 - response body は返しません。
 - `Set-Cookie` で `shorts_fans_session` を発行します。
+- backend は sign-up request で受けた `displayName / handle` を使って internal user と shared viewer profile を作成します。
+- sign-up flow はこの後に optional avatar の初期化を完了させます。
+  - avatar を選択していた場合は、authenticated になった直後に `docs/contracts/viewer-profile-api-contract.md` の avatar upload / update transport を呼び、modal を閉じる前に shared viewer profile へ反映します。
 
 ### `POST /api/fan/auth/password-reset`
 
@@ -231,6 +247,8 @@
 | status | code | meaning |
 | --- | --- | --- |
 | `400` | `invalid_email` | email 形式が不正、または email payload が不正 |
+| `400` | `invalid_display_name` | display name が空、または request boundary を満たさない |
+| `400` | `invalid_handle` | handle が空、または許可外文字を含む |
 | `400` | `invalid_password` | password が空、または request boundary を満たさない |
 | `400` | `invalid_confirmation_code` | confirmation code が不正 |
 | `400` | `confirmation_code_expired` | confirmation code が期限切れ |
@@ -238,6 +256,7 @@
 | `401` | `invalid_credentials` | sign in または re-auth の email / password 組み合わせが不正 |
 | `401` | `auth_required` | re-auth に current authenticated fan session が必要 |
 | `403` | `confirmation_required` | sign in 前に email confirmation が必要 |
+| `409` | `handle_already_taken` | normalized handle が既存 shared viewer profile と衝突 |
 | `429` | `rate_limited` | retry guardrail または provider throttle に到達 |
 | `500` | `internal_error` | 想定外の server failure |
 

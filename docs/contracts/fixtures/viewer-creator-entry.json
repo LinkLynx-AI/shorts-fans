@@ -31,20 +31,6 @@
         }
       },
       "status": 400
-    },
-    "handleAlreadyTaken": {
-      "body": {
-        "data": null,
-        "error": {
-          "code": "handle_already_taken",
-          "message": "handle is already taken"
-        },
-        "meta": {
-          "page": null,
-          "requestId": "req_viewer_creator_registration_handle_already_taken_001"
-        }
-      },
-      "status": 409
     }
   },
   "PUT /api/viewer/active-mode": {
