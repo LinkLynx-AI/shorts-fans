@@ -1,17 +1,22 @@
 :root {
-  --background: #effcff;
-  --background-muted: #d7e8f3;
-  --surface: rgba(255, 255, 255, 0.74);
-  --surface-strong: rgba(255, 255, 255, 0.92);
-  --foreground: #061521;
-  --muted: #4c6171;
-  --muted-strong: #273847;
-  --border: rgba(167, 220, 249, 0.72);
-  --accent: #1082c8;
-  --accent-strong: #0a5b8c;
-  --ring: rgba(16, 130, 200, 0.36);
-  --tabbar-surface: rgba(255, 255, 255, 0.96);
-  --device-shadow: 0 28px 100px rgba(36, 94, 132, 0.16);
+  --background: #f3f5f8;
+  --background-muted: #edf2f7;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #f7f9fc;
+  --surface-subtle: #fbfcfe;
+  --foreground: #172033;
+  --muted: #6a7484;
+  --muted-strong: #425065;
+  --border: #e5ebf2;
+  --border-strong: #d8e0ea;
+  --accent: #71b4ea;
+  --accent-strong: #509fe0;
+  --accent-soft: #ecf6ff;
+  --accent-ink: #448dcb;
+  --ring: rgba(113, 180, 234, 0.3);
+  --tabbar-surface: rgba(255, 255, 255, 0.98);
+  --device-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
   --font-body:
     system-ui,
     -apple-system,
@@ -39,12 +44,17 @@
   --color-background-muted: var(--background-muted);
   --color-surface: var(--surface);
   --color-surface-strong: var(--surface-strong);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-subtle: var(--surface-subtle);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-muted-strong: var(--muted-strong);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-ring: var(--ring);
   --color-tabbar-surface: var(--tabbar-surface);
 }

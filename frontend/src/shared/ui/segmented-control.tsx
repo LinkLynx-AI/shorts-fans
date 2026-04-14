@@ -34,8 +34,8 @@ export function SegmentedControl({
         className={cn(
           "inline-flex items-center",
           variant === "pill"
-            ? "gap-1.5 rounded-full border border-white/72 bg-white/80 p-1.5 shadow-[0_10px_24px_rgba(36,94,132,0.12)] backdrop-blur-md"
-            : "gap-6",
+            ? "gap-1 rounded-full border border-border bg-surface-subtle p-1 shadow-[0_8px_20px_rgba(15,23,42,0.05)]"
+            : "gap-7 border-b border-border",
         )}
       >
         {items.map((item) => (
@@ -46,15 +46,15 @@ export function SegmentedControl({
             className={cn(
               "inline-flex items-center justify-center gap-2 transition",
               variant === "pill"
-                ? "min-h-10 rounded-full px-4 text-[11px] font-semibold uppercase tracking-[0.14em]"
-                : "relative min-h-8 pb-2 text-[15px] font-semibold",
+                ? "min-h-10 rounded-full px-4 text-[14px] font-semibold"
+                : "relative min-h-10 pb-3 text-[15px] font-semibold",
               item.active
                 ? variant === "pill"
-                  ? "bg-accent-strong text-white shadow-[0_10px_22px_rgba(16,130,200,0.22)]"
-                  : "text-white after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-white"
+                  ? "border border-border bg-white text-foreground shadow-[0_8px_18px_rgba(15,23,42,0.07)]"
+                  : "text-accent-ink after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:rounded-full after:bg-accent"
                 : variant === "pill"
-                  ? "text-accent-strong hover:bg-white/84"
-                  : "text-white/68 hover:text-white/84",
+                  ? "text-muted hover:text-foreground"
+                  : "text-muted hover:text-foreground",
             )}
             href={item.href}
           >

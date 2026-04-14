@@ -10,13 +10,12 @@
   html {
     min-height: 100%;
     scroll-behavior: smooth;
+    color-scheme: light;
   }
 
   body {
     min-height: 100svh;
-    background:
-      radial-gradient(circle at top, rgb(132 216 255 / 0.48), transparent 36%),
-      linear-gradient(180deg, #effcff 0%, #e3f2fd 42%, #d7e8f3 100%);
+    background: linear-gradient(180deg, #fafbfd 0%, #f1f4f8 100%);
     color: var(--foreground);
     font-family: var(--font-sans);
     text-rendering: optimizeLegibility;
@@ -37,6 +36,6 @@
   }
 
   ::selection {
-    background: rgb(16 130 200 / 0.22);
+    background: rgb(113 180 234 / 0.28);
   }
 }

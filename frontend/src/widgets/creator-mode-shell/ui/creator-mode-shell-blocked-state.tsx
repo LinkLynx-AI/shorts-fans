@@ -9,7 +9,7 @@ import type { CreatorModeShellBlockedState } from "../model/creator-mode-shell";
 
 function CreatorModeBlockedFrame({ children }: { children: ReactNode }) {
   return (
-    <main className="min-h-svh bg-[radial-gradient(circle_at_top,rgba(214,242,247,0.82),transparent_34%),linear-gradient(180deg,#f7fcfd_0%,#eef7f8_42%,#e8eff6_100%)] text-foreground">
+    <main className="min-h-svh bg-background text-foreground sm:px-4 sm:py-6">
       {children}
     </main>
   );
@@ -17,8 +17,8 @@ function CreatorModeBlockedFrame({ children }: { children: ReactNode }) {
 
 export function CreatorModeWorkspaceFrame({ children }: { children: ReactNode }) {
   return (
-    <main className="bg-background">
-      <div className="mx-auto min-h-svh w-full max-w-[408px] overflow-hidden bg-white text-foreground">
+    <main className="bg-background sm:px-4 sm:py-6">
+      <div className="mx-auto min-h-svh w-full max-w-[408px] overflow-hidden bg-white text-foreground sm:min-h-[calc(100svh-48px)] sm:rounded-[36px] sm:border sm:border-border sm:shadow-[var(--device-shadow)]">
         {children}
       </div>
     </main>

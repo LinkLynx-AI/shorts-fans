@@ -58,11 +58,9 @@ export function CreatorFollowButton({
       aria-busy={isPending || undefined}
       aria-pressed={isFollowing}
       className={cn(
-        "rounded-[10px] text-[13px] font-bold shadow-none",
+        "text-[15px] font-semibold",
         fullWidth && "w-full",
-        isFollowing
-          ? "border-transparent bg-[#edf2f7] text-foreground backdrop-blur-none"
-          : "bg-accent-strong text-white disabled:brightness-90",
+        isFollowing && "shadow-none",
         className,
       )}
       disabled={disabled || isPending}

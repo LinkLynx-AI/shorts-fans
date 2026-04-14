@@ -5,7 +5,7 @@ import type { ButtonHTMLAttributes } from "react";
 import { cn } from "@/shared/lib";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70 disabled:pointer-events-none disabled:opacity-55",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full border border-transparent text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/60 disabled:pointer-events-none disabled:opacity-55",
   {
     defaultVariants: {
       size: "default",
@@ -13,19 +13,19 @@ const buttonVariants = cva(
     },
     variants: {
       size: {
-        default: "h-11 px-5",
+        default: "h-11 px-5 text-[15px]",
         icon: "size-10 p-0",
         lg: "h-12 px-6 text-base",
-        sm: "h-9 px-4 text-[11px] uppercase tracking-[0.14em]",
+        sm: "h-9 px-4 text-sm",
       },
       variant: {
         chrome:
-          "border border-white/72 bg-white/76 text-accent-strong shadow-[0_10px_24px_rgba(36,94,132,0.1)] backdrop-blur-md hover:bg-white/90",
+          "border-border bg-white text-foreground shadow-[0_8px_20px_rgba(15,23,42,0.06)] hover:bg-surface-subtle",
         default:
-          "bg-[linear-gradient(135deg,var(--accent)_0%,var(--accent-strong)_100%)] text-white shadow-[0_18px_44px_rgba(16,130,200,0.28)] hover:brightness-105",
-        ghost: "bg-transparent text-foreground hover:bg-white/12",
+          "bg-accent text-white shadow-[0_12px_28px_rgba(80,159,224,0.24)] hover:bg-accent-strong",
+        ghost: "bg-transparent text-foreground hover:bg-accent-soft",
         secondary:
-          "bg-white/82 text-foreground shadow-[inset_0_0_0_1px_rgba(167,220,249,0.52),0_12px_28px_rgba(36,94,132,0.12)] backdrop-blur-md hover:bg-white",
+          "border-border bg-white text-foreground shadow-[0_10px_24px_rgba(15,23,42,0.06)] hover:bg-surface-subtle",
       },
     },
   },
