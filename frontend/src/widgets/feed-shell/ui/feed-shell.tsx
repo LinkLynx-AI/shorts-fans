@@ -13,7 +13,8 @@ type FeedShellProps = {
   state: FeedShellState;
 };
 
-const sharedFanNavigationInsetPx = 76;
+const sharedFanNavigationBaseInsetPx = 76;
+const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env(safe-area-inset-bottom, 0px))`;
 
 function FeedTabsNavigation({ activeTab }: { activeTab: "following" | "recommended" }) {
   return (
@@ -45,10 +46,10 @@ function FeedTopBar({ activeTab }: { activeTab: "following" | "recommended" }) {
       <FeedTabsNavigation activeTab={activeTab} />
       <Link
         aria-label="Search"
-        className="text-white drop-shadow-md transition hover:scale-105"
+        className="inline-flex size-11 items-center justify-center text-white drop-shadow-md transition hover:scale-105"
         href="/search"
       >
-        <Search className="h-6 w-6" strokeWidth={2.1} />
+        <Search aria-hidden="true" className="h-6 w-6" strokeWidth={2.1} />
       </Link>
     </div>
   );
@@ -80,10 +81,10 @@ function FeedFallbackState({
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_24%)]" />
       <div
         className="absolute inset-x-0 h-[46%] bg-[linear-gradient(180deg,rgba(7,19,29,0)_0%,rgba(7,19,29,0.18)_16%,rgba(7,19,29,0.9)_100%)]"
-        style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+        style={{ bottom: sharedFanNavigationInset }}
       />
       <FeedTopBar activeTab={activeTab} />
-      <div className="relative flex h-full items-end px-4" style={{ paddingBottom: `${sharedFanNavigationInsetPx + 24}px` }}>
+      <div className="relative flex h-full items-end px-4" style={{ paddingBottom: `calc(${sharedFanNavigationBaseInsetPx + 24}px + env(safe-area-inset-bottom, 0px))` }}>
         <div className="w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-1 pb-5 pt-16">
           <SurfacePanel className="w-full rounded-[28px] border-white/12 bg-[rgba(7,19,29,0.52)] px-5 py-5 text-white shadow-[0_26px_60px_rgba(5,13,24,0.34)] backdrop-blur-[18px]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/58">

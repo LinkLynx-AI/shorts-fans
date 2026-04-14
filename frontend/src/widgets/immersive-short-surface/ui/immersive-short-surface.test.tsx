@@ -138,6 +138,8 @@ describe("ImmersiveShortSurface", () => {
     );
     expect(screen.queryByRole("link", { name: /Back/i })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "More options" })).toBeDisabled();
     expect(screen.getByText("Follow")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));

@@ -49,8 +49,9 @@ const feedSurfaceStyle = {
 } as CSSProperties;
 
 const feedAccentColor = "#4DA8DA";
-const sharedFanNavigationInsetPx = 76;
-const feedActionRailBottomPx = sharedFanNavigationInsetPx + 128;
+const sharedFanNavigationBaseInsetPx = 76;
+const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env(safe-area-inset-bottom, 0px))`;
+const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + 128}px + env(safe-area-inset-bottom, 0px))`;
 
 export type ImmersiveShortSurfaceProps =
   | {
@@ -101,10 +102,10 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
         </nav>
         <Link
           aria-label="Search"
-          className="text-white drop-shadow-md transition hover:scale-105"
+          className="inline-flex size-11 items-center justify-center text-white drop-shadow-md transition hover:scale-105"
           href="/search"
         >
-          <Search className="h-6 w-6" strokeWidth={2.1} />
+          <Search aria-hidden="true" className="h-6 w-6" strokeWidth={2.1} />
         </Link>
       </div>
     );
@@ -122,10 +123,10 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
 }
 
 type PinRailProps = {
-  disabled?: boolean | undefined;
+  disabled?: boolean;
   onToggle?: (() => void) | undefined;
   pinned: boolean;
-  variant?: "default" | "feed" | undefined;
+  variant?: "default" | "feed";
 };
 
 /**
@@ -143,7 +144,7 @@ function PinRail({ disabled = false, onToggle, pinned, variant = "default" }: Pi
         aria-pressed={pinned}
         className={cn(
           isFeedVariant
-            ? "inline-flex items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-wait disabled:hover:scale-100"
+            ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-wait disabled:hover:scale-100"
             : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:cursor-wait disabled:hover:text-accent-strong/72",
           pinned && (isFeedVariant ? "text-[#8fd1ff]" : "text-accent"),
         )}
@@ -233,7 +234,7 @@ function FeedActionRail({
   return (
     <div
       className="absolute right-3 z-20 flex flex-col items-center space-y-6"
-      style={{ bottom: `${feedActionRailBottomPx}px` }}
+      style={{ bottom: feedActionRailBottom }}
     >
       <Link
         aria-label="プロフィールへ"
@@ -248,23 +249,25 @@ function FeedActionRail({
           className="absolute -bottom-2 left-1/2 inline-flex -translate-x-1/2 rounded-full p-0.5 text-white shadow-[0_8px_18px_rgba(52,118,181,0.48)]"
           style={{ backgroundColor: feedAccentColor }}
         >
-          <Plus className="h-3 w-3" strokeWidth={3} />
+          <Plus aria-hidden="true" className="h-3 w-3" strokeWidth={3} />
         </span>
       </Link>
       <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
       <button
         aria-label="Share"
-        className="text-white drop-shadow-lg transition-transform hover:scale-110"
+        className="inline-flex size-11 items-center justify-center text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100 disabled:opacity-100"
+        disabled
         type="button"
       >
-        <Share2 className="h-7 w-7" strokeWidth={2.1} />
+        <Share2 aria-hidden="true" className="h-7 w-7" strokeWidth={2.1} />
       </button>
       <button
         aria-label="More options"
-        className="text-white drop-shadow-lg transition-transform hover:scale-110"
+        className="inline-flex size-11 items-center justify-center text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100 disabled:opacity-100"
+        disabled
         type="button"
       >
-        <MoreVertical className="h-7 w-7" strokeWidth={2.1} />
+        <MoreVertical aria-hidden="true" className="h-7 w-7" strokeWidth={2.1} />
       </button>
     </div>
   );
@@ -715,7 +718,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       {isFeedMode ? (
         <div
           className="absolute inset-x-0 h-[46%] bg-[linear-gradient(180deg,rgba(7,19,29,0)_0%,rgba(7,19,29,0.18)_16%,rgba(7,19,29,0.9)_100%)]"
-          style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+          style={{ bottom: sharedFanNavigationInset }}
         />
       ) : null}
 
@@ -734,7 +737,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: isFeedMode ? `${feedActionRailBottomPx + 116}px` : "258px" }}
+            style={{ bottom: isFeedMode ? `calc(${sharedFanNavigationBaseInsetPx + 244}px + env(safe-area-inset-bottom, 0px))` : "258px" }}
           >
             {pinErrorMessage}
           </p>
@@ -743,7 +746,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <>
             <div
               className="absolute left-0 z-10 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-5 pt-16"
-              style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+              style={{ bottom: sharedFanNavigationInset }}
             >
               <UnlockCta
                 className="mb-4 w-full"
@@ -770,7 +773,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             <div
               aria-hidden="true"
               className="absolute left-0 z-10 h-[2px] w-full bg-white/20"
-              style={{ bottom: `${sharedFanNavigationInsetPx}px` }}
+              style={{ bottom: sharedFanNavigationInset }}
             >
               <div className="h-full w-1/3 rounded-r-full bg-white" />
             </div>
