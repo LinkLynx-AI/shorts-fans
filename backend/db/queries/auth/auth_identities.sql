@@ -23,6 +23,13 @@ WHERE provider = sqlc.arg(provider)
     AND provider_subject = sqlc.arg(provider_subject)
 LIMIT 1;
 
+-- name: GetAuthIdentityByEmailNormalized :one
+SELECT *
+FROM app.auth_identities
+WHERE email_normalized = sqlc.arg(email_normalized)
+ORDER BY created_at DESC, id DESC
+LIMIT 1;
+
 -- name: ListAuthIdentitiesByUserID :many
 SELECT *
 FROM app.auth_identities

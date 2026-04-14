@@ -237,6 +237,9 @@ func TestStartSignInSessionCreatesSession(t *testing.T) {
 			if input.SessionTokenHash != HashSessionToken("session-token") {
 				t.Fatalf("CreateSession() token hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
 			}
+			if !input.RecentAuthenticatedAt.Equal(now) {
+				t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
+			}
 
 			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil
 		},
@@ -349,6 +352,9 @@ func TestStartSignUpSessionCreatesUserIdentityAndSession(t *testing.T) {
 			}
 			if input.SessionTokenHash != HashSessionToken("session-token") {
 				t.Fatalf("CreateUserWithEmailIdentityAndSession() token hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
+			}
+			if !input.RecentAuthenticatedAt.Equal(now) {
+				t.Fatalf("CreateUserWithEmailIdentityAndSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
 			}
 
 			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil

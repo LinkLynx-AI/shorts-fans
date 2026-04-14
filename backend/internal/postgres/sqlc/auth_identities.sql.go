@@ -63,6 +63,31 @@ func (q *Queries) CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentity
 	return i, err
 }
 
+const getAuthIdentityByEmailNormalized = `-- name: GetAuthIdentityByEmailNormalized :one
+SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
+FROM app.auth_identities
+WHERE email_normalized = $1
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetAuthIdentityByEmailNormalized(ctx context.Context, emailNormalized pgtype.Text) (AppAuthIdentity, error) {
+	row := q.db.QueryRow(ctx, getAuthIdentityByEmailNormalized, emailNormalized)
+	var i AppAuthIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Provider,
+		&i.ProviderSubject,
+		&i.EmailNormalized,
+		&i.VerifiedAt,
+		&i.LastAuthenticatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getAuthIdentityByProviderAndSubject = `-- name: GetAuthIdentityByProviderAndSubject :one
 SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
 FROM app.auth_identities
