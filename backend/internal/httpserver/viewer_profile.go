@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	viewerProfileAuthRequiredMessage          = "viewer profile requires authentication"
-	viewerProfileAvatarUploadCreateScope      = "viewer_profile_avatar_upload_create"
-	viewerProfileAvatarUploadCompleteScope    = "viewer_profile_avatar_upload_complete"
-	viewerProfileGetRequestScope              = "viewer_profile_get"
-	viewerProfileUpdateRequestScope           = "viewer_profile_update"
+	viewerProfileAuthRequiredMessage       = "viewer profile requires authentication"
+	viewerProfileAvatarUploadCreateScope   = "viewer_profile_avatar_upload_create"
+	viewerProfileAvatarUploadCompleteScope = "viewer_profile_avatar_upload_complete"
+	viewerProfileGetRequestScope           = "viewer_profile_get"
+	viewerProfileUpdateRequestScope        = "viewer_profile_update"
 )
 
 type viewerProfilePayload struct {
