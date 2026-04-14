@@ -11,7 +11,7 @@ type SearchShellProps = {
  */
 export function SearchShell({ initialState, query }: SearchShellProps) {
   return (
-    <section className="min-h-full overflow-y-auto bg-white pb-28 text-foreground">
+    <section className="min-h-full overflow-y-auto px-4 pb-28 pt-4 text-foreground">
       <h1 className="sr-only">Creator search</h1>
       <CreatorSearchPanel initialQuery={query} initialState={initialState} key={query} />
     </section>
