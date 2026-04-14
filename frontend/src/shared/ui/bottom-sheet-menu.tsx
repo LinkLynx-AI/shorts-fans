@@ -38,14 +38,14 @@ export function BottomSheetMenu({
     <Dialog.Root>
       <Dialog.Trigger asChild>{trigger}</Dialog.Trigger>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(77,132,166,0.22)] backdrop-blur-[8px]" />
-        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-[rgba(217,226,232,0.94)] bg-[rgba(255,255,255,0.98)] p-[10px_10px_14px] shadow-[0_18px_42px_rgba(6,21,33,0.12)]">
+        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[rgba(15,23,42,0.22)] backdrop-blur-[6px]" />
+        <Dialog.Content className="fixed bottom-3 left-1/2 z-50 w-[calc(100vw-24px)] max-w-[384px] -translate-x-1/2 rounded-[28px] border border-border bg-white p-[10px_10px_12px] shadow-[0_20px_48px_rgba(15,23,42,0.18)]">
           <Dialog.Title className="sr-only">{title}</Dialog.Title>
           <Dialog.Description className="sr-only">{description}</Dialog.Description>
 
           <div
             aria-hidden="true"
-            className="mx-auto mb-3 h-1 w-10 rounded-full bg-[rgba(6,21,33,0.16)]"
+            className="mx-auto mb-3 h-1 w-10 rounded-full bg-border-strong"
           />
 
           {children}
@@ -64,7 +64,7 @@ export function BottomSheetMenuGroup({
 }: BottomSheetMenuGroupProps) {
   return (
     <div
-      className={cn("rounded-[24px] bg-[#f3f6f8] py-1", className)}
+      className={cn("rounded-[22px] bg-surface-subtle py-1", className)}
       {...props}
     />
   );
@@ -85,11 +85,11 @@ export function BottomSheetMenuAction({
   return (
     <Comp
       className={cn(
-        "flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-sm font-bold transition disabled:cursor-default disabled:opacity-55",
+        "flex min-h-[54px] w-full items-center justify-between px-[18px] text-left text-[15px] font-semibold transition disabled:cursor-default disabled:opacity-55",
         tone === "danger"
           ? "text-[#b2394f] hover:bg-[#fff1f3]"
-          : "text-foreground hover:bg-white/65",
-        withDivider ? "border-t border-[rgba(167,220,249,0.24)]" : "",
+          : "text-foreground hover:bg-white",
+        withDivider ? "border-t border-border" : "",
         className,
       )}
       {...(!asChild ? { type: "button" as const } : {})}

@@ -50,4 +50,28 @@ describe("VerticalSnapReel", () => {
       top: 720,
     });
   });
+
+  it("sizes each item to the reel container instead of the raw viewport", () => {
+    const { container } = render(
+      <VerticalSnapReel
+        getKey={(item) => item}
+        items={["first", "second"]}
+        renderItem={(item) => <div>{item}</div>}
+      />,
+    );
+
+    const reel = container.firstElementChild;
+
+    if (!(reel instanceof HTMLDivElement)) {
+      throw new Error("vertical snap reel container missing");
+    }
+
+    expect(reel).toHaveClass("h-full");
+
+    const items = reel.querySelectorAll(":scope > div");
+
+    expect(items).toHaveLength(2);
+    expect(items[0]).toHaveClass("h-full");
+    expect(items[0]).toHaveClass("min-h-full");
+  });
 });

@@ -14,7 +14,7 @@ export function Avatar({ className, ...props }: AvatarProps) {
   return (
     <AvatarPrimitive.Root
       className={cn(
-        "relative flex size-12 shrink-0 overflow-hidden rounded-[20px] border border-white/70 bg-[linear-gradient(180deg,#d7f4ff_0%,#81c7f1_44%,#1f4f73_100%)] text-white shadow-[0_10px_24px_rgba(36,92,129,0.16)]",
+        "relative flex size-12 shrink-0 overflow-hidden rounded-full border border-border bg-[linear-gradient(180deg,#dbeaff_0%,#abcdf1_100%)] text-[#173252] shadow-[0_10px_24px_rgba(80,159,224,0.16)]",
         className,
       )}
       {...props}
@@ -36,7 +36,7 @@ export function AvatarFallback({ className, ...props }: AvatarFallbackProps) {
   return (
     <AvatarPrimitive.Fallback
       className={cn(
-        "flex size-full items-center justify-center bg-[linear-gradient(180deg,#b2ecff_0%,#65bae0_56%,#1b4362_100%)] font-display text-sm font-semibold uppercase tracking-[0.08em]",
+        "flex size-full items-center justify-center bg-[linear-gradient(180deg,#d6e9ff_0%,#9fc7ec_100%)] font-display text-sm font-semibold uppercase tracking-[0.08em]",
         className,
       )}
       {...props}

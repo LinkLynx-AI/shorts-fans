@@ -41,7 +41,7 @@ function formatCompactCount(value: number): string {
  */
 export function CreatorAvatar({ className, creator }: CreatorAvatarProps) {
   return (
-    <Avatar className={cn("size-12 border-white/68", className)}>
+    <Avatar className={cn("size-12 border-border", className)}>
       {creator.avatar ? <AvatarImage alt={creator.displayName} src={creator.avatar.url} /> : null}
       <AvatarFallback>{getCreatorInitials(creator.displayName)}</AvatarFallback>
     </Avatar>
@@ -55,7 +55,7 @@ export function CreatorIdentity({ className, creator, href }: CreatorIdentityPro
   const content = (
     <div className={cn("min-w-0", className)}>
       <p className="truncate text-sm font-semibold text-current">{creator.displayName}</p>
-      <p className="truncate text-[13px] text-current/72">{creator.handle}</p>
+      <p className="truncate text-[13px] text-current/62">{creator.handle}</p>
     </div>
   );
 
@@ -108,7 +108,7 @@ export function CreatorStatList({
           <span
             className={cn(
               "mt-1 block text-[11px] text-muted",
-              variant === "creatorProfile" ? "text-[12px] leading-[1.25]" : "uppercase tracking-[0.14em]",
+              variant === "creatorProfile" ? "uppercase tracking-[0.12em]" : "uppercase tracking-[0.14em]",
             )}
           >
             {stat.label}

@@ -29,7 +29,7 @@ function clampIndex(index: number, length: number): number {
  * 全画面 panel を縦方向の snap scroll で連続表示する。
  */
 export function VerticalSnapReel<TItem>({
-  className = "absolute inset-0 snap-y snap-mandatory overflow-y-auto overscroll-y-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
+  className = "absolute inset-0 h-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden",
   getKey,
   initialIndex = 0,
   items,
@@ -137,7 +137,7 @@ export function VerticalSnapReel<TItem>({
     >
       {items.map((item, index) => (
         <div
-          className="relative h-dvh min-h-dvh snap-start [scroll-snap-stop:always]"
+          className="relative h-full min-h-full snap-start [scroll-snap-stop:always]"
           key={getKey(item, index)}
         >
           {renderItem(item, {

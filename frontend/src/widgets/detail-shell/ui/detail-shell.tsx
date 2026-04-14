@@ -29,12 +29,17 @@ export function DetailShell({
 }: DetailShellProps) {
   if (variant === "immersive") {
     return (
-      <section className="relative min-h-full overflow-y-auto px-4 pb-28 pt-4 text-white" style={style}>
+      <section className="relative min-h-full overflow-y-auto px-5 pb-28 pt-3 text-white" style={style}>
         <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-mid)_54%,var(--short-bg-end)_100%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
 
         <div className="relative space-y-5">
-          <Button asChild className="text-white hover:bg-white/16 hover:text-white" size="icon" variant="ghost">
+          <Button
+            asChild
+            className="border border-white/18 bg-black/12 text-white backdrop-blur-sm hover:bg-black/24 hover:text-white"
+            size="icon"
+            variant="ghost"
+          >
             <Link aria-label="Back" href={backHref}>
               <ArrowLeft className="size-5" strokeWidth={2.1} />
             </Link>
@@ -47,16 +52,22 @@ export function DetailShell({
   }
 
   return (
-    <section className="min-h-full overflow-y-auto px-4 pb-28 pt-4 text-foreground">
-      <div className="flex items-center gap-3">
-        <Button asChild className={backButtonClassName} size="icon" variant="ghost">
+    <section className="min-h-full overflow-y-auto bg-white px-5 pb-28 pt-3 text-foreground">
+      <div className={cn("flex min-h-11 items-center gap-3", headerContent ? "border-b border-border pb-3" : "")}>
+        <Button
+          asChild
+          className={cn("bg-surface-subtle hover:bg-accent-soft", backButtonClassName)}
+          size="icon"
+          variant="ghost"
+        >
           <Link aria-label="Back" href={backHref}>
             <ArrowLeft className="size-5" strokeWidth={2.1} />
           </Link>
         </Button>
-        {headerContent ? <div className="min-w-0 flex-1">{headerContent}</div> : null}
+        {headerContent ? <div className="min-w-0 flex-1 text-center">{headerContent}</div> : null}
+        {headerContent ? <div aria-hidden="true" className="size-10 shrink-0" /> : null}
       </div>
-      <div className={cn(headerContent ? "mt-3" : "mt-4", bodyClassName)}>{children}</div>
+      <div className={cn(headerContent ? "mt-4" : "mt-5", bodyClassName)}>{children}</div>
     </section>
   );
 }
