@@ -5,7 +5,7 @@ import {
   type ShortPreviewMeta,
 } from "@/entities/short";
 
-export type FanHubTab = "library" | "pinned";
+export type FanHubTab = "following" | "library" | "pinned";
 
 export type FanProfileOverview = {
   counts: {
@@ -59,6 +59,7 @@ export type FanSettingsSection = {
 
 export type FanHubState = {
   activeTab: FanHubTab;
+  followingItems: readonly FanFollowingItem[];
   libraryItems: readonly FanLibraryItem[];
   overview: FanProfileOverview;
   pinnedItems: readonly FanPinnedShortItem[];
@@ -159,7 +160,15 @@ const fanOverview = {
  * fan hub の tab 文字列を正規化する。
  */
 export function normalizeFanHubTab(tab: string | string[] | undefined): FanHubTab {
-  return tab === "library" ? "library" : "pinned";
+  if (tab === "following") {
+    return "following";
+  }
+
+  if (tab === "library") {
+    return "library";
+  }
+
+  return "pinned";
 }
 
 /**
@@ -175,6 +184,7 @@ export function getFanProfileOverview(): FanProfileOverview {
 export function getFanHubState(activeTab: FanHubTab): FanHubState {
   return {
     activeTab,
+    followingItems,
     libraryItems,
     overview: fanOverview,
     pinnedItems,

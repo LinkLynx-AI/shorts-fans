@@ -8,6 +8,7 @@ import {
 
 describe("fan profile model", () => {
   it("normalizes the hub tab", () => {
+    expect(normalizeFanHubTab("following")).toBe("following");
     expect(normalizeFanHubTab("library")).toBe("library");
     expect(normalizeFanHubTab("pinned")).toBe("pinned");
     expect(normalizeFanHubTab("unknown")).toBe("pinned");
@@ -24,6 +25,7 @@ describe("fan profile model", () => {
       pinnedShorts: 3,
     });
     expect(libraryState.activeTab).toBe("library");
+    expect(libraryState.followingItems).toHaveLength(3);
     expect(libraryState.libraryItems[0]?.main.id).toBe("main_aoi_blue_balcony");
     expect(libraryState.pinnedItems).toHaveLength(3);
   });

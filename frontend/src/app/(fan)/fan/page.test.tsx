@@ -7,11 +7,13 @@ import {
 
 import { CurrentViewerProvider, ViewerSessionProvider } from "@/entities/viewer";
 import {
+  fetchFanProfileFollowingPage,
   fetchFanProfileLibraryPage,
   fetchFanProfileOverview,
   fetchFanProfilePinnedShortsPage,
 } from "@/entities/fan-profile";
 import { FanAuthDialogProvider } from "@/features/fan-auth";
+import { getViewerProfile } from "@/features/viewer-profile";
 import { ApiError } from "@/shared/api";
 
 import FanPage from "./page";
@@ -46,9 +48,19 @@ vi.mock("@/entities/fan-profile", async () => {
 
   return {
     ...actual,
+    fetchFanProfileFollowingPage: vi.fn(),
     fetchFanProfileLibraryPage: vi.fn(),
     fetchFanProfileOverview: vi.fn(),
     fetchFanProfilePinnedShortsPage: vi.fn(),
+  };
+});
+
+vi.mock("@/features/viewer-profile", async () => {
+  const actual = await vi.importActual<typeof import("@/features/viewer-profile")>("@/features/viewer-profile");
+
+  return {
+    ...actual,
+    getViewerProfile: vi.fn(),
   };
 });
 
@@ -71,9 +83,16 @@ describe("FanPage", () => {
     mockedRouter.push.mockReset();
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
+    vi.mocked(fetchFanProfileFollowingPage).mockReset();
     vi.mocked(fetchFanProfileLibraryPage).mockReset();
     vi.mocked(fetchFanProfileOverview).mockReset();
     vi.mocked(fetchFanProfilePinnedShortsPage).mockReset();
+    vi.mocked(getViewerProfile).mockReset();
+    vi.mocked(getViewerProfile).mockResolvedValue({
+      avatar: null,
+      displayName: "Alex_Fan",
+      handle: "@alex_f",
+    });
   });
 
   it("fetches overview and pinned shorts with the viewer session when the pinned tab is active", async () => {
@@ -132,16 +151,75 @@ describe("FanPage", () => {
     expect(fetchFanProfileOverview).toHaveBeenCalledWith({
       sessionToken: "valid-session",
     });
+    expect(getViewerProfile).toHaveBeenCalledWith({
+      sessionToken: "valid-session",
+    });
     expect(fetchFanProfilePinnedShortsPage).toHaveBeenCalledWith({
       sessionToken: "valid-session",
     });
-    expect(screen.getByRole("heading", { name: "Archive from API" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Pinned" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.getByText("Alex_Fan")).toBeInTheDocument();
+    expect(screen.getByText("@alex_f")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Pinned Shorts" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByRole("link", { name: "Sora Vale after rain preview" })).toHaveAttribute(
       "href",
       "/shorts/short_sora_afterrain?fanTab=pinned&from=fan",
     );
-    expect(screen.getByText("9")).toBeInTheDocument();
+    expect(screen.getByText("Following 9, Pinned Shorts 8, Library 7, Archive from API")).toBeInTheDocument();
+  });
+
+  it("fetches overview and following items when the following tab is active", async () => {
+    cookiesMock.mockResolvedValue({
+      get: () => ({
+        value: "valid-session",
+      }),
+    });
+    vi.mocked(fetchFanProfileOverview).mockResolvedValue({
+      counts: {
+        following: 3,
+        library: 2,
+        pinnedShorts: 4,
+      },
+      title: "Archive from API",
+    });
+    vi.mocked(fetchFanProfileFollowingPage).mockResolvedValue({
+      items: [
+        {
+          creator: {
+            avatar: null,
+            bio: "after rain と balcony mood の short をまとめています。",
+            displayName: "Mika Aoi",
+            handle: "@mikaaoi",
+            id: "creator_mika_aoi",
+          },
+          viewer: {
+            isFollowing: true,
+          },
+        },
+      ],
+      page: {
+        hasNext: false,
+        nextCursor: null,
+      },
+      requestId: "req_fan_profile_following_001",
+    });
+
+    renderWithFanAuthDialog(
+      await FanPage({
+        searchParams: Promise.resolve({
+          tab: "following",
+        }),
+      }),
+    );
+
+    expect(fetchFanProfilePinnedShortsPage).not.toHaveBeenCalled();
+    expect(fetchFanProfileLibraryPage).not.toHaveBeenCalled();
+    expect(fetchFanProfileFollowingPage).toHaveBeenCalledWith({
+      sessionToken: "valid-session",
+    });
+    expect(screen.getByRole("link", { name: "Following" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Mika Aoi")).toBeInTheDocument();
+    expect(screen.getByText("1 creators")).toBeInTheDocument();
   });
 
   it("fetches overview and library items when the library tab is active", async () => {
@@ -209,10 +287,14 @@ describe("FanPage", () => {
     );
 
     expect(fetchFanProfilePinnedShortsPage).not.toHaveBeenCalled();
+    expect(getViewerProfile).toHaveBeenCalledWith({
+      sessionToken: "valid-session",
+    });
     expect(fetchFanProfileLibraryPage).toHaveBeenCalledWith({
       sessionToken: "valid-session",
     });
     expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByText("Alex_Fan")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Mina Rei quiet rooftop preview。" })).toHaveAttribute(
       "href",
       "/mains/main_mina_quiet_rooftop?fanTab=library&from=fan&fromShortId=short_mina_rooftop",
@@ -241,6 +323,50 @@ describe("FanPage", () => {
         searchParams: Promise.resolve({
           tab: "library",
         }),
+      }),
+    );
+
+    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+  });
+
+  it("opens the shared auth dialog when the viewer profile api responds with auth_required", async () => {
+    cookiesMock.mockResolvedValue({
+      get: () => ({
+        value: "valid-session",
+      }),
+    });
+    vi.mocked(fetchFanProfileOverview).mockResolvedValue({
+      counts: {
+        following: 9,
+        library: 7,
+        pinnedShorts: 8,
+      },
+      title: "Archive from API",
+    });
+    vi.mocked(fetchFanProfilePinnedShortsPage).mockResolvedValue({
+      items: [],
+      page: {
+        hasNext: false,
+        nextCursor: null,
+      },
+      requestId: "req_fan_profile_pinned_shorts_004",
+    });
+    vi.mocked(getViewerProfile).mockRejectedValue(
+      new ApiError("unauthorized", {
+        code: "http",
+        details: JSON.stringify({
+          error: {
+            code: "auth_required",
+            message: "fan profile requires authentication",
+          },
+        }),
+        status: 401,
+      }),
+    );
+
+    renderWithFanAuthDialog(
+      await FanPage({
+        searchParams: Promise.resolve({}),
       }),
     );
 
