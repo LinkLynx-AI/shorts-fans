@@ -114,7 +114,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 9)
+	assertMigrationVersion(t, migrator, 12)
 
 	queries := sqlc.New(conn)
 	now := time.Now().UTC()
@@ -162,6 +162,28 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAuthIdentity() non-email duplicate error = %v, want nil", err)
 	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              user.ID,
+		Provider:            "cognito",
+		ProviderSubject:     "cognito-subject",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("CreateAuthIdentity() cognito bridge error = %v, want nil", err)
+	}
+
+	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              secondUser.ID,
+		Provider:            "cognito",
+		ProviderSubject:     "second-cognito-subject",
+		EmailNormalized:     pgText("fan@example.com"),
+		VerifiedAt:          pgTime(now),
+		LastAuthenticatedAt: pgTime(now),
+	})
+	assertPgConstraintError(t, err, "23505", "idx_auth_identities_cognito_email_normalized")
 
 	_, err = queries.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
 		UserID:              secondUser.ID,
@@ -246,13 +268,17 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	}
 
 	session, err := queries.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
-		UserID:           user.ID,
-		ActiveMode:       "fan",
-		SessionTokenHash: "session-token-hash",
-		ExpiresAt:        pgTime(now.Add(24 * time.Hour)),
+		UserID:                user.ID,
+		ActiveMode:            "fan",
+		SessionTokenHash:      "session-token-hash",
+		ExpiresAt:             pgTime(now.Add(24 * time.Hour)),
+		RecentAuthenticatedAt: pgTime(now),
 	})
 	if err != nil {
 		t.Fatalf("CreateAuthSession() error = %v, want nil", err)
+	}
+	if !session.RecentAuthenticatedAt.Time.Equal(now) {
+		t.Fatalf("CreateAuthSession() recent_authenticated_at got %s want %s", session.RecentAuthenticatedAt.Time, now)
 	}
 
 	gotSession, err := queries.GetActiveAuthSessionByTokenHash(ctx, "session-token-hash")
@@ -272,6 +298,24 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	}
 	if !touchedByToken.LastSeenAt.Time.Equal(now.Add(4 * time.Minute)) {
 		t.Fatalf("TouchAuthSessionLastSeenByTokenHash() last_seen_at got %s want %s", touchedByToken.LastSeenAt.Time, now.Add(4*time.Minute))
+	}
+
+	refreshedSession, err := queries.RefreshAuthSessionRecentAuthenticatedAtByTokenHash(
+		ctx,
+		sqlc.RefreshAuthSessionRecentAuthenticatedAtByTokenHashParams{
+			SessionTokenHash:      "session-token-hash",
+			RecentAuthenticatedAt: pgTime(now.Add(5 * time.Minute)),
+		},
+	)
+	if err != nil {
+		t.Fatalf("RefreshAuthSessionRecentAuthenticatedAtByTokenHash() error = %v, want nil", err)
+	}
+	if !refreshedSession.RecentAuthenticatedAt.Time.Equal(now.Add(5 * time.Minute)) {
+		t.Fatalf(
+			"RefreshAuthSessionRecentAuthenticatedAtByTokenHash() recent_authenticated_at got %s want %s",
+			refreshedSession.RecentAuthenticatedAt.Time,
+			now.Add(5*time.Minute),
+		)
 	}
 
 	currentViewer, err := queries.GetCurrentViewerBySessionTokenHash(ctx, "session-token-hash")
@@ -337,18 +381,59 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Steps(-1); err != nil {
 		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 6)
+	assertMigrationVersion(t, migrator, 11)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
 
+	legacySessionCreatedAt := now.Add(-2 * time.Hour)
+	if _, err := conn.Exec(
+		ctx,
+		`INSERT INTO app.auth_sessions (
+			user_id,
+			active_mode,
+			session_token_hash,
+			expires_at,
+			last_seen_at,
+			created_at,
+			updated_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		secondUser.ID,
+		"fan",
+		"legacy-session-token-hash",
+		now.Add(24*time.Hour),
+		legacySessionCreatedAt.Add(10*time.Minute),
+		legacySessionCreatedAt,
+		legacySessionCreatedAt,
+	); err != nil {
+		t.Fatalf("Exec(insert legacy auth session before migration 12) error = %v, want nil", err)
+	}
+
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 9)
+	assertMigrationVersion(t, migrator, 12)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
+
+	var backfilledRecentAuthenticatedAt time.Time
+	if err := conn.QueryRow(
+		ctx,
+		`SELECT recent_authenticated_at
+		FROM app.auth_sessions
+		WHERE session_token_hash = $1`,
+		"legacy-session-token-hash",
+	).Scan(&backfilledRecentAuthenticatedAt); err != nil {
+		t.Fatalf("QueryRow(legacy auth session recent_authenticated_at) error = %v, want nil", err)
+	}
+	if !backfilledRecentAuthenticatedAt.Equal(legacySessionCreatedAt) {
+		t.Fatalf(
+			"legacy auth session recent_authenticated_at got %s want %s",
+			backfilledRecentAuthenticatedAt,
+			legacySessionCreatedAt,
+		)
+	}
 
 	thirdUser, err := queries.CreateUser(ctx)
 	if err != nil {

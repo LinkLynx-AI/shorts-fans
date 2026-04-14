@@ -15,6 +15,7 @@ source:
         - 000009_require_creator_profile_handle.up.sql
         - 000010_add_short_caption_and_processing_jobs.up.sql
         - 000011_require_main_price_metadata.up.sql
+        - 000012_add_cognito_session_foundation.up.sql
 schemas:
     - name: app
       tables:
@@ -76,6 +77,12 @@ schemas:
             - name: auth_identities_provider_subject_check
               expression: CHECK (length(btrim(provider_subject)) > 0)
           indexes:
+            - name: idx_auth_identities_cognito_email_normalized
+              columns:
+                - email_normalized
+              unique: true
+              predicate: ((provider = 'cognito'::text) AND (email_normalized IS NOT NULL))
+              definition: CREATE UNIQUE INDEX idx_auth_identities_cognito_email_normalized ON app.auth_identities USING btree (email_normalized) WHERE ((provider = 'cognito'::text) AND (email_normalized IS NOT NULL))
             - name: idx_auth_identities_email_normalized
               columns:
                 - email_normalized
@@ -188,6 +195,10 @@ schemas:
               nullable: false
               default: CURRENT_TIMESTAMP
             - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: recent_authenticated_at
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP

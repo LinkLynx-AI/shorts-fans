@@ -35,15 +35,16 @@ type AppAuthLoginChallenge struct {
 }
 
 type AppAuthSession struct {
-	ID               pgtype.UUID
-	UserID           pgtype.UUID
-	ActiveMode       string
-	SessionTokenHash string
-	ExpiresAt        pgtype.Timestamptz
-	LastSeenAt       pgtype.Timestamptz
-	RevokedAt        pgtype.Timestamptz
-	CreatedAt        pgtype.Timestamptz
-	UpdatedAt        pgtype.Timestamptz
+	ID                    pgtype.UUID
+	UserID                pgtype.UUID
+	ActiveMode            string
+	SessionTokenHash      string
+	ExpiresAt             pgtype.Timestamptz
+	LastSeenAt            pgtype.Timestamptz
+	RevokedAt             pgtype.Timestamptz
+	CreatedAt             pgtype.Timestamptz
+	UpdatedAt             pgtype.Timestamptz
+	RecentAuthenticatedAt pgtype.Timestamptz
 }
 
 type AppCreatorCapability struct {

@@ -15,10 +15,12 @@ import (
 )
 
 const (
-	identityProviderEmail    = "email"
-	loginChallengePurpose    = "login"
-	identityUniqueConstraint = "auth_identities_provider_provider_subject_key"
-	emailUniqueConstraint    = "idx_auth_identities_email_normalized"
+	identityProviderEmail        = "email"
+	identityProviderCognito      = "cognito"
+	loginChallengePurpose        = "login"
+	identityUniqueConstraint     = "auth_identities_provider_provider_subject_key"
+	emailUniqueConstraint        = "idx_auth_identities_email_normalized"
+	cognitoEmailUniqueConstraint = "idx_auth_identities_cognito_email_normalized"
 )
 
 var (
@@ -32,6 +34,10 @@ var (
 	ErrLoginChallengeNotFound = errors.New("login challenge が見つかりません")
 	// ErrSessionNotFound は有効な session が見つからないことを表します。
 	ErrSessionNotFound = errors.New("auth session が見つかりません")
+	// ErrInvalidProviderSubject は provider subject が不正なことを表します。
+	ErrInvalidProviderSubject = errors.New("provider subject が不正です")
+	// ErrEmailVerificationRequired は verified email が必要なことを表します。
+	ErrEmailVerificationRequired = errors.New("email verification が必要です")
 )
 
 type queries interface {
@@ -77,15 +83,26 @@ type Challenge struct {
 
 // SessionRecord は domain 向けの auth session レコードです。
 type SessionRecord struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	ActiveMode       ActiveMode
-	SessionTokenHash string
-	ExpiresAt        time.Time
-	LastSeenAt       time.Time
-	RevokedAt        *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                    uuid.UUID
+	UserID                uuid.UUID
+	ActiveMode            ActiveMode
+	SessionTokenHash      string
+	ExpiresAt             time.Time
+	RecentAuthenticatedAt time.Time
+	LastSeenAt            time.Time
+	RevokedAt             *time.Time
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
+// CreateIdentityInput は CreateIdentity の入力です。
+type CreateIdentityInput struct {
+	UserID              uuid.UUID
+	Provider            string
+	ProviderSubject     string
+	EmailNormalized     *string
+	VerifiedAt          *time.Time
+	LastAuthenticatedAt *time.Time
 }
 
 // CreateLoginChallengeInput は CreateLoginChallenge の入力です。
@@ -105,19 +122,33 @@ type RecordIdentityAuthenticationInput struct {
 
 // CreateSessionInput は CreateSession の入力です。
 type CreateSessionInput struct {
-	UserID           uuid.UUID
-	ActiveMode       ActiveMode
-	SessionTokenHash string
-	ExpiresAt        time.Time
+	UserID                uuid.UUID
+	ActiveMode            ActiveMode
+	SessionTokenHash      string
+	ExpiresAt             time.Time
+	RecentAuthenticatedAt time.Time
+}
+
+// CreateUserWithIdentityAndSessionInput は identity と session の一括作成入力です。
+type CreateUserWithIdentityAndSessionInput struct {
+	Provider              string
+	ProviderSubject       string
+	EmailNormalized       *string
+	SessionTokenHash      string
+	VerifiedAt            *time.Time
+	LastAuthenticatedAt   *time.Time
+	ExpiresAt             time.Time
+	RecentAuthenticatedAt time.Time
 }
 
 // CreateUserWithEmailIdentityAndSessionInput は sign-up 完了時の一括作成入力です。
 type CreateUserWithEmailIdentityAndSessionInput struct {
-	EmailNormalized     string
-	SessionTokenHash    string
-	VerifiedAt          time.Time
-	LastAuthenticatedAt time.Time
-	ExpiresAt           time.Time
+	EmailNormalized       string
+	SessionTokenHash      string
+	VerifiedAt            time.Time
+	LastAuthenticatedAt   time.Time
+	ExpiresAt             time.Time
+	RecentAuthenticatedAt time.Time
 }
 
 // NewRepository は pgxpool ベースの auth repository を構築します。
@@ -138,28 +169,85 @@ func newRepository(q queries) *Repository {
 	return &Repository{queries: q}
 }
 
-// GetIdentityByEmail は email provider の auth identity を取得します。
-func (r *Repository) GetIdentityByEmail(ctx context.Context, emailNormalized string) (Identity, error) {
+// GetIdentityByProviderAndSubject は provider / subject で auth identity を取得します。
+func (r *Repository) GetIdentityByProviderAndSubject(ctx context.Context, provider string, providerSubject string) (Identity, error) {
 	q, err := r.dbQueries()
 	if err != nil {
 		return Identity{}, err
 	}
 
 	row, err := q.GetAuthIdentityByProviderAndSubject(ctx, sqlc.GetAuthIdentityByProviderAndSubjectParams{
-		Provider:        identityProviderEmail,
-		ProviderSubject: emailNormalized,
+		Provider:        provider,
+		ProviderSubject: providerSubject,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return Identity{}, fmt.Errorf("auth identity 取得 email=%s: %w", emailNormalized, ErrIdentityNotFound)
+			return Identity{}, fmt.Errorf(
+				"auth identity 取得 provider=%s provider_subject=%s: %w",
+				provider,
+				providerSubject,
+				ErrIdentityNotFound,
+			)
 		}
 
-		return Identity{}, fmt.Errorf("auth identity 取得 email=%s: %w", emailNormalized, err)
+		return Identity{}, fmt.Errorf(
+			"auth identity 取得 provider=%s provider_subject=%s: %w",
+			provider,
+			providerSubject,
+			err,
+		)
 	}
 
 	identity, err := mapIdentity(row)
 	if err != nil {
-		return Identity{}, fmt.Errorf("auth identity 取得結果の変換 email=%s: %w", emailNormalized, err)
+		return Identity{}, fmt.Errorf(
+			"auth identity 取得結果の変換 provider=%s provider_subject=%s: %w",
+			provider,
+			providerSubject,
+			err,
+		)
+	}
+
+	return identity, nil
+}
+
+// GetIdentityByEmail は email provider の auth identity を取得します。
+func (r *Repository) GetIdentityByEmail(ctx context.Context, emailNormalized string) (Identity, error) {
+	return r.GetIdentityByProviderAndSubject(ctx, identityProviderEmail, emailNormalized)
+}
+
+// CreateIdentity は auth identity を作成します。
+func (r *Repository) CreateIdentity(ctx context.Context, input CreateIdentityInput) (Identity, error) {
+	q, err := r.dbQueries()
+	if err != nil {
+		return Identity{}, err
+	}
+
+	row, err := q.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+		UserID:              postgres.UUIDToPG(input.UserID),
+		Provider:            input.Provider,
+		ProviderSubject:     input.ProviderSubject,
+		EmailNormalized:     postgres.TextToPG(input.EmailNormalized),
+		VerifiedAt:          postgres.TimeToPG(input.VerifiedAt),
+		LastAuthenticatedAt: postgres.TimeToPG(input.LastAuthenticatedAt),
+	})
+	if err != nil {
+		return Identity{}, fmt.Errorf(
+			"auth identity 作成 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			mapIdentityWriteError(err),
+		)
+	}
+
+	identity, err := mapIdentity(row)
+	if err != nil {
+		return Identity{}, fmt.Errorf(
+			"auth identity 作成結果の変換 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			err,
+		)
 	}
 
 	return identity, nil
@@ -308,10 +396,11 @@ func (r *Repository) CreateSession(ctx context.Context, input CreateSessionInput
 	}
 
 	row, err := q.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
-		UserID:           postgres.UUIDToPG(input.UserID),
-		ActiveMode:       string(input.ActiveMode),
-		SessionTokenHash: input.SessionTokenHash,
-		ExpiresAt:        postgres.TimeToPG(&input.ExpiresAt),
+		UserID:                postgres.UUIDToPG(input.UserID),
+		ActiveMode:            string(input.ActiveMode),
+		SessionTokenHash:      input.SessionTokenHash,
+		ExpiresAt:             postgres.TimeToPG(&input.ExpiresAt),
+		RecentAuthenticatedAt: postgres.TimeToPG(&input.RecentAuthenticatedAt),
 	})
 	if err != nil {
 		return SessionRecord{}, fmt.Errorf("auth session 作成 user=%s: %w", input.UserID, err)
@@ -325,8 +414,8 @@ func (r *Repository) CreateSession(ctx context.Context, input CreateSessionInput
 	return session, nil
 }
 
-// CreateUserWithEmailIdentityAndSession は sign-up 完了時の一括作成を transaction で行います。
-func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, input CreateUserWithEmailIdentityAndSessionInput) (SessionRecord, error) {
+// CreateUserWithIdentityAndSession は identity と session の一括作成を transaction で行います。
+func (r *Repository) CreateUserWithIdentityAndSession(ctx context.Context, input CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
 	if r.txBeginner == nil {
 		return SessionRecord{}, fmt.Errorf("auth repository pool が初期化されていません")
 	}
@@ -342,20 +431,21 @@ func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, 
 
 		if _, err := q.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
 			UserID:              user.ID,
-			Provider:            identityProviderEmail,
-			ProviderSubject:     input.EmailNormalized,
-			EmailNormalized:     postgres.TextToPG(&input.EmailNormalized),
-			VerifiedAt:          postgres.TimeToPG(&input.VerifiedAt),
-			LastAuthenticatedAt: postgres.TimeToPG(&input.LastAuthenticatedAt),
+			Provider:            input.Provider,
+			ProviderSubject:     input.ProviderSubject,
+			EmailNormalized:     postgres.TextToPG(input.EmailNormalized),
+			VerifiedAt:          postgres.TimeToPG(input.VerifiedAt),
+			LastAuthenticatedAt: postgres.TimeToPG(input.LastAuthenticatedAt),
 		}); err != nil {
 			return fmt.Errorf("auth identity 作成: %w", mapIdentityWriteError(err))
 		}
 
 		sessionRow, err = q.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
-			UserID:           user.ID,
-			ActiveMode:       string(ActiveModeFan),
-			SessionTokenHash: input.SessionTokenHash,
-			ExpiresAt:        postgres.TimeToPG(&input.ExpiresAt),
+			UserID:                user.ID,
+			ActiveMode:            string(ActiveModeFan),
+			SessionTokenHash:      input.SessionTokenHash,
+			ExpiresAt:             postgres.TimeToPG(&input.ExpiresAt),
+			RecentAuthenticatedAt: postgres.TimeToPG(&input.RecentAuthenticatedAt),
 		})
 		if err != nil {
 			return fmt.Errorf("auth session 作成: %w", err)
@@ -368,15 +458,39 @@ func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, 
 			return SessionRecord{}, err
 		}
 
-		return SessionRecord{}, fmt.Errorf("sign up 一括作成 email=%s: %w", input.EmailNormalized, err)
+		return SessionRecord{}, fmt.Errorf(
+			"identity と session の一括作成 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			err,
+		)
 	}
 
 	session, err := mapSession(sessionRow)
 	if err != nil {
-		return SessionRecord{}, fmt.Errorf("sign up session 結果の変換 email=%s: %w", input.EmailNormalized, err)
+		return SessionRecord{}, fmt.Errorf(
+			"identity と session の一括作成結果の変換 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			err,
+		)
 	}
 
 	return session, nil
+}
+
+// CreateUserWithEmailIdentityAndSession は sign-up 完了時の一括作成を transaction で行います。
+func (r *Repository) CreateUserWithEmailIdentityAndSession(ctx context.Context, input CreateUserWithEmailIdentityAndSessionInput) (SessionRecord, error) {
+	return r.CreateUserWithIdentityAndSession(ctx, CreateUserWithIdentityAndSessionInput{
+		Provider:              identityProviderEmail,
+		ProviderSubject:       input.EmailNormalized,
+		EmailNormalized:       &input.EmailNormalized,
+		SessionTokenHash:      input.SessionTokenHash,
+		VerifiedAt:            &input.VerifiedAt,
+		LastAuthenticatedAt:   &input.LastAuthenticatedAt,
+		ExpiresAt:             input.ExpiresAt,
+		RecentAuthenticatedAt: input.RecentAuthenticatedAt,
+	})
 }
 
 // TouchSessionLastSeenByTokenHash は session の last seen を更新します。
@@ -401,6 +515,52 @@ func (r *Repository) TouchSessionLastSeenByTokenHash(ctx context.Context, sessio
 	session, err := mapSession(row)
 	if err != nil {
 		return SessionRecord{}, fmt.Errorf("auth session touch 結果の変換 token=%s: %w", sessionTokenHash, err)
+	}
+
+	return session, nil
+}
+
+// RefreshSessionRecentAuthenticatedAtByTokenHash は session の recent auth proof を更新します。
+func (r *Repository) RefreshSessionRecentAuthenticatedAtByTokenHash(
+	ctx context.Context,
+	sessionTokenHash string,
+	recentAuthenticatedAt time.Time,
+) (SessionRecord, error) {
+	q, err := r.dbQueries()
+	if err != nil {
+		return SessionRecord{}, err
+	}
+
+	row, err := q.RefreshAuthSessionRecentAuthenticatedAtByTokenHash(
+		ctx,
+		sqlc.RefreshAuthSessionRecentAuthenticatedAtByTokenHashParams{
+			SessionTokenHash:      sessionTokenHash,
+			RecentAuthenticatedAt: postgres.TimeToPG(&recentAuthenticatedAt),
+		},
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return SessionRecord{}, fmt.Errorf(
+				"auth session recent auth 更新 token=%s: %w",
+				sessionTokenHash,
+				ErrSessionNotFound,
+			)
+		}
+
+		return SessionRecord{}, fmt.Errorf(
+			"auth session recent auth 更新 token=%s: %w",
+			sessionTokenHash,
+			err,
+		)
+	}
+
+	session, err := mapSession(row)
+	if err != nil {
+		return SessionRecord{}, fmt.Errorf(
+			"auth session recent auth 更新結果の変換 token=%s: %w",
+			sessionTokenHash,
+			err,
+		)
 	}
 
 	return session, nil
@@ -602,6 +762,11 @@ func mapSession(row sqlc.AppAuthSession) (SessionRecord, error) {
 		return SessionRecord{}, fmt.Errorf("auth session expires_at 変換: %w", err)
 	}
 
+	recentAuthenticatedAt, err := postgres.RequiredTimeFromPG(row.RecentAuthenticatedAt)
+	if err != nil {
+		return SessionRecord{}, fmt.Errorf("auth session recent_authenticated_at 変換: %w", err)
+	}
+
 	lastSeenAt, err := postgres.RequiredTimeFromPG(row.LastSeenAt)
 	if err != nil {
 		return SessionRecord{}, fmt.Errorf("auth session last_seen_at 変換: %w", err)
@@ -618,15 +783,16 @@ func mapSession(row sqlc.AppAuthSession) (SessionRecord, error) {
 	}
 
 	return SessionRecord{
-		ID:               id,
-		UserID:           userID,
-		ActiveMode:       ActiveMode(row.ActiveMode),
-		SessionTokenHash: row.SessionTokenHash,
-		ExpiresAt:        expiresAt,
-		LastSeenAt:       lastSeenAt,
-		RevokedAt:        postgres.OptionalTimeFromPG(row.RevokedAt),
-		CreatedAt:        createdAt,
-		UpdatedAt:        updatedAt,
+		ID:                    id,
+		UserID:                userID,
+		ActiveMode:            ActiveMode(row.ActiveMode),
+		SessionTokenHash:      row.SessionTokenHash,
+		ExpiresAt:             expiresAt,
+		RecentAuthenticatedAt: recentAuthenticatedAt,
+		LastSeenAt:            lastSeenAt,
+		RevokedAt:             postgres.OptionalTimeFromPG(row.RevokedAt),
+		CreatedAt:             createdAt,
+		UpdatedAt:             updatedAt,
 	}, nil
 }
 
@@ -634,7 +800,7 @@ func mapIdentityWriteError(err error) error {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		switch pgErr.ConstraintName {
-		case identityUniqueConstraint, emailUniqueConstraint:
+		case identityUniqueConstraint, emailUniqueConstraint, cognitoEmailUniqueConstraint:
 			return ErrIdentityAlreadyExists
 		}
 	}
