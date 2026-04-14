@@ -39,9 +39,6 @@ type UseFanAuthEntryResult = {
   switchMode: () => void;
 };
 
-const signUpAvatarSaveFailureMessage =
-  "アカウントは作成されましたが、avatar の保存に失敗しました。fan settings から再度設定してください。";
-
 /**
  * fan auth entry UI に必要な mode / email / submit 状態を管理する。
  */
@@ -123,8 +120,7 @@ export function useFanAuthEntry({
             });
           }
         } catch {
-          setErrorMessage(signUpAvatarSaveFailureMessage);
-          return;
+          // avatar は optional なので、保存失敗でも auth success path は継続する。
         }
       }
 
