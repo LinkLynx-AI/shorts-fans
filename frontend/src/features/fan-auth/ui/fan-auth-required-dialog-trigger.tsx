@@ -22,6 +22,7 @@ export function FanAuthRequiredDialogTrigger() {
     hasOpenedRef.current = true;
     openFanAuthDialog({
       closeBehavior: "back",
+      closeFallbackHref: "/",
     });
   }, [openFanAuthDialog]);
 
