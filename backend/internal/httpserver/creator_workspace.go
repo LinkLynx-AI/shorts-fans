@@ -23,6 +23,7 @@ const (
 	creatorWorkspaceMainDetailRequestScope      = "creator_workspace_main_preview_detail"
 	creatorWorkspaceMainListRequestScope        = "creator_workspace_mains"
 	creatorWorkspaceRequestScope                = "creator_workspace"
+	creatorWorkspaceProfileUpdateRequestScope   = "creator_workspace_profile_update"
 	creatorWorkspaceShortCaptionPutRequestScope = "creator_workspace_short_caption_put"
 	creatorWorkspaceMainPriceUpdateRequestScope = "creator_workspace_main_price_update"
 	creatorWorkspaceShortDetailRequestScope     = "creator_workspace_short_preview_detail"
@@ -87,6 +88,13 @@ type creatorWorkspaceTopPerformersResponseData struct {
 
 type creatorWorkspaceMainPriceUpdateRequest struct {
 	PriceJpy json.RawMessage `json:"priceJpy"`
+}
+
+type creatorWorkspaceProfileUpdateRequest struct {
+	AvatarUploadToken string `json:"avatarUploadToken"`
+	Bio               string `json:"bio"`
+	DisplayName       string `json:"displayName"`
+	Handle            string `json:"handle"`
 }
 
 type creatorWorkspaceMainPriceUpdateResponseData struct {
@@ -182,6 +190,8 @@ func registerCreatorWorkspaceRoutes(
 	router gin.IRouter,
 	reader CreatorWorkspaceReader,
 	mainPriceWriter CreatorWorkspaceMainPriceWriter,
+	profileWriter CreatorWorkspaceProfileWriter,
+	avatarUploads ViewerCreatorAvatarUploadHandler,
 	shortCaptionWriter CreatorWorkspaceShortCaptionWriter,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
@@ -240,6 +250,16 @@ func registerCreatorWorkspaceRoutes(
 			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainPriceUpdateRequestScope, creatorWorkspaceAuthRequiredMessage),
 			func(c *gin.Context) {
 				handleCreatorWorkspaceMainPriceUpdate(c, mainPriceWriter)
+			},
+		)
+	}
+
+	if profileWriter != nil {
+		router.PUT(
+			"/api/creator/workspace/profile",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceProfileUpdateRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceProfileUpdate(c, profileWriter, avatarUploads)
 			},
 		)
 	}

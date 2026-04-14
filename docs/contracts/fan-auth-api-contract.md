@@ -27,6 +27,7 @@
 ## Canonical Sources
 
 - `docs/contracts/fan-auth-modal-ui-contract.md`
+- `docs/contracts/viewer-profile-api-contract.md`
 - `docs/contracts/viewer-bootstrap-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/contracts/mvp-core-domain-contract.md`
@@ -58,6 +59,8 @@
 - `fan` と `creator` を別 identity に分けません。新規 session の `activeMode` は常に `fan` で開始します。
 - custom modal UI が primary entry です。`/login` route を後続実装で残す場合も secondary fallback 扱いとし、別の auth contract を持ち込みません。
 - login / logout / re-auth 成功 body に viewer state は返しません。成功後の current viewer は `GET /api/viewer/bootstrap` から読みます。
+- sign up 時点で shared viewer profile の `displayName / handle` を確定させ、creator registration 時には同じ値を再入力しません。
+- sign up 時の avatar は optional であり、保存 transport は `docs/contracts/viewer-profile-api-contract.md` を正とします。
 - sign in は `missing email` と `wrong password` を wire 上で区別しません。
 - sign up と password reset の開始 endpoint は、valid request から account existence を推測できないように扱います。
 - sign up / password reset の開始 endpoint を再度呼ぶことは resend として扱えます。response shape は変えません。

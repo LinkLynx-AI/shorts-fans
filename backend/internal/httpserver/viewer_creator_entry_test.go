@@ -13,6 +13,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -77,6 +78,25 @@ func (s viewerActiveModeSwitcherStub) SwitchActiveMode(
 	return s.switchActiveMode(ctx, rawSessionToken, activeMode)
 }
 
+type viewerProfileReaderStub struct {
+	getProfile func(context.Context, uuid.UUID) (viewerprofile.Profile, error)
+}
+
+func (s viewerProfileReaderStub) GetProfile(ctx context.Context, userID uuid.UUID) (viewerprofile.Profile, error) {
+	return s.getProfile(ctx, userID)
+}
+
+type viewerProfileWriterStub struct {
+	updateProfile func(context.Context, viewerprofile.UpdateProfileInput) (viewerprofile.Profile, error)
+}
+
+func (s viewerProfileWriterStub) UpdateProfile(
+	ctx context.Context,
+	input viewerprofile.UpdateProfileInput,
+) (viewerprofile.Profile, error) {
+	return s.updateProfile(ctx, input)
+}
+
 func TestViewerCreatorRegistrationRequiresAuth(t *testing.T) {
 	t.Parallel()
 
@@ -93,9 +113,15 @@ func TestViewerCreatorRegistrationRequiresAuth(t *testing.T) {
 				return creator.SelfServeRegistrationResult{}, nil
 			},
 		},
+		ViewerProfile: viewerProfileReaderStub{
+			getProfile: func(context.Context, uuid.UUID) (viewerprofile.Profile, error) {
+				t.Fatal("GetProfile() should not be called")
+				return viewerprofile.Profile{}, nil
+			},
+		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 
@@ -109,10 +135,11 @@ func TestViewerCreatorRegistrationRequiresAuth(t *testing.T) {
 	}
 }
 
-func TestViewerCreatorRegistrationSuccess(t *testing.T) {
+func TestViewerCreatorRegistrationUsesSharedProfile(t *testing.T) {
 	t.Parallel()
 
 	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	avatarURL := "https://cdn.example.com/viewer/avatar.png"
 	var gotInput creator.SelfServeRegistrationInput
 
 	router := NewHandler(HandlerConfig{
@@ -126,6 +153,20 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 				}, nil
 			},
 		},
+		ViewerProfile: viewerProfileReaderStub{
+			getProfile: func(_ context.Context, gotUserID uuid.UUID) (viewerprofile.Profile, error) {
+				if gotUserID != viewerID {
+					t.Fatalf("GetProfile() user id got %s want %s", gotUserID, viewerID)
+				}
+
+				return viewerprofile.Profile{
+					UserID:      viewerID,
+					DisplayName: "Mina",
+					Handle:      "mina",
+					AvatarURL:   &avatarURL,
+				}, nil
+			},
+		},
 		CreatorRegistration: viewerCreatorRegistrationWriterStub{
 			registerApprovedCreator: func(_ context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
 				gotInput = input
@@ -134,7 +175,7 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()
@@ -153,65 +194,38 @@ func TestViewerCreatorRegistrationSuccess(t *testing.T) {
 	if gotInput.Handle != "mina" {
 		t.Fatalf("POST /api/viewer/creator-registration handle got %q want %q", gotInput.Handle, "mina")
 	}
-	if gotInput.Bio != "bio" {
-		t.Fatalf("POST /api/viewer/creator-registration bio got %q want %q", gotInput.Bio, "bio")
+	if gotInput.Bio != "" {
+		t.Fatalf("POST /api/viewer/creator-registration bio got %q want empty", gotInput.Bio)
+	}
+	if gotInput.AvatarURL == nil || *gotInput.AvatarURL != avatarURL {
+		t.Fatalf("POST /api/viewer/creator-registration avatar url got %v want %q", gotInput.AvatarURL, avatarURL)
 	}
 }
 
-func TestViewerCreatorRegistrationSuccessWithAvatarUploadToken(t *testing.T) {
+func TestViewerCreatorRegistrationRejectsUnexpectedInput(t *testing.T) {
 	t.Parallel()
 
-	viewerID := uuid.MustParse("12111111-1111-1111-1111-111111111111")
-	var gotInput creator.SelfServeRegistrationInput
-	resolveCalled := false
-	consumeCalled := false
-
+	writerCalled := false
 	router := NewHandler(HandlerConfig{
 		ViewerBootstrap: viewerBootstrapReaderStub{
 			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
 				return auth.Bootstrap{
 					CurrentViewer: &auth.CurrentViewer{
-						ID:         viewerID,
+						ID:         uuid.New(),
 						ActiveMode: auth.ActiveModeFan,
 					},
 				}, nil
 			},
 		},
-		CreatorAvatarUpload: viewerCreatorAvatarUploadHandlerStub{
-			resolveCompletedUpload: func(_ context.Context, viewerUserID uuid.UUID, avatarUploadToken string) (creatoravatar.CompletedUpload, error) {
-				resolveCalled = true
-				if viewerUserID != viewerID {
-					t.Fatalf("ResolveCompletedUpload() viewer id got %s want %s", viewerUserID, viewerID)
-				}
-				if avatarUploadToken != "vcupl_token" {
-					t.Fatalf("ResolveCompletedUpload() token got %q want %q", avatarUploadToken, "vcupl_token")
-				}
-				return creatoravatar.CompletedUpload{
-					AvatarAssetID:     "asset_creator_registration_avatar_token",
-					AvatarUploadToken: avatarUploadToken,
-					AvatarURL:         "https://cdn.example.com/creator-avatar/avatar.png",
-				}, nil
-			},
-			consumeCompletedUpload: func(_ context.Context, viewerUserID uuid.UUID, avatarUploadToken string) error {
-				consumeCalled = true
-				if viewerUserID != viewerID {
-					t.Fatalf("ConsumeCompletedUpload() viewer id got %s want %s", viewerUserID, viewerID)
-				}
-				if avatarUploadToken != "vcupl_token" {
-					t.Fatalf("ConsumeCompletedUpload() token got %q want %q", avatarUploadToken, "vcupl_token")
-				}
-				return nil
-			},
-			createUpload: func(context.Context, creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error) {
-				return creatoravatar.CreateUploadResult{}, errors.New("should not be called")
-			},
-			completeUpload: func(context.Context, creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error) {
-				return creatoravatar.CompleteUploadResult{}, errors.New("should not be called")
+		ViewerProfile: viewerProfileReaderStub{
+			getProfile: func(context.Context, uuid.UUID) (viewerprofile.Profile, error) {
+				t.Fatal("GetProfile() should not be called")
+				return viewerprofile.Profile{}, nil
 			},
 		},
 		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(_ context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				gotInput = input
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				writerCalled = true
 				return creator.SelfServeRegistrationResult{}, nil
 			},
 		},
@@ -220,67 +234,7 @@ func TestViewerCreatorRegistrationSuccessWithAvatarUploadToken(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","avatarUploadToken":"vcupl_token"}`),
-	)
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusNoContent {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusNoContent)
-	}
-	if !resolveCalled {
-		t.Fatal("POST /api/viewer/creator-registration resolveCalled = false, want true")
-	}
-	if !consumeCalled {
-		t.Fatal("POST /api/viewer/creator-registration consumeCalled = false, want true")
-	}
-	if gotInput.AvatarURL == nil || *gotInput.AvatarURL != "https://cdn.example.com/creator-avatar/avatar.png" {
-		t.Fatalf("POST /api/viewer/creator-registration avatar url got %v want %q", gotInput.AvatarURL, "https://cdn.example.com/creator-avatar/avatar.png")
-	}
-}
-
-func TestViewerCreatorRegistrationInvalidAvatarUploadToken(t *testing.T) {
-	t.Parallel()
-
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
-				}, nil
-			},
-		},
-		CreatorAvatarUpload: viewerCreatorAvatarUploadHandlerStub{
-			resolveCompletedUpload: func(context.Context, uuid.UUID, string) (creatoravatar.CompletedUpload, error) {
-				return creatoravatar.CompletedUpload{}, creatoravatar.ErrUploadExpired
-			},
-			consumeCompletedUpload: func(context.Context, uuid.UUID, string) error {
-				return errors.New("should not be called")
-			},
-			createUpload: func(context.Context, creatoravatar.CreateUploadInput) (creatoravatar.CreateUploadResult, error) {
-				return creatoravatar.CreateUploadResult{}, errors.New("should not be called")
-			},
-			completeUpload: func(context.Context, creatoravatar.CompleteUploadInput) (creatoravatar.CompleteUploadResult, error) {
-				return creatoravatar.CompleteUploadResult{}, errors.New("should not be called")
-			},
-		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				return creator.SelfServeRegistrationResult{}, errors.New("should not be called")
-			},
-		},
-	})
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","avatarUploadToken":"vcupl_token"}`),
+		bytes.NewBufferString(`{"displayName":"Mina"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -291,12 +245,58 @@ func TestViewerCreatorRegistrationInvalidAvatarUploadToken(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
 	}
-	if !strings.Contains(rec.Body.String(), `"code":"invalid_avatar_upload_token"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_avatar_upload_token", rec.Body.String())
+	if writerCalled {
+		t.Fatal("POST /api/viewer/creator-registration writerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_request", rec.Body.String())
 	}
 }
 
-func TestViewerCreatorRegistrationInvalidDisplayName(t *testing.T) {
+func TestViewerCreatorRegistrationReturnsInternalErrorWhenSharedProfileLookupFails(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         uuid.New(),
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		ViewerProfile: viewerProfileReaderStub{
+			getProfile: func(context.Context, uuid.UUID) (viewerprofile.Profile, error) {
+				return viewerprofile.Profile{}, errors.New("boom")
+			},
+		},
+		CreatorRegistration: viewerCreatorRegistrationWriterStub{
+			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
+				writerCalled = true
+				return creator.SelfServeRegistrationResult{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if writerCalled {
+		t.Fatal("POST /api/viewer/creator-registration writerCalled = true, want false")
+	}
+}
+
+func TestViewerCreatorRegistrationReturnsInternalErrorWhenWriterFails(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
@@ -310,97 +310,31 @@ func TestViewerCreatorRegistrationInvalidDisplayName(t *testing.T) {
 				}, nil
 			},
 		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				return creator.SelfServeRegistrationResult{}, creator.ErrInvalidDisplayName
-			},
-		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":" ","handle":"mina","bio":"bio"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
-	}
-	if !strings.Contains(rec.Body.String(), `"code":"invalid_display_name"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_display_name", rec.Body.String())
-	}
-}
-
-func TestViewerCreatorRegistrationInvalidHandle(t *testing.T) {
-	t.Parallel()
-
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
+		ViewerProfile: viewerProfileReaderStub{
+			getProfile: func(_ context.Context, userID uuid.UUID) (viewerprofile.Profile, error) {
+				return viewerprofile.Profile{
+					UserID:      userID,
+					DisplayName: "Mina",
+					Handle:      "mina",
 				}, nil
 			},
 		},
 		CreatorRegistration: viewerCreatorRegistrationWriterStub{
 			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				return creator.SelfServeRegistrationResult{}, creator.ErrInvalidHandle
+				return creator.SelfServeRegistrationResult{}, errors.New("boom")
 			},
 		},
 	})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"@","bio":"bio"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{}`))
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
-	}
-	if !strings.Contains(rec.Body.String(), `"code":"invalid_handle"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_handle", rec.Body.String())
-	}
-}
-
-func TestViewerCreatorRegistrationHandleAlreadyTaken(t *testing.T) {
-	t.Parallel()
-
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
-				}, nil
-			},
-		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				return creator.SelfServeRegistrationResult{}, creator.ErrHandleAlreadyTaken
-			},
-		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusConflict {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusConflict)
-	}
-	if !strings.Contains(rec.Body.String(), `"code":"handle_already_taken"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want handle_already_taken", rec.Body.String())
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
 
@@ -494,129 +428,6 @@ func TestViewerActiveModeSwitchRejectsUnavailableCreatorMode(t *testing.T) {
 	}
 	if response.Error == nil || response.Error.Code != "creator_mode_unavailable" {
 		t.Fatalf("PUT /api/viewer/active-mode error got %#v want creator_mode_unavailable", response.Error)
-	}
-}
-
-func TestViewerCreatorRegistrationRejectsInvalidJSON(t *testing.T) {
-	t.Parallel()
-
-	writerCalled := false
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
-				}, nil
-			},
-		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				writerCalled = true
-				return creator.SelfServeRegistrationResult{}, nil
-			},
-		},
-	})
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina"}{"bio":"bio"}`),
-	)
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
-	}
-	if writerCalled {
-		t.Fatal("POST /api/viewer/creator-registration writerCalled = true, want false")
-	}
-	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_request", rec.Body.String())
-	}
-}
-
-func TestViewerCreatorRegistrationRejectsUnknownField(t *testing.T) {
-	t.Parallel()
-
-	writerCalled := false
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
-				}, nil
-			},
-		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				writerCalled = true
-				return creator.SelfServeRegistrationResult{}, nil
-			},
-		},
-	})
-
-	req := httptest.NewRequest(
-		http.MethodPost,
-		"/api/viewer/creator-registration",
-		bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio","unexpected":true}`),
-	)
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusBadRequest {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusBadRequest)
-	}
-	if writerCalled {
-		t.Fatal("POST /api/viewer/creator-registration writerCalled = true, want false")
-	}
-	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
-		t.Fatalf("POST /api/viewer/creator-registration body got %q want invalid_request", rec.Body.String())
-	}
-}
-
-func TestViewerCreatorRegistrationReturnsInternalErrorWhenWriterFails(t *testing.T) {
-	t.Parallel()
-
-	router := NewHandler(HandlerConfig{
-		ViewerBootstrap: viewerBootstrapReaderStub{
-			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
-				return auth.Bootstrap{
-					CurrentViewer: &auth.CurrentViewer{
-						ID:         uuid.New(),
-						ActiveMode: auth.ActiveModeFan,
-					},
-				}, nil
-			},
-		},
-		CreatorRegistration: viewerCreatorRegistrationWriterStub{
-			registerApprovedCreator: func(context.Context, creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error) {
-				return creator.SelfServeRegistrationResult{}, errors.New("boom")
-			},
-		},
-	})
-
-	req := httptest.NewRequest(http.MethodPost, "/api/viewer/creator-registration", bytes.NewBufferString(`{"displayName":"Mina","handle":"mina","bio":"bio"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
-	rec := httptest.NewRecorder()
-
-	router.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusInternalServerError {
-		t.Fatalf("POST /api/viewer/creator-registration status got %d want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
 

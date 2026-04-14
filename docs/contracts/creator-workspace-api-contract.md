@@ -24,6 +24,7 @@
 
 - `docs/contracts/mvp-core-domain-contract.md`
 - `docs/contracts/viewer-bootstrap-api-contract.md`
+- `docs/contracts/viewer-profile-api-contract.md`
 - `docs/contracts/viewer-creator-entry-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/ssot/product/account/account-permissions.md`
@@ -48,8 +49,9 @@
 
 - shape は `docs/contracts/fan-mvp-common-transport-contract.md` の `CreatorSummary` と同じです。
 - `id / displayName / handle / avatar / bio` を返します。
+- `displayName / handle / avatar` は `docs/contracts/viewer-profile-api-contract.md` の shared viewer profile と同じ canonical 値です。
 - `avatar` は custom avatar がない場合 `null` を返し、client は既存の platform default avatar / initials fallback を描画します。
-- `/creator` では `bio` を本人紹介文として使い、workspace 固有の別説明文は持ちません。
+- `/creator` では `bio` を本人紹介文として使い、workspace 固有の別説明文は持ちません。`bio` だけは creator 固有情報として shared viewer profile とは別管理です。
 
 ### `WorkspaceOverviewMetrics`
 
@@ -181,8 +183,8 @@
 - caller は approved creator capability を持つ必要があります。
 - workspace creator は current viewer 自身に固定し、path parameter で他 creator の private workspace を読む形にはしません。
 - `handle` は `/creator` header での表示前提で必須とします。
-- `avatar = null` は error ではなく、creator registration 時に custom avatar を設定しなかったか、既存 avatar が未設定であることを表します。
-- ただし `handle` を creator registration 時にいつ確定させるかは別 PR の責務とし、この文書は approved creator workspace read に必要な shape だけを固定します。
+- `avatar = null` は error ではなく、shared viewer profile に custom avatar が未設定であることを表します。
+- `displayName / handle / avatar` の更新は `docs/contracts/viewer-profile-api-contract.md` を正とし、この文書は approved creator workspace read に必要な shape を固定します。
 - `GET /api/creator/workspace/top-performers` も同じ auth / creator capability 制約を使います。
 - `GET /api/creator/workspace/top-performers` は `managedCollections` や detail view state を返しません。
 

@@ -1,7 +1,17 @@
 "use client";
 
-import { CreatorRegistrationPanel } from "@/features/creator-entry";
+import { startTransition, useState } from "react";
+import { useRouter } from "next/navigation";
+
 import { SurfacePanel } from "@/shared/ui";
+import {
+  ProfileEditorPanel,
+  SharedViewerProfileFields,
+  updateCreatorWorkspaceProfile,
+  useViewerProfileDraft,
+  getViewerProfileErrorCode,
+  getViewerProfileSaveErrorMessage,
+} from "@/features/viewer-profile";
 
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 import { CreatorModeShell } from "./creator-mode-shell";
@@ -58,6 +68,124 @@ function CreatorProfileSettingsError({
   );
 }
 
+function CreatorProfileSettingsForm({
+  initialValues,
+}: {
+  initialValues: {
+    avatarUrl: string | null;
+    bio: string;
+    displayName: string;
+    handle: string;
+  };
+}) {
+  const router = useRouter();
+  const [bio, setBio] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const draft = useViewerProfileDraft({
+    initialValues: {
+      avatarUrl: initialValues.avatarUrl,
+      displayName: initialValues.displayName,
+      handle: initialValues.handle,
+    },
+    mode: "edit",
+    onDirty: () => {
+      if (errorMessage !== null) {
+        setErrorMessage(null);
+      }
+    },
+  });
+  const resolvedBio = bio ?? initialValues.bio;
+
+  const submit = async () => {
+    if (isSubmitting) {
+      return;
+    }
+
+    const profileValidationError = draft.getProfileValidationError();
+    if (profileValidationError !== null) {
+      setErrorMessage(profileValidationError);
+      return;
+    }
+
+    const avatarSubmissionError = draft.getAvatarSubmissionError();
+    if (avatarSubmissionError !== null) {
+      setErrorMessage(avatarSubmissionError);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    try {
+      const avatarUploadToken = await draft.uploadAvatarIfNeeded();
+
+      await updateCreatorWorkspaceProfile({
+        ...(avatarUploadToken ? { avatarUploadToken } : {}),
+        bio: resolvedBio,
+        displayName: draft.displayName,
+        handle: draft.handle,
+      });
+
+      startTransition(() => {
+        router.replace("/creator");
+      });
+    } catch (error) {
+      if (getViewerProfileErrorCode(error) === "invalid_avatar_upload_token") {
+        draft.resetCompletedAvatarUploadToken();
+      }
+      setErrorMessage(getViewerProfileSaveErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <ProfileEditorPanel
+      backHref="/creator"
+      backLabel="ワークスペースへ戻る"
+      description="workspace に表示する名前、handle、avatar を fan profile と共通管理しつつ、creator 固有の bio だけをここで更新できます。"
+      errorMessage={errorMessage}
+      eyebrow="creator settings"
+      isSubmitting={isSubmitting}
+      onSubmit={submit}
+      submitLabel="保存する"
+      submittingLabel="保存中..."
+      title="プロフィールを編集"
+    >
+      <SharedViewerProfileFields
+        avatar={draft.avatar}
+        avatarInputKey={draft.avatarInputKey}
+        displayName={draft.displayName}
+        handle={draft.handle}
+        isSubmitting={isSubmitting}
+        onAvatarClear={draft.clearAvatarSelection}
+        onAvatarSelect={draft.selectAvatarFile}
+        onDisplayNameChange={draft.setDisplayName}
+        onHandleChange={draft.setHandle}
+      />
+      <label className="grid gap-1.5">
+        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+          Bio
+        </span>
+        <textarea
+          className="min-h-28 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60"
+          disabled={isSubmitting}
+          onChange={(event) => {
+            setBio(event.target.value);
+            if (errorMessage !== null) {
+              setErrorMessage(null);
+            }
+          }}
+          placeholder="quiet rooftop の continuation を中心に投稿します。"
+          rows={4}
+          value={resolvedBio}
+        />
+      </label>
+    </ProfileEditorPanel>
+  );
+}
+
 /**
  * creator workspace の現在 profile を prefill した編集フォームを表示する。
  */
@@ -81,14 +209,13 @@ export function CreatorProfileSettingsShell() {
   }
 
   return (
-    <CreatorRegistrationPanel
+    <CreatorProfileSettingsForm
       initialValues={{
         avatarUrl: state.summary.creator.avatar?.url ?? null,
         bio: state.summary.creator.bio,
         displayName: state.summary.creator.displayName,
         handle: state.summary.creator.handle,
       }}
-      mode="edit"
     />
   );
 }

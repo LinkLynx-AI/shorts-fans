@@ -38,6 +38,13 @@ type AuthenticateFanWithEmailOptions = {
   fetcher?: typeof fetch;
 };
 
+type AuthenticateFanWithEmailInput = {
+  displayName?: string;
+  email: string;
+  handle?: string;
+  mode: FanAuthMode;
+};
+
 async function sendFanAuthRequest(
   path: `/${string}`,
   body: Record<string, string>,
@@ -145,17 +152,23 @@ async function issueFanAuthChallenge(
 }
 
 async function startFanAuthSession(
-  mode: FanAuthMode,
-  email: string,
+  input: AuthenticateFanWithEmailInput,
   challengeToken: string,
   options: AuthenticateFanWithEmailOptions,
 ): Promise<void> {
   const response = await sendFanAuthRequest(
-    buildFanAuthPath(mode, "session"),
-    {
-      challengeToken,
-      email,
-    },
+    buildFanAuthPath(input.mode, "session"),
+    input.mode === "sign-up"
+      ? {
+          challengeToken,
+          displayName: input.displayName ?? "",
+          email: input.email,
+          handle: input.handle ?? "",
+        }
+      : {
+          challengeToken,
+          email: input.email,
+        },
     options,
   );
 
@@ -179,10 +192,9 @@ async function startFanAuthSession(
  * - backend fan auth endpoint へ network request を送る
  */
 export async function authenticateFanWithEmail(
-  mode: FanAuthMode,
-  email: string,
+  input: AuthenticateFanWithEmailInput,
   options: AuthenticateFanWithEmailOptions = {},
 ): Promise<void> {
-  const challengeToken = await issueFanAuthChallenge(mode, email, options);
-  await startFanAuthSession(mode, email, challengeToken, options);
+  const challengeToken = await issueFanAuthChallenge(input.mode, input.email, options);
+  await startFanAuthSession(input, challengeToken, options);
 }

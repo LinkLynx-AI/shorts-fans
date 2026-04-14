@@ -341,6 +341,12 @@ func TestStartSignUpSessionCreatesUserIdentityAndSession(t *testing.T) {
 			if input.EmailNormalized != "fan@example.com" {
 				t.Fatalf("CreateUserWithEmailIdentityAndSession() email got %q want %q", input.EmailNormalized, "fan@example.com")
 			}
+			if input.DisplayName != "Mina" {
+				t.Fatalf("CreateUserWithEmailIdentityAndSession() display name got %q want %q", input.DisplayName, "Mina")
+			}
+			if input.Handle != "mina" {
+				t.Fatalf("CreateUserWithEmailIdentityAndSession() handle got %q want %q", input.Handle, "mina")
+			}
 			if input.SessionTokenHash != HashSessionToken("session-token") {
 				t.Fatalf("CreateUserWithEmailIdentityAndSession() token hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
 			}
@@ -351,7 +357,7 @@ func TestStartSignUpSessionCreatesUserIdentityAndSession(t *testing.T) {
 	lifecycle.now = func() time.Time { return now }
 	lifecycle.newSessionToken = func() (string, error) { return "session-token", nil }
 
-	got, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "sign-up-token")
+	got, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "sign-up-token", "Mina", "mina")
 	if err != nil {
 		t.Fatalf("StartSignUpSession() error = %v, want nil", err)
 	}
@@ -369,7 +375,7 @@ func TestStartSignUpSessionMapsExistingIdentityToConflict(t *testing.T) {
 		},
 	})
 
-	if _, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "challenge-token"); !errors.Is(err, ErrEmailAlreadyRegistered) {
+	if _, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "challenge-token", "Mina", "mina"); !errors.Is(err, ErrEmailAlreadyRegistered) {
 		t.Fatalf("StartSignUpSession() error got %v want %v", err, ErrEmailAlreadyRegistered)
 	}
 }
@@ -399,7 +405,7 @@ func TestStartSignUpSessionMapsIdentityWriteConflict(t *testing.T) {
 	lifecycle.now = func() time.Time { return now }
 	lifecycle.newSessionToken = func() (string, error) { return "session-token", nil }
 
-	if _, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "sign-up-token"); !errors.Is(err, ErrEmailAlreadyRegistered) {
+	if _, err := lifecycle.StartSignUpSession(context.Background(), "fan@example.com", "sign-up-token", "Mina", "mina"); !errors.Is(err, ErrEmailAlreadyRegistered) {
 		t.Fatalf("StartSignUpSession() error got %v want %v", err, ErrEmailAlreadyRegistered)
 	}
 }

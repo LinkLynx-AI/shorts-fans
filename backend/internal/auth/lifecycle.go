@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/google/uuid"
 )
@@ -22,8 +23,14 @@ var (
 	ErrEmailNotFound = errors.New("email が見つかりません")
 	// ErrEmailAlreadyRegistered は sign-up 対象の email が既に使われていることを表します。
 	ErrEmailAlreadyRegistered = errors.New("email は既に登録されています")
+	// ErrInvalidDisplayName は sign-up display name が不正なことを表します。
+	ErrInvalidDisplayName = errors.New("display name が不正です")
 	// ErrInvalidChallenge は challenge token が不正、期限切れ、または消費済みであることを表します。
 	ErrInvalidChallenge = errors.New("challenge が不正です")
+	// ErrInvalidHandle は sign-up handle が不正なことを表します。
+	ErrInvalidHandle = errors.New("handle が不正です")
+	// ErrHandleAlreadyTaken は sign-up handle が既に使われていることを表します。
+	ErrHandleAlreadyTaken = errors.New("handle は既に使われています")
 )
 
 // IssuedChallenge は client へ返す challenge token を表します。
@@ -178,7 +185,13 @@ func (l *Lifecycle) StartSignInSession(ctx context.Context, email string, challe
 }
 
 // StartSignUpSession は sign-up challenge を消費して user / identity / session を開始します。
-func (l *Lifecycle) StartSignUpSession(ctx context.Context, email string, challengeToken string) (AuthenticatedSession, error) {
+func (l *Lifecycle) StartSignUpSession(
+	ctx context.Context,
+	email string,
+	challengeToken string,
+	displayName string,
+	handle string,
+) (AuthenticatedSession, error) {
 	if l == nil || l.repository == nil {
 		return AuthenticatedSession{}, fmt.Errorf("auth lifecycle が初期化されていません")
 	}
@@ -192,6 +205,11 @@ func (l *Lifecycle) StartSignUpSession(ctx context.Context, email string, challe
 		return AuthenticatedSession{}, ErrEmailAlreadyRegistered
 	} else if !errors.Is(err, ErrIdentityNotFound) {
 		return AuthenticatedSession{}, fmt.Errorf("sign up identity 確認 email=%s: %w", normalizedEmail, err)
+	}
+
+	normalizedDisplayName, normalizedHandle, err := normalizeSignUpProfileInput(displayName, handle)
+	if err != nil {
+		return AuthenticatedSession{}, err
 	}
 
 	now := l.now().UTC()
@@ -208,7 +226,9 @@ func (l *Lifecycle) StartSignUpSession(ctx context.Context, email string, challe
 	}
 
 	session, err := l.repository.CreateUserWithEmailIdentityAndSession(ctx, CreateUserWithEmailIdentityAndSessionInput{
+		DisplayName:         normalizedDisplayName,
 		EmailNormalized:     normalizedEmail,
+		Handle:              normalizedHandle,
 		SessionTokenHash:    HashSessionToken(rawSessionToken),
 		VerifiedAt:          now,
 		LastAuthenticatedAt: now,
@@ -217,6 +237,9 @@ func (l *Lifecycle) StartSignUpSession(ctx context.Context, email string, challe
 	if err != nil {
 		if errors.Is(err, ErrIdentityAlreadyExists) {
 			return AuthenticatedSession{}, ErrEmailAlreadyRegistered
+		}
+		if errors.Is(err, ErrHandleAlreadyTaken) {
+			return AuthenticatedSession{}, ErrHandleAlreadyTaken
 		}
 
 		return AuthenticatedSession{}, fmt.Errorf("sign up session 作成 email=%s: %w", normalizedEmail, err)
@@ -274,6 +297,32 @@ func (l *Lifecycle) issueChallenge(ctx context.Context, emailNormalized string) 
 		Token:     rawToken,
 		ExpiresAt: challenge.ExpiresAt,
 	}, nil
+}
+
+func normalizeSignUpProfileInput(displayName string, handle string) (string, string, error) {
+	normalizedDisplayName := strings.TrimSpace(displayName)
+	if normalizedDisplayName == "" {
+		return "", "", ErrInvalidDisplayName
+	}
+
+	normalizedHandle := strings.TrimSpace(handle)
+	normalizedHandle = strings.TrimPrefix(normalizedHandle, "@")
+	normalizedHandle = strings.ToLower(normalizedHandle)
+	if normalizedHandle == "" {
+		return "", "", ErrInvalidHandle
+	}
+
+	for _, char := range normalizedHandle {
+		if !isAllowedHandleRune(char) {
+			return "", "", ErrInvalidHandle
+		}
+	}
+
+	return normalizedDisplayName, normalizedHandle, nil
+}
+
+func isAllowedHandleRune(char rune) bool {
+	return unicode.IsDigit(char) || (char >= 'a' && char <= 'z') || char == '.' || char == '_'
 }
 
 func (l *Lifecycle) consumeChallenge(ctx context.Context, emailNormalized string, rawChallengeToken string, consumedAt time.Time) error {

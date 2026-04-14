@@ -9,6 +9,7 @@
 ## Canonical Sources
 
 - `docs/contracts/fan-mvp-common-transport-contract.md`
+- `docs/contracts/viewer-profile-api-contract.md`
 - `docs/ssot/product/fan/consumer-state-and-profile.md`
 - `docs/ssot/product/fan/fan-profile-and-engagement.md`
 - `docs/ssot/product/ui/fan-surfaces.md`
@@ -22,7 +23,7 @@
 | `GET` | `/api/fan/profile/following` | required | following creator 一覧 |
 | `GET` | `/api/fan/profile/pinned-shorts` | required | pinned short 一覧 |
 | `GET` | `/api/fan/profile/library` | required | unlocked main 一覧 |
-| `GET` | `/api/fan/profile/settings` | required | minimum read-only settings sections |
+| `GET` | `/api/fan/profile/settings` | required | minimum read-only settings sections。実際の shared profile 編集は別 contract |
 
 ## Surface-specific Payloads
 
@@ -130,6 +131,7 @@
 #### Boundary Rule
 
 - mode switch 可否や現在の active mode は app shell の global self state が持ち、この endpoint では返しません。
+- `displayName / handle / avatar` の編集 transport は `docs/contracts/viewer-profile-api-contract.md` を正とし、この endpoint は settings hub の section 一覧だけを返します。
 
 ## HTTP States
 

@@ -14,11 +14,19 @@ import { Button } from "@/shared/ui";
 export function FanAuthEntryShell() {
   const router = useRouter();
   const {
+    avatar,
+    avatarInputKey,
+    clearAvatarSelection,
+    displayName,
     email,
     errorMessage,
+    handle,
     isSubmitting,
     mode,
+    selectAvatarFile,
+    setDisplayName,
     setEmail,
+    setHandle,
     submit,
     switchMode,
   } = useFanAuthEntry();
@@ -26,6 +34,10 @@ export function FanAuthEntryShell() {
   return (
     <main className="mx-auto flex min-h-svh w-full max-w-[408px] items-center px-4 py-10">
       <FanAuthEntryPanel
+        avatar={avatar}
+        avatarInputKey={avatarInputKey}
+        clearAvatarSelection={clearAvatarSelection}
+        displayName={displayName}
         dismissAction={(
           <Button
             className="w-full"
@@ -39,9 +51,13 @@ export function FanAuthEntryShell() {
         )}
         email={email}
         errorMessage={errorMessage}
+        handle={handle}
         isSubmitting={isSubmitting}
         mode={mode}
+        onAvatarSelect={selectAvatarFile}
+        onDisplayNameChange={setDisplayName}
         onEmailChange={setEmail}
+        onHandleChange={setHandle}
         onModeSwitch={switchMode}
         onSubmit={submit}
       />

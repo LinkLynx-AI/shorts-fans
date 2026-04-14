@@ -17,22 +17,38 @@ function FanAuthEntryPanelHarness(props: {
   onAuthenticated?: () => Promise<string | null> | string | null;
 }) {
   const {
+    avatar,
+    avatarInputKey,
+    clearAvatarSelection,
+    displayName,
     email,
     errorMessage,
+    handle,
     isSubmitting,
     mode,
+    selectAvatarFile,
+    setDisplayName,
     setEmail,
+    setHandle,
     submit,
     switchMode,
   } = useFanAuthEntry(props);
 
   return (
     <FanAuthEntryPanel
+      avatar={avatar}
+      avatarInputKey={avatarInputKey}
+      clearAvatarSelection={clearAvatarSelection}
+      displayName={displayName}
       email={email}
       errorMessage={errorMessage}
+      handle={handle}
       isSubmitting={isSubmitting}
       mode={mode}
+      onAvatarSelect={selectAvatarFile}
+      onDisplayNameChange={setDisplayName}
       onEmailChange={setEmail}
+      onHandleChange={setHandle}
       onModeSwitch={switchMode}
       onSubmit={submit}
     />
@@ -58,6 +74,8 @@ describe("FanAuthEntryPanel", () => {
 
     expect(screen.getByRole("button", { name: "新規登録を続ける" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("fan@example.com");
+    expect(screen.getByRole("textbox", { name: "Display name" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Handle" })).toBeInTheDocument();
   });
 
   it("runs the shared auth flow and notifies the caller on success", async () => {
@@ -72,8 +90,34 @@ describe("FanAuthEntryPanel", () => {
     await user.click(screen.getByRole("button", { name: "サインインを続ける" }));
 
     await waitFor(() => {
-      expect(authenticateFanWithEmailMock).toHaveBeenCalledWith("sign-in", "fan@example.com");
+      expect(authenticateFanWithEmailMock).toHaveBeenCalledWith({
+        email: "fan@example.com",
+        mode: "sign-in",
+      });
       expect(onAuthenticated).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("passes shared profile fields when signing up", async () => {
+    const user = userEvent.setup();
+
+    authenticateFanWithEmailMock.mockResolvedValue(undefined);
+
+    render(<FanAuthEntryPanelHarness />);
+
+    await user.click(screen.getByRole("button", { name: "サインアップへ" }));
+    await user.type(screen.getByRole("textbox", { name: "Email" }), "fan@example.com");
+    await user.type(screen.getByRole("textbox", { name: "Display name" }), "Mina");
+    await user.type(screen.getByRole("textbox", { name: "Handle" }), "@mina");
+    await user.click(screen.getByRole("button", { name: "新規登録を続ける" }));
+
+    await waitFor(() => {
+      expect(authenticateFanWithEmailMock).toHaveBeenCalledWith({
+        displayName: "Mina",
+        email: "fan@example.com",
+        handle: "@mina",
+        mode: "sign-up",
+      });
     });
   });
 

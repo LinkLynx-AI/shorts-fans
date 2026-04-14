@@ -525,6 +525,15 @@ func TestCreateUserWithEmailIdentityAndSession(t *testing.T) {
 				pgTime(now),
 				pgTime(now),
 			)
+		case 4:
+			return rowWithValues(
+				pgUUID(userID),
+				"Mina",
+				"mina",
+				pgtype.Text{},
+				pgTime(now),
+				pgTime(now),
+			)
 		default:
 			return rowErr(fmt.Errorf("unexpected QueryRow call count: %d", callCount))
 		}
@@ -534,7 +543,9 @@ func TestCreateUserWithEmailIdentityAndSession(t *testing.T) {
 	repository := &Repository{txBeginner: beginner}
 
 	got, err := repository.CreateUserWithEmailIdentityAndSession(context.Background(), CreateUserWithEmailIdentityAndSessionInput{
+		DisplayName:         "Mina",
 		EmailNormalized:     "fan@example.com",
+		Handle:              "mina",
 		SessionTokenHash:    "session-hash",
 		VerifiedAt:          now,
 		LastAuthenticatedAt: now,
@@ -585,7 +596,9 @@ func TestCreateUserWithEmailIdentityAndSessionMapsDuplicateIdentity(t *testing.T
 	repository := &Repository{txBeginner: &txBeginnerStub{tx: tx}}
 
 	if _, err := repository.CreateUserWithEmailIdentityAndSession(context.Background(), CreateUserWithEmailIdentityAndSessionInput{
+		DisplayName:         "Mina",
 		EmailNormalized:     "fan@example.com",
+		Handle:              "mina",
 		SessionTokenHash:    "session-hash",
 		VerifiedAt:          now,
 		LastAuthenticatedAt: now,

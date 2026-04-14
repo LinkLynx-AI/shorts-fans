@@ -19,6 +19,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
 )
 
 const readinessTimeout = 2 * time.Second
@@ -53,6 +54,12 @@ type CreatorProfileShortsReader interface {
 // CreatorWorkspaceMainPriceWriter は creator workspace main price mutation を表します。
 type CreatorWorkspaceMainPriceWriter interface {
 	UpdateWorkspaceMainPrice(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID, priceJpy int64) (creator.WorkspaceMainPrice, error)
+}
+
+// CreatorWorkspaceProfileWriter は creator workspace profile mutation を表します。
+type CreatorWorkspaceProfileWriter interface {
+	GetProfile(ctx context.Context, userID uuid.UUID) (viewerprofile.Profile, error)
+	UpdateCreatorProfileSync(ctx context.Context, input viewerprofile.UpdateProfileInput, creatorBio string) (viewerprofile.Profile, error)
 }
 
 // FanFeedReader は public short feed/detail 用の read 操作を表します。
@@ -94,6 +101,16 @@ type CreatorFollowWriter interface {
 // ViewerCreatorRegistrationWriter は creator registration mutation を表します。
 type ViewerCreatorRegistrationWriter interface {
 	RegisterApprovedCreator(ctx context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error)
+}
+
+// ViewerProfileReader は shared viewer profile read を表します。
+type ViewerProfileReader interface {
+	GetProfile(ctx context.Context, userID uuid.UUID) (viewerprofile.Profile, error)
+}
+
+// ViewerProfileWriter は shared viewer profile write を表します。
+type ViewerProfileWriter interface {
+	UpdateProfile(ctx context.Context, input viewerprofile.UpdateProfileInput) (viewerprofile.Profile, error)
 }
 
 // ViewerCreatorAvatarUploadHandler は creator registration avatar upload を表します。
@@ -146,6 +163,7 @@ type HandlerConfig struct {
 	CreatorSearch                CreatorSearchReader
 	CreatorWorkspace             CreatorWorkspaceReader
 	CreatorWorkspaceMainPrice    CreatorWorkspaceMainPriceWriter
+	CreatorWorkspaceProfile      CreatorWorkspaceProfileWriter
 	CreatorWorkspaceShortCaption CreatorWorkspaceShortCaptionWriter
 	CreatorUpload                CreatorUploadHandler
 	CreatorProfile               CreatorProfileReader
@@ -160,6 +178,8 @@ type HandlerConfig struct {
 	FanProfileFollowing          FanProfileFollowingReader
 	FanProfilePinnedShorts       FanProfilePinnedShortsReader
 	FanProfileOverview           FanProfileOverviewReader
+	ViewerProfile                ViewerProfileReader
+	ViewerProfileWriter          ViewerProfileWriter
 	FanAuth                      FanAuthService
 	AuthCookie                   AuthCookieConfig
 	ShortDisplayAssets           ShortDisplayAssetResolver
@@ -236,7 +256,16 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		router,
 		config.CreatorWorkspace,
 		config.CreatorWorkspaceMainPrice,
+		config.CreatorWorkspaceProfile,
+		config.CreatorAvatarUpload,
 		config.CreatorWorkspaceShortCaption,
+		config.ViewerBootstrap,
+	)
+	registerViewerProfileRoutes(
+		router,
+		config.ViewerProfile,
+		config.ViewerProfileWriter,
+		config.CreatorAvatarUpload,
 		config.ViewerBootstrap,
 	)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
@@ -245,7 +274,14 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerFanUnlockMainRoutes(router, config.FanUnlockMain, config.ShortDisplayAssets, config.MainDisplayAssets, config.ViewerBootstrap)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
-	registerViewerCreatorEntryRoutes(router, config.CreatorRegistration, config.CreatorAvatarUpload, config.ViewerActiveMode, config.ViewerBootstrap)
+	registerViewerCreatorEntryRoutes(
+		router,
+		config.CreatorRegistration,
+		config.CreatorAvatarUpload,
+		config.ViewerProfile,
+		config.ViewerActiveMode,
+		config.ViewerBootstrap,
+	)
 
 	return router
 }
