@@ -21,6 +21,7 @@
 
 ## Canonical Sources
 
+- `docs/contracts/fan-auth-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/contracts/fan-mvp-fixtures-and-integration-guide.md`
 - `docs/contracts/mvp-core-domain-contract.md`
@@ -35,6 +36,7 @@
 ## Request Boundary
 
 - bootstrap は `shorts_fans_session` cookie から current viewer を解決します。
+- `shorts_fans_session` は Cognito-backed fan auth 完了後に app backend が発行する cookie です。bootstrap は Cognito access token / ID token を直接読みません。
 - cookie がない、期限切れ、revoked、lookup 不能のいずれでも `unauthenticated success` として扱います。
 - bootstrap 自体は `auth_required` を返しません。
 
@@ -102,6 +104,7 @@
 
 - `profile`、`settings`、`payment method`、`follow counts` などの viewer-private detail は返しません。
 - `lastSeenAt`、`expiresAt`、`sessionTokenHash` のような session internals は返しません。
+- `emailVerified`、`recentAuthAt`、Cognito provider state のような auth provider detail は返しません。
 - `fan / creator` を別 login identity として扱いません。
 
 ## Fixture Reference

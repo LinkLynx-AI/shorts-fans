@@ -9,7 +9,8 @@
 
 | issue | contract | fixture |
 | --- | --- | --- |
-| `SHO-53` | `docs/contracts/fan-auth-api-contract.md` | `docs/contracts/fixtures/fan-auth.json` |
+| `SHO-166` | `docs/contracts/fan-auth-api-contract.md` | `docs/contracts/fixtures/fan-auth.json` |
+| `SHO-169` | `docs/contracts/fan-auth-modal-ui-contract.md` | `-` |
 | `SHO-39` | `docs/contracts/viewer-bootstrap-api-contract.md` | `docs/contracts/fixtures/viewer-bootstrap.json` |
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
@@ -49,13 +50,16 @@
 
 ## App Bootstrap Connection Order
 
-1. `SHO-53`
-   - `POST /api/fan/auth/sign-in/challenges`
-   - `POST /api/fan/auth/sign-in/session`
-   - `POST /api/fan/auth/sign-up/challenges`
-   - `POST /api/fan/auth/sign-up/session`
+1. `SHO-166`
+   - `POST /api/fan/auth/sign-in`
+   - `POST /api/fan/auth/sign-up`
+   - `POST /api/fan/auth/sign-up/confirm`
+   - `POST /api/fan/auth/password-reset`
+   - `POST /api/fan/auth/password-reset/confirm`
+   - `POST /api/fan/auth/re-auth`
    - `DELETE /api/fan/auth/session`
-   - auth mutation 成功後は cookie のみを更新し、viewer state はまだ返さない
+   - sign in / sign up confirm / re-auth / logout 成功時も viewer state 自体は返さず、client は cookie と follow-up bootstrap を正とする
+   - sign up / password reset の開始 endpoint は modal state を進める accepted response を返す
 2. `SHO-39`
    - `GET /api/viewer/bootstrap`
    - current viewer の `id / activeMode / canAccessCreatorMode`
@@ -77,6 +81,7 @@
 
 | downstream issue | UI area | primary contract | fixture scenarios |
 | --- | --- | --- | --- |
+| `SHO-169` | `shared fan auth modal` | `fan-auth-modal-ui-contract.md` + `fan-auth-api-contract.md` | `signInSuccess`, `signInInvalidCredentials`, `signInConfirmationRequired`, `signUpAccepted`, `signUpConfirmSuccess`, `passwordResetAccepted`, `passwordResetConfirmSuccess`, `reAuthSuccess`, `logoutSuccess` |
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
@@ -87,6 +92,7 @@
 
 - `SHO-6` の creator profile 初回表示では `GET /api/fan/creators/{creatorId}` と `GET /api/fan/creators/{creatorId}/shorts` を並列取得します。
 - `SHO-6` の short grid 追加取得では `GET /api/fan/creators/{creatorId}/shorts?cursor=...` だけを再度呼びます。
+- `SHO-169` の shared fan auth modal は primary entry を modal に固定し、auth success 後の behavior は current bootstrap refresh を正とします。
 - `SHO-163` の feed pin CTA は `PUT / DELETE /api/fan/shorts/{shortId}/pin` を使い、success body の `viewer.isPinned` で current surface state を更新できます。
 - `SHO-115` の creator profile follow CTA は `PUT / DELETE /api/fan/creators/{creatorId}/follow` を使い、success body の `viewer.isFollowing` と `stats.fanCount` で header state を更新できます。
 - `SHO-8` の `Unlock` CTA は `GET /api/fan/shorts/{shortId}/unlock` で setup state を読み、条件を満たしたら `POST /api/fan/mains/{mainId}/access-entry` で main route へ遷移します。
