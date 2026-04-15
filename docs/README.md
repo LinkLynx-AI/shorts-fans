@@ -10,6 +10,7 @@
 - [TECH_STACK.md](TECH_STACK.md): Frontend / Backend / Infra / Payment / Analytics を含む技術選定
 - [GO.md](GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [TYPESCRIPT.md](TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
+- [infra/dev-cognito-sandbox.md](infra/dev-cognito-sandbox.md): dev 用 Cognito fan auth sandbox の Terraform 構成、mail 前提、backend env handoff
 - [infra/dev-media-sandbox.md](infra/dev-media-sandbox.md): dev 用 AWS media sandbox の Terraform 構成、guardrail、適用手順、backend 接続用 env 対応
 - [infra/dev-media-smoke.md](infra/dev-media-smoke.md): dev media smoke の再現手順、切り分け、manual recovery、quota/cost 注意点
 - [contracts/mvp-core-domain-contract.md](contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約

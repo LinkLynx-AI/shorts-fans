@@ -4,6 +4,7 @@
 
 - この文書は `SHO-24 dev 用 AWS media sandbox を Terraform で整備する` の実装内容をまとめるためのものです。
 - `SHO-148 creator avatar 保存・配信基盤を実装する` で追加した creator avatar 用 infra slice もこの文書で扱います。
+- 同じ `infra/terraform/dev` root にある Cognito fan auth slice は [dev-cognito-sandbox.md](dev-cognito-sandbox.md) で扱います。
 - 対象は cycle1 の local 開発から使う最小の dev media 基盤です。
 - `short` の public delivery には `CloudFront` を含めます。
 - remote state、GitHub Actions 連携、principal への policy attach 自動化はこの文書の対象外です。

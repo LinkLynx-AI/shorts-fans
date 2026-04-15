@@ -180,6 +180,8 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 - `POSTGRES_DSN`
 - `REDIS_ADDR`
 - `AWS_REGION`
+- `COGNITO_USER_POOL_ID`
+- `COGNITO_USER_POOL_CLIENT_ID`
 - `MEDIA_JOBS_QUEUE_URL`
 - `MEDIA_RAW_BUCKET_NAME`
 - `MEDIA_SHORT_PUBLIC_BUCKET_NAME`
@@ -192,7 +194,11 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
+ルート `Makefile` 経由で `make backend-run` を使う場合は、shell から直接 `COGNITO_USER_POOL_ID` / `COGNITO_USER_POOL_CLIENT_ID` を export するのではなく、`BACKEND_COGNITO_USER_POOL_ID` / `BACKEND_COGNITO_USER_POOL_CLIENT_ID` を設定します。Makefile がそれらを backend process 用の `COGNITO_*` へ引き渡します。
+
 `cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media sandbox 用 env 一式、および creator avatar upload / delivery 用 env 一式を必須にします。creator upload endpoint と creator registration avatar upload endpoint が常時有効なため、`AWS_REGION`、media bucket / queue / role 設定、avatar bucket / base URL 設定が不足している場合は fail fast します。`cmd/worker` は creator avatar env を要求しませんが、media sandbox を有効にして起動する場合は `POSTGRES_DSN` と media queue / bucket / role 設定が必要です。
+
+`COGNITO_USER_POOL_ID` と `COGNITO_USER_POOL_CLIENT_ID` は `SHO-198` で env contract として追加しました。現時点では `internal/config.ValidateFanAuth` で専用検証できる状態に留め、API startup の fail fast へ組み込むのは `SHO-168` の Cognito endpoint wiring と同時に行います。値は `infra/terraform/dev` の `cognito_user_pool_id` / `cognito_user_pool_client_id` output から受け取ります。
 
 `cmd/media-smoke` は次を前提にします。
 
