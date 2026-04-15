@@ -1,13 +1,17 @@
 import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
+import { buildCreatorProfileHref } from "@/features/creator-navigation";
 import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 
 import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
 import { MainPlaybackSurface } from "./main-playback-surface";
 
-function buildCreatorProfileHref(shortId: string): string {
-  return `/creators/creator_1?from=short&shortId=${shortId}`;
+function getExpectedCreatorProfileHref(creatorId: string, shortId: string): string {
+  return buildCreatorProfileHref(creatorId, {
+    from: "short",
+    shortId,
+  });
 }
 
 const back = vi.fn();
@@ -51,7 +55,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={surface}
       />,
@@ -96,7 +100,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={surface}
       />,
@@ -107,7 +111,7 @@ describe("MainPlaybackSurface", () => {
     expect(screen.getByRole("dialog", { name: "Main options" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "クリエイターのプロフィールへ" })).toHaveAttribute(
       "href",
-      buildCreatorProfileHref("softlight"),
+      getExpectedCreatorProfileHref(surface.creator.id, "softlight"),
     );
   });
 
@@ -127,7 +131,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("balcony")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "balcony")}
         fallbackHref="/shorts/balcony"
         surface={surface}
       />,
@@ -152,7 +156,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={surface}
       />,
@@ -184,7 +188,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("afterrain")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "afterrain")}
         fallbackHref="/shorts/afterrain"
         surface={surface}
       />,
@@ -219,7 +223,7 @@ describe("MainPlaybackSurface", () => {
 
     const { rerender } = render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={surface}
       />,
@@ -236,7 +240,7 @@ describe("MainPlaybackSurface", () => {
 
     rerender(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={{
           ...surface,
@@ -273,7 +277,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         surface={surface}
       />,
@@ -352,7 +356,7 @@ describe("MainPlaybackSurface", () => {
 
     render(
       <MainPlaybackSurface
-        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
         fallbackHref="/shorts/softlight"
         isActive={false}
         surface={surface}
