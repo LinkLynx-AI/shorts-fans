@@ -344,19 +344,19 @@ export function MainPlaybackSurface({
             </span>
           </div>
 
-          <div className="group relative mt-3 flex h-5 items-center">
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/24 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+          <div className="group relative mt-3 flex h-6 items-center">
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-2 -translate-y-1/2 overflow-hidden rounded-full bg-white/38 shadow-[0_0_0_1px_rgba(8,12,18,0.24),0_3px_14px_rgba(0,0,0,0.28)] backdrop-blur-[1px]">
               <div
-                className="h-full rounded-full bg-[#78c9ff] shadow-[0_0_12px_rgba(120,201,255,0.4)]"
+                className="h-full rounded-full bg-[#78c9ff] shadow-[0_0_18px_rgba(120,201,255,0.72)]"
                 data-testid="playback-progress-fill"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <div className="pointer-events-none absolute inset-0 rounded-full ring-0 ring-white/45 transition group-focus-within:ring-2" />
+            <div className="pointer-events-none absolute inset-0 rounded-full ring-0 ring-white/60 transition group-focus-within:ring-2" />
             <input
               aria-label="Playback progress"
               aria-valuetext={`${formatPlaybackTimestamp(currentTimeSeconds)} of ${formatPlaybackTimestamp(durationSeconds)}`}
-              className="absolute inset-x-0 top-1/2 h-5 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent opacity-0"
+              className="absolute inset-x-0 top-1/2 h-6 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent opacity-0"
               max={durationSeconds > 0 ? durationSeconds : 0}
               min={0}
               onChange={handleSeek}
