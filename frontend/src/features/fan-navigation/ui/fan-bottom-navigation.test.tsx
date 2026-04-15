@@ -55,6 +55,14 @@ describe("fan navigation", () => {
     expect(screen.getByRole("link", { name: "マイ" })).toHaveAttribute("href", "/fan");
   });
 
+  it("hides the bottom navigation on main playback routes", () => {
+    vi.mocked(usePathname).mockReturnValue("/mains/main_aoi_blue_balcony");
+
+    const { container } = renderNavigation(true);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it("does not open the shared auth dialog before /fan responds with auth_required", async () => {
     vi.mocked(usePathname).mockReturnValue("/");
     const user = userEvent.setup();

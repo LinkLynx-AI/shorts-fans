@@ -12,6 +12,11 @@ import { getFanNavigationItems, resolveActiveFanNavigation } from "../model/fan-
  */
 export function FanBottomNavigation() {
   const pathname = usePathname();
+
+  if (pathname.startsWith("/mains/")) {
+    return null;
+  }
+
   const activeKey = resolveActiveFanNavigation(pathname);
 
   return (
