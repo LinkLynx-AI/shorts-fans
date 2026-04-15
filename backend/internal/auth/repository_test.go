@@ -293,6 +293,22 @@ func TestGetIdentityByNormalizedEmail(t *testing.T) {
 	}
 }
 
+func TestGetIdentityByNormalizedEmailNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.GetIdentityByNormalizedEmail(context.Background(), "fan@example.com"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("GetIdentityByNormalizedEmail() error got %v want %v", err, ErrIdentityNotFound)
+	}
+}
+
 func TestGetIdentityByProviderAndSubject(t *testing.T) {
 	t.Parallel()
 
@@ -370,6 +386,31 @@ func TestCreateIdentity(t *testing.T) {
 	}
 	if got.Provider != identityProviderCognito {
 		t.Fatalf("CreateIdentity() provider got %q want %q", got.Provider, identityProviderCognito)
+	}
+}
+
+func TestCreateIdentityMapsDuplicate(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(&pgconn.PgError{
+					Code:           "23505",
+					ConstraintName: cognitoEmailUniqueConstraint,
+				})
+			},
+		},
+	}
+
+	email := "fan@example.com"
+	if _, err := repository.CreateIdentity(context.Background(), CreateIdentityInput{
+		UserID:          uuid.New(),
+		Provider:        identityProviderCognito,
+		ProviderSubject: "cognito-subject",
+		EmailNormalized: &email,
+	}); !errors.Is(err, ErrIdentityAlreadyExists) {
+		t.Fatalf("CreateIdentity() error got %v want %v", err, ErrIdentityAlreadyExists)
 	}
 }
 
@@ -451,6 +492,22 @@ func TestGetLatestPendingLoginChallengeByEmail(t *testing.T) {
 	}
 }
 
+func TestGetLatestPendingLoginChallengeByEmailNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.GetLatestPendingLoginChallengeByEmail(context.Background(), "fan@example.com"); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("GetLatestPendingLoginChallengeByEmail() error got %v want %v", err, ErrLoginChallengeNotFound)
+	}
+}
+
 func TestIncrementLoginChallengeAttemptCount(t *testing.T) {
 	t.Parallel()
 
@@ -482,6 +539,23 @@ func TestIncrementLoginChallengeAttemptCount(t *testing.T) {
 	}
 	if got.AttemptCount != 3 {
 		t.Fatalf("IncrementLoginChallengeAttemptCount() attempt count got %d want %d", got.AttemptCount, 3)
+	}
+}
+
+func TestIncrementLoginChallengeAttemptCountNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	challengeID := uuid.New()
+	if _, err := repository.IncrementLoginChallengeAttemptCount(context.Background(), challengeID); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("IncrementLoginChallengeAttemptCount() error got %v want %v", err, ErrLoginChallengeNotFound)
 	}
 }
 
@@ -520,6 +594,23 @@ func TestConsumeLoginChallenge(t *testing.T) {
 	}
 }
 
+func TestConsumeLoginChallengeNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	challengeID := uuid.New()
+	if _, err := repository.ConsumeLoginChallenge(context.Background(), challengeID, time.Now().UTC()); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("ConsumeLoginChallenge() error got %v want %v", err, ErrLoginChallengeNotFound)
+	}
+}
+
 func TestRecordIdentityAuthentication(t *testing.T) {
 	t.Parallel()
 
@@ -555,6 +646,27 @@ func TestRecordIdentityAuthentication(t *testing.T) {
 	}
 	if got.ID != identityID {
 		t.Fatalf("RecordIdentityAuthentication() id got %s want %s", got.ID, identityID)
+	}
+}
+
+func TestRecordIdentityAuthenticationNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	identityID := uuid.New()
+	if _, err := repository.RecordIdentityAuthentication(context.Background(), RecordIdentityAuthenticationInput{
+		ID:                  identityID,
+		EmailNormalized:     "fan@example.com",
+		LastAuthenticatedAt: time.Now().UTC(),
+	}); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("RecordIdentityAuthentication() error got %v want %v", err, ErrIdentityNotFound)
 	}
 }
 
@@ -953,6 +1065,26 @@ func TestRefreshSessionRecentAuthenticatedAtByTokenHash(t *testing.T) {
 			got.RecentAuthenticatedAt,
 			now.Add(time.Minute),
 		)
+	}
+}
+
+func TestRefreshSessionRecentAuthenticatedAtByTokenHashNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.RefreshSessionRecentAuthenticatedAtByTokenHash(
+		context.Background(),
+		"session-token-hash",
+		time.Now().UTC(),
+	); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("RefreshSessionRecentAuthenticatedAtByTokenHash() error got %v want %v", err, ErrSessionNotFound)
 	}
 }
 
