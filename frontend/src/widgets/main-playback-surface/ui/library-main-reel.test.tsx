@@ -13,8 +13,17 @@ vi.mock("../api/resolve-library-main-playback-surface", () => ({
 
 vi.mock("./main-playback-surface", () => ({
   MainPlaybackSurface: vi.fn(
-    ({ surface }: { surface: { main: { id: string } } }) => (
-      <div data-testid={`main-playback-surface-${surface.main.id}`} />
+    ({
+      creatorProfileHref,
+      surface,
+    }: {
+      creatorProfileHref: string;
+      surface: { main: { id: string } };
+    }) => (
+      <div
+        data-creator-profile-href={creatorProfileHref}
+        data-testid={`main-playback-surface-${surface.main.id}`}
+      />
     ),
   ),
 }));
@@ -144,5 +153,10 @@ describe("LibraryMainReel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("main-playback-surface-main_short_1")).toBeInTheDocument();
     });
+
+    expect(screen.getByTestId("main-playback-surface-main_short_1")).toHaveAttribute(
+      "data-creator-profile-href",
+      "/creators/creator_1?from=short&shortFanTab=library&shortId=short_1",
+    );
   });
 });

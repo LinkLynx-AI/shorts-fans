@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
 
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
@@ -61,6 +62,8 @@ describe("MainPlaybackPage", () => {
       buildMockMainPlaybackGrantContext("main_mina_quiet_rooftop", "rooftop", "unlocked"),
     );
 
+    const user = userEvent.setup();
+
     render(
       await MainPlaybackPage({
         params: Promise.resolve({
@@ -75,6 +78,13 @@ describe("MainPlaybackPage", () => {
 
     expect(screen.getByLabelText("Main playback video")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "この main はまだ unlock されていません。" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "More options" }));
+
+    expect(screen.getByRole("link", { name: "クリエイターのプロフィールへ" })).toHaveAttribute(
+      "href",
+      "/creators/creator_mina_rei?from=short&shortId=rooftop",
+    );
   });
 
   it("renders the locked state when a signed grant is replayed for a different short context", async () => {

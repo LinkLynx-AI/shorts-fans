@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { z } from "zod";
 
 import { getShortById } from "@/entities/short";
+import { buildCreatorProfileHref } from "@/features/creator-navigation";
 import { viewerSessionCookieName } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
@@ -110,6 +111,20 @@ export default async function MainPlaybackPage({
   }
 
   const fallbackHref = `/shorts/${normalizedFromShortId}`;
+  const creatorProfileHref = (creatorId: string) =>
+    buildCreatorProfileHref(
+      creatorId,
+      routeFrom === "fan"
+        ? {
+            from: "short",
+            shortFanTab: routeFanTab,
+            shortId: normalizedFromShortId,
+          }
+        : {
+            from: "short",
+            shortId: normalizedFromShortId,
+          },
+    );
 
   if (normalizedFromShortId.startsWith("short_")) {
     const cookieStore = await cookies();
@@ -137,7 +152,13 @@ export default async function MainPlaybackPage({
       throw error;
     }
 
-    return <MainPlaybackSurface fallbackHref={fallbackHref} surface={surface} />;
+    return (
+      <MainPlaybackSurface
+        creatorProfileHref={creatorProfileHref(surface.creator.id)}
+        fallbackHref={fallbackHref}
+        surface={surface}
+      />
+    );
   }
 
   const entryShort = getShortById(normalizedFromShortId);
@@ -169,5 +190,11 @@ export default async function MainPlaybackPage({
     notFound();
   }
 
-  return <MainPlaybackSurface fallbackHref={fallbackHref} surface={surface} />;
+  return (
+    <MainPlaybackSurface
+      creatorProfileHref={creatorProfileHref(surface.creator.id)}
+      fallbackHref={fallbackHref}
+      surface={surface}
+    />
+  );
 }

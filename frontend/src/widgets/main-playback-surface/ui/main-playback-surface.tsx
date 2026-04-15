@@ -1,16 +1,24 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play, Volume2 } from "lucide-react";
+import { ArrowLeft, ChevronRight, Pause, Play, Volume2 } from "lucide-react";
 
 import { getShortThemeStyle } from "@/entities/short";
-import { Button } from "@/shared/ui";
+import {
+  BottomSheetMenu,
+  BottomSheetMenuAction,
+  BottomSheetMenuClose,
+  BottomSheetMenuGroup,
+  Button,
+} from "@/shared/ui";
 
 import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
 import type { MainPlaybackSurface as MainPlaybackSurfaceModel } from "../model/main-playback-surface";
 
 export type MainPlaybackSurfaceProps = {
+  creatorProfileHref: string;
   fallbackHref: string;
   isActive?: boolean;
   surface: MainPlaybackSurfaceModel;
@@ -30,6 +38,7 @@ function resolveDurationSeconds(video: HTMLVideoElement, fallbackDurationSeconds
  * unlock 後の main 継続視聴 surface を表示する。
  */
 export function MainPlaybackSurface({
+  creatorProfileHref,
   fallbackHref,
   isActive = true,
   surface,
@@ -337,7 +346,7 @@ export function MainPlaybackSurface({
       <div className="relative h-full">
         <h1 className="sr-only">{playbackHeading}</h1>
 
-        <div className="absolute top-0 z-10 w-full bg-gradient-to-b from-black/78 to-transparent px-4 pb-6 pt-14">
+        <div className="absolute top-0 z-10 flex w-full items-center justify-between bg-gradient-to-b from-black/78 to-transparent px-4 pb-6 pt-14">
           <Button
             aria-label="Back"
             className="text-white hover:bg-white/16 hover:text-white"
@@ -348,6 +357,38 @@ export function MainPlaybackSurface({
           >
             <ArrowLeft className="size-6" strokeWidth={2.2} />
           </Button>
+          <BottomSheetMenu
+            description={`${surface.creator.displayName} の creator profile に移動するメニュー`}
+            title="Main options"
+            trigger={
+              <Button
+                aria-label="More options"
+                className="gap-1 text-white hover:bg-white/16 hover:text-white"
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <span aria-hidden="true" className="size-1 rounded-full bg-current" />
+                <span aria-hidden="true" className="size-1 rounded-full bg-current" />
+                <span aria-hidden="true" className="size-1 rounded-full bg-current" />
+              </Button>
+            }
+          >
+            <BottomSheetMenuGroup>
+              <BottomSheetMenuClose asChild>
+                <BottomSheetMenuAction asChild>
+                  <Link aria-label="クリエイターのプロフィールへ" href={creatorProfileHref}>
+                    <span>クリエイターのプロフィールへ</span>
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="size-4 text-muted"
+                      strokeWidth={2.2}
+                    />
+                  </Link>
+                </BottomSheetMenuAction>
+              </BottomSheetMenuClose>
+            </BottomSheetMenuGroup>
+          </BottomSheetMenu>
         </div>
 
         <div className="absolute bottom-0 z-10 w-full bg-gradient-to-t from-black/92 via-black/72 to-transparent px-5 pb-10 pt-24">
