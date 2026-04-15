@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, MoreVertical, Plus, Search, Share2 } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -48,10 +48,12 @@ const feedSurfaceStyle = {
   "--short-tile-top": "#d8f3ff",
 } as CSSProperties;
 
-const feedAccentColor = "#4DA8DA";
 const sharedFanNavigationBaseInsetPx = 76;
+const feedActionRailOffsetPx = 152;
+const feedPinErrorOffsetPx = feedActionRailOffsetPx + 116;
 const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env(safe-area-inset-bottom, 0px))`;
-const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + 128}px + env(safe-area-inset-bottom, 0px))`;
+const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + feedActionRailOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
+const feedPinErrorBottom = `calc(${sharedFanNavigationBaseInsetPx + feedPinErrorOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
 
 export type ImmersiveShortSurfaceProps =
   | {
@@ -100,13 +102,7 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
             </Link>
           ))}
         </nav>
-        <Link
-          aria-label="Search"
-          className="inline-flex size-11 items-center justify-center text-white drop-shadow-md transition hover:scale-105"
-          href="/search"
-        >
-          <Search aria-hidden="true" className="h-6 w-6" strokeWidth={2.1} />
-        </Link>
+        <div aria-hidden="true" className="size-11" />
       </div>
     );
   }
@@ -219,56 +215,21 @@ function FeedCreatorAvatar({
 }
 
 function FeedActionRail({
-  creator,
   disabled = false,
   onToggle,
   pinned,
-  profileHref,
 }: {
-  creator: FeedShortSurface["creator"];
   disabled?: boolean;
   onToggle?: () => void;
   pinned: boolean;
-  profileHref: string;
 }) {
   return (
     <div
       className="absolute right-3 z-20 flex flex-col items-center space-y-6"
+      data-testid="feed-action-rail"
       style={{ bottom: feedActionRailBottom }}
     >
-      <Link
-        aria-label="プロフィールへ"
-        className="relative inline-flex transition hover:scale-[1.03]"
-        href={profileHref}
-      >
-        <FeedCreatorAvatar
-          className="size-11 border-[2px] border-white shadow-[0_12px_24px_rgba(0,0,0,0.26)]"
-          creator={creator}
-        />
-        <span
-          className="absolute -bottom-2 left-1/2 inline-flex -translate-x-1/2 rounded-full p-0.5 text-white shadow-[0_8px_18px_rgba(52,118,181,0.48)]"
-          style={{ backgroundColor: feedAccentColor }}
-        >
-          <Plus aria-hidden="true" className="h-3 w-3" strokeWidth={3} />
-        </span>
-      </Link>
       <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
-      <button
-        aria-label="Share"
-        className="inline-flex size-11 items-center justify-center text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100 disabled:opacity-100"
-        disabled
-        type="button"
-      >
-        <Share2 aria-hidden="true" className="h-7 w-7" strokeWidth={2.1} />
-      </button>
-      <button
-        aria-label="More options"
-        className="inline-flex size-11 items-center justify-center text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-default disabled:hover:scale-100 disabled:opacity-100"
-        disabled
-        type="button"
-      >
-        <MoreVertical aria-hidden="true" className="h-7 w-7" strokeWidth={2.1} />
-      </button>
     </div>
   );
 }
@@ -726,7 +687,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <ShortSurfaceHeader {...props} />
         {isFeedMode ? (
-          <FeedActionRail creator={creator} pinned={pinned} profileHref={profileHref} {...pinProps} />
+          <FeedActionRail pinned={pinned} {...pinProps} />
         ) : (
           <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
             <PinRail pinned={pinned} {...pinProps} />
@@ -737,7 +698,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: isFeedMode ? `calc(${sharedFanNavigationBaseInsetPx + 244}px + env(safe-area-inset-bottom, 0px))` : "258px" }}
+            style={{ bottom: isFeedMode ? feedPinErrorBottom : "258px" }}
           >
             {pinErrorMessage}
           </p>

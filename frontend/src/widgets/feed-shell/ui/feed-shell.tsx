@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
 
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { cn } from "@/shared/lib";
@@ -44,13 +43,7 @@ function FeedTopBar({ activeTab }: { activeTab: "following" | "recommended" }) {
     <div className="absolute top-0 z-20 flex w-full items-center justify-between px-4 pb-4 pt-14">
       <div className="w-6" />
       <FeedTabsNavigation activeTab={activeTab} />
-      <Link
-        aria-label="Search"
-        className="inline-flex size-11 items-center justify-center text-white drop-shadow-md transition hover:scale-105"
-        href="/search"
-      >
-        <Search aria-hidden="true" className="h-6 w-6" strokeWidth={2.1} />
-      </Link>
+      <div aria-hidden="true" className="size-11" />
     </div>
   );
 }

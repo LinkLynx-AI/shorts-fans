@@ -137,9 +137,14 @@ describe("ImmersiveShortSurface", () => {
       "/creators/creator_mina_rei?from=feed&tab=recommended",
     );
     expect(screen.queryByRole("link", { name: /Back/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Share" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "More options" })).toBeDisabled();
+    expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
+    const feedActionRail = screen.getByTestId("feed-action-rail");
+    const pinButton = screen.getByRole("button", { name: "Pinned short" });
+    expect(feedActionRail).toHaveStyle("bottom: calc(228px + env(safe-area-inset-bottom, 0px))");
+    expect(pinButton).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "プロフィールへ" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "More options" })).not.toBeInTheDocument();
     expect(screen.getByText("Follow")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
