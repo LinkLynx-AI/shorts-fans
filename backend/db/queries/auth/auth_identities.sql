@@ -25,8 +25,26 @@ LIMIT 1;
 
 -- name: GetAuthIdentityByEmailNormalized :one
 SELECT *
-FROM app.auth_identities
-WHERE email_normalized = sqlc.arg(email_normalized)
+FROM (
+    SELECT *
+    FROM app.auth_identities AS auth_identities_email
+    WHERE auth_identities_email.provider = 'email'
+        AND auth_identities_email.email_normalized = sqlc.arg(target_email_normalized)
+
+    UNION ALL
+
+    SELECT *
+    FROM app.auth_identities AS auth_identities_cognito
+    WHERE auth_identities_cognito.provider = 'cognito'
+        AND auth_identities_cognito.email_normalized = sqlc.arg(target_email_normalized)
+
+    UNION ALL
+
+    SELECT *
+    FROM app.auth_identities AS auth_identities_other
+    WHERE auth_identities_other.provider NOT IN ('email', 'cognito')
+        AND auth_identities_other.email_normalized = sqlc.arg(target_email_normalized)
+) AS auth_identities_by_email
 ORDER BY created_at DESC, id DESC
 LIMIT 1;
 

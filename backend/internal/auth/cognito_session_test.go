@@ -122,7 +122,7 @@ func TestCognitoSessionManagerStartSessionUsesExistingIdentity(t *testing.T) {
 			if input.UserID != userID {
 				t.Fatalf("CreateSession() userID got %s want %s", input.UserID, userID)
 			}
-			if input.RecentAuthenticatedAt != now {
+			if !input.RecentAuthenticatedAt.Equal(now) {
 				t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
 			}
 			if input.SessionTokenHash != HashSessionToken("session-token") {
@@ -257,7 +257,7 @@ func TestCognitoSessionManagerStartSessionCreatesNewUser(t *testing.T) {
 			if input.EmailNormalized == nil || *input.EmailNormalized != "fan@example.com" {
 				t.Fatalf("CreateUserWithIdentityAndSession() email got %v want %q", input.EmailNormalized, "fan@example.com")
 			}
-			if input.RecentAuthenticatedAt != now {
+			if !input.RecentAuthenticatedAt.Equal(now) {
 				t.Fatalf("CreateUserWithIdentityAndSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
 			}
 
@@ -326,7 +326,7 @@ func TestCognitoSessionManagerStartSessionBridgesLegacyIdentityAfterCreateConfli
 			if input.SessionTokenHash != HashSessionToken("session-token") {
 				t.Fatalf("CreateSession() session hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
 			}
-			if input.RecentAuthenticatedAt != now {
+			if !input.RecentAuthenticatedAt.Equal(now) {
 				t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
 			}
 
@@ -436,7 +436,7 @@ func TestCognitoSessionManagerStartSessionUsesNowWhenAuthenticatedAtZero(t *test
 			return Identity{}, nil
 		},
 		createSession: func(_ context.Context, input CreateSessionInput) (SessionRecord, error) {
-			if input.RecentAuthenticatedAt != now {
+			if !input.RecentAuthenticatedAt.Equal(now) {
 				t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
 			}
 			if !input.ExpiresAt.Equal(now.Add(defaultSessionTTL)) {
