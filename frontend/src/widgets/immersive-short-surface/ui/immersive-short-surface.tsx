@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -54,6 +54,30 @@ const feedPinErrorOffsetPx = feedActionRailOffsetPx + 116;
 const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env(safe-area-inset-bottom, 0px))`;
 const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + feedActionRailOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
 const feedPinErrorBottom = `calc(${sharedFanNavigationBaseInsetPx + feedPinErrorOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
+
+function clampPlaybackProgress(progress: number) {
+  if (!Number.isFinite(progress)) {
+    return 0;
+  }
+
+  if (progress <= 0) {
+    return 0;
+  }
+
+  if (progress >= 1) {
+    return 1;
+  }
+
+  return progress;
+}
+
+function calculatePlaybackProgress(currentTime: number, duration: number) {
+  if (!Number.isFinite(currentTime) || !Number.isFinite(duration) || duration <= 0) {
+    return 0;
+  }
+
+  return clampPlaybackProgress(currentTime / duration);
+}
 
 export type ImmersiveShortSurfaceProps =
   | {
@@ -234,6 +258,77 @@ function FeedActionRail({
   );
 }
 
+function FeedPlaybackProgressBar({
+  onSeek,
+  progress,
+}: {
+  onSeek: (nextProgress: number) => void;
+  progress: number;
+}) {
+  const handleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+
+    if (bounds.width <= 0) {
+      return;
+    }
+
+    onSeek(clampPlaybackProgress((event.clientX - bounds.left) / bounds.width));
+  };
+
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    let nextProgress: number | null = null;
+
+    switch (event.key) {
+      case "ArrowLeft":
+      case "ArrowDown":
+        nextProgress = progress - 0.05;
+        break;
+      case "ArrowRight":
+      case "ArrowUp":
+        nextProgress = progress + 0.05;
+        break;
+      case "Home":
+        nextProgress = 0;
+        break;
+      case "End":
+        nextProgress = 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    onSeek(clampPlaybackProgress(nextProgress));
+  };
+
+  return (
+    <div
+      aria-label="Short playback progress"
+      aria-valuemax={100}
+      aria-valuemin={0}
+      aria-valuenow={Math.round(progress * 100)}
+      className="absolute left-0 z-10 h-5 w-full cursor-pointer"
+      data-testid="feed-playback-progress-bar"
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role="slider"
+      style={{ bottom: sharedFanNavigationInset, touchAction: "pan-y" }}
+      tabIndex={0}
+    >
+      <div aria-hidden="true" className="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden bg-white/20">
+        <div
+          className="h-full w-full rounded-r-full bg-white"
+          data-testid="feed-playback-progress-fill"
+          style={{
+            transform: `scaleX(${progress})`,
+            transformOrigin: "left center",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /**
  * creator 名、follow 状態、caption をまとめた下部 creator block を表示する。
  */
@@ -401,6 +496,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [isHydrated, setIsHydrated] = useState(false);
   const [acceptAge, setAcceptAge] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [feedPlaybackProgress, setFeedPlaybackProgress] = useState(0);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isResolvingUnlock, setIsResolvingUnlock] = useState(false);
   const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
@@ -442,10 +538,68 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const seekFeedPlayback = (nextProgress: number) => {
+    if (!isFeedMode) {
+      return;
+    }
+
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const fallbackDurationSeconds = short.media.durationSeconds ?? short.previewDurationSeconds;
+    const resolvedDuration =
+      Number.isFinite(video.duration) && video.duration > 0 ? video.duration : fallbackDurationSeconds;
+
+    if (!Number.isFinite(resolvedDuration) || resolvedDuration <= 0) {
+      return;
+    }
+
+    const clampedProgress = clampPlaybackProgress(nextProgress);
+
+    video.currentTime = resolvedDuration * clampedProgress;
+    setFeedPlaybackProgress(clampedProgress);
+  };
 
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isFeedMode) {
+      return;
+    }
+
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const syncProgress = () => {
+      const nextProgress = calculatePlaybackProgress(video.currentTime, video.duration);
+
+      setFeedPlaybackProgress((currentProgress) =>
+        Math.abs(currentProgress - nextProgress) < 0.001 ? currentProgress : nextProgress,
+      );
+    };
+
+    setFeedPlaybackProgress(0);
+
+    video.addEventListener("durationchange", syncProgress);
+    video.addEventListener("emptied", syncProgress);
+    video.addEventListener("loadedmetadata", syncProgress);
+    video.addEventListener("timeupdate", syncProgress);
+
+    return () => {
+      video.removeEventListener("durationchange", syncProgress);
+      video.removeEventListener("emptied", syncProgress);
+      video.removeEventListener("loadedmetadata", syncProgress);
+      video.removeEventListener("timeupdate", syncProgress);
+    };
+  }, [isFeedMode, short.media.id, short.media.url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -731,13 +885,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
                 variant="feed"
               />
             </div>
-            <div
-              aria-hidden="true"
-              className="absolute left-0 z-10 h-[2px] w-full bg-white/20"
-              style={{ bottom: sharedFanNavigationInset }}
-            >
-              <div className="h-full w-1/3 rounded-r-full bg-white" />
-            </div>
+            <FeedPlaybackProgressBar onSeek={seekFeedPlayback} progress={feedPlaybackProgress} />
           </>
         ) : (
           <>

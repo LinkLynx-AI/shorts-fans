@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
   CreatorFollowApiError,
@@ -150,6 +150,192 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+  });
+
+  it("updates the feed playback progress bar from video metadata and timeupdate", () => {
+    const { container } = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
+      { hasSession: true },
+    );
+
+    const video = container.querySelector("video");
+
+    if (!video) {
+      throw new Error("video element missing");
+    }
+
+    const progressFill = screen.getByTestId("feed-playback-progress-fill");
+
+    expect(progressFill).toHaveStyle("transform: scaleX(0)");
+
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: 16,
+    });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 4,
+      writable: true,
+    });
+
+    fireEvent(video, new Event("loadedmetadata"));
+
+    expect(progressFill).toHaveStyle("transform: scaleX(0.25)");
+
+    video.currentTime = 8;
+    fireEvent(video, new Event("timeupdate"));
+
+    expect(progressFill).toHaveStyle("transform: scaleX(0.5)");
+  });
+
+  it("seeks the feed video when the playback progress bar is clicked", () => {
+    const { container } = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
+      { hasSession: true },
+    );
+
+    const video = container.querySelector("video");
+
+    if (!video) {
+      throw new Error("video element missing");
+    }
+
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: 16,
+    });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    const progressBar = screen.getByTestId("feed-playback-progress-bar");
+
+    vi.spyOn(progressBar, "getBoundingClientRect").mockReturnValue({
+      bottom: 20,
+      height: 20,
+      left: 0,
+      right: 100,
+      toJSON: () => ({}),
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+    });
+
+    fireEvent.click(progressBar, {
+      clientX: 25,
+    });
+
+    expect(video.currentTime).toBe(4);
+    expect(screen.getByTestId("feed-playback-progress-fill")).toHaveStyle("transform: scaleX(0.25)");
+  });
+
+  it("uses the short duration fallback when the feed video duration is unavailable during seek", () => {
+    const { container } = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
+      { hasSession: true },
+    );
+
+    const video = container.querySelector("video");
+
+    if (!video) {
+      throw new Error("video element missing");
+    }
+
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: Number.NaN,
+    });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    const progressBar = screen.getByTestId("feed-playback-progress-bar");
+
+    vi.spyOn(progressBar, "getBoundingClientRect").mockReturnValue({
+      bottom: 20,
+      height: 20,
+      left: 0,
+      right: 100,
+      toJSON: () => ({}),
+      top: 0,
+      width: 100,
+      x: 0,
+      y: 0,
+    });
+
+    fireEvent.click(progressBar, {
+      clientX: 75,
+    });
+
+    expect(video.currentTime).toBe(12);
+    expect(screen.getByTestId("feed-playback-progress-fill")).toHaveStyle("transform: scaleX(0.75)");
+  });
+
+  it("resets the feed playback progress bar when the feed short changes", async () => {
+    const { rerender, container } = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
+      { hasSession: true },
+    );
+
+    const video = container.querySelector("video");
+
+    if (!video) {
+      throw new Error("video element missing");
+    }
+
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: 16,
+    });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 8,
+      writable: true,
+    });
+
+    fireEvent(video, new Event("loadedmetadata"));
+
+    expect(screen.getByTestId("feed-playback-progress-fill")).toHaveStyle("transform: scaleX(0.5)");
+
+    const nextSurface = {
+      ...feedSurface,
+      short: {
+        ...feedSurface.short,
+        id: "short_mina_rooftop_alt",
+        media: {
+          ...feedSurface.short.media,
+          id: "asset_short_mina_rooftop_alt",
+          url: "https://cdn.example.com/shorts/playback-alt.mp4",
+        },
+      },
+      unlock: {
+        ...feedSurface.unlock,
+        short: {
+          ...feedSurface.unlock.short,
+          id: "short_mina_rooftop_alt",
+          media: {
+            ...feedSurface.unlock.short.media,
+            id: "asset_short_mina_rooftop_alt",
+            url: "https://cdn.example.com/shorts/playback-alt.mp4",
+          },
+        },
+      },
+    };
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={nextSurface} />
+      </ViewerSessionProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("feed-playback-progress-fill")).toHaveStyle("transform: scaleX(0)");
+    });
   });
 
   it("resolves the unlock surface before opening paywall for API-backed feed content", async () => {
