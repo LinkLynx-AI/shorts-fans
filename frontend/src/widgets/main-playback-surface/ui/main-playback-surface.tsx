@@ -1,61 +1,29 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pause, Play, Volume2 } from "lucide-react";
 
-import { CreatorAvatar } from "@/entities/creator";
-import { buildShortContinuationCopy, getShortThemeStyle } from "@/entities/short";
-import { cn } from "@/shared/lib";
+import { getShortThemeStyle } from "@/entities/short";
 import { Button } from "@/shared/ui";
 
-import {
-  getMainPlaybackStatusCopy,
-  getMainPlaybackStatusMeta,
-  getMainPlaybackStatusTitle,
-  type MainPlaybackSurface,
-} from "../model/main-playback-surface";
+import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
+import type { MainPlaybackSurface as MainPlaybackSurfaceModel } from "../model/main-playback-surface";
 
 export type MainPlaybackSurfaceProps = {
   fallbackHref: string;
   isActive?: boolean;
-  surface: MainPlaybackSurface;
+  surface: MainPlaybackSurfaceModel;
 };
 
 const MAIN_PLAYBACK_VIDEO_LABEL = "Main playback video";
 
-function PinRail({ pinned }: { pinned: boolean }) {
-  const label = pinned ? "Pinned short" : "Pin short";
+function resolveDurationSeconds(video: HTMLVideoElement, fallbackDurationSeconds: number): number {
+  if (Number.isFinite(video.duration) && video.duration > 0) {
+    return video.duration;
+  }
 
-  return (
-    <div className="absolute right-4 z-20 flex flex-col items-center gap-2.5" style={{ bottom: "204px" }}>
-      <button
-        aria-label={label}
-        aria-pressed={pinned}
-        className={cn(
-          "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent",
-          pinned && "text-accent",
-        )}
-        type="button"
-      >
-        <svg
-          aria-hidden="true"
-          className="size-[22px]"
-          fill={pinned ? "currentColor" : "none"}
-          viewBox="0 0 14 18"
-        >
-          <path
-            d="M3 1.75h8a1 1 0 0 1 1 1V16L7 12.9 2 16V2.75a1 1 0 0 1 1-1Z"
-            stroke="currentColor"
-            strokeLinejoin="round"
-            strokeWidth="1.7"
-          />
-        </svg>
-        <span className="sr-only">{label}</span>
-      </button>
-    </div>
-  );
+  return fallbackDurationSeconds;
 }
 
 /**
@@ -69,11 +37,35 @@ export function MainPlaybackSurface({
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const resumeAppliedRef = useRef<string | null>(null);
-  const statusTitle = getMainPlaybackStatusTitle(surface);
-  const statusCopy = getMainPlaybackStatusCopy(surface);
-  const statusMeta = getMainPlaybackStatusMeta(surface);
-  const continuationCopy = surface.entryShort ? buildShortContinuationCopy(surface.entryShort.caption) : "short の続きから再生中。";
   const playbackHeading = surface.entryShort?.caption.trim() || "Main playback";
+  const resumePositionSeconds = surface.resumePositionSeconds;
+  const resumeKey =
+    resumePositionSeconds === null ? null : `${surface.main.media.id}:${surface.main.media.url}:${resumePositionSeconds}`;
+  const mediaStateKey = `${surface.main.media.id}:${surface.main.media.url}:${surface.main.durationSeconds}:${resumePositionSeconds ?? "none"}`;
+  const [currentTimeState, setCurrentTimeState] = useState({
+    mediaStateKey,
+    seconds: surface.resumePositionSeconds ?? 0,
+  });
+  const [durationState, setDurationState] = useState({
+    mediaStateKey,
+    seconds: surface.main.durationSeconds,
+  });
+  const [playbackState, setPlaybackState] = useState({
+    isPlaying: isActive,
+    mediaStateKey,
+  });
+  const [audioState, setAudioState] = useState({
+    isMuted: false,
+    mediaStateKey,
+  });
+  const currentTimeSeconds =
+    currentTimeState.mediaStateKey === mediaStateKey ? currentTimeState.seconds : surface.resumePositionSeconds ?? 0;
+  const durationSeconds =
+    durationState.mediaStateKey === mediaStateKey ? durationState.seconds : surface.main.durationSeconds;
+  const isPlaying = isActive && (playbackState.mediaStateKey === mediaStateKey ? playbackState.isPlaying : true);
+  const isMuted = audioState.mediaStateKey === mediaStateKey ? audioState.isMuted : false;
+  const progressPercent = durationSeconds > 0 ? Math.min(100, (currentTimeSeconds / durationSeconds) * 100) : 0;
+  const playbackButtonLabel = isMuted && isPlaying ? "Enable audio" : isPlaying ? "Pause playback" : "Play playback";
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -83,6 +75,13 @@ export function MainPlaybackSurface({
 
     router.push(fallbackHref);
   };
+
+  const syncMutedState = useCallback((video: HTMLVideoElement) => {
+    setAudioState({
+      isMuted: video.muted,
+      mediaStateKey,
+    });
+  }, [mediaStateKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -97,9 +96,13 @@ export function MainPlaybackSurface({
     }
 
     let cancelled = false;
-    const resumePositionSeconds = surface.resumePositionSeconds;
-    const resumeKey =
-      resumePositionSeconds === null ? null : `${surface.main.media.id}:${surface.main.media.url}:${resumePositionSeconds}`;
+
+    const syncDuration = () => {
+      setDurationState({
+        mediaStateKey,
+        seconds: resolveDurationSeconds(video, surface.main.durationSeconds),
+      });
+    };
 
     const applyResumePosition = () => {
       if (resumePositionSeconds === null || resumeKey === null || resumeAppliedRef.current === resumeKey) {
@@ -108,30 +111,60 @@ export function MainPlaybackSurface({
 
       video.currentTime = resumePositionSeconds;
       resumeAppliedRef.current = resumeKey;
+      setCurrentTimeState({
+        mediaStateKey,
+        seconds: resumePositionSeconds,
+      });
     };
 
     const attemptPlayback = async () => {
       applyResumePosition();
+      syncDuration();
       video.muted = false;
+      syncMutedState(video);
 
       try {
         await video.play();
+
+        if (!cancelled) {
+          syncMutedState(video);
+          setPlaybackState({
+            isPlaying: true,
+            mediaStateKey,
+          });
+        }
       } catch {
         if (cancelled) {
           return;
         }
 
         video.muted = true;
+        syncMutedState(video);
 
         try {
           await video.play();
+
+          if (!cancelled) {
+            syncMutedState(video);
+            setPlaybackState({
+              isPlaying: true,
+              mediaStateKey,
+            });
+          }
         } catch {
-          // ブラウザ制約で自動再生できない場合は controls から再生してもらう。
+          if (!cancelled) {
+            syncMutedState(video);
+            setPlaybackState({
+              isPlaying: false,
+              mediaStateKey,
+            });
+          }
         }
       }
     };
 
     const handleMetadataLoaded = () => {
+      syncDuration();
       void attemptPlayback();
     };
 
@@ -145,7 +178,122 @@ export function MainPlaybackSurface({
       cancelled = true;
       video.removeEventListener("loadedmetadata", handleMetadataLoaded);
     };
-  }, [isActive, surface.main.media.id, surface.main.media.url, surface.resumePositionSeconds]);
+  }, [
+    isActive,
+    mediaStateKey,
+    resumeKey,
+    resumePositionSeconds,
+    syncMutedState,
+    surface.main.durationSeconds,
+    surface.main.media.id,
+    surface.main.media.url,
+  ]);
+
+  const handleLoadedMetadata = () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    setDurationState({
+      mediaStateKey,
+      seconds: resolveDurationSeconds(video, surface.main.durationSeconds),
+    });
+
+    if (resumePositionSeconds === null || resumeKey === null || resumeAppliedRef.current === resumeKey) {
+      return;
+    }
+
+    video.currentTime = resumePositionSeconds;
+    resumeAppliedRef.current = resumeKey;
+    setCurrentTimeState({
+      mediaStateKey,
+      seconds: resumePositionSeconds,
+    });
+  };
+
+  const handleDurationChange = () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    setDurationState({
+      mediaStateKey,
+      seconds: resolveDurationSeconds(video, surface.main.durationSeconds),
+    });
+  };
+
+  const handleTimeUpdate = () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    setCurrentTimeState({
+      mediaStateKey,
+      seconds: video.currentTime,
+    });
+  };
+
+  const handleSeek = (event: ChangeEvent<HTMLInputElement>) => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    const nextSeconds = Number.isFinite(event.currentTarget.valueAsNumber) ? event.currentTarget.valueAsNumber : 0;
+
+    video.currentTime = nextSeconds;
+    setCurrentTimeState({
+      mediaStateKey,
+      seconds: nextSeconds,
+    });
+  };
+
+  const handleTogglePlayback = async () => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    if (video.paused || video.ended) {
+      try {
+        video.muted = false;
+        syncMutedState(video);
+        await video.play();
+        syncMutedState(video);
+        setPlaybackState({
+          isPlaying: true,
+          mediaStateKey,
+        });
+      } catch {
+        setPlaybackState({
+          isPlaying: false,
+          mediaStateKey,
+        });
+      }
+
+      return;
+    }
+
+    if (video.muted) {
+      video.muted = false;
+      syncMutedState(video);
+      return;
+    }
+
+    video.pause();
+    setPlaybackState({
+      isPlaying: false,
+      mediaStateKey,
+    });
+  };
 
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={getShortThemeStyle(surface.themeShort)}>
@@ -155,18 +303,41 @@ export function MainPlaybackSurface({
         aria-label={MAIN_PLAYBACK_VIDEO_LABEL}
         autoPlay={isActive}
         className="absolute inset-0 size-full object-cover"
-        controls
+        onDurationChange={handleDurationChange}
+        onLoadedMetadata={handleLoadedMetadata}
+        onPause={() => {
+          setPlaybackState({
+            isPlaying: false,
+            mediaStateKey,
+          });
+        }}
+        onPlay={() => {
+          setPlaybackState({
+            isPlaying: true,
+            mediaStateKey,
+          });
+        }}
+        onTimeUpdate={handleTimeUpdate}
+        onVolumeChange={() => {
+          const video = videoRef.current;
+
+          if (!video) {
+            return;
+          }
+
+          syncMutedState(video);
+        }}
         playsInline
         poster={surface.main.media.posterUrl ?? undefined}
         preload="metadata"
         src={surface.main.media.url}
       />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.32)_0%,rgba(3,10,18,0.08)_24%,rgba(3,10,18,0.18)_58%,rgba(3,10,18,0.86)_100%)]" />
 
       <div className="relative h-full">
         <h1 className="sr-only">{playbackHeading}</h1>
-        <div className="relative z-10 px-4 pt-4">
+
+        <div className="absolute top-0 z-10 w-full bg-gradient-to-b from-black/78 to-transparent px-4 pb-6 pt-14">
           <Button
             aria-label="Back"
             className="text-white hover:bg-white/16 hover:text-white"
@@ -175,44 +346,53 @@ export function MainPlaybackSurface({
             type="button"
             variant="ghost"
           >
-            <ArrowLeft className="size-5" strokeWidth={2.1} />
+            <ArrowLeft className="size-6" strokeWidth={2.2} />
           </Button>
         </div>
 
-        {surface.viewer.isPinned !== null ? <PinRail pinned={surface.viewer.isPinned} /> : null}
-
-        <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
-          <div className="flex min-h-12 items-center justify-between gap-3 rounded-full border border-[#85cdf1]/92 bg-[linear-gradient(90deg,rgba(225,244,255,0.98),rgba(204,235,252,0.96))] px-3 py-1.5 text-left text-foreground shadow-[0_18px_44px_rgba(36,94,132,0.14)] backdrop-blur-xl">
-            <span className="flex min-w-0 flex-1 items-center gap-3">
-              <span className="inline-flex min-h-[34px] shrink-0 items-center rounded-full bg-accent-strong px-3.5 text-xs font-semibold tracking-[-0.01em] text-white">
-                Play
-              </span>
-              <span className="min-w-0">
-                <span className="block truncate text-[15px] font-semibold tracking-[-0.01em]">{statusTitle}</span>
-                <span className="mt-0.5 block truncate text-[12px] text-muted">{statusCopy}</span>
-              </span>
-            </span>
-            <span className="inline-flex min-h-[34px] shrink-0 items-center rounded-full bg-accent-strong/12 px-3.5 text-xs font-semibold tracking-[-0.01em] text-accent-strong">
-              {statusMeta}
+        <div className="absolute bottom-0 z-10 w-full bg-gradient-to-t from-black/92 via-black/72 to-transparent px-5 pb-10 pt-24">
+          <div className="flex items-center gap-4">
+            <button
+              aria-label={playbackButtonLabel}
+              className="inline-flex size-9 items-center justify-center rounded-full text-white transition hover:bg-white/10"
+              onClick={() => {
+                void handleTogglePlayback();
+              }}
+              type="button"
+            >
+              {isMuted && isPlaying ? (
+                <Volume2 className="size-5" strokeWidth={2.2} />
+              ) : isPlaying ? (
+                <Pause className="size-5 fill-current" />
+              ) : (
+                <Play className="size-5 fill-current" />
+              )}
+            </button>
+            <span className="text-[13px] font-bold tabular-nums tracking-wide text-white/92">
+              {formatPlaybackTimestamp(currentTimeSeconds)} / {formatPlaybackTimestamp(durationSeconds)}
             </span>
           </div>
-        </div>
 
-        <div className="absolute inset-x-0 bottom-0 z-10 px-4" style={{ paddingBottom: "68px" }}>
-          <div className="w-[min(88%,344px)] max-w-[344px]">
-            <div className="flex w-fit max-w-full items-center gap-2.5">
-              <Link
-                className="inline-flex min-w-0 items-center gap-2 text-left text-white transition hover:opacity-90"
-                href={`/creators/${surface.creator.id}`}
-              >
-                <CreatorAvatar
-                  className="size-[38px] rounded-full border-white/68 shadow-[0_8px_20px_rgba(7,19,29,0.2)]"
-                  creator={surface.creator}
-                />
-                <span className="truncate text-[15px] font-bold text-white">{surface.creator.displayName}</span>
-              </Link>
+          <div className="mt-3 mb-[calc(40px+env(safe-area-inset-bottom,0px))] w-full">
+            <div className="group relative h-2 w-full overflow-hidden rounded-full border border-white/18 bg-white/32 shadow-[0_2px_10px_rgba(0,0,0,0.24)]">
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-[#78c9ff] shadow-[0_0_12px_rgba(120,201,255,0.48)]"
+                data-testid="playback-progress-fill"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <div className="pointer-events-none absolute inset-0 rounded-full ring-0 ring-white/60 transition group-focus-within:ring-2" />
+              <input
+                aria-label="Playback progress"
+                aria-valuetext={`${formatPlaybackTimestamp(currentTimeSeconds)} of ${formatPlaybackTimestamp(durationSeconds)}`}
+                className="absolute inset-0 h-full w-full cursor-pointer appearance-none bg-transparent opacity-0"
+                max={durationSeconds > 0 ? durationSeconds : 0}
+                min={0}
+                onChange={handleSeek}
+                step="0.1"
+                type="range"
+                value={Math.min(currentTimeSeconds, durationSeconds || 0)}
+              />
             </div>
-            <p className="mt-0.5 text-[14px] leading-[1.45] text-white/92">{continuationCopy}</p>
           </div>
         </div>
       </div>
