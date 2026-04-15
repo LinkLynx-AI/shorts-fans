@@ -695,6 +695,33 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.getByRole("dialog", { name: detailDialogTitle })).toBeInTheDocument();
   });
 
+  it("renders feed-like detail presentation with back navigation for creator and pinned sources", () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface
+        backHref="/fan?tab=pinned"
+        creatorProfileOrigin={pinnedDetailOrigin}
+        mode="detail"
+        presentation="feedLike"
+        surface={detailSurface}
+      />,
+      { hasSession: true },
+    );
+
+    expect(screen.getByRole("link", { name: /Back/i })).toHaveAttribute("href", "/fan?tab=pinned");
+    expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
+      "href",
+      "/creators/creator_mina_rei?from=short&shortFanTab=pinned&shortId=rooftop",
+    );
+    expect(screen.getByTestId("feed-action-rail")).toBeInTheDocument();
+    expect(screen.getByTestId("feed-playback-progress-bar")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /For You/i })).not.toBeInTheDocument();
+    expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
+  });
+
   it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {
     if (!detailSurface) {
       throw new Error("fixture missing");

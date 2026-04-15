@@ -1,19 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { FanHubTab } from "@/entities/fan-profile";
 import { getPublicShortDetail } from "@/entities/short";
-import {
-  Button,
-  SurfacePanel,
-  VerticalSnapReel,
-} from "@/shared/ui";
+import { VerticalSnapReel } from "@/shared/ui";
+import { Button } from "@/shared/ui";
 
 import { buildDetailSurfaceFromApi } from "../model/api-short-surface";
 import type { DetailShortSurface } from "../model/short-surface";
-import { ImmersiveShortSurface } from "./immersive-short-surface";
+import {
+  FeedLikeShortBackdrop,
+  FeedLikeShortBackHeader,
+  ImmersiveShortSurface,
+} from "./immersive-short-surface";
 
 type ShortDetailReelProps = {
   backHref: string;
@@ -36,42 +37,57 @@ type ShortDetailItemState =
       surface: DetailShortSurface;
     };
 
-function ShortDetailLoadingState() {
+const reelStateBaseInsetPx = 76;
+
+function ShortDetailStateShell({
+  backHref,
+  children,
+}: {
+  backHref: string;
+  children: ReactNode;
+}) {
   return (
-    <section className="absolute inset-0 overflow-hidden bg-[linear-gradient(180deg,#b7e8ff_0%,#68c0eb_22%,#2a648f_56%,#07131d_100%)] text-white">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.22),transparent_34%)]" />
-      <div className="relative flex h-full items-center justify-center px-6 text-center">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/72">short loading</p>
-          <p className="mt-4 text-[18px] font-semibold tracking-[-0.04em]">
-            short を準備しています。
-          </p>
+    <FeedLikeShortBackdrop header={<FeedLikeShortBackHeader backHref={backHref} />}>
+      <div
+        className="relative flex h-full items-end px-4"
+        style={{ paddingBottom: `calc(${reelStateBaseInsetPx + 24}px + env(safe-area-inset-bottom, 0px))` }}
+      >
+        <div className="w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-1 pb-5 pt-16">
+          {children}
         </div>
       </div>
-    </section>
+    </FeedLikeShortBackdrop>
+  );
+}
+
+function ShortDetailLoadingState({ backHref }: { backHref: string }) {
+  return (
+    <ShortDetailStateShell backHref={backHref}>
+      <div className="w-full rounded-[28px] border border-white/12 bg-[rgba(7,19,29,0.52)] px-5 py-5 text-white shadow-[0_26px_60px_rgba(5,13,24,0.34)] backdrop-blur-[18px]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/58">short loading</p>
+        <p className="mt-3 font-display text-[24px] font-semibold tracking-[-0.05em]">short を準備しています。</p>
+        <p className="mt-2 text-[14px] leading-6 text-white/78">次の short surface を読み込んでいます。</p>
+      </div>
+    </ShortDetailStateShell>
   );
 }
 
 function ShortDetailErrorState({ backHref }: { backHref: string }) {
   return (
-    <main className="flex min-h-full items-center justify-center px-6 py-12">
-      <SurfacePanel className="w-full max-w-xl px-8 py-9">
-        <p className="font-display text-[11px] font-semibold uppercase tracking-[0.24em] text-accent">
-          short unavailable
-        </p>
-        <h1 className="mt-4 font-display text-3xl font-semibold tracking-[-0.05em] text-foreground">
+    <ShortDetailStateShell backHref={backHref}>
+      <div className="w-full rounded-[28px] border border-white/12 bg-[rgba(7,19,29,0.52)] px-5 py-5 text-white shadow-[0_26px_60px_rgba(5,13,24,0.34)] backdrop-blur-[18px]">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-white/58">short unavailable</p>
+        <h1 className="mt-3 font-display text-[24px] font-semibold tracking-[-0.05em]">
           この short を開けませんでした。
         </h1>
-        <p className="mt-3 text-sm leading-7 text-muted">
-          一覧に戻って別の short を選び直してください。
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
+        <p className="mt-2 text-[14px] leading-6 text-white/78">一覧に戻って別の short を選び直してください。</p>
+        <div className="mt-5 flex flex-wrap gap-3">
           <Button asChild>
             <Link href={backHref}>一覧に戻る</Link>
           </Button>
         </div>
-      </SurfacePanel>
-    </main>
+      </div>
+    </ShortDetailStateShell>
   );
 }
 
@@ -191,6 +207,7 @@ export function ShortDetailReel({
               }}
               isActive={isActive}
               mode="detail"
+              presentation="feedLike"
               surface={itemState.surface}
             />
           );
@@ -200,7 +217,7 @@ export function ShortDetailReel({
           return <ShortDetailErrorState backHref={backHref} />;
         }
 
-        return <ShortDetailLoadingState />;
+        return <ShortDetailLoadingState backHref={backHref} />;
       }}
     />
   );

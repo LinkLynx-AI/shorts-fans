@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -55,6 +55,48 @@ const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env
 const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + feedActionRailOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
 const feedPinErrorBottom = `calc(${sharedFanNavigationBaseInsetPx + feedPinErrorOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
 
+export function FeedLikeShortBackHeader({ backHref }: { backHref: string }) {
+  return (
+    <div className="absolute top-0 z-20 flex w-full items-center justify-between px-4 pb-4 pt-14">
+      <Button asChild className="text-white hover:bg-white/16 hover:text-white" size="icon" variant="ghost">
+        <Link aria-label="Back" href={backHref}>
+          <ArrowLeft className="size-5" strokeWidth={2.1} />
+        </Link>
+      </Button>
+      <div className="flex-1" />
+      <div aria-hidden="true" className="size-11" />
+    </div>
+  );
+}
+
+export function FeedLikeShortBackdrop({
+  children,
+  header,
+  mediaLayer,
+}: {
+  children: ReactNode;
+  header: ReactNode;
+  mediaLayer?: ReactNode;
+}) {
+  return (
+    <section className="absolute inset-0 overflow-hidden text-white" style={feedSurfaceStyle}>
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
+      {mediaLayer}
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,10,18,0.08)_0%,rgba(3,10,18,0.02)_28%,rgba(3,10,18,0.34)_62%,rgba(3,10,18,0.86)_100%)]" />
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_22%)]" />
+      <div
+        className="absolute inset-x-0 h-[46%] bg-[linear-gradient(180deg,rgba(7,19,29,0)_0%,rgba(7,19,29,0.18)_16%,rgba(7,19,29,0.9)_100%)]"
+        style={{ bottom: sharedFanNavigationInset }}
+      />
+
+      <div className="relative h-full">
+        {header}
+        {children}
+      </div>
+    </section>
+  );
+}
+
 function clampPlaybackProgress(progress: number) {
   if (!Number.isFinite(progress)) {
     return 0;
@@ -97,6 +139,7 @@ export type ImmersiveShortSurfaceProps =
       creatorProfileOrigin: CreatorProfileRouteOrigin;
       isActive?: boolean;
       mode: "detail";
+      presentation?: "default" | "feedLike";
       surface: DetailShortSurface;
     };
 
@@ -129,6 +172,10 @@ function ShortSurfaceHeader(props: ImmersiveShortSurfaceProps) {
         <div aria-hidden="true" className="size-11" />
       </div>
     );
+  }
+
+  if (props.presentation === "feedLike") {
+    return <FeedLikeShortBackHeader backHref={props.backHref} />;
   }
 
   return (
@@ -509,6 +556,8 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const router = useRouter();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
+  const detailPresentation = mode === "detail" ? props.presentation ?? "default" : "default";
+  const usesFeedPresentation = mode === "feed" || detailPresentation === "feedLike";
   const detailPinState = useShortPinState({
     enabled: mode === "detail",
     initialIsPinned: viewer.isPinned,
@@ -521,8 +570,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     resolvedFeedUnlockState?.shortId === short.id ? resolvedFeedUnlockState.unlock : null;
   const activeUnlock = resolvedFeedUnlock ?? unlock;
   const unlockAction = getUnlockEntryAction(activeUnlock);
-  const isFeedMode = mode === "feed";
-  const surfaceStyle = mode === "feed" ? feedSurfaceStyle : getShortThemeStyle(short);
+  const surfaceStyle = usesFeedPresentation ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
     mode === "feed"
       ? buildCreatorProfileHref(creator.id, {
@@ -539,7 +587,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
 
   const usesApiBackedUnlockFlow = short.id.startsWith("short_");
   const seekFeedPlayback = (nextProgress: number) => {
-    if (!isFeedMode) {
+    if (!usesFeedPresentation) {
       return;
     }
 
@@ -568,7 +616,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   }, []);
 
   useEffect(() => {
-    if (!isFeedMode) {
+    if (!usesFeedPresentation) {
       return;
     }
 
@@ -599,7 +647,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       video.removeEventListener("loadedmetadata", syncProgress);
       video.removeEventListener("timeupdate", syncProgress);
     };
-  }, [isFeedMode, short.media.id, short.media.url]);
+  }, [usesFeedPresentation, short.media.id, short.media.url]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -634,10 +682,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   /**
-   * feed surface 用に server-generated unlock surface を解決する。
+   * feed-like surface 用に server-generated unlock surface を解決する。
    */
   const resolveUnlockForAction = async (): Promise<UnlockSurfaceModel | null> => {
-    if (mode !== "feed") {
+    if (!usesFeedPresentation) {
       return activeUnlock;
     }
 
@@ -775,7 +823,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     const nextAction = getUnlockEntryAction(targetUnlock);
 
     const shouldOpenPaywall =
-      nextAction === "open_paywall" || (mode === "feed" && targetUnlock.unlockCta.state === "unlock_available");
+      nextAction === "open_paywall" || (usesFeedPresentation && targetUnlock.unlockCta.state === "unlock_available");
 
     if (shouldOpenPaywall) {
       resetPaywallState();
@@ -799,6 +847,81 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           onToggle: detailPinState.onToggle,
         };
 
+  if (usesFeedPresentation) {
+    return (
+      <FeedLikeShortBackdrop
+        header={<ShortSurfaceHeader {...props} />}
+        mediaLayer={
+          <video
+            ref={videoRef}
+            aria-hidden="true"
+            autoPlay={isActive}
+            className="absolute inset-0 size-full object-cover"
+            loop
+            muted
+            playsInline
+            poster={short.media.posterUrl ?? undefined}
+            preload={isActive ? "auto" : "metadata"}
+            src={short.media.url}
+          />
+        }
+      >
+        <h1 className="sr-only">Short detail</h1>
+        <FeedActionRail pinned={pinned} {...pinProps} />
+        {pinErrorMessage ? (
+          <p
+            aria-live="polite"
+            className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
+            role="alert"
+            style={{ bottom: feedPinErrorBottom }}
+          >
+            {pinErrorMessage}
+          </p>
+        ) : null}
+        <div
+          className="absolute left-0 z-10 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-5 pt-16"
+          style={{ bottom: sharedFanNavigationInset }}
+        >
+          <UnlockCta
+            className="mb-4 w-full"
+            cta={activeUnlock.unlockCta}
+            disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+            variant="feed"
+            {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
+              ? {
+                  onClick: () => {
+                    void handleActivateUnlock();
+                  },
+                }
+              : {})}
+          />
+          <FeedCreatorBlock
+            creator={creator}
+            hasViewerSession={hasViewerSession}
+            initialIsFollowing={viewer.isFollowingCreator}
+            profileHref={profileHref}
+            short={short}
+            variant="feed"
+          />
+        </div>
+        <FeedPlaybackProgressBar onSeek={seekFeedPlayback} progress={feedPlaybackProgress} />
+        <UnlockPaywallDialog
+          acceptAge={acceptAge}
+          acceptTerms={acceptTerms}
+          isSubmitting={isSubmittingMainAccess}
+          onAcceptAgeChange={setAcceptAge}
+          onAcceptTermsChange={setAcceptTerms}
+          onClose={handleClosePaywall}
+          onConfirm={() => {
+            void handleOpenMain(activeUnlock);
+          }}
+          open={isPaywallOpen}
+          unlock={activeUnlock}
+        />
+      </FeedLikeShortBackdrop>
+    );
+  }
+
   return (
     <section className="absolute inset-0 overflow-hidden text-white" style={surfaceStyle}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,var(--short-bg-start)_0%,var(--short-bg-accent)_22%,var(--short-bg-mid)_56%,var(--short-bg-end)_100%)]" />
@@ -817,101 +940,53 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       <div
         className={cn(
           "absolute inset-0",
-          isFeedMode
-            ? "bg-[linear-gradient(180deg,rgba(3,10,18,0.08)_0%,rgba(3,10,18,0.02)_28%,rgba(3,10,18,0.34)_62%,rgba(3,10,18,0.86)_100%)]"
-            : "bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]",
+          "bg-[linear-gradient(180deg,rgba(6,21,33,0.08)_0%,rgba(6,21,33,0.18)_20%,rgba(6,21,33,0.36)_58%,rgba(6,21,33,0.74)_100%)]",
         )}
       />
       <div
         className={cn(
           "absolute inset-0",
-          isFeedMode
-            ? "bg-[linear-gradient(180deg,rgba(255,255,255,0.08)_0%,rgba(255,255,255,0)_22%)]"
-            : "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_34%)]",
+          "bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.18),transparent_34%)]",
         )}
       />
-      {isFeedMode ? (
-        <div
-          className="absolute inset-x-0 h-[46%] bg-[linear-gradient(180deg,rgba(7,19,29,0)_0%,rgba(7,19,29,0.18)_16%,rgba(7,19,29,0.9)_100%)]"
-          style={{ bottom: sharedFanNavigationInset }}
-        />
-      ) : null}
 
       <div className="relative h-full">
-        <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
+        <h1 className="sr-only">Short detail</h1>
         <ShortSurfaceHeader {...props} />
-        {isFeedMode ? (
-          <FeedActionRail pinned={pinned} {...pinProps} />
-        ) : (
-          <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
-            <PinRail pinned={pinned} {...pinProps} />
-          </div>
-        )}
+        <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
+          <PinRail pinned={pinned} {...pinProps} />
+        </div>
         {pinErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: isFeedMode ? feedPinErrorBottom : "258px" }}
+            style={{ bottom: "258px" }}
           >
             {pinErrorMessage}
           </p>
         ) : null}
-        {isFeedMode ? (
-          <>
-            <div
-              className="absolute left-0 z-10 w-full bg-gradient-to-t from-black/90 via-black/40 to-transparent px-4 pb-5 pt-16"
-              style={{ bottom: sharedFanNavigationInset }}
-            >
-              <UnlockCta
-                className="mb-4 w-full"
-                cta={activeUnlock.unlockCta}
-                disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
-                variant="feed"
-                {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
-                  ? {
-                      onClick: () => {
-                        void handleActivateUnlock();
-                      },
-                    }
-                  : {})}
-              />
-              <FeedCreatorBlock
-                creator={creator}
-                hasViewerSession={hasViewerSession}
-                initialIsFollowing={viewer.isFollowingCreator}
-                profileHref={profileHref}
-                short={short}
-                variant="feed"
-              />
-            </div>
-            <FeedPlaybackProgressBar onSeek={seekFeedPlayback} progress={feedPlaybackProgress} />
-          </>
-        ) : (
-          <>
-            <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
-              <UnlockCta
-                className="w-full"
-                cta={activeUnlock.unlockCta}
-                disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
-                {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
-                  ? {
-                      onClick: () => {
-                        void handleActivateUnlock();
-                      },
-                    }
-                  : {})}
-              />
-            </div>
-            <FeedCreatorBlock
-              creator={creator}
-              hasViewerSession={hasViewerSession}
-              initialIsFollowing={viewer.isFollowingCreator}
-              profileHref={profileHref}
-              short={short}
-            />
-          </>
-        )}
+        <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>
+          <UnlockCta
+            className="w-full"
+            cta={activeUnlock.unlockCta}
+            disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+            {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
+              ? {
+                  onClick: () => {
+                    void handleActivateUnlock();
+                  },
+                }
+              : {})}
+          />
+        </div>
+        <FeedCreatorBlock
+          creator={creator}
+          hasViewerSession={hasViewerSession}
+          initialIsFollowing={viewer.isFollowingCreator}
+          profileHref={profileHref}
+          short={short}
+        />
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}
