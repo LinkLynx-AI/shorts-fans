@@ -226,6 +226,7 @@ function FeedActionRail({
   return (
     <div
       className="absolute right-3 z-20 flex flex-col items-center space-y-6"
+      data-testid="feed-action-rail"
       style={{ bottom: feedActionRailBottom }}
     >
       <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
