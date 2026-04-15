@@ -344,7 +344,7 @@ export function MainPlaybackSurface({
             </span>
           </div>
 
-          <div className="mt-3 w-full">
+          <div className="mt-3 mb-[calc(40px+env(safe-area-inset-bottom,0px))] w-full">
             <div className="group relative h-2 w-full overflow-hidden rounded-full border border-white/18 bg-white/32 shadow-[0_2px_10px_rgba(0,0,0,0.24)]">
               <div
                 className="absolute inset-y-0 left-0 rounded-full bg-[#78c9ff] shadow-[0_0_12px_rgba(120,201,255,0.48)]"
