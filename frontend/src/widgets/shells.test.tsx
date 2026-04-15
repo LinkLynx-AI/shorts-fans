@@ -72,6 +72,7 @@ describe("widgets", () => {
     renderFeedShell(getMockFeedShellState("recommended"));
 
     expect(screen.getByRole("link", { name: /For You/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Mina Rei" })).toBeInTheDocument();
     expect(screen.getByText("@minarei")).toBeInTheDocument();
@@ -82,6 +83,7 @@ describe("widgets", () => {
     render(<FeedShell state={getFollowingFeedShellState("empty")} />);
 
     expect(screen.getByRole("link", { name: /Following/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
     expect(screen.getByText("フォロー中の creator はまだいません")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "creatorを探す" })).toHaveAttribute("href", "/search");
   });
@@ -90,6 +92,7 @@ describe("widgets", () => {
     render(<FeedShell state={getFollowingFeedShellState("auth_required")} />);
 
     expect(screen.getByRole("link", { name: /Following/i })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "ログインへ進む" })).toHaveAttribute("href", "/login");
   });
