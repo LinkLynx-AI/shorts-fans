@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 
+import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
 import { MainPlaybackSurface } from "./main-playback-surface";
 
 const back = vi.fn();
@@ -16,19 +17,6 @@ vi.mock("next/navigation", () => ({
     push,
   }),
 }));
-
-function formatPlaybackTimestamp(totalSeconds: number): string {
-  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(normalizedSeconds / 3600);
-  const minutes = Math.floor(normalizedSeconds / 60);
-  const remainingSeconds = normalizedSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(Math.floor((normalizedSeconds % 3600) / 60)).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-}
 
 describe("MainPlaybackSurface", () => {
   beforeEach(() => {
@@ -130,7 +118,7 @@ describe("MainPlaybackSurface", () => {
     expect(video.currentTime).toBe(surface.resumePositionSeconds);
   });
 
-  it("falls back to muted autoplay when the first playback attempt is rejected", async () => {
+  it("falls back to muted autoplay and lets the primary control enable audio", async () => {
     play.mockRejectedValueOnce(new Error("autoplay blocked")).mockResolvedValueOnce(undefined);
 
     const surface = getMainPlaybackSurfaceById("main_sora_after_rain", "afterrain", "unlocked");
@@ -140,6 +128,8 @@ describe("MainPlaybackSurface", () => {
     if (!surface) {
       throw new Error("fixture missing");
     }
+
+    const user = userEvent.setup();
 
     render(<MainPlaybackSurface fallbackHref="/shorts/afterrain" surface={surface} />);
 
@@ -152,6 +142,13 @@ describe("MainPlaybackSurface", () => {
     });
 
     expect(video.muted).toBe(true);
+    expect(screen.getByRole("button", { name: "Enable audio" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Enable audio" }));
+
+    expect(video.muted).toBe(false);
+    expect(pause).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Pause playback" })).toBeInTheDocument();
   });
 
   it("reapplies the resume position when the playback URL changes for the same media", async () => {

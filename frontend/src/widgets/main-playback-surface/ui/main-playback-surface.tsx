@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Pause, Play } from "lucide-react";
+import { ArrowLeft, Pause, Play, Volume2 } from "lucide-react";
 
 import { getShortThemeStyle } from "@/entities/short";
 import { Button } from "@/shared/ui";
 
+import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
 import type { MainPlaybackSurface as MainPlaybackSurfaceModel } from "../model/main-playback-surface";
 
 export type MainPlaybackSurfaceProps = {
@@ -23,19 +24,6 @@ function resolveDurationSeconds(video: HTMLVideoElement, fallbackDurationSeconds
   }
 
   return fallbackDurationSeconds;
-}
-
-function formatPlaybackTimestamp(totalSeconds: number): string {
-  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
-  const hours = Math.floor(normalizedSeconds / 3600);
-  const minutes = Math.floor(normalizedSeconds / 60);
-  const remainingSeconds = normalizedSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(Math.floor((normalizedSeconds % 3600) / 60)).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
-  }
-
-  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 /**
@@ -66,13 +54,18 @@ export function MainPlaybackSurface({
     isPlaying: isActive,
     mediaStateKey,
   });
+  const [audioState, setAudioState] = useState({
+    isMuted: false,
+    mediaStateKey,
+  });
   const currentTimeSeconds =
     currentTimeState.mediaStateKey === mediaStateKey ? currentTimeState.seconds : surface.resumePositionSeconds ?? 0;
   const durationSeconds =
     durationState.mediaStateKey === mediaStateKey ? durationState.seconds : surface.main.durationSeconds;
   const isPlaying = isActive && (playbackState.mediaStateKey === mediaStateKey ? playbackState.isPlaying : true);
+  const isMuted = audioState.mediaStateKey === mediaStateKey ? audioState.isMuted : false;
   const progressPercent = durationSeconds > 0 ? Math.min(100, (currentTimeSeconds / durationSeconds) * 100) : 0;
-  const playbackButtonLabel = isPlaying ? "Pause playback" : "Play playback";
+  const playbackButtonLabel = isMuted && isPlaying ? "Enable audio" : isPlaying ? "Pause playback" : "Play playback";
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -82,6 +75,13 @@ export function MainPlaybackSurface({
 
     router.push(fallbackHref);
   };
+
+  const syncMutedState = useCallback((video: HTMLVideoElement) => {
+    setAudioState({
+      isMuted: video.muted,
+      mediaStateKey,
+    });
+  }, [mediaStateKey]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -121,11 +121,13 @@ export function MainPlaybackSurface({
       applyResumePosition();
       syncDuration();
       video.muted = false;
+      syncMutedState(video);
 
       try {
         await video.play();
 
         if (!cancelled) {
+          syncMutedState(video);
           setPlaybackState({
             isPlaying: true,
             mediaStateKey,
@@ -137,11 +139,13 @@ export function MainPlaybackSurface({
         }
 
         video.muted = true;
+        syncMutedState(video);
 
         try {
           await video.play();
 
           if (!cancelled) {
+            syncMutedState(video);
             setPlaybackState({
               isPlaying: true,
               mediaStateKey,
@@ -149,6 +153,7 @@ export function MainPlaybackSurface({
           }
         } catch {
           if (!cancelled) {
+            syncMutedState(video);
             setPlaybackState({
               isPlaying: false,
               mediaStateKey,
@@ -178,6 +183,7 @@ export function MainPlaybackSurface({
     mediaStateKey,
     resumeKey,
     resumePositionSeconds,
+    syncMutedState,
     surface.main.durationSeconds,
     surface.main.media.id,
     surface.main.media.url,
@@ -259,7 +265,9 @@ export function MainPlaybackSurface({
     if (video.paused || video.ended) {
       try {
         video.muted = false;
+        syncMutedState(video);
         await video.play();
+        syncMutedState(video);
         setPlaybackState({
           isPlaying: true,
           mediaStateKey,
@@ -271,6 +279,12 @@ export function MainPlaybackSurface({
         });
       }
 
+      return;
+    }
+
+    if (video.muted) {
+      video.muted = false;
+      syncMutedState(video);
       return;
     }
 
@@ -304,6 +318,15 @@ export function MainPlaybackSurface({
           });
         }}
         onTimeUpdate={handleTimeUpdate}
+        onVolumeChange={() => {
+          const video = videoRef.current;
+
+          if (!video) {
+            return;
+          }
+
+          syncMutedState(video);
+        }}
         playsInline
         poster={surface.main.media.posterUrl ?? undefined}
         preload="metadata"
@@ -337,7 +360,13 @@ export function MainPlaybackSurface({
               }}
               type="button"
             >
-              {isPlaying ? <Pause className="size-5 fill-current" /> : <Play className="size-5 fill-current" />}
+              {isMuted && isPlaying ? (
+                <Volume2 className="size-5" strokeWidth={2.2} />
+              ) : isPlaying ? (
+                <Pause className="size-5 fill-current" />
+              ) : (
+                <Play className="size-5 fill-current" />
+              )}
             </button>
             <span className="text-[13px] font-bold tabular-nums tracking-wide text-white/92">
               {formatPlaybackTimestamp(currentTimeSeconds)} / {formatPlaybackTimestamp(durationSeconds)}
