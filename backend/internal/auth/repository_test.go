@@ -257,6 +257,163 @@ func TestGetIdentityByEmailNotFound(t *testing.T) {
 	}
 }
 
+func TestGetIdentityByNormalizedEmail(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000005, 0).UTC()
+	identityID := uuid.New()
+	userID := uuid.New()
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowWithValues(
+					pgUUID(identityID),
+					pgUUID(userID),
+					identityProviderCognito,
+					"cognito-subject",
+					pgText("fan@example.com"),
+					pgTime(now),
+					pgTime(now.Add(time.Minute)),
+					pgTime(now.Add(-time.Hour)),
+					pgTime(now.Add(-30*time.Minute)),
+				)
+			},
+		},
+	}
+
+	got, err := repository.GetIdentityByNormalizedEmail(context.Background(), "fan@example.com")
+	if err != nil {
+		t.Fatalf("GetIdentityByNormalizedEmail() error = %v, want nil", err)
+	}
+	if got.ID != identityID {
+		t.Fatalf("GetIdentityByNormalizedEmail() id got %s want %s", got.ID, identityID)
+	}
+	if got.Provider != identityProviderCognito {
+		t.Fatalf("GetIdentityByNormalizedEmail() provider got %q want %q", got.Provider, identityProviderCognito)
+	}
+}
+
+func TestGetIdentityByNormalizedEmailNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.GetIdentityByNormalizedEmail(context.Background(), "fan@example.com"); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("GetIdentityByNormalizedEmail() error got %v want %v", err, ErrIdentityNotFound)
+	}
+}
+
+func TestGetIdentityByProviderAndSubject(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000000, 0).UTC()
+	identityID := uuid.New()
+	userID := uuid.New()
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowWithValues(
+					pgUUID(identityID),
+					pgUUID(userID),
+					identityProviderCognito,
+					"cognito-subject",
+					pgText("fan@example.com"),
+					pgTime(now),
+					pgTime(now.Add(time.Minute)),
+					pgTime(now.Add(-time.Hour)),
+					pgTime(now.Add(-30*time.Minute)),
+				)
+			},
+		},
+	}
+
+	got, err := repository.GetIdentityByProviderAndSubject(context.Background(), identityProviderCognito, "cognito-subject")
+	if err != nil {
+		t.Fatalf("GetIdentityByProviderAndSubject() error = %v, want nil", err)
+	}
+	if got.Provider != identityProviderCognito {
+		t.Fatalf("GetIdentityByProviderAndSubject() provider got %q want %q", got.Provider, identityProviderCognito)
+	}
+	if got.ProviderSubject != "cognito-subject" {
+		t.Fatalf("GetIdentityByProviderAndSubject() subject got %q want %q", got.ProviderSubject, "cognito-subject")
+	}
+}
+
+func TestCreateIdentity(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000050, 0).UTC()
+	identityID := uuid.New()
+	userID := uuid.New()
+	email := "fan@example.com"
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowWithValues(
+					pgUUID(identityID),
+					pgUUID(userID),
+					identityProviderCognito,
+					"cognito-subject",
+					pgText(email),
+					pgTime(now),
+					pgTime(now),
+					pgTime(now),
+					pgTime(now),
+				)
+			},
+		},
+	}
+
+	got, err := repository.CreateIdentity(context.Background(), CreateIdentityInput{
+		UserID:              userID,
+		Provider:            identityProviderCognito,
+		ProviderSubject:     "cognito-subject",
+		EmailNormalized:     &email,
+		VerifiedAt:          &now,
+		LastAuthenticatedAt: &now,
+	})
+	if err != nil {
+		t.Fatalf("CreateIdentity() error = %v, want nil", err)
+	}
+	if got.ID != identityID {
+		t.Fatalf("CreateIdentity() id got %s want %s", got.ID, identityID)
+	}
+	if got.Provider != identityProviderCognito {
+		t.Fatalf("CreateIdentity() provider got %q want %q", got.Provider, identityProviderCognito)
+	}
+}
+
+func TestCreateIdentityMapsDuplicate(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(&pgconn.PgError{
+					Code:           "23505",
+					ConstraintName: cognitoEmailUniqueConstraint,
+				})
+			},
+		},
+	}
+
+	email := "fan@example.com"
+	if _, err := repository.CreateIdentity(context.Background(), CreateIdentityInput{
+		UserID:          uuid.New(),
+		Provider:        identityProviderCognito,
+		ProviderSubject: "cognito-subject",
+		EmailNormalized: &email,
+	}); !errors.Is(err, ErrIdentityAlreadyExists) {
+		t.Fatalf("CreateIdentity() error got %v want %v", err, ErrIdentityAlreadyExists)
+	}
+}
+
 func TestCreateLoginChallenge(t *testing.T) {
 	t.Parallel()
 
@@ -335,6 +492,22 @@ func TestGetLatestPendingLoginChallengeByEmail(t *testing.T) {
 	}
 }
 
+func TestGetLatestPendingLoginChallengeByEmailNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.GetLatestPendingLoginChallengeByEmail(context.Background(), "fan@example.com"); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("GetLatestPendingLoginChallengeByEmail() error got %v want %v", err, ErrLoginChallengeNotFound)
+	}
+}
+
 func TestIncrementLoginChallengeAttemptCount(t *testing.T) {
 	t.Parallel()
 
@@ -366,6 +539,23 @@ func TestIncrementLoginChallengeAttemptCount(t *testing.T) {
 	}
 	if got.AttemptCount != 3 {
 		t.Fatalf("IncrementLoginChallengeAttemptCount() attempt count got %d want %d", got.AttemptCount, 3)
+	}
+}
+
+func TestIncrementLoginChallengeAttemptCountNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	challengeID := uuid.New()
+	if _, err := repository.IncrementLoginChallengeAttemptCount(context.Background(), challengeID); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("IncrementLoginChallengeAttemptCount() error got %v want %v", err, ErrLoginChallengeNotFound)
 	}
 }
 
@@ -401,6 +591,23 @@ func TestConsumeLoginChallenge(t *testing.T) {
 	}
 	if got.ConsumedAt == nil || !got.ConsumedAt.Equal(consumedAt) {
 		t.Fatalf("ConsumeLoginChallenge() consumed at got %v want %s", got.ConsumedAt, consumedAt)
+	}
+}
+
+func TestConsumeLoginChallengeNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	challengeID := uuid.New()
+	if _, err := repository.ConsumeLoginChallenge(context.Background(), challengeID, time.Now().UTC()); !errors.Is(err, ErrLoginChallengeNotFound) {
+		t.Fatalf("ConsumeLoginChallenge() error got %v want %v", err, ErrLoginChallengeNotFound)
 	}
 }
 
@@ -442,6 +649,27 @@ func TestRecordIdentityAuthentication(t *testing.T) {
 	}
 }
 
+func TestRecordIdentityAuthenticationNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	identityID := uuid.New()
+	if _, err := repository.RecordIdentityAuthentication(context.Background(), RecordIdentityAuthenticationInput{
+		ID:                  identityID,
+		EmailNormalized:     "fan@example.com",
+		LastAuthenticatedAt: time.Now().UTC(),
+	}); !errors.Is(err, ErrIdentityNotFound) {
+		t.Fatalf("RecordIdentityAuthentication() error got %v want %v", err, ErrIdentityNotFound)
+	}
+}
+
 func TestCreateSession(t *testing.T) {
 	t.Parallel()
 
@@ -461,16 +689,18 @@ func TestCreateSession(t *testing.T) {
 					pgtype.Timestamptz{},
 					pgTime(now),
 					pgTime(now),
+					pgTime(now),
 				)
 			},
 		},
 	}
 
 	got, err := repository.CreateSession(context.Background(), CreateSessionInput{
-		UserID:           userID,
-		ActiveMode:       ActiveModeFan,
-		SessionTokenHash: "session-hash",
-		ExpiresAt:        now.Add(24 * time.Hour),
+		UserID:                userID,
+		ActiveMode:            ActiveModeFan,
+		SessionTokenHash:      "session-hash",
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
 	})
 	if err != nil {
 		t.Fatalf("CreateSession() error = %v, want nil", err)
@@ -480,6 +710,92 @@ func TestCreateSession(t *testing.T) {
 	}
 	if got.ActiveMode != ActiveModeFan {
 		t.Fatalf("CreateSession() active mode got %q want %q", got.ActiveMode, ActiveModeFan)
+	}
+	if !got.RecentAuthenticatedAt.Equal(now) {
+		t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", got.RecentAuthenticatedAt, now)
+	}
+}
+
+func TestCreateUserWithIdentityAndSession(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000650, 0).UTC()
+	userID := uuid.New()
+	identityID := uuid.New()
+	sessionID := uuid.New()
+	tx := &txStub{}
+	callCount := 0
+	tx.queryRow = func(context.Context, string, ...any) pgx.Row {
+		callCount++
+		switch callCount {
+		case 1:
+			return rowWithValues(true)
+		case 2:
+			return rowErr(pgx.ErrNoRows)
+		case 3:
+			return rowWithValues(
+				pgUUID(userID),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 4:
+			return rowWithValues(
+				pgUUID(identityID),
+				pgUUID(userID),
+				identityProviderCognito,
+				"cognito-subject",
+				pgText("fan@example.com"),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 5:
+			return rowWithValues(
+				pgUUID(sessionID),
+				pgUUID(userID),
+				string(ActiveModeFan),
+				"session-hash",
+				pgTime(now.Add(24*time.Hour)),
+				pgTime(now),
+				pgtype.Timestamptz{},
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		default:
+			return rowErr(fmt.Errorf("unexpected QueryRow call count: %d", callCount))
+		}
+	}
+
+	beginner := &txBeginnerStub{tx: tx}
+	repository := &Repository{txBeginner: beginner}
+	email := "fan@example.com"
+
+	got, err := repository.CreateUserWithIdentityAndSession(context.Background(), CreateUserWithIdentityAndSessionInput{
+		Provider:              identityProviderCognito,
+		ProviderSubject:       "cognito-subject",
+		EmailNormalized:       &email,
+		SessionTokenHash:      "session-hash",
+		VerifiedAt:            &now,
+		LastAuthenticatedAt:   &now,
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("CreateUserWithIdentityAndSession() error = %v, want nil", err)
+	}
+	if got.ID != sessionID {
+		t.Fatalf("CreateUserWithIdentityAndSession() session id got %s want %s", got.ID, sessionID)
+	}
+	if !beginner.began {
+		t.Fatal("CreateUserWithIdentityAndSession() did not begin transaction")
+	}
+	if !tx.committed {
+		t.Fatal("CreateUserWithIdentityAndSession() did not commit transaction")
+	}
+	if tx.rolledBack {
+		t.Fatal("CreateUserWithIdentityAndSession() rolled back successful transaction")
 	}
 }
 
@@ -524,6 +840,7 @@ func TestCreateUserWithEmailIdentityAndSession(t *testing.T) {
 				pgtype.Timestamptz{},
 				pgTime(now),
 				pgTime(now),
+				pgTime(now),
 			)
 		case 4:
 			return rowWithValues(
@@ -543,13 +860,14 @@ func TestCreateUserWithEmailIdentityAndSession(t *testing.T) {
 	repository := &Repository{txBeginner: beginner}
 
 	got, err := repository.CreateUserWithEmailIdentityAndSession(context.Background(), CreateUserWithEmailIdentityAndSessionInput{
-		DisplayName:         "Mina",
-		EmailNormalized:     "fan@example.com",
-		Handle:              "mina",
-		SessionTokenHash:    "session-hash",
-		VerifiedAt:          now,
-		LastAuthenticatedAt: now,
-		ExpiresAt:           now.Add(24 * time.Hour),
+		DisplayName:           "Mina",
+		EmailNormalized:       "fan@example.com",
+		Handle:                "mina",
+		SessionTokenHash:      "session-hash",
+		VerifiedAt:            now,
+		LastAuthenticatedAt:   now,
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
 	})
 	if err != nil {
 		t.Fatalf("CreateUserWithEmailIdentityAndSession() error = %v, want nil", err)
@@ -565,6 +883,9 @@ func TestCreateUserWithEmailIdentityAndSession(t *testing.T) {
 	}
 	if tx.rolledBack {
 		t.Fatal("CreateUserWithEmailIdentityAndSession() rolled back successful transaction")
+	}
+	if !got.RecentAuthenticatedAt.Equal(now) {
+		t.Fatalf("CreateUserWithEmailIdentityAndSession() recent_authenticated_at got %s want %s", got.RecentAuthenticatedAt, now)
 	}
 }
 
@@ -596,13 +917,14 @@ func TestCreateUserWithEmailIdentityAndSessionMapsDuplicateIdentity(t *testing.T
 	repository := &Repository{txBeginner: &txBeginnerStub{tx: tx}}
 
 	if _, err := repository.CreateUserWithEmailIdentityAndSession(context.Background(), CreateUserWithEmailIdentityAndSessionInput{
-		DisplayName:         "Mina",
-		EmailNormalized:     "fan@example.com",
-		Handle:              "mina",
-		SessionTokenHash:    "session-hash",
-		VerifiedAt:          now,
-		LastAuthenticatedAt: now,
-		ExpiresAt:           now.Add(24 * time.Hour),
+		DisplayName:           "Mina",
+		EmailNormalized:       "fan@example.com",
+		Handle:                "mina",
+		SessionTokenHash:      "session-hash",
+		VerifiedAt:            now,
+		LastAuthenticatedAt:   now,
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
 	}); !errors.Is(err, ErrIdentityAlreadyExists) {
 		t.Fatalf("CreateUserWithEmailIdentityAndSession() error got %v want %v", err, ErrIdentityAlreadyExists)
 	}
@@ -680,14 +1002,15 @@ func TestTouchSessionLastSeenByTokenHash(t *testing.T) {
 	repository := newRepository(stubQueries{
 		touchAuthSessionLastSeenByTokenHash: func(context.Context, sqlc.TouchAuthSessionLastSeenByTokenHashParams) (sqlc.AppAuthSession, error) {
 			return sqlc.AppAuthSession{
-				ID:               pgUUID(expectedID),
-				UserID:           pgUUID(uuid.New()),
-				ActiveMode:       "fan",
-				SessionTokenHash: "session-token-hash",
-				ExpiresAt:        pgTime(now.Add(time.Hour)),
-				LastSeenAt:       pgTime(now),
-				CreatedAt:        pgTime(now),
-				UpdatedAt:        pgTime(now),
+				ID:                    pgUUID(expectedID),
+				UserID:                pgUUID(uuid.New()),
+				ActiveMode:            "fan",
+				SessionTokenHash:      "session-token-hash",
+				ExpiresAt:             pgTime(now.Add(time.Hour)),
+				RecentAuthenticatedAt: pgTime(now.Add(-time.Minute)),
+				LastSeenAt:            pgTime(now),
+				CreatedAt:             pgTime(now),
+				UpdatedAt:             pgTime(now),
 			}, nil
 		},
 	})
@@ -698,6 +1021,70 @@ func TestTouchSessionLastSeenByTokenHash(t *testing.T) {
 	}
 	if got.ID != expectedID {
 		t.Fatalf("TouchSessionLastSeenByTokenHash() id got %s want %s", got.ID, expectedID)
+	}
+}
+
+func TestRefreshSessionRecentAuthenticatedAtByTokenHash(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000050, 0).UTC()
+	expectedID := uuid.New()
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowWithValues(
+					pgUUID(expectedID),
+					pgUUID(uuid.New()),
+					string(ActiveModeFan),
+					"session-token-hash",
+					pgTime(now.Add(time.Hour)),
+					pgTime(now),
+					pgtype.Timestamptz{},
+					pgTime(now),
+					pgTime(now.Add(time.Minute)),
+					pgTime(now.Add(time.Minute)),
+				)
+			},
+		},
+	}
+
+	got, err := repository.RefreshSessionRecentAuthenticatedAtByTokenHash(
+		context.Background(),
+		"session-token-hash",
+		now.Add(time.Minute),
+	)
+	if err != nil {
+		t.Fatalf("RefreshSessionRecentAuthenticatedAtByTokenHash() error = %v, want nil", err)
+	}
+	if got.ID != expectedID {
+		t.Fatalf("RefreshSessionRecentAuthenticatedAtByTokenHash() id got %s want %s", got.ID, expectedID)
+	}
+	if !got.RecentAuthenticatedAt.Equal(now.Add(time.Minute)) {
+		t.Fatalf(
+			"RefreshSessionRecentAuthenticatedAtByTokenHash() recent_authenticated_at got %s want %s",
+			got.RecentAuthenticatedAt,
+			now.Add(time.Minute),
+		)
+	}
+}
+
+func TestRefreshSessionRecentAuthenticatedAtByTokenHashNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	if _, err := repository.RefreshSessionRecentAuthenticatedAtByTokenHash(
+		context.Background(),
+		"session-token-hash",
+		time.Now().UTC(),
+	); !errors.Is(err, ErrSessionNotFound) {
+		t.Fatalf("RefreshSessionRecentAuthenticatedAtByTokenHash() error got %v want %v", err, ErrSessionNotFound)
 	}
 }
 
@@ -737,6 +1124,7 @@ func TestUpdateActiveModeByTokenHash(t *testing.T) {
 					pgtype.Timestamptz{},
 					pgTime(now),
 					pgTime(now.Add(time.Minute)),
+					pgTime(now),
 				)
 			},
 		},
@@ -797,6 +1185,7 @@ func TestRevokeActiveSessionByTokenHash(t *testing.T) {
 					pgTime(now),
 					pgTime(now.Add(time.Minute)),
 					pgTime(now),
+					pgTime(now.Add(time.Minute)),
 					pgTime(now),
 				)
 			},
@@ -877,9 +1266,34 @@ func TestMapIdentityWriteError(t *testing.T) {
 		t.Fatal("mapIdentityWriteError() did not map duplicate constraint to ErrIdentityAlreadyExists")
 	}
 
+	cognitoDuplicateErr := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: cognitoEmailUniqueConstraint,
+	}
+	if !errors.Is(mapIdentityWriteError(cognitoDuplicateErr), ErrIdentityAlreadyExists) {
+		t.Fatal("mapIdentityWriteError() did not map cognito duplicate constraint to ErrIdentityAlreadyExists")
+	}
+
 	expectedErr := errors.New("write failed")
 	if got := mapIdentityWriteError(expectedErr); !errors.Is(got, expectedErr) {
 		t.Fatalf("mapIdentityWriteError() got %v want %v", got, expectedErr)
+	}
+}
+
+func TestMapUserProfileWriteError(t *testing.T) {
+	t.Parallel()
+
+	duplicateErr := &pgconn.PgError{
+		Code:           "23505",
+		ConstraintName: userProfileHandleUnique,
+	}
+	if !errors.Is(mapUserProfileWriteError(duplicateErr), ErrHandleAlreadyTaken) {
+		t.Fatal("mapUserProfileWriteError() did not map duplicate handle constraint to ErrHandleAlreadyTaken")
+	}
+
+	expectedErr := errors.New("write failed")
+	if got := mapUserProfileWriteError(expectedErr); !errors.Is(got, expectedErr) {
+		t.Fatalf("mapUserProfileWriteError() got %v want %v", got, expectedErr)
 	}
 }
 

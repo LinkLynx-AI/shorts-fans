@@ -17,6 +17,7 @@ INSERT INTO app.auth_sessions (
     active_mode,
     session_token_hash,
     expires_at,
+    recent_authenticated_at,
     last_seen_at,
     revoked_at
 ) VALUES (
@@ -25,18 +26,20 @@ INSERT INTO app.auth_sessions (
     $3,
     $4,
     COALESCE($5::timestamptz, CURRENT_TIMESTAMP),
-    $6
+    COALESCE($6::timestamptz, CURRENT_TIMESTAMP),
+    $7
 )
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type CreateAuthSessionParams struct {
-	UserID           pgtype.UUID
-	ActiveMode       string
-	SessionTokenHash string
-	ExpiresAt        pgtype.Timestamptz
-	LastSeenAt       pgtype.Timestamptz
-	RevokedAt        pgtype.Timestamptz
+	UserID                pgtype.UUID
+	ActiveMode            string
+	SessionTokenHash      string
+	ExpiresAt             pgtype.Timestamptz
+	RecentAuthenticatedAt pgtype.Timestamptz
+	LastSeenAt            pgtype.Timestamptz
+	RevokedAt             pgtype.Timestamptz
 }
 
 func (q *Queries) CreateAuthSession(ctx context.Context, arg CreateAuthSessionParams) (AppAuthSession, error) {
@@ -45,6 +48,7 @@ func (q *Queries) CreateAuthSession(ctx context.Context, arg CreateAuthSessionPa
 		arg.ActiveMode,
 		arg.SessionTokenHash,
 		arg.ExpiresAt,
+		arg.RecentAuthenticatedAt,
 		arg.LastSeenAt,
 		arg.RevokedAt,
 	)
@@ -59,12 +63,13 @@ func (q *Queries) CreateAuthSession(ctx context.Context, arg CreateAuthSessionPa
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
 
 const getActiveAuthSessionByTokenHash = `-- name: GetActiveAuthSessionByTokenHash :one
-SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 FROM app.auth_sessions
 WHERE session_token_hash = $1
     AND revoked_at IS NULL
@@ -85,6 +90,7 @@ func (q *Queries) GetActiveAuthSessionByTokenHash(ctx context.Context, sessionTo
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
@@ -120,7 +126,7 @@ func (q *Queries) GetCurrentViewerBySessionTokenHash(ctx context.Context, sessio
 }
 
 const listAuthSessionsByUserID = `-- name: ListAuthSessionsByUserID :many
-SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+SELECT id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 FROM app.auth_sessions
 WHERE user_id = $1
 ORDER BY created_at DESC, id DESC
@@ -145,6 +151,7 @@ func (q *Queries) ListAuthSessionsByUserID(ctx context.Context, userID pgtype.UU
 			&i.RevokedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.RecentAuthenticatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -156,6 +163,40 @@ func (q *Queries) ListAuthSessionsByUserID(ctx context.Context, userID pgtype.UU
 	return items, nil
 }
 
+const refreshAuthSessionRecentAuthenticatedAtByTokenHash = `-- name: RefreshAuthSessionRecentAuthenticatedAtByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    recent_authenticated_at = COALESCE($1::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = $2
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
+`
+
+type RefreshAuthSessionRecentAuthenticatedAtByTokenHashParams struct {
+	RecentAuthenticatedAt pgtype.Timestamptz
+	SessionTokenHash      string
+}
+
+func (q *Queries) RefreshAuthSessionRecentAuthenticatedAtByTokenHash(ctx context.Context, arg RefreshAuthSessionRecentAuthenticatedAtByTokenHashParams) (AppAuthSession, error) {
+	row := q.db.QueryRow(ctx, refreshAuthSessionRecentAuthenticatedAtByTokenHash, arg.RecentAuthenticatedAt, arg.SessionTokenHash)
+	var i AppAuthSession
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActiveMode,
+		&i.SessionTokenHash,
+		&i.ExpiresAt,
+		&i.LastSeenAt,
+		&i.RevokedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
+	)
+	return i, err
+}
+
 const revokeActiveAuthSessionByTokenHash = `-- name: RevokeActiveAuthSessionByTokenHash :one
 UPDATE app.auth_sessions
 SET
@@ -164,7 +205,7 @@ SET
 WHERE session_token_hash = $2
     AND revoked_at IS NULL
     AND expires_at > CURRENT_TIMESTAMP
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type RevokeActiveAuthSessionByTokenHashParams struct {
@@ -185,6 +226,7 @@ func (q *Queries) RevokeActiveAuthSessionByTokenHash(ctx context.Context, arg Re
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
@@ -195,7 +237,7 @@ SET
     revoked_at = COALESCE($1::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $2
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type RevokeAuthSessionParams struct {
@@ -216,6 +258,7 @@ func (q *Queries) RevokeAuthSession(ctx context.Context, arg RevokeAuthSessionPa
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
@@ -227,7 +270,7 @@ SET
     last_seen_at = COALESCE($2::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $3
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type TouchAuthSessionParams struct {
@@ -249,6 +292,7 @@ func (q *Queries) TouchAuthSession(ctx context.Context, arg TouchAuthSessionPara
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
@@ -261,7 +305,7 @@ SET
 WHERE session_token_hash = $2
     AND revoked_at IS NULL
     AND expires_at > CURRENT_TIMESTAMP
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type TouchAuthSessionLastSeenByTokenHashParams struct {
@@ -282,6 +326,7 @@ func (q *Queries) TouchAuthSessionLastSeenByTokenHash(ctx context.Context, arg T
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }
@@ -294,7 +339,7 @@ SET
 WHERE session_token_hash = $2
     AND revoked_at IS NULL
     AND expires_at > CURRENT_TIMESTAMP
-RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at
+RETURNING id, user_id, active_mode, session_token_hash, expires_at, last_seen_at, revoked_at, created_at, updated_at, recent_authenticated_at
 `
 
 type UpdateActiveAuthSessionModeByTokenHashParams struct {
@@ -315,6 +360,7 @@ func (q *Queries) UpdateActiveAuthSessionModeByTokenHash(ctx context.Context, ar
 		&i.RevokedAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.RecentAuthenticatedAt,
 	)
 	return i, err
 }

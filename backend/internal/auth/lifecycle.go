@@ -169,10 +169,11 @@ func (l *Lifecycle) StartSignInSession(ctx context.Context, email string, challe
 	}
 
 	session, err := l.repository.CreateSession(ctx, CreateSessionInput{
-		UserID:           identity.UserID,
-		ActiveMode:       ActiveModeFan,
-		SessionTokenHash: HashSessionToken(rawSessionToken),
-		ExpiresAt:        now.Add(defaultSessionTTL),
+		UserID:                identity.UserID,
+		ActiveMode:            ActiveModeFan,
+		SessionTokenHash:      HashSessionToken(rawSessionToken),
+		ExpiresAt:             now.Add(defaultSessionTTL),
+		RecentAuthenticatedAt: now,
 	})
 	if err != nil {
 		return AuthenticatedSession{}, fmt.Errorf("sign in session 作成 email=%s: %w", normalizedEmail, err)
@@ -226,13 +227,14 @@ func (l *Lifecycle) StartSignUpSession(
 	}
 
 	session, err := l.repository.CreateUserWithEmailIdentityAndSession(ctx, CreateUserWithEmailIdentityAndSessionInput{
-		DisplayName:         normalizedDisplayName,
-		EmailNormalized:     normalizedEmail,
-		Handle:              normalizedHandle,
-		SessionTokenHash:    HashSessionToken(rawSessionToken),
-		VerifiedAt:          now,
-		LastAuthenticatedAt: now,
-		ExpiresAt:           now.Add(defaultSessionTTL),
+		DisplayName:           normalizedDisplayName,
+		EmailNormalized:       normalizedEmail,
+		Handle:                normalizedHandle,
+		SessionTokenHash:      HashSessionToken(rawSessionToken),
+		VerifiedAt:            now,
+		LastAuthenticatedAt:   now,
+		ExpiresAt:             now.Add(defaultSessionTTL),
+		RecentAuthenticatedAt: now,
 	})
 	if err != nil {
 		if errors.Is(err, ErrIdentityAlreadyExists) {

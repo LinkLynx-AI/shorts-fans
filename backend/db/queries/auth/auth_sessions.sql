@@ -4,6 +4,7 @@ INSERT INTO app.auth_sessions (
     active_mode,
     session_token_hash,
     expires_at,
+    recent_authenticated_at,
     last_seen_at,
     revoked_at
 ) VALUES (
@@ -11,6 +12,7 @@ INSERT INTO app.auth_sessions (
     sqlc.arg(active_mode),
     sqlc.arg(session_token_hash),
     sqlc.arg(expires_at),
+    COALESCE(sqlc.narg(recent_authenticated_at)::timestamptz, CURRENT_TIMESTAMP),
     COALESCE(sqlc.narg(last_seen_at)::timestamptz, CURRENT_TIMESTAMP),
     sqlc.narg(revoked_at)
 )
@@ -69,6 +71,16 @@ RETURNING *;
 UPDATE app.auth_sessions
 SET
     last_seen_at = COALESCE(sqlc.narg(last_seen_at)::timestamptz, CURRENT_TIMESTAMP),
+    updated_at = CURRENT_TIMESTAMP
+WHERE session_token_hash = sqlc.arg(session_token_hash)
+    AND revoked_at IS NULL
+    AND expires_at > CURRENT_TIMESTAMP
+RETURNING *;
+
+-- name: RefreshAuthSessionRecentAuthenticatedAtByTokenHash :one
+UPDATE app.auth_sessions
+SET
+    recent_authenticated_at = COALESCE(sqlc.narg(recent_authenticated_at)::timestamptz, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE session_token_hash = sqlc.arg(session_token_hash)
     AND revoked_at IS NULL

@@ -63,6 +63,49 @@ func (q *Queries) CreateAuthIdentity(ctx context.Context, arg CreateAuthIdentity
 	return i, err
 }
 
+const getAuthIdentityByEmailNormalized = `-- name: GetAuthIdentityByEmailNormalized :one
+SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
+FROM (
+    SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
+    FROM app.auth_identities AS auth_identities_email
+    WHERE auth_identities_email.provider = 'email'
+        AND auth_identities_email.email_normalized = $1
+
+    UNION ALL
+
+    SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
+    FROM app.auth_identities AS auth_identities_cognito
+    WHERE auth_identities_cognito.provider = 'cognito'
+        AND auth_identities_cognito.email_normalized = $1
+
+    UNION ALL
+
+    SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
+    FROM app.auth_identities AS auth_identities_other
+    WHERE auth_identities_other.provider NOT IN ('email', 'cognito')
+        AND auth_identities_other.email_normalized = $1
+) AS auth_identities_by_email
+ORDER BY created_at DESC, id DESC
+LIMIT 1
+`
+
+func (q *Queries) GetAuthIdentityByEmailNormalized(ctx context.Context, targetEmailNormalized pgtype.Text) (AppAuthIdentity, error) {
+	row := q.db.QueryRow(ctx, getAuthIdentityByEmailNormalized, targetEmailNormalized)
+	var i AppAuthIdentity
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Provider,
+		&i.ProviderSubject,
+		&i.EmailNormalized,
+		&i.VerifiedAt,
+		&i.LastAuthenticatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getAuthIdentityByProviderAndSubject = `-- name: GetAuthIdentityByProviderAndSubject :one
 SELECT id, user_id, provider, provider_subject, email_normalized, verified_at, last_authenticated_at, created_at, updated_at
 FROM app.auth_identities

@@ -15,6 +15,8 @@ source:
         - 000009_require_creator_profile_handle.up.sql
         - 000010_add_short_caption_and_processing_jobs.up.sql
         - 000011_require_main_price_metadata.up.sql
+        - 000012_add_user_profiles.up.sql
+        - 000013_add_cognito_session_foundation.up.sql
 schemas:
     - name: app
       tables:
@@ -76,6 +78,12 @@ schemas:
             - name: auth_identities_provider_subject_check
               expression: CHECK (length(btrim(provider_subject)) > 0)
           indexes:
+            - name: idx_auth_identities_cognito_email_normalized
+              columns:
+                - email_normalized
+              unique: true
+              predicate: ((provider = 'cognito'::text) AND (email_normalized IS NOT NULL))
+              definition: CREATE UNIQUE INDEX idx_auth_identities_cognito_email_normalized ON app.auth_identities USING btree (email_normalized) WHERE ((provider = 'cognito'::text) AND (email_normalized IS NOT NULL))
             - name: idx_auth_identities_email_normalized
               columns:
                 - email_normalized
@@ -188,6 +196,10 @@ schemas:
               nullable: false
               default: CURRENT_TIMESTAMP
             - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: recent_authenticated_at
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
@@ -943,6 +955,54 @@ schemas:
               columns:
                 - state
               definition: CREATE INDEX idx_shorts_state ON app.shorts USING btree (state)
+        - name: user_profiles
+          columns:
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: display_name
+              type: text
+              nullable: false
+            - name: handle
+              type: text
+              nullable: false
+            - name: avatar_url
+              type: text
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - user_id
+          foreign_keys:
+            - name: user_profiles_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+          check_constraints:
+            - name: user_profiles_display_name_trimmed_check
+              expression: CHECK (length(btrim(display_name)) > 0)
+            - name: user_profiles_handle_format_check
+              expression: CHECK (handle ~ '^[a-z0-9._]+$'::text)
+            - name: user_profiles_handle_lowercase_check
+              expression: CHECK (handle = lower(handle))
+            - name: user_profiles_handle_trimmed_check
+              expression: CHECK (handle = btrim(handle))
+          indexes:
+            - name: user_profiles_handle_unique_idx
+              columns:
+                - handle
+              unique: true
+              definition: CREATE UNIQUE INDEX user_profiles_handle_unique_idx ON app.user_profiles USING btree (handle)
         - name: users
           columns:
             - name: id
