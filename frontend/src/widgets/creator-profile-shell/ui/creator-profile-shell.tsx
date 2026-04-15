@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { ArrowLeft, EllipsisVertical } from "lucide-react";
 
 import {
   CreatorAvatar,
   CreatorFollowButton,
-  CreatorStatList,
 } from "@/entities/creator";
 import {
   useCurrentViewer,
@@ -18,7 +18,6 @@ import {
   type CreatorProfileRouteState,
 } from "@/features/creator-navigation";
 import { useFanAuthDialog } from "@/features/fan-auth";
-import { DetailShell } from "@/widgets/detail-shell";
 import { Button } from "@/shared/ui";
 
 import type {
@@ -39,34 +38,18 @@ type CreatorProfileShortGridTileProps = {
   short: CreatorProfileShellShortItem;
 };
 
-function ShortsGridTab() {
-  return (
-    <div className="mt-[18px] flex justify-center border-t border-border/60">
-      <div
-        aria-hidden="true"
-        className="inline-flex min-h-[42px] w-[72px] items-center justify-center border-t-2 border-t-foreground pt-[10px] text-foreground"
-      >
-        <svg aria-hidden="true" className="size-[18px] fill-current" viewBox="0 0 18 18">
-          <rect height="4" rx="1" width="4" x="2" y="2" />
-          <rect height="4" rx="1" width="4" x="7" y="2" />
-          <rect height="4" rx="1" width="4" x="12" y="2" />
-          <rect height="4" rx="1" width="4" x="2" y="7" />
-          <rect height="4" rx="1" width="4" x="7" y="7" />
-          <rect height="4" rx="1" width="4" x="12" y="7" />
-          <rect height="4" rx="1" width="4" x="2" y="12" />
-          <rect height="4" rx="1" width="4" x="7" y="12" />
-          <rect height="4" rx="1" width="4" x="12" y="12" />
-        </svg>
-      </div>
-    </div>
-  );
-}
-
 function formatPreviewDuration(seconds: number): string {
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
 
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
+}
+
+function formatProfileCount(value: number): string {
+  return new Intl.NumberFormat("en", {
+    maximumFractionDigits: 1,
+    notation: "compact",
+  }).format(value);
 }
 
 function normalizeViewerIdForSelfComparison(viewerId: string | undefined): string | null {
@@ -98,6 +81,24 @@ function isSelfCreatorProfile(currentViewerId: string | undefined, creatorId: st
   return normalizedViewerId !== null && normalizedCreatorUserId !== null && normalizedViewerId === normalizedCreatorUserId;
 }
 
+type CreatorProfileStatProps = {
+  label: string;
+  value: string;
+};
+
+function CreatorProfileStat({ label, value }: CreatorProfileStatProps) {
+  return (
+    <div className="min-w-[84px] text-center">
+      <strong className="block font-display text-[22px] font-bold leading-none tracking-[-0.04em] text-foreground">
+        {value}
+      </strong>
+      <span className="mt-2 block text-[11px] font-semibold uppercase tracking-[0.16em] text-muted">
+        {label}
+      </span>
+    </div>
+  );
+}
+
 function CreatorProfileShortGridTile({
   creatorDisplayName,
   creatorId,
@@ -109,7 +110,7 @@ function CreatorProfileShortGridTile({
   return (
     <Link
       aria-label={`${creatorDisplayName} preview ${previewDuration}`}
-      className="group relative block aspect-[3/4] overflow-hidden bg-[linear-gradient(180deg,#d7f4ff_0%,#81c7f1_44%,#1f4f73_100%)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
+      className="group relative block aspect-[3/4] overflow-hidden bg-[linear-gradient(180deg,#d7f4ff_0%,#81c7f1_44%,#1f4f73_100%)] focus-visible:z-10 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/70"
       href={buildCreatorShortDetailHref(short.routeShortId, creatorId, routeState)}
     >
       <video
@@ -121,8 +122,8 @@ function CreatorProfileShortGridTile({
         preload="metadata"
         src={short.media.url}
       />
-      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(6,21,33,0.04)_0%,rgba(6,21,33,0.28)_72%,rgba(6,21,33,0.62)_100%)]" />
-      <span className="absolute bottom-2 right-2 rounded-full bg-black/54 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+      <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,22,35,0.02)_0%,rgba(10,22,35,0.18)_68%,rgba(10,22,35,0.4)_100%)]" />
+      <span className="absolute bottom-2 right-2 rounded-full bg-black/42 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
         {previewDuration}
       </span>
     </Link>
@@ -146,7 +147,6 @@ export function CreatorProfileShell({
     isSubmitting: isCreatorModeEntrySubmitting,
   } = useCreatorModeEntry();
   const backHref = resolveCreatorProfileBackHref(routeState);
-  const displayHandle = creator.handle.replace(/^@/, "");
   const isSelfProfile = isSelfCreatorProfile(currentViewer?.id, creator.id);
   const {
     errorMessage,
@@ -167,44 +167,61 @@ export function CreatorProfileShell({
     },
   });
   const primaryActionErrorMessage = isSelfProfile ? creatorModeEntryErrorMessage : errorMessage;
-  const resolvedStats = {
-    ...stats,
-    fanCount,
-  };
 
   return (
-    <DetailShell
-      backButtonClassName="-ml-2"
-      backHref={backHref}
-      headerContent={
-        <p className="truncate text-[19px] font-semibold tracking-[-0.03em] text-foreground">
-          {displayHandle}
-        </p>
-      }
-      variant="surface"
-    >
-      <section className="text-foreground">
-        <h1 className="sr-only">{creator.displayName} creator profile</h1>
-        <div className="flex items-start gap-4">
-          <CreatorAvatar
-            className="size-[86px] rounded-full border-white/70 shadow-[0_10px_24px_rgba(36,92,129,0.16)]"
-            creator={creator}
-          />
-          <div className="min-w-0 flex-1 pl-1.5">
+    <section className="min-h-full overflow-y-auto bg-white pb-28 text-foreground">
+      <header className="sticky top-0 z-10 bg-white/95 backdrop-blur-sm">
+        <div className="flex min-h-14 items-center border-b border-border/70 px-3.5">
+          <Button
+            asChild
+            className="size-10 text-foreground hover:bg-surface-subtle"
+            size="icon"
+            variant="ghost"
+          >
+            <Link aria-label="Back" href={backHref}>
+              <ArrowLeft className="size-5" strokeWidth={2.1} />
+            </Link>
+          </Button>
+          <div className="min-w-0 flex-1 px-3 text-center">
             <p className="truncate text-[18px] font-semibold tracking-[-0.03em] text-foreground">
-              {creator.displayName}
+              {creator.handle}
             </p>
-            <CreatorStatList className="mt-3 gap-[10px]" stats={resolvedStats} variant="creatorProfile" />
+          </div>
+          <div aria-hidden="true" className="flex size-10 items-center justify-center text-muted">
+            <EllipsisVertical className="size-[18px]" strokeWidth={2.1} />
           </div>
         </div>
+      </header>
 
-        <p className="mt-4 text-[13px] leading-[1.6] text-muted">{creator.bio}</p>
+      <div className="px-6 pb-8 pt-7 text-center">
+        <CreatorAvatar
+          className="mx-auto size-28 shadow-[0_16px_36px_rgba(36,92,129,0.16)]"
+          creator={creator}
+        />
 
-        <div className="mt-[14px]">
+        <div className="mt-5">
+          <h1 className="text-[20px] font-semibold tracking-[-0.04em] text-foreground">
+            {creator.displayName}
+          </h1>
+          <p className="mt-1 text-[15px] font-semibold tracking-[-0.02em] text-muted-strong">
+            {creator.handle}
+          </p>
+        </div>
+
+        <p className="mx-auto mt-4 max-w-[292px] text-[15px] leading-[1.6] text-muted-strong">
+          {creator.bio}
+        </p>
+
+        <div className="mt-7 flex justify-center gap-6">
+          <CreatorProfileStat label="Followers" value={formatProfileCount(fanCount)} />
+          <CreatorProfileStat label="Shorts" value={stats.shortCount.toString()} />
+        </div>
+
+        <div className="mx-auto mt-7 w-full max-w-[284px]">
           {isSelfProfile ? (
             <Button
               aria-busy={isCreatorModeEntrySubmitting || undefined}
-              className="w-full rounded-[10px] text-[13px] font-bold shadow-none"
+              className="h-12 w-full rounded-full text-[17px] font-semibold"
               disabled={isCreatorModeEntrySubmitting}
               onClick={() => {
                 void enterCreatorMode();
@@ -215,12 +232,13 @@ export function CreatorProfileShell({
             </Button>
           ) : (
             <CreatorFollowButton
+              className="h-12 rounded-full text-[17px] font-semibold shadow-[0_14px_32px_rgba(80,159,224,0.24)]"
               fullWidth
+              isFollowing={isFollowing}
+              isPending={isPending}
               onClick={() => {
                 void toggleFollow();
               }}
-              isFollowing={isFollowing}
-              isPending={isPending}
             />
           )}
           {primaryActionErrorMessage ? (
@@ -232,27 +250,26 @@ export function CreatorProfileShell({
             </p>
           ) : null}
         </div>
+      </div>
 
-        <ShortsGridTab />
-
-        {state.kind === "empty" ? (
-          <p className="px-1 pt-6 text-center text-[13px] leading-6 text-muted">
-            まだ公開中の short はありません。
-          </p>
-        ) : (
-          <div className="mt-0.5 grid grid-cols-3 gap-[3px]">
-            {shorts.map((short) => (
+      {state.kind === "empty" ? (
+        <p className="border-t border-border/70 px-6 pt-8 text-center text-[14px] leading-6 text-muted">
+          まだ公開中の short はありません。
+        </p>
+      ) : (
+        <div className="grid grid-cols-3 gap-px bg-white">
+          {shorts.map((short) => (
+            <div className="bg-white" key={short.id}>
               <CreatorProfileShortGridTile
                 creatorDisplayName={creator.displayName}
                 creatorId={creator.id}
-                key={short.id}
                 routeState={routeState}
                 short={short}
               />
-            ))}
-          </div>
-        )}
-      </section>
-    </DetailShell>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

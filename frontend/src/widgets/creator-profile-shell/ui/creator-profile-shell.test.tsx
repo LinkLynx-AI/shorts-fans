@@ -128,8 +128,8 @@ function buildEmptyState(
   };
 }
 
-function getFanStatValue(): string | null {
-  return screen.getByText("fans").previousElementSibling?.textContent ?? null;
+function getFollowerStatValue(): string | null {
+  return screen.getByText("Followers").previousElementSibling?.textContent ?? null;
 }
 
 describe("CreatorProfileShell", () => {
@@ -168,8 +168,8 @@ describe("CreatorProfileShell", () => {
       />,
     );
 
-    expect(screen.getByText("minarei")).toBeInTheDocument();
-    expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
+    expect(screen.getAllByText("@minarei")).toHaveLength(2);
+    expect(screen.getByRole("heading", { name: "Mina Rei" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Following" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("link", { name: /Mina Rei preview 0:16/i })).toHaveAttribute(
       "href",
@@ -265,7 +265,7 @@ describe("CreatorProfileShell", () => {
     });
 
     expect(screen.getByRole("button", { name: "Follow" })).toHaveAttribute("aria-pressed", "false");
-    expect(getFanStatValue()).toBe("10");
+    expect(getFollowerStatValue()).toBe("10");
   });
 
   it("keeps the CTA pending during follow and ignores duplicate clicks", async () => {
@@ -307,7 +307,7 @@ describe("CreatorProfileShell", () => {
       expect(screen.getByRole("button", { name: "Following" })).toBeEnabled();
     });
 
-    expect(getFanStatValue()).toBe("11");
+    expect(getFollowerStatValue()).toBe("11");
   });
 
   it("opens the shared auth modal when an anonymous viewer presses follow", async () => {
