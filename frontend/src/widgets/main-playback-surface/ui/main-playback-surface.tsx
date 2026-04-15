@@ -344,15 +344,19 @@ export function MainPlaybackSurface({
             </span>
           </div>
 
-          <div className="relative mt-3 h-5">
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-white/26" />
-            <div
-              className="pointer-events-none absolute left-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#78c9ff]"
-              style={{ width: `${progressPercent}%` }}
-            />
+          <div className="group relative mt-3 flex h-5 items-center">
+            <div className="pointer-events-none absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-white/24 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]">
+              <div
+                className="h-full rounded-full bg-[#78c9ff] shadow-[0_0_12px_rgba(120,201,255,0.4)]"
+                data-testid="playback-progress-fill"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <div className="pointer-events-none absolute inset-0 rounded-full ring-0 ring-white/45 transition group-focus-within:ring-2" />
             <input
               aria-label="Playback progress"
-              className="absolute inset-0 w-full cursor-pointer opacity-0"
+              aria-valuetext={`${formatPlaybackTimestamp(currentTimeSeconds)} of ${formatPlaybackTimestamp(durationSeconds)}`}
+              className="absolute inset-x-0 top-1/2 h-5 w-full -translate-y-1/2 cursor-pointer appearance-none bg-transparent opacity-0"
               max={durationSeconds > 0 ? durationSeconds : 0}
               min={0}
               onChange={handleSeek}

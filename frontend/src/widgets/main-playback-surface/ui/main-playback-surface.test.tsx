@@ -214,6 +214,7 @@ describe("MainPlaybackSurface", () => {
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
     const progress = screen.getByRole("slider", { name: "Playback progress" });
+    const progressFill = screen.getByTestId("playback-progress-fill");
     let pausedState = false;
 
     Object.defineProperty(video, "paused", {
@@ -244,6 +245,9 @@ describe("MainPlaybackSurface", () => {
     expect(
       screen.getByText(`03:30 / ${formatPlaybackTimestamp(surface.main.durationSeconds)}`),
     ).toBeInTheDocument();
+    expect(progressFill).toHaveStyle({
+      width: `${(210 / surface.main.durationSeconds) * 100}%`,
+    });
 
     await user.click(screen.getByRole("button", { name: "Pause playback" }));
 
@@ -259,6 +263,9 @@ describe("MainPlaybackSurface", () => {
     expect(
       screen.getByText(`02:00 / ${formatPlaybackTimestamp(surface.main.durationSeconds)}`),
     ).toBeInTheDocument();
+    expect(progressFill).toHaveStyle({
+      width: `${(120 / surface.main.durationSeconds) * 100}%`,
+    });
 
     await user.click(screen.getByRole("button", { name: "Play playback" }));
 
