@@ -44,6 +44,7 @@ export {
 export {
   CreatorAvatar,
   CreatorIdentity,
+  formatCompactCount,
   CreatorStatList,
 } from "./ui/creator-presenters";
 export { CreatorFollowButton } from "./ui/creator-follow-button";

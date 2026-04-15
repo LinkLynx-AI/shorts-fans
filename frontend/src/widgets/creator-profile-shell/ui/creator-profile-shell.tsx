@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, EllipsisVertical } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 
 import {
   CreatorAvatar,
   CreatorFollowButton,
+  formatCompactCount,
 } from "@/entities/creator";
 import {
   useCurrentViewer,
@@ -43,13 +44,6 @@ function formatPreviewDuration(seconds: number): string {
   const remainingSeconds = seconds % 60;
 
   return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
-}
-
-function formatProfileCount(value: number): string {
-  return new Intl.NumberFormat("en", {
-    maximumFractionDigits: 1,
-    notation: "compact",
-  }).format(value);
 }
 
 function normalizeViewerIdForSelfComparison(viewerId: string | undefined): string | null {
@@ -187,15 +181,13 @@ export function CreatorProfileShell({
               {creator.handle}
             </p>
           </div>
-          <div aria-hidden="true" className="flex size-10 items-center justify-center text-muted">
-            <EllipsisVertical className="size-[18px]" strokeWidth={2.1} />
-          </div>
+          <div aria-hidden="true" className="size-10 shrink-0" />
         </div>
       </header>
 
       <div className="px-6 pb-8 pt-7 text-center">
         <CreatorAvatar
-          className="mx-auto size-28 shadow-[0_16px_36px_rgba(36,92,129,0.16)]"
+          className="mx-auto size-28 !border-0 shadow-[0_16px_36px_rgba(36,92,129,0.16)]"
           creator={creator}
         />
 
@@ -213,7 +205,7 @@ export function CreatorProfileShell({
         </p>
 
         <div className="mt-7 flex justify-center gap-6">
-          <CreatorProfileStat label="Followers" value={formatProfileCount(fanCount)} />
+          <CreatorProfileStat label="Followers" value={formatCompactCount(fanCount)} />
           <CreatorProfileStat label="Shorts" value={stats.shortCount.toString()} />
         </div>
 
