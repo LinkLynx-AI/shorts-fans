@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from "react";
+import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -265,7 +265,7 @@ function FeedPlaybackProgressBar({
   onSeek: (nextProgress: number) => void;
   progress: number;
 }) {
-  const handlePointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+  const handleClick = (event: ReactMouseEvent<HTMLDivElement>) => {
     const bounds = event.currentTarget.getBoundingClientRect();
 
     if (bounds.width <= 0) {
@@ -307,12 +307,12 @@ function FeedPlaybackProgressBar({
       aria-valuemax={100}
       aria-valuemin={0}
       aria-valuenow={Math.round(progress * 100)}
-      className="absolute left-0 z-10 h-5 w-full cursor-pointer touch-none"
+      className="absolute left-0 z-10 h-5 w-full cursor-pointer"
       data-testid="feed-playback-progress-bar"
+      onClick={handleClick}
       onKeyDown={handleKeyDown}
-      onPointerDown={handlePointerDown}
       role="slider"
-      style={{ bottom: sharedFanNavigationInset }}
+      style={{ bottom: sharedFanNavigationInset, touchAction: "pan-y" }}
       tabIndex={0}
     >
       <div aria-hidden="true" className="absolute bottom-0 left-0 h-[2px] w-full overflow-hidden bg-white/20">
