@@ -1,5 +1,5 @@
 import userEvent from "@testing-library/user-event";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 
@@ -17,6 +17,19 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+function formatPlaybackTimestamp(totalSeconds: number): string {
+  const normalizedSeconds = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(normalizedSeconds / 3600);
+  const minutes = Math.floor(normalizedSeconds / 60);
+  const remainingSeconds = normalizedSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}:${String(Math.floor((normalizedSeconds % 3600) / 60)).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  }
+
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+}
+
 describe("MainPlaybackSurface", () => {
   beforeEach(() => {
     pause.mockReset();
@@ -33,7 +46,7 @@ describe("MainPlaybackSurface", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders playback status and falls back to the provided short when there is no browser history", async () => {
+  it("renders the refreshed playback chrome and falls back to the provided short when there is no browser history", async () => {
     const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
 
     expect(surface).toBeDefined();
@@ -49,21 +62,21 @@ describe("MainPlaybackSurface", () => {
     const video = screen.getByLabelText("Main playback video");
 
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.getByText("Playing main")).toBeInTheDocument();
-    expect(screen.getByText("resume without another unlock step")).toBeInTheDocument();
-    expect(screen.getByText("3:18")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pin short" })).toBeInTheDocument();
-    expect(video).toHaveAttribute("controls");
+    expect(screen.getByRole("button", { name: "Pause playback" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        `${formatPlaybackTimestamp(surface.resumePositionSeconds ?? 0)} / ${formatPlaybackTimestamp(surface.main.durationSeconds)}`,
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Playback progress" })).toBeInTheDocument();
+    expect(screen.queryByText("Playing main")).not.toBeInTheDocument();
+    expect(screen.queryByText("Owner preview")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pin short" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Aoi N/i })).not.toBeInTheDocument();
+    expect(video).not.toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");
     expect(video).toHaveAttribute("poster", surface.main.media.posterUrl ?? undefined);
     expect(video).toHaveAttribute("src", surface.main.media.url);
-    expect(video.nextElementSibling).toHaveClass("pointer-events-none");
-    expect(video.nextElementSibling?.nextElementSibling).toHaveClass("pointer-events-none");
-    expect(screen.getByRole("link", { name: /Aoi N/i })).toHaveAttribute(
-      "href",
-      "/creators/creator_aoi_n",
-    );
-    expect(screen.getByText("soft light の preview の続き。")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
@@ -87,9 +100,7 @@ describe("MainPlaybackSurface", () => {
 
     render(<MainPlaybackSurface fallbackHref="/shorts/balcony" surface={surface} />);
 
-    expect(screen.getAllByText("Owner preview")).toHaveLength(2);
-    expect(screen.getByText("unlock confirmation is skipped for your own main")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pinned short" })).toBeInTheDocument();
+    expect(screen.queryByText("Owner preview")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
@@ -97,7 +108,7 @@ describe("MainPlaybackSurface", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
-  it("applies the resume position to actual playback after metadata loads", () => {
+  it("applies the resume position to actual playback after metadata loads", async () => {
     const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
 
     expect(surface).toBeDefined();
@@ -112,7 +123,9 @@ describe("MainPlaybackSurface", () => {
 
     expect(video.currentTime).toBe(0);
 
-    fireEvent(video, new Event("loadedmetadata"));
+    await act(async () => {
+      fireEvent(video, new Event("loadedmetadata"));
+    });
 
     expect(video.currentTime).toBe(surface.resumePositionSeconds);
   });
@@ -141,7 +154,7 @@ describe("MainPlaybackSurface", () => {
     expect(video.muted).toBe(true);
   });
 
-  it("reapplies the resume position when the playback URL changes for the same media", () => {
+  it("reapplies the resume position when the playback URL changes for the same media", async () => {
     const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
 
     expect(surface).toBeDefined();
@@ -154,7 +167,9 @@ describe("MainPlaybackSurface", () => {
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
 
-    fireEvent(video, new Event("loadedmetadata"));
+    await act(async () => {
+      fireEvent(video, new Event("loadedmetadata"));
+    });
     expect(video.currentTime).toBe(surface.resumePositionSeconds);
 
     video.currentTime = 0;
@@ -175,14 +190,16 @@ describe("MainPlaybackSurface", () => {
       />,
     );
 
-    fireEvent(screen.getByLabelText("Main playback video"), new Event("loadedmetadata"));
+    await act(async () => {
+      fireEvent(screen.getByLabelText("Main playback video"), new Event("loadedmetadata"));
+    });
 
     expect((screen.getByLabelText("Main playback video") as HTMLVideoElement).currentTime).toBe(
       surface.resumePositionSeconds,
     );
   });
 
-  it("falls back to a generic continuation copy when the entry short caption is empty", () => {
+  it("updates playback time, toggles pause and play, and seeks through the custom progress control", async () => {
     const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
 
     expect(surface).toBeDefined();
@@ -191,22 +208,63 @@ describe("MainPlaybackSurface", () => {
       throw new Error("fixture missing");
     }
 
-    render(
-      <MainPlaybackSurface
-        fallbackHref="/shorts/softlight"
-        surface={{
-          ...surface,
-          entryShort: surface.entryShort
-            ? {
-                ...surface.entryShort,
-                caption: "   ",
-              }
-            : surface.entryShort,
-        }}
-      />,
-    );
+    const user = userEvent.setup();
 
-    expect(screen.getByText("short の続きから再生中。")).toBeInTheDocument();
+    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+
+    const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
+    const progress = screen.getByRole("slider", { name: "Playback progress" });
+    let pausedState = false;
+
+    Object.defineProperty(video, "paused", {
+      configurable: true,
+      get: () => pausedState,
+    });
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: surface.main.durationSeconds,
+    });
+
+    pause.mockImplementation(() => {
+      pausedState = true;
+    });
+    play.mockImplementation(() => {
+      pausedState = false;
+      return Promise.resolve();
+    });
+
+    fireEvent(video, new Event("loadedmetadata"));
+    await waitFor(() => {
+      expect(play).toHaveBeenCalled();
+    });
+
+    video.currentTime = 210;
+    fireEvent(video, new Event("timeupdate"));
+
+    expect(
+      screen.getByText(`03:30 / ${formatPlaybackTimestamp(surface.main.durationSeconds)}`),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Pause playback" }));
+
+    expect(pause).toHaveBeenCalled();
+
+    fireEvent.change(progress, {
+      target: {
+        value: "120",
+      },
+    });
+
+    expect(video.currentTime).toBe(120);
+    expect(
+      screen.getByText(`02:00 / ${formatPlaybackTimestamp(surface.main.durationSeconds)}`),
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Play playback" }));
+
+    await waitFor(() => {
+      expect(play).toHaveBeenCalledTimes(2);
+    });
   });
 
   it("pauses playback while the panel is inactive", () => {
@@ -222,5 +280,6 @@ describe("MainPlaybackSurface", () => {
 
     expect(pause).toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Play playback" })).toBeInTheDocument();
   });
 });
