@@ -8,6 +8,8 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	t.Setenv("POSTGRES_DSN", "postgres://example")
 	t.Setenv("REDIS_ADDR", "redis:6379")
 	t.Setenv("AWS_REGION", "ap-northeast-1")
+	t.Setenv("COGNITO_USER_POOL_ID", "ap-northeast-1_example")
+	t.Setenv("COGNITO_USER_POOL_CLIENT_ID", "exampleclientid")
 	t.Setenv("MEDIA_JOBS_QUEUE_URL", "https://example.com/media-queue")
 	t.Setenv("MEDIA_RAW_BUCKET_NAME", "raw-bucket")
 	t.Setenv("MEDIA_SHORT_PUBLIC_BUCKET_NAME", "short-bucket")
@@ -34,6 +36,12 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	}
 	if cfg.AWSRegion != "ap-northeast-1" {
 		t.Fatalf("Load() aws region got %q want %q", cfg.AWSRegion, "ap-northeast-1")
+	}
+	if cfg.CognitoUserPoolID != "ap-northeast-1_example" {
+		t.Fatalf("Load() cognito user pool id got %q want %q", cfg.CognitoUserPoolID, "ap-northeast-1_example")
+	}
+	if cfg.CognitoUserPoolClientID != "exampleclientid" {
+		t.Fatalf("Load() cognito user pool client id got %q want %q", cfg.CognitoUserPoolClientID, "exampleclientid")
 	}
 	if cfg.MediaJobsQueueURL != "https://example.com/media-queue" {
 		t.Fatalf("Load() media jobs queue url got %q want %q", cfg.MediaJobsQueueURL, "https://example.com/media-queue")
@@ -80,5 +88,33 @@ func TestLoadFallsBackToLegacySQSQueueURL(t *testing.T) {
 	cfg := Load()
 	if cfg.MediaJobsQueueURL != "https://example.com/legacy-queue" {
 		t.Fatalf("Load() media jobs queue url got %q want %q", cfg.MediaJobsQueueURL, "https://example.com/legacy-queue")
+	}
+}
+
+func TestValidateFanAuthRequiresCognitoRuntimeValues(t *testing.T) {
+	cfg := Config{
+		AWSRegion:               "ap-northeast-1",
+		CognitoUserPoolID:       "ap-northeast-1_example",
+		CognitoUserPoolClientID: "exampleclientid",
+	}
+
+	if err := cfg.ValidateFanAuth(); err != nil {
+		t.Fatalf("ValidateFanAuth() error = %v, want nil", err)
+	}
+}
+
+func TestValidateFanAuthReportsMissingValues(t *testing.T) {
+	cfg := Config{
+		AWSRegion: "ap-northeast-1",
+	}
+
+	err := cfg.ValidateFanAuth()
+	if err == nil {
+		t.Fatal("ValidateFanAuth() error = nil, want missing env error")
+	}
+
+	want := "missing required environment variables: COGNITO_USER_POOL_ID, COGNITO_USER_POOL_CLIENT_ID"
+	if err.Error() != want {
+		t.Fatalf("ValidateFanAuth() error got %q want %q", err.Error(), want)
 	}
 }

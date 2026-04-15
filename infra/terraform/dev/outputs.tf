@@ -3,6 +3,26 @@ output "aws_region" {
   value       = var.aws_region
 }
 
+output "cognito_user_pool_id" {
+  description = "Cognito User Pool ID for dev fan auth."
+  value       = aws_cognito_user_pool.fan_auth.id
+}
+
+output "cognito_user_pool_arn" {
+  description = "Cognito User Pool ARN for dev fan auth."
+  value       = aws_cognito_user_pool.fan_auth.arn
+}
+
+output "cognito_user_pool_client_id" {
+  description = "Secretless Cognito App Client ID for backend fan auth."
+  value       = aws_cognito_user_pool_client.fan_auth.id
+}
+
+output "cognito_user_pool_issuer_url" {
+  description = "HTTPS issuer URL for the dev Cognito User Pool."
+  value       = format("https://%s", aws_cognito_user_pool.fan_auth.endpoint)
+}
+
 output "raw_bucket_name" {
   description = "Private raw upload bucket name."
   value       = aws_s3_bucket.raw.bucket

@@ -7,18 +7,20 @@ import (
 )
 
 const (
-	defaultAPIAddr          = ":8080"
-	defaultAppEnv           = "development"
-	legacySQSQueueURLEnv    = "SQS_QUEUE_URL"
-	mediaJobsQueueURLEnv    = "MEDIA_JOBS_QUEUE_URL"
-	mediaRawBucketNameEnv   = "MEDIA_RAW_BUCKET_NAME"
-	mediaShortBucketNameEnv = "MEDIA_SHORT_PUBLIC_BUCKET_NAME"
-	mediaShortBaseURLEnv    = "MEDIA_SHORT_PUBLIC_BASE_URL"
-	mediaMainBucketNameEnv  = "MEDIA_MAIN_PRIVATE_BUCKET_NAME"
-	mediaRoleARNEnv         = "MEDIACONVERT_SERVICE_ROLE_ARN"
-	avatarUploadBucketEnv   = "CREATOR_AVATAR_UPLOAD_BUCKET_NAME"
-	avatarDeliveryBucketEnv = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
-	avatarBaseURLEnv        = "CREATOR_AVATAR_BASE_URL"
+	defaultAPIAddr             = ":8080"
+	defaultAppEnv              = "development"
+	legacySQSQueueURLEnv       = "SQS_QUEUE_URL"
+	cognitoUserPoolIDEnv       = "COGNITO_USER_POOL_ID"
+	cognitoUserPoolClientIDEnv = "COGNITO_USER_POOL_CLIENT_ID"
+	mediaJobsQueueURLEnv       = "MEDIA_JOBS_QUEUE_URL"
+	mediaRawBucketNameEnv      = "MEDIA_RAW_BUCKET_NAME"
+	mediaShortBucketNameEnv    = "MEDIA_SHORT_PUBLIC_BUCKET_NAME"
+	mediaShortBaseURLEnv       = "MEDIA_SHORT_PUBLIC_BASE_URL"
+	mediaMainBucketNameEnv     = "MEDIA_MAIN_PRIVATE_BUCKET_NAME"
+	mediaRoleARNEnv            = "MEDIACONVERT_SERVICE_ROLE_ARN"
+	avatarUploadBucketEnv      = "CREATOR_AVATAR_UPLOAD_BUCKET_NAME"
+	avatarDeliveryBucketEnv    = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
+	avatarBaseURLEnv           = "CREATOR_AVATAR_BASE_URL"
 )
 
 // Config は backend コマンドの実行時設定を保持します。
@@ -28,6 +30,8 @@ type Config struct {
 	PostgresDSN                     string
 	RedisAddr                       string
 	AWSRegion                       string
+	CognitoUserPoolID               string
+	CognitoUserPoolClientID         string
 	MediaJobsQueueURL               string
 	MediaRawBucketName              string
 	MediaShortPublicBucketName      string
@@ -52,6 +56,8 @@ func LoadFromEnv(lookup func(string) string) Config {
 		PostgresDSN:                     trimmedLookup(lookup, "POSTGRES_DSN"),
 		RedisAddr:                       trimmedLookup(lookup, "REDIS_ADDR"),
 		AWSRegion:                       trimmedLookup(lookup, "AWS_REGION"),
+		CognitoUserPoolID:               trimmedLookup(lookup, cognitoUserPoolIDEnv),
+		CognitoUserPoolClientID:         trimmedLookup(lookup, cognitoUserPoolClientIDEnv),
 		MediaJobsQueueURL:               firstNonEmpty(trimmedLookup(lookup, mediaJobsQueueURLEnv), trimmedLookup(lookup, legacySQSQueueURLEnv)),
 		MediaRawBucketName:              trimmedLookup(lookup, mediaRawBucketNameEnv),
 		MediaShortPublicBucketName:      trimmedLookup(lookup, mediaShortBucketNameEnv),
@@ -127,6 +133,30 @@ func (c Config) ValidateWorker() error {
 // ValidateMediaSmoke は media smoke 用の設定が不足なく与えられているか検証します。
 func (c Config) ValidateMediaSmoke() error {
 	return c.validateMediaSandbox(true)
+}
+
+// ValidateFanAuth は fan auth runtime が必要とする Cognito 設定を検証します。
+func (c Config) ValidateFanAuth() error {
+	required := []struct {
+		name  string
+		value string
+	}{
+		{name: "AWS_REGION", value: c.AWSRegion},
+		{name: cognitoUserPoolIDEnv, value: c.CognitoUserPoolID},
+		{name: cognitoUserPoolClientIDEnv, value: c.CognitoUserPoolClientID},
+	}
+
+	var missing []string
+	for _, field := range required {
+		if field.value == "" {
+			missing = append(missing, field.name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
 }
 
 // MediaSandboxEnabled は media sandbox 用の env が 1 つ以上投入されているか返します。
