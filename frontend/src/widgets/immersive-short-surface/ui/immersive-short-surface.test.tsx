@@ -685,6 +685,7 @@ describe("ImmersiveShortSurface", () => {
       "href",
       "/creators/creator_mina_rei?from=short&shortFanTab=pinned&shortId=rooftop",
     );
+    expect(screen.getByRole("heading", { level: 1, name: "Short detail" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /For You/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Unlock/i })).toBeInTheDocument();
@@ -716,10 +717,20 @@ describe("ImmersiveShortSurface", () => {
       "href",
       "/creators/creator_mina_rei?from=short&shortFanTab=pinned&shortId=rooftop",
     );
+    expect(screen.getByRole("heading", { level: 1, name: "Short detail" })).toBeInTheDocument();
     expect(screen.getByTestId("feed-action-rail")).toBeInTheDocument();
     expect(screen.getByTestId("feed-playback-progress-bar")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /For You/i })).not.toBeInTheDocument();
     expect(screen.getByText(detailSurface.short.caption)).toBeInTheDocument();
+  });
+
+  it("keeps the feed accessibility heading when feed mode uses the feed-like presentation branch", () => {
+    renderWithViewerSession(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />, {
+      hasSession: true,
+    });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Feed" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Short detail" })).not.toBeInTheDocument();
   });
 
   it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {

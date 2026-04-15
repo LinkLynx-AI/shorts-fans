@@ -866,7 +866,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           />
         }
       >
-        <h1 className="sr-only">Short detail</h1>
+        <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <FeedActionRail pinned={pinned} {...pinProps} />
         {pinErrorMessage ? (
           <p
