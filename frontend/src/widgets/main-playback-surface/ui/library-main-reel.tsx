@@ -4,7 +4,10 @@ import { useEffect, useRef, useState } from "react";
 
 import type { FanLibraryItem } from "@/entities/fan-profile";
 import { getShortThemeStyle } from "@/entities/short";
-import { buildFanProfileShortDetailHref } from "@/features/creator-navigation";
+import {
+  buildCreatorProfileHref,
+  buildFanProfileShortDetailHref,
+} from "@/features/creator-navigation";
 import { VerticalSnapReel } from "@/shared/ui";
 
 import { resolveLibraryMainPlaybackSurface } from "../api/resolve-library-main-playback-surface";
@@ -166,6 +169,11 @@ export function LibraryMainReel({
           <>
             {itemState?.kind === "ready" ? (
               <MainPlaybackSurface
+                creatorProfileHref={buildCreatorProfileHref(itemState.surface.creator.id, {
+                  from: "short",
+                  shortFanTab: "library",
+                  shortId: item.entryShort.id,
+                })}
                 fallbackHref={backHref}
                 isActive={isActive}
                 surface={itemState.surface}

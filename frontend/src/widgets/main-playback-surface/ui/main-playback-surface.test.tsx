@@ -6,6 +6,10 @@ import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
 import { MainPlaybackSurface } from "./main-playback-surface";
 
+function buildCreatorProfileHref(shortId: string): string {
+  return `/creators/creator_1?from=short&shortId=${shortId}`;
+}
+
 const back = vi.fn();
 const push = vi.fn();
 const pause = vi.fn();
@@ -45,11 +49,18 @@ describe("MainPlaybackSurface", () => {
 
     const user = userEvent.setup();
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        surface={surface}
+      />,
+    );
 
     const video = screen.getByLabelText("Main playback video");
 
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "More options" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause playback" })).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -72,6 +83,34 @@ describe("MainPlaybackSurface", () => {
     expect(back).not.toHaveBeenCalled();
   });
 
+  it("opens the bottom-sheet menu and exposes the creator profile action", async () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        surface={surface}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "More options" }));
+
+    expect(screen.getByRole("dialog", { name: "Main options" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "クリエイターのプロフィールへ" })).toHaveAttribute(
+      "href",
+      buildCreatorProfileHref("softlight"),
+    );
+  });
+
   it("uses router.back when a previous history entry exists", async () => {
     const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "balcony", "owner");
 
@@ -86,7 +125,13 @@ describe("MainPlaybackSurface", () => {
 
     const user = userEvent.setup();
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/balcony" surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("balcony")}
+        fallbackHref="/shorts/balcony"
+        surface={surface}
+      />,
+    );
 
     expect(screen.queryByText("Owner preview")).not.toBeInTheDocument();
 
@@ -105,7 +150,13 @@ describe("MainPlaybackSurface", () => {
       throw new Error("fixture missing");
     }
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        surface={surface}
+      />,
+    );
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
 
@@ -131,7 +182,13 @@ describe("MainPlaybackSurface", () => {
 
     const user = userEvent.setup();
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/afterrain" surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("afterrain")}
+        fallbackHref="/shorts/afterrain"
+        surface={surface}
+      />,
+    );
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
 
@@ -160,7 +217,13 @@ describe("MainPlaybackSurface", () => {
       throw new Error("fixture missing");
     }
 
-    const { rerender } = render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+    const { rerender } = render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        surface={surface}
+      />,
+    );
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
 
@@ -173,6 +236,7 @@ describe("MainPlaybackSurface", () => {
 
     rerender(
       <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
         fallbackHref="/shorts/softlight"
         surface={{
           ...surface,
@@ -207,7 +271,13 @@ describe("MainPlaybackSurface", () => {
 
     const user = userEvent.setup();
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        surface={surface}
+      />,
+    );
 
     const video = screen.getByLabelText("Main playback video") as HTMLVideoElement;
     const progress = screen.getByRole("slider", { name: "Playback progress" });
@@ -280,7 +350,14 @@ describe("MainPlaybackSurface", () => {
       throw new Error("fixture missing");
     }
 
-    render(<MainPlaybackSurface fallbackHref="/shorts/softlight" isActive={false} surface={surface} />);
+    render(
+      <MainPlaybackSurface
+        creatorProfileHref={buildCreatorProfileHref("softlight")}
+        fallbackHref="/shorts/softlight"
+        isActive={false}
+        surface={surface}
+      />,
+    );
 
     expect(pause).toHaveBeenCalled();
     expect(play).not.toHaveBeenCalled();
