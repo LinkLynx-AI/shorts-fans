@@ -71,6 +71,8 @@ export default async function ShortDetailPage({
     shortFanTab: routeState.from === "fan" ? routeState.fanTab : undefined,
     shortId,
   };
+  const shouldUseFeedLikePresentation =
+    routeState.from === "creator" || (routeState.from === "fan" && routeState.fanTab === "pinned");
   const legacySurface = !shortId.startsWith("short_") ? getShortSurfaceById(shortId) : undefined;
 
   if (legacySurface) {
@@ -80,6 +82,7 @@ export default async function ShortDetailPage({
         creatorProfileOrigin={creatorProfileOrigin}
         mode="detail"
         surface={legacySurface}
+        {...(shouldUseFeedLikePresentation ? { presentation: "feedLike" as const } : {})}
       />
     );
   }
@@ -143,6 +146,7 @@ export default async function ShortDetailPage({
       creatorProfileOrigin={creatorProfileOrigin}
       mode="detail"
       surface={buildDetailSurfaceFromApi(detail)}
+      {...(shouldUseFeedLikePresentation ? { presentation: "feedLike" as const } : {})}
     />
   );
 }

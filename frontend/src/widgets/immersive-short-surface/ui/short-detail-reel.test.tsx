@@ -1,4 +1,4 @@
-import { StrictMode } from "react";
+import { StrictMode, type ReactNode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 
 import { getPublicShortDetail } from "@/entities/short";
@@ -16,9 +16,11 @@ vi.mock("@/entities/short", async () => {
 });
 
 vi.mock("./immersive-short-surface", () => ({
+  FeedLikeShortBackdrop: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
+  FeedLikeShortBackHeader: vi.fn(() => null),
   ImmersiveShortSurface: vi.fn(
-    ({ surface }: { surface: { short: { id: string } } }) => (
-      <div data-testid={`immersive-short-surface-${surface.short.id}`} />
+    ({ presentation, surface }: { presentation?: string; surface: { short: { id: string } } }) => (
+      <div data-presentation={presentation ?? "default"} data-testid={`immersive-short-surface-${surface.short.id}`} />
     ),
   ),
 }));
@@ -189,5 +191,6 @@ describe("ShortDetailReel", () => {
     await waitFor(() => {
       expect(screen.getByTestId("immersive-short-surface-short_3")).toBeInTheDocument();
     });
+    expect(screen.getByTestId("immersive-short-surface-short_3")).toHaveAttribute("data-presentation", "feedLike");
   });
 });
