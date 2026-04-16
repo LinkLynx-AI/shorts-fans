@@ -2,29 +2,29 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 import { CreatorUploadForm } from "@/features/creator-upload";
-import { Button } from "@/shared/ui";
 
 /**
  * `/creator/upload` の creator-private upload shell を表示する。
  */
 export function CreatorUploadShell() {
   return (
-    <main className="bg-background">
-      <div className="mx-auto min-h-svh w-full max-w-[408px] overflow-hidden bg-white text-foreground">
-        <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
-          <div className="flex items-center justify-between gap-3">
-            <Button asChild className="-ml-2" size="icon" variant="ghost">
-              <Link href="/creator">
-                <span className="sr-only">Back</span>
-                <ArrowLeft className="size-5" strokeWidth={2.1} />
-              </Link>
-            </Button>
+    <main className="min-h-svh bg-background sm:px-4">
+      <div className="mx-auto flex min-h-svh w-full max-w-[408px] flex-col overflow-hidden bg-white text-foreground sm:border sm:border-border sm:shadow-[var(--device-shadow)]">
+        <header className="sticky top-0 z-20 border-b border-[#eef2f6] bg-white/95 backdrop-blur-sm">
+          <div className="grid min-h-[74px] grid-cols-[40px_1fr_40px] items-center px-4 pt-[12px]">
+            <Link
+              aria-label="Back"
+              className="inline-flex size-9 items-center justify-center rounded-full text-foreground transition hover:bg-[#f5f8fb]"
+              href="/creator"
+            >
+              <ArrowLeft className="size-5" strokeWidth={2.1} />
+            </Link>
+            <p className="text-center text-[17px] font-bold tracking-[-0.02em] text-foreground">新しい動画</p>
+            <div className="size-9" />
           </div>
+        </header>
 
-          <section className="mt-[18px] pb-10">
-            <CreatorUploadForm />
-          </section>
-        </section>
+        <CreatorUploadForm />
       </div>
     </main>
   );
