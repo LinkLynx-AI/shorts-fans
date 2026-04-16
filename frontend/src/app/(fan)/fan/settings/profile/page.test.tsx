@@ -123,7 +123,8 @@ describe("FanProfileSettingsPage", () => {
 
     expect(await screen.findByDisplayValue("Mina Rei")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "プロフィールを編集" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Handle" })).toHaveValue("@minarei");
+    expect(screen.getByRole("textbox", { name: /handle/i })).toHaveValue("@minarei");
     expect(screen.getByRole("link", { name: "fan hub に戻る" })).toHaveAttribute("href", "/fan");
+    expect(screen.getByRole("button", { name: "保存する" })).toBeInTheDocument();
   });
 });
