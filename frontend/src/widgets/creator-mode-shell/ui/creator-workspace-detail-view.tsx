@@ -223,6 +223,30 @@ function resolveEditableShortCaption(
   return previewDetailState.detail.short.caption;
 }
 
+export function resolveCreatorWorkspaceDetailSummary(
+  detailSelection: CreatorWorkspaceDetailViewSelection,
+  summary: string,
+  previewDetailState: CreatorWorkspacePreviewDetailState,
+): string | null {
+  if (detailSelection.kind === "mock") {
+    const normalizedSummary = summary.trim();
+
+    return normalizedSummary.length > 0 ? normalizedSummary : null;
+  }
+
+  if (detailSelection.kind === "preview-main") {
+    return null;
+  }
+
+  if (previewDetailState.kind !== "ready" || previewDetailState.detail.kind !== "preview-short") {
+    return null;
+  }
+
+  const normalizedCaption = previewDetailState.detail.short.caption.trim();
+
+  return normalizedCaption.length > 0 ? normalizedCaption : null;
+}
+
 function CreatorWorkspaceDetailMedia({
   detail,
   onRetryPreviewDetail,
@@ -413,7 +437,7 @@ function resolvePreviewDetailState(
         settings: buildPreviewMainDetailSettings(detailSelection.item),
         statusLabel: null,
         statusTone: null,
-        summary: "owner preview 一覧から取得した本編データです。",
+        summary: "",
       },
       linkedPreviewItems: previewCollections.shorts.items.filter((item) => item.canonicalMainId === detailSelection.item.id),
       poster: {
@@ -433,7 +457,7 @@ function resolvePreviewDetailState(
       settings: buildPreviewShortDetailSettings(detailSelection.item),
       statusLabel: null,
       statusTone: null,
-      summary: "owner preview 一覧から取得したショートデータです。",
+      summary: "",
     },
     linkedPreviewItems: previewCollections.mains.items.filter((item) => item.id === detailSelection.item.canonicalMainId),
     poster: {
@@ -508,6 +532,7 @@ export function CreatorWorkspaceDetailView({
   const postActionMenu = resolveCreatorWorkspacePostActionMenu(detailSelection, canEditShortCaption);
   const editableShortCaption = resolveEditableShortCaption(previewDetailState);
   const editableShortId = canEditShortCaption ? detailSelection.item.id : null;
+  const detailSummary = resolveCreatorWorkspaceDetailSummary(detailSelection, detail.summary, previewDetailState);
 
   return (
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-10 pt-[14px] text-foreground">
@@ -580,9 +605,11 @@ export function CreatorWorkspaceDetailView({
           previewDetailState={previewDetailState}
         />
 
-        <div className="grid gap-1.5">
-          <p className="m-0 text-[15px] leading-[1.6] text-foreground">{detail.summary}</p>
-        </div>
+        {detailSummary ? (
+          <div className="grid gap-1.5">
+            <p className="m-0 text-[15px] leading-[1.6] text-foreground">{detailSummary}</p>
+          </div>
+        ) : null}
 
         {detail.metrics.length > 0 ? <CreatorWorkspaceDetailMetrics metrics={detail.metrics} /> : null}
 

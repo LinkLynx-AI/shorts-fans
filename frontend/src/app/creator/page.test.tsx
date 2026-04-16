@@ -405,8 +405,8 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
 
-    expect(await screen.findByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
-    expect(screen.getByText("¥1,800")).toBeInTheDocument();
+    expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
     expect(screen.getAllByText("12:00")).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Back" }));
@@ -415,7 +415,7 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: /^Top short\b/ }));
 
-    expect(await screen.findByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(await screen.findByText("quiet rooftop preview.")).toBeInTheDocument();
     expect(screen.getAllByText("0:16")).toHaveLength(2);
 
     await user.click(screen.getByRole("button", { name: "Back" }));
@@ -510,8 +510,8 @@ describe("CreatorPage", () => {
     await screen.findByText("@minarei");
     await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
 
-    expect(await screen.findByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
-    expect(screen.getByText("¥1,800")).toBeInTheDocument();
+    expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "投稿操作" }));
     await user.click(await screen.findByRole("button", { name: "priceの変更" }));
@@ -678,7 +678,7 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
 
-    expect(screen.getByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(screen.getByText("quiet rooftop preview.")).toBeInTheDocument();
     expect(screen.queryByText("short_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.queryByText("main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.queryByText("asset_short_quiet_rooftop")).not.toBeInTheDocument();
@@ -693,12 +693,12 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
 
-    expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
     expect(screen.queryByText("asset_main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.getByText("¥1,800")).toBeInTheDocument();
     expect(screen.getAllByText("12:00")).toHaveLength(2);
     expect(await screen.findByRole("button", { name: "本編を再生" })).toBeInTheDocument();
     expect(screen.queryByLabelText("ショート動画")).not.toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "本編を再生" }));
 
@@ -748,7 +748,7 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "captionの変更" }));
 
     expect(await screen.findByRole("dialog", { name: "captionを変更" })).toBeInTheDocument();
-    expect(screen.getByText("owner preview 一覧から取得したショートデータです。")).toBeInTheDocument();
+    expect(screen.getByLabelText("caption")).toHaveValue("quiet rooftop preview.");
     expect(mockedRouter.push).not.toHaveBeenCalled();
 
     await user.click(screen.getByRole("button", { name: "閉じる" }));
@@ -772,7 +772,7 @@ describe("CreatorPage", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
     });
-    expect(screen.getByText("owner preview 一覧から取得した本編データです。")).toBeInTheDocument();
+    expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog", { name: "captionを変更" })).not.toBeInTheDocument();
     expect(mockedRouter.push).not.toHaveBeenCalled();
   });
