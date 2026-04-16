@@ -151,7 +151,6 @@ function ViewerProfileTextField({
   autoCapitalize,
   autoComplete,
   autoCorrect,
-  children,
   disabled,
   id,
   label,
@@ -163,7 +162,6 @@ function ViewerProfileTextField({
   autoCapitalize?: string;
   autoComplete?: string;
   autoCorrect?: string;
-  children?: ReactNode;
   disabled: boolean;
   id: string;
   label: string;
@@ -189,7 +187,6 @@ function ViewerProfileTextField({
         type={type}
         value={value}
       />
-      {children}
     </label>
   );
 }
