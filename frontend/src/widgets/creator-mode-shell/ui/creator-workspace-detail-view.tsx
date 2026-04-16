@@ -34,6 +34,7 @@ import {
   createVideoPosterStyle,
   formatDurationLabel,
 } from "../lib/creator-mode-shell-ui";
+import { resolveCreatorWorkspaceDetailSummary } from "../lib/resolve-creator-workspace-detail-summary";
 import type {
   CreatorWorkspaceDetailPoster,
   CreatorWorkspaceDetailSelection,
@@ -221,30 +222,6 @@ function resolveEditableShortCaption(
   }
 
   return previewDetailState.detail.short.caption;
-}
-
-export function resolveCreatorWorkspaceDetailSummary(
-  detailSelection: CreatorWorkspaceDetailViewSelection,
-  summary: string,
-  previewDetailState: CreatorWorkspacePreviewDetailState,
-): string | null {
-  if (detailSelection.kind === "mock") {
-    const normalizedSummary = summary.trim();
-
-    return normalizedSummary.length > 0 ? normalizedSummary : null;
-  }
-
-  if (detailSelection.kind === "preview-main") {
-    return null;
-  }
-
-  if (previewDetailState.kind !== "ready" || previewDetailState.detail.kind !== "preview-short") {
-    return null;
-  }
-
-  const normalizedCaption = previewDetailState.detail.short.caption.trim();
-
-  return normalizedCaption.length > 0 ? normalizedCaption : null;
 }
 
 function CreatorWorkspaceDetailMedia({

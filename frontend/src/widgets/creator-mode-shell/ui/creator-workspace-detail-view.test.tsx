@@ -6,9 +6,9 @@ import type {
   CreatorWorkspacePreviewMainItem,
   CreatorWorkspacePreviewShortItem,
 } from "../api/get-creator-workspace-preview-collections";
+import { resolveCreatorWorkspaceDetailSummary } from "../lib/resolve-creator-workspace-detail-summary";
 import type { CreatorWorkspacePreviewDetailState } from "../model/use-creator-workspace-preview-detail";
 import type { CreatorWorkspaceDetailViewSelection } from "./creator-mode-shell.types";
-import { resolveCreatorWorkspaceDetailSummary } from "./creator-workspace-detail-view";
 
 function getMockReadyState(): CreatorModeShellReadyState {
   return getMockCreatorModeShellState("dashboard");
@@ -130,8 +130,6 @@ describe("resolveCreatorWorkspaceDetailSummary", () => {
       resolveCreatorWorkspaceDetailSummary(
         {
           kind: "mock",
-          shortId: mockShortId,
-          tab: "shorts",
         },
         mockDetail?.summary ?? "",
         {
