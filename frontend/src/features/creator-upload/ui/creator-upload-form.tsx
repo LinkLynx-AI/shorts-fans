@@ -43,15 +43,15 @@ type ConfirmationCheckboxProps = {
 
 function getFieldStateClassName(selected: boolean, tone: "default" | "error" | "success" = "default"): string {
   if (tone === "error") {
-    return "inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[#fff0f1] px-3 text-[12px] font-bold text-[#b2394f]";
+    return "inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[#fff0f1] px-3 text-[12px] font-semibold text-[#b2394f]";
   }
 
   if (tone === "success") {
-    return "inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[rgba(26,152,80,0.12)] px-3 text-[12px] font-bold text-[#197040]";
+    return "inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[rgba(26,152,80,0.12)] px-3 text-[12px] font-semibold text-[#197040]";
   }
 
   return cn(
-    "inline-flex min-h-8 items-center justify-center rounded-[10px] px-3 text-[12px] font-bold",
+    "inline-flex min-h-8 items-center justify-center rounded-[10px] px-3 text-[12px] font-semibold",
     selected ? "bg-[#edf5ff] text-[#5b84eb]" : "bg-[#f2f4f7] text-[#7f8898]",
   );
 }
@@ -66,7 +66,7 @@ function getPickerAreaClassName(disabled: boolean, compact: boolean): string {
 
 function getInputClassName(disabled: boolean): string {
   return cn(
-    "min-h-[64px] w-full rounded-[20px] border border-transparent bg-[#f5f7fb] px-5 text-[16px] font-bold text-foreground outline-none transition placeholder:font-semibold placeholder:text-[#b2b9c6]",
+    "min-h-[64px] w-full rounded-[20px] border border-transparent bg-[#f5f7fb] px-5 text-[16px] font-semibold text-foreground outline-none transition placeholder:font-medium placeholder:text-[#b2b9c6]",
     disabled ? "cursor-not-allowed opacity-60" : "focus:border-[#d7eaff] focus:bg-white focus:ring-4 focus:ring-[#71b4ea]/15",
   );
 }
@@ -113,8 +113,8 @@ function UploadPicker({
           className={cn("mb-2 text-[#6790ff]", compact ? "size-7" : "size-8")}
           strokeWidth={1.9}
         />
-        <span className={cn("font-bold text-[#4e7ff7]", compact ? "text-[14px]" : "text-[15px]")}>{label}</span>
-        {subtitle ? <span className="mt-1 text-[12px] font-semibold text-[#a7b0bf]">{subtitle}</span> : null}
+        <span className={cn("font-semibold text-[#4e7ff7]", compact ? "text-[14px]" : "text-[15px]")}>{label}</span>
+        {subtitle ? <span className="mt-1 text-[12px] font-medium text-[#a7b0bf]">{subtitle}</span> : null}
       </label>
 
       {fileName ? <p className="px-1 text-[12px] font-medium text-muted">{fileName}</p> : null}
@@ -141,7 +141,7 @@ function ConfirmationCheckbox({
         }}
         type="checkbox"
       />
-      <span className="text-[14px] font-semibold leading-[1.55] text-muted-strong">{label}</span>
+      <span className="text-[14px] font-medium leading-[1.55] text-muted-strong">{label}</span>
     </label>
   );
 }
@@ -203,10 +203,10 @@ export function CreatorUploadForm() {
     <form className="flex min-h-0 flex-1 flex-col" onSubmit={(event) => void handleSubmit(event)}>
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-36 pt-7">
         <div className="px-1">
-          <h1 className="text-[25px] font-black leading-[1.18] tracking-[-0.05em] text-foreground">
+          <h1 className="text-[25px] font-extrabold leading-[1.18] tracking-[-0.05em] text-foreground">
             本編とショートを追加
           </h1>
-          <p className="mt-2 text-[14px] font-semibold text-muted">動画ファイルと詳細情報を入力してください</p>
+          <p className="mt-2 text-[14px] font-medium text-muted">動画ファイルと詳細情報を入力してください</p>
         </div>
 
         <input
@@ -225,14 +225,14 @@ export function CreatorUploadForm() {
               <div className="flex items-center gap-2">
                 <Video className="size-[18px] shrink-0 text-[#6890ff]" strokeWidth={2.1} />
                 <div className="flex items-baseline gap-2">
-                  <p className="m-0 text-[15px] font-black uppercase tracking-[0.02em] text-foreground">MAIN</p>
-                  <p className="m-0 text-[14px] font-bold text-muted">本編動画</p>
+                  <p className="m-0 text-[15px] font-bold uppercase tracking-[0.02em] text-foreground">MAIN</p>
+                  <p className="m-0 text-[14px] font-semibold text-muted">本編動画</p>
                 </div>
               </div>
               <span className={getFieldStateClassName(draft.mainFile !== null, mainStatus.tone)}>{mainStatus.label}</span>
             </div>
 
-            <p className="mt-5 text-[14px] font-semibold text-muted">
+            <p className="mt-5 text-[14px] font-medium text-muted">
               {draft.mainFile ? "本編動画を選択しました" : "本編動画を追加してください"}
             </p>
 
@@ -247,14 +247,14 @@ export function CreatorUploadForm() {
             </div>
 
             {draft.mainTransferState.kind === "failed" ? (
-              <p className="mt-3 text-[13px] font-semibold leading-[1.5] text-[#b2394f]">
+              <p className="mt-3 text-[13px] font-medium leading-[1.5] text-[#b2394f]">
                 {draft.mainTransferState.message}
               </p>
             ) : null}
 
             <div className="mt-6 grid gap-4">
               <div className="grid gap-2">
-                <label className="text-[15px] font-black tracking-[-0.02em] text-foreground" htmlFor={`${inputIdBase}-price-jpy`}>
+                <label className="text-[15px] font-bold tracking-[-0.02em] text-foreground" htmlFor={`${inputIdBase}-price-jpy`}>
                   価格（円）
                 </label>
                 <div className="relative">
@@ -272,7 +272,7 @@ export function CreatorUploadForm() {
                     type="number"
                     value={draft.mainPriceJpyInput}
                   />
-                  <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-[26px] font-black text-[#aeb6c3]">
+                  <span className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-[26px] font-bold text-[#aeb6c3]">
                     ¥
                   </span>
                 </div>
@@ -299,12 +299,12 @@ export function CreatorUploadForm() {
           <section className="grid gap-4">
             <div className="flex items-center justify-between gap-3 px-1">
               <div className="flex items-baseline gap-2">
-                <p className="m-0 text-[15px] font-black uppercase tracking-[0.02em] text-foreground">SHORTS</p>
-                <p className="m-0 text-[14px] font-bold text-muted">ショート動画</p>
+                <p className="m-0 text-[15px] font-bold uppercase tracking-[0.02em] text-foreground">SHORTS</p>
+                <p className="m-0 text-[14px] font-semibold text-muted">ショート動画</p>
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[#f2f4f7] px-3 text-[12px] font-bold text-[#6f7786]">
+                <span className="inline-flex min-h-8 items-center justify-center rounded-[10px] bg-[#f2f4f7] px-3 text-[12px] font-semibold text-[#6f7786]">
                   {shortSlotCountLabel}
                 </span>
                 <button
@@ -344,10 +344,10 @@ export function CreatorUploadForm() {
 
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-baseline gap-2">
-                          <p className="m-0 text-[15px] font-black uppercase tracking-[0.02em] text-[#5c84eb]">
+                          <p className="m-0 text-[15px] font-bold uppercase tracking-[0.02em] text-[#5c84eb]">
                             {`SHORT ${index + 1}`}
                           </p>
-                          <p className="m-0 text-[14px] font-bold text-foreground">{`ショート動画 ${index + 1}`}</p>
+                          <p className="m-0 text-[14px] font-semibold text-foreground">{`ショート動画 ${index + 1}`}</p>
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -370,7 +370,7 @@ export function CreatorUploadForm() {
                         </div>
                       </div>
 
-                      <p className="mt-5 text-[14px] font-semibold text-muted">
+                      <p className="mt-5 text-[14px] font-medium text-muted">
                         {slot.file ? `ショート動画 ${index + 1} を選択しました` : "ショート動画を追加してください"}
                       </p>
 
@@ -385,15 +385,15 @@ export function CreatorUploadForm() {
                       </div>
 
                       {slot.transferState.kind === "failed" ? (
-                        <p className="mt-3 text-[13px] font-semibold leading-[1.5] text-[#b2394f]">
+                        <p className="mt-3 text-[13px] font-medium leading-[1.5] text-[#b2394f]">
                           {slot.transferState.message}
                         </p>
                       ) : null}
 
                       <div className="mt-5 grid gap-2">
-                        <label className="text-[15px] font-black tracking-[-0.02em] text-foreground" htmlFor={`${shortInputId}-caption`}>
+                        <label className="text-[15px] font-bold tracking-[-0.02em] text-foreground" htmlFor={`${shortInputId}-caption`}>
                           {`ショート動画 ${index + 1} の caption`}
-                          <span className="ml-1 font-bold text-muted">(任意)</span>
+                          <span className="ml-1 font-medium text-muted">(任意)</span>
                         </label>
                         <input
                           aria-label={`ショート動画 ${index + 1} の caption`}
@@ -412,7 +412,7 @@ export function CreatorUploadForm() {
                   );
                 })
               ) : (
-                <p className="px-1 text-[14px] font-semibold text-muted">ショート動画を追加してください</p>
+                <p className="px-1 text-[14px] font-medium text-muted">ショート動画を追加してください</p>
               )}
             </div>
           </section>
@@ -420,7 +420,7 @@ export function CreatorUploadForm() {
           {pendingMessage ? (
             <p
               aria-live="polite"
-              className="rounded-[22px] border border-[#d7eaff] bg-[#f5fbff] px-4 py-4 text-[14px] font-semibold leading-[1.6] text-[#436aa7]"
+              className="rounded-[22px] border border-[#d7eaff] bg-[#f5fbff] px-4 py-4 text-[14px] font-medium leading-[1.6] text-[#436aa7]"
             >
               {pendingMessage}
             </p>
@@ -428,7 +428,7 @@ export function CreatorUploadForm() {
 
           {successState ? (
             <section className="grid gap-2 rounded-[22px] border border-[rgba(26,152,80,0.22)] bg-[rgba(245,255,249,0.95)] px-4 py-4 text-[14px] leading-[1.6] text-[#197040]">
-              <p aria-live="polite" className="m-0 font-bold">
+              <p aria-live="polite" className="m-0 font-semibold">
                 処理開始を受け付けました。
               </p>
               <p className="m-0 font-medium">
@@ -440,7 +440,7 @@ export function CreatorUploadForm() {
           {errorMessage ? (
             <p
               aria-live="polite"
-              className="rounded-[22px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-4 text-[14px] font-semibold leading-[1.6] text-[#b2394f]"
+              className="rounded-[22px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-4 text-[14px] font-medium leading-[1.6] text-[#b2394f]"
               role="alert"
             >
               {`${errorMessage} 再試行するか、ファイルを選び直してください。`}

@@ -19,7 +19,7 @@ export function CreatorUploadShell() {
             >
               <ArrowLeft className="size-5" strokeWidth={2.1} />
             </Link>
-            <p className="text-center text-[17px] font-bold tracking-[-0.02em] text-foreground">新しい動画</p>
+            <p className="text-center text-[17px] font-semibold tracking-[-0.02em] text-foreground">新しい動画</p>
             <div className="size-9" />
           </div>
         </header>
