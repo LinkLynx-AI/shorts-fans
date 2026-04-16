@@ -5,10 +5,9 @@ import { useRouter } from "next/navigation";
 
 import { SurfacePanel } from "@/shared/ui";
 import {
-  ProfileEditorPanel,
-  SharedViewerProfileFields,
   updateCreatorWorkspaceProfile,
   useViewerProfileDraft,
+  ViewerProfileEditorForm,
   getViewerProfileErrorCode,
   getViewerProfileSaveErrorMessage,
 } from "@/features/viewer-profile";
@@ -65,6 +64,33 @@ function CreatorProfileSettingsError({
         </div>
       </SurfacePanel>
     </main>
+  );
+}
+
+function CreatorProfileBioField({
+  disabled,
+  onChange,
+  value,
+}: {
+  disabled: boolean;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <label className="block" htmlFor="creator-viewer-profile-bio">
+      <span className="block pl-1 text-[12px] font-extrabold uppercase tracking-[0.12em] text-[#a9aeb9]">
+        Bio
+      </span>
+      <textarea
+        className="mt-2.5 min-h-[132px] w-full rounded-[20px] border border-transparent bg-[#f6f7fa] px-5 py-4 text-[15px] leading-6 text-[#1f2430] outline-none transition placeholder:text-[#b5bbc6] focus:border-[#d7e6f5] focus:bg-white focus:ring-4 focus:ring-[rgba(113,180,234,0.18)]"
+        disabled={disabled}
+        id="creator-viewer-profile-bio"
+        onChange={(event) => onChange(event.target.value)}
+        placeholder="quiet rooftop の continuation を中心に投稿します。"
+        rows={4}
+        value={value}
+      />
+    </label>
   );
 }
 
@@ -141,48 +167,32 @@ function CreatorProfileSettingsForm({
   };
 
   return (
-    <ProfileEditorPanel
+    <ViewerProfileEditorForm
+      avatar={draft.avatar}
+      avatarInputKey={draft.avatarInputKey}
       backHref="/creator"
       backLabel="ワークスペースへ戻る"
-      description="workspace に表示する名前、handle、avatar を fan profile と共通管理しつつ、creator 固有の bio だけをここで更新できます。"
+      displayName={draft.displayName}
       errorMessage={errorMessage}
-      eyebrow="creator settings"
+      handle={draft.handle}
       isSubmitting={isSubmitting}
+      onAvatarClear={draft.clearAvatarSelection}
+      onAvatarSelect={draft.selectAvatarFile}
+      onDisplayNameChange={draft.setDisplayName}
+      onHandleChange={draft.setHandle}
       onSubmit={submit}
-      submitLabel="保存する"
-      submittingLabel="保存中..."
-      title="プロフィールを編集"
     >
-      <SharedViewerProfileFields
-        avatar={draft.avatar}
-        avatarInputKey={draft.avatarInputKey}
-        displayName={draft.displayName}
-        handle={draft.handle}
-        isSubmitting={isSubmitting}
-        onAvatarClear={draft.clearAvatarSelection}
-        onAvatarSelect={draft.selectAvatarFile}
-        onDisplayNameChange={draft.setDisplayName}
-        onHandleChange={draft.setHandle}
+      <CreatorProfileBioField
+        disabled={isSubmitting}
+        onChange={(nextBio) => {
+          setBio(nextBio);
+          if (errorMessage !== null) {
+            setErrorMessage(null);
+          }
+        }}
+        value={resolvedBio}
       />
-      <label className="grid gap-1.5">
-        <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-          Bio
-        </span>
-        <textarea
-          className="min-h-28 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60"
-          disabled={isSubmitting}
-          onChange={(event) => {
-            setBio(event.target.value);
-            if (errorMessage !== null) {
-              setErrorMessage(null);
-            }
-          }}
-          placeholder="quiet rooftop の continuation を中心に投稿します。"
-          rows={4}
-          value={resolvedBio}
-        />
-      </label>
-    </ProfileEditorPanel>
+    </ViewerProfileEditorForm>
   );
 }
 
