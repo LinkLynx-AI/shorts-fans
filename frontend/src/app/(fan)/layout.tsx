@@ -8,6 +8,9 @@ import { FanAuthDialogProvider } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
 import { FanBottomNavigation } from "@/features/fan-navigation";
 
+const fanBottomNavigationOffsetClassName =
+  "pb-[calc(76px+env(safe-area-inset-bottom,0px))]";
+
 function resolveViewerSessionKey(hasSession: boolean): string {
   return hasSession ? "session-present" : "session-missing";
 }
@@ -36,11 +39,15 @@ export default async function FanLayout({ children }: { children: ReactNode }) {
       >
         <FanAuthDialogProvider>
           <div className="min-h-svh bg-background sm:px-4">
-            <div className="relative mx-auto min-h-svh w-full max-w-[408px] overflow-hidden bg-white text-foreground sm:border sm:border-border sm:shadow-[var(--device-shadow)]">
-              <div className="relative min-h-svh overflow-hidden pb-[76px]">
+            <div className="mx-auto min-h-svh w-full max-w-[408px] overflow-hidden bg-white text-foreground sm:border sm:border-border sm:shadow-[var(--device-shadow)]">
+              <div
+                className={`relative min-h-svh overflow-hidden ${fanBottomNavigationOffsetClassName}`}
+              >
                 {children}
               </div>
-              <div className="absolute inset-x-0 bottom-0 z-30">
+            </div>
+            <div className="fixed inset-x-0 bottom-0 z-30 sm:px-4">
+              <div className="mx-auto w-full max-w-[408px]">
                 <FanBottomNavigation />
               </div>
             </div>

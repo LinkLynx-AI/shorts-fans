@@ -31,7 +31,7 @@ vi.mock("@/features/fan-auth-gate", async () => {
 });
 
 describe("FanLayout", () => {
-  it("keeps the width cap while removing the desktop height clamp", async () => {
+  it("keeps the width cap while pinning the bottom navigation to the viewport", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
 
     vi.mocked(getFanAuthGateState).mockResolvedValue({
@@ -48,11 +48,18 @@ describe("FanLayout", () => {
     const contentWrapper = screen.getByText("fan surface").parentElement;
     const frame = contentWrapper?.parentElement;
     const shell = frame?.parentElement;
+    const navigation = screen.getByRole("navigation", { name: "Primary" });
+    const navigationWidthWrapper = navigation.parentElement;
+    const navigationViewportWrapper = navigationWidthWrapper?.parentElement;
 
     expect(contentWrapper?.className).not.toContain("sm:min-h-[calc(100svh-48px)]");
+    expect(contentWrapper?.className).toContain("pb-[calc(76px+env(safe-area-inset-bottom,0px))]");
     expect(frame?.className).toContain("max-w-[408px]");
     expect(frame?.className).not.toContain("sm:min-h-[calc(100svh-48px)]");
     expect(frame?.className).not.toContain("sm:rounded-[36px]");
     expect(shell?.className).not.toContain("sm:py-6");
+    expect(navigationWidthWrapper?.className).toContain("max-w-[408px]");
+    expect(navigationViewportWrapper?.className).toContain("fixed");
+    expect(navigationViewportWrapper?.className).toContain("bottom-0");
   });
 });
