@@ -52,6 +52,7 @@ func (s stubQueries) UpdateActiveAuthSessionModeByTokenHash(
 }
 
 type dbtxStub struct {
+	query    func(context.Context, string, ...any) (pgx.Rows, error)
 	queryRow func(context.Context, string, ...any) pgx.Row
 }
 
@@ -59,8 +60,12 @@ func (s dbtxStub) Exec(context.Context, string, ...any) (pgconn.CommandTag, erro
 	return pgconn.CommandTag{}, fmt.Errorf("unexpected Exec call")
 }
 
-func (s dbtxStub) Query(context.Context, string, ...any) (pgx.Rows, error) {
-	return nil, fmt.Errorf("unexpected Query call")
+func (s dbtxStub) Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error) {
+	if s.query == nil {
+		return nil, fmt.Errorf("unexpected Query call")
+	}
+
+	return s.query(ctx, sql, args...)
 }
 
 func (s dbtxStub) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
@@ -82,6 +87,73 @@ func (s rowStub) Scan(dest ...any) error {
 	}
 
 	return s.err
+}
+
+type rowsStub struct {
+	err  error
+	rows [][]any
+	idx  int
+}
+
+func (s *rowsStub) Close() {}
+
+func (s *rowsStub) Err() error {
+	return s.err
+}
+
+func (s *rowsStub) CommandTag() pgconn.CommandTag {
+	return pgconn.CommandTag{}
+}
+
+func (s *rowsStub) FieldDescriptions() []pgconn.FieldDescription {
+	return nil
+}
+
+func (s *rowsStub) Next() bool {
+	if s.idx >= len(s.rows) {
+		return false
+	}
+
+	s.idx++
+	return true
+}
+
+func (s *rowsStub) Scan(dest ...any) error {
+	if s.idx == 0 || s.idx > len(s.rows) {
+		return fmt.Errorf("scan called without a current row")
+	}
+
+	for i, value := range s.rows[s.idx-1] {
+		destValue := reflect.ValueOf(dest[i])
+		if destValue.Kind() != reflect.Pointer || destValue.IsNil() {
+			return fmt.Errorf("scan dest[%d] must be a non-nil pointer", i)
+		}
+
+		sourceValue := reflect.ValueOf(value)
+		if !sourceValue.Type().AssignableTo(destValue.Elem().Type()) {
+			return fmt.Errorf("scan value[%d] type %s is not assignable to %s", i, sourceValue.Type(), destValue.Elem().Type())
+		}
+
+		destValue.Elem().Set(sourceValue)
+	}
+
+	return nil
+}
+
+func (s *rowsStub) Values() ([]any, error) {
+	if s.idx == 0 || s.idx > len(s.rows) {
+		return nil, fmt.Errorf("values called without a current row")
+	}
+
+	return s.rows[s.idx-1], nil
+}
+
+func (s *rowsStub) RawValues() [][]byte {
+	return nil
+}
+
+func (s *rowsStub) Conn() *pgx.Conn {
+	return nil
 }
 
 type txBeginnerStub struct {
@@ -930,6 +1002,307 @@ func TestCreateUserWithEmailIdentityAndSessionMapsDuplicateIdentity(t *testing.T
 	}
 	if !tx.rolledBack {
 		t.Fatal("CreateUserWithEmailIdentityAndSession() did not roll back failed transaction")
+	}
+}
+
+func TestCreateUserWithIdentityProfileAndSession(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000900, 0).UTC()
+	userID := uuid.New()
+	identityID := uuid.New()
+	sessionID := uuid.New()
+	tx := &txStub{}
+	callCount := 0
+	tx.queryRow = func(context.Context, string, ...any) pgx.Row {
+		callCount++
+		switch callCount {
+		case 1:
+			return rowWithValues(true)
+		case 2:
+			return rowErr(pgx.ErrNoRows)
+		case 3:
+			return rowWithValues(
+				pgUUID(userID),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 4:
+			return rowWithValues(
+				pgUUID(identityID),
+				pgUUID(userID),
+				identityProviderCognito,
+				"cognito-subject",
+				pgText("fan@example.com"),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 5:
+			return rowWithValues(
+				pgUUID(sessionID),
+				pgUUID(userID),
+				string(ActiveModeFan),
+				"session-hash",
+				pgTime(now.Add(24*time.Hour)),
+				pgTime(now),
+				pgtype.Timestamptz{},
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 6:
+			return rowWithValues(
+				pgUUID(userID),
+				"Mina",
+				"mina",
+				pgtype.Text{},
+				pgTime(now),
+				pgTime(now),
+			)
+		default:
+			return rowErr(fmt.Errorf("unexpected QueryRow call count: %d", callCount))
+		}
+	}
+
+	beginner := &txBeginnerStub{tx: tx}
+	repository := &Repository{txBeginner: beginner}
+	email := "fan@example.com"
+
+	got, err := repository.CreateUserWithIdentityProfileAndSession(context.Background(), CreateUserWithIdentityProfileAndSessionInput{
+		DisplayName:           "Mina",
+		Handle:                "mina",
+		Provider:              identityProviderCognito,
+		ProviderSubject:       "cognito-subject",
+		EmailNormalized:       &email,
+		SessionTokenHash:      "session-hash",
+		VerifiedAt:            &now,
+		LastAuthenticatedAt:   &now,
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("CreateUserWithIdentityProfileAndSession() error = %v, want nil", err)
+	}
+	if got.ID != sessionID {
+		t.Fatalf("CreateUserWithIdentityProfileAndSession() session id got %s want %s", got.ID, sessionID)
+	}
+	if !beginner.began {
+		t.Fatal("CreateUserWithIdentityProfileAndSession() did not begin transaction")
+	}
+	if !tx.committed {
+		t.Fatal("CreateUserWithIdentityProfileAndSession() did not commit transaction")
+	}
+	if tx.rolledBack {
+		t.Fatal("CreateUserWithIdentityProfileAndSession() rolled back successful transaction")
+	}
+}
+
+func TestCreateUserWithIdentityProfileAndSessionMapsHandleConflict(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000910, 0).UTC()
+	tx := &txStub{}
+	callCount := 0
+	tx.queryRow = func(context.Context, string, ...any) pgx.Row {
+		callCount++
+		switch callCount {
+		case 1:
+			return rowWithValues(true)
+		case 2:
+			return rowErr(pgx.ErrNoRows)
+		case 3:
+			return rowWithValues(
+				pgUUID(uuid.New()),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 4:
+			return rowWithValues(
+				pgUUID(uuid.New()),
+				pgUUID(uuid.New()),
+				identityProviderCognito,
+				"cognito-subject",
+				pgText("fan@example.com"),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 5:
+			return rowWithValues(
+				pgUUID(uuid.New()),
+				pgUUID(uuid.New()),
+				string(ActiveModeFan),
+				"session-hash",
+				pgTime(now.Add(24*time.Hour)),
+				pgTime(now),
+				pgtype.Timestamptz{},
+				pgTime(now),
+				pgTime(now),
+				pgTime(now),
+			)
+		case 6:
+			return rowErr(&pgconn.PgError{
+				Code:           "23505",
+				ConstraintName: userProfileHandleUnique,
+			})
+		default:
+			return rowErr(fmt.Errorf("unexpected QueryRow call count: %d", callCount))
+		}
+	}
+
+	repository := &Repository{txBeginner: &txBeginnerStub{tx: tx}}
+	email := "fan@example.com"
+
+	if _, err := repository.CreateUserWithIdentityProfileAndSession(context.Background(), CreateUserWithIdentityProfileAndSessionInput{
+		DisplayName:           "Mina",
+		Handle:                "mina",
+		Provider:              identityProviderCognito,
+		ProviderSubject:       "cognito-subject",
+		EmailNormalized:       &email,
+		SessionTokenHash:      "session-hash",
+		VerifiedAt:            &now,
+		LastAuthenticatedAt:   &now,
+		ExpiresAt:             now.Add(24 * time.Hour),
+		RecentAuthenticatedAt: now,
+	}); !errors.Is(err, ErrHandleAlreadyTaken) {
+		t.Fatalf("CreateUserWithIdentityProfileAndSession() error got %v want %v", err, ErrHandleAlreadyTaken)
+	}
+	if !tx.rolledBack {
+		t.Fatal("CreateUserWithIdentityProfileAndSession() did not roll back failed transaction")
+	}
+}
+
+func TestGetPreferredEmailByUserIDPrefersCognito(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000950, 0).UTC()
+	userID := uuid.New()
+	repository := &Repository{
+		db: dbtxStub{
+			query: func(context.Context, string, ...any) (pgx.Rows, error) {
+				return &rowsStub{
+					rows: [][]any{
+						{
+							pgUUID(uuid.New()),
+							pgUUID(userID),
+							identityProviderEmail,
+							"fan@example.com",
+							pgText("fan@example.com"),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+						},
+						{
+							pgUUID(uuid.New()),
+							pgUUID(userID),
+							identityProviderCognito,
+							"cognito-subject",
+							pgText("fan@example.com"),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	got, err := repository.GetPreferredEmailByUserID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetPreferredEmailByUserID() error = %v, want nil", err)
+	}
+	if got != "fan@example.com" {
+		t.Fatalf("GetPreferredEmailByUserID() email got %q want %q", got, "fan@example.com")
+	}
+}
+
+func TestGetPreferredEmailByUserIDFallsBackToEmailIdentity(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000960, 0).UTC()
+	userID := uuid.New()
+	repository := &Repository{
+		db: dbtxStub{
+			query: func(context.Context, string, ...any) (pgx.Rows, error) {
+				return &rowsStub{
+					rows: [][]any{
+						{
+							pgUUID(uuid.New()),
+							pgUUID(userID),
+							identityProviderEmail,
+							"fan@example.com",
+							pgText("fan@example.com"),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+							pgTime(now),
+						},
+					},
+				}, nil
+			},
+		},
+	}
+
+	got, err := repository.GetPreferredEmailByUserID(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetPreferredEmailByUserID() error = %v, want nil", err)
+	}
+	if got != "fan@example.com" {
+		t.Fatalf("GetPreferredEmailByUserID() email got %q want %q", got, "fan@example.com")
+	}
+}
+
+func TestHandleExists(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710001000, 0).UTC()
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowWithValues(
+					pgUUID(uuid.New()),
+					"Mina",
+					"mina",
+					pgtype.Text{},
+					pgTime(now),
+					pgTime(now),
+				)
+			},
+		},
+	}
+
+	got, err := repository.HandleExists(context.Background(), "mina")
+	if err != nil {
+		t.Fatalf("HandleExists() error = %v, want nil", err)
+	}
+	if !got {
+		t.Fatal("HandleExists() got false want true")
+	}
+}
+
+func TestHandleExistsReturnsFalseWhenNotFound(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		db: dbtxStub{
+			queryRow: func(context.Context, string, ...any) pgx.Row {
+				return rowErr(pgx.ErrNoRows)
+			},
+		},
+	}
+
+	got, err := repository.HandleExists(context.Background(), "mina")
+	if err != nil {
+		t.Fatalf("HandleExists() error = %v, want nil", err)
+	}
+	if got {
+		t.Fatal("HandleExists() got true want false")
 	}
 }
 

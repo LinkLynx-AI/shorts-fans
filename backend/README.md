@@ -180,7 +180,6 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 - `POSTGRES_DSN`
 - `REDIS_ADDR`
 - `AWS_REGION`
-- `COGNITO_USER_POOL_ID`
 - `COGNITO_USER_POOL_CLIENT_ID`
 - `MEDIA_JOBS_QUEUE_URL`
 - `MEDIA_RAW_BUCKET_NAME`
@@ -194,11 +193,11 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
-ルート `Makefile` 経由で `make backend-run` を使う場合は、shell から直接 `COGNITO_USER_POOL_ID` / `COGNITO_USER_POOL_CLIENT_ID` を export するのではなく、`BACKEND_COGNITO_USER_POOL_ID` / `BACKEND_COGNITO_USER_POOL_CLIENT_ID` を設定します。Makefile がそれらを backend process 用の `COGNITO_*` へ引き渡します。
+ルート `Makefile` 経由で `make backend-run` を使う場合は、shell から直接 `COGNITO_USER_POOL_CLIENT_ID` を export するのではなく、`BACKEND_COGNITO_USER_POOL_CLIENT_ID` を設定します。Makefile がそれを backend process 用の `COGNITO_USER_POOL_CLIENT_ID` へ引き渡します。`BACKEND_COGNITO_USER_POOL_ID` も従来どおり渡せますが、現状の `cmd/api` fail fast では必須ではありません。
 
 `cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media sandbox 用 env 一式、および creator avatar upload / delivery 用 env 一式を必須にします。creator upload endpoint と creator registration avatar upload endpoint が常時有効なため、`AWS_REGION`、media bucket / queue / role 設定、avatar bucket / base URL 設定が不足している場合は fail fast します。`cmd/worker` は creator avatar env を要求しませんが、media sandbox を有効にして起動する場合は `POSTGRES_DSN` と media queue / bucket / role 設定が必要です。
 
-`COGNITO_USER_POOL_ID` と `COGNITO_USER_POOL_CLIENT_ID` は `SHO-198` で env contract として追加しました。現時点では `internal/config.ValidateFanAuth` で専用検証できる状態に留め、API startup の fail fast へ組み込むのは `SHO-168` の Cognito endpoint wiring と同時に行います。値は `infra/terraform/dev` の `cognito_user_pool_id` / `cognito_user_pool_client_id` output から受け取ります。
+`COGNITO_USER_POOL_CLIENT_ID` は `SHO-168` の fan auth endpoint wiring で API startup fail fast に組み込みました。`cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media / avatar env 一式に加えて、`AWS_REGION` と `COGNITO_USER_POOL_CLIENT_ID` が欠けている場合も起動しません。`COGNITO_USER_POOL_ID` は dev Cognito sandbox の CLI verification や将来の admin / issuer-based integration では引き続き有用ですが、現状の public Cognito API wiring では必須ではありません。値は `infra/terraform/dev` の `cognito_user_pool_client_id` output から受け取り、必要に応じて `cognito_user_pool_id` も併せて使います。
 
 `cmd/media-smoke` は次を前提にします。
 

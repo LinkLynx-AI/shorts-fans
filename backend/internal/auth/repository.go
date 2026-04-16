@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
@@ -143,6 +144,20 @@ type CreateUserWithIdentityAndSessionInput struct {
 	RecentAuthenticatedAt time.Time
 }
 
+// CreateUserWithIdentityProfileAndSessionInput は cognito sign-up confirm 時の一括作成入力です。
+type CreateUserWithIdentityProfileAndSessionInput struct {
+	DisplayName           string
+	Handle                string
+	Provider              string
+	ProviderSubject       string
+	EmailNormalized       *string
+	SessionTokenHash      string
+	VerifiedAt            *time.Time
+	LastAuthenticatedAt   *time.Time
+	ExpiresAt             time.Time
+	RecentAuthenticatedAt time.Time
+}
+
 // CreateUserWithEmailIdentityAndSessionInput は sign-up 完了時の一括作成入力です。
 type CreateUserWithEmailIdentityAndSessionInput struct {
 	DisplayName           string
@@ -242,6 +257,60 @@ func (r *Repository) GetIdentityByNormalizedEmail(ctx context.Context, emailNorm
 	}
 
 	return identity, nil
+}
+
+// GetPreferredEmailByUserID は user に紐づく再認証用 email を返します。
+func (r *Repository) GetPreferredEmailByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	q, err := r.dbQueries()
+	if err != nil {
+		return "", err
+	}
+
+	rows, err := q.ListAuthIdentitiesByUserID(ctx, postgres.UUIDToPG(userID))
+	if err != nil {
+		return "", fmt.Errorf("auth identity 一覧取得 user=%s: %w", userID, err)
+	}
+
+	var fallbackEmail string
+	for _, row := range rows {
+		email := postgres.OptionalTextFromPG(row.EmailNormalized)
+		if email == nil || strings.TrimSpace(*email) == "" {
+			continue
+		}
+
+		switch row.Provider {
+		case identityProviderCognito:
+			return *email, nil
+		case identityProviderEmail:
+			if fallbackEmail == "" {
+				fallbackEmail = *email
+			}
+		}
+	}
+
+	if fallbackEmail != "" {
+		return fallbackEmail, nil
+	}
+
+	return "", fmt.Errorf("re-auth email 取得 user=%s: %w", userID, ErrIdentityNotFound)
+}
+
+// HandleExists は shared viewer profile handle が既に存在するか返します。
+func (r *Repository) HandleExists(ctx context.Context, handle string) (bool, error) {
+	q, err := r.dbQueries()
+	if err != nil {
+		return false, err
+	}
+
+	_, err = q.GetUserProfileByHandle(ctx, strings.TrimSpace(handle))
+	switch {
+	case err == nil:
+		return true, nil
+	case errors.Is(err, pgx.ErrNoRows):
+		return false, nil
+	default:
+		return false, fmt.Errorf("viewer profile handle 取得 handle=%s: %w", handle, err)
+	}
 }
 
 // CreateIdentity は auth identity を作成します。
@@ -508,6 +577,93 @@ func (r *Repository) CreateUserWithIdentityAndSession(
 	if err != nil {
 		return SessionRecord{}, fmt.Errorf(
 			"identity/session 一括作成結果の変換 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			err,
+		)
+	}
+
+	return session, nil
+}
+
+// CreateUserWithIdentityProfileAndSession は identity/profile/session の一括作成を transaction で行います。
+func (r *Repository) CreateUserWithIdentityProfileAndSession(
+	ctx context.Context,
+	input CreateUserWithIdentityProfileAndSessionInput,
+) (SessionRecord, error) {
+	if r.txBeginner == nil {
+		return SessionRecord{}, fmt.Errorf("auth repository pool が初期化されていません")
+	}
+
+	var sessionRow sqlc.AppAuthSession
+	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
+		q := sqlc.New(tx)
+
+		if err := lockEmailClaimIfNeeded(ctx, tx, input.EmailNormalized); err != nil {
+			return err
+		}
+		if err := ensureNormalizedEmailAvailable(ctx, q, input.EmailNormalized); err != nil {
+			return fmt.Errorf("auth identity 競合確認: %w", err)
+		}
+
+		user, err := q.CreateUser(ctx)
+		if err != nil {
+			return fmt.Errorf("user 作成: %w", err)
+		}
+
+		if _, err := q.CreateAuthIdentity(ctx, sqlc.CreateAuthIdentityParams{
+			UserID:              user.ID,
+			Provider:            input.Provider,
+			ProviderSubject:     input.ProviderSubject,
+			EmailNormalized:     postgres.TextToPG(input.EmailNormalized),
+			VerifiedAt:          postgres.TimeToPG(input.VerifiedAt),
+			LastAuthenticatedAt: postgres.TimeToPG(input.LastAuthenticatedAt),
+		}); err != nil {
+			return fmt.Errorf("auth identity 作成: %w", mapIdentityWriteError(err))
+		}
+
+		sessionRow, err = q.CreateAuthSession(ctx, sqlc.CreateAuthSessionParams{
+			UserID:                user.ID,
+			ActiveMode:            string(ActiveModeFan),
+			SessionTokenHash:      input.SessionTokenHash,
+			ExpiresAt:             postgres.TimeToPG(&input.ExpiresAt),
+			RecentAuthenticatedAt: postgres.TimeToPG(&input.RecentAuthenticatedAt),
+		})
+		if err != nil {
+			return fmt.Errorf("auth session 作成: %w", err)
+		}
+
+		if _, err := q.CreateUserProfile(ctx, sqlc.CreateUserProfileParams{
+			UserID:      user.ID,
+			DisplayName: input.DisplayName,
+			Handle:      input.Handle,
+			AvatarUrl:   postgres.TextToPG(nil),
+		}); err != nil {
+			return fmt.Errorf("user profile 作成: %w", mapUserProfileWriteError(err))
+		}
+
+		return nil
+	})
+	if err != nil {
+		if errors.Is(err, ErrIdentityAlreadyExists) {
+			return SessionRecord{}, err
+		}
+		if errors.Is(err, ErrHandleAlreadyTaken) {
+			return SessionRecord{}, err
+		}
+
+		return SessionRecord{}, fmt.Errorf(
+			"identity/profile/session 一括作成 provider=%s provider_subject=%s: %w",
+			input.Provider,
+			input.ProviderSubject,
+			err,
+		)
+	}
+
+	session, err := mapSession(sessionRow)
+	if err != nil {
+		return SessionRecord{}, fmt.Errorf(
+			"identity/profile/session 一括作成結果の変換 provider=%s provider_subject=%s: %w",
 			input.Provider,
 			input.ProviderSubject,
 			err,

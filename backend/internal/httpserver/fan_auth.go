@@ -15,11 +15,13 @@ import (
 
 // FanAuthService は fan auth transport が依存する auth lifecycle 境界です。
 type FanAuthService interface {
-	IssueSignInChallenge(ctx context.Context, email string) (auth.IssuedChallenge, error)
-	IssueSignUpChallenge(ctx context.Context, email string) (auth.IssuedChallenge, error)
-	StartSignInSession(ctx context.Context, email string, challengeToken string) (auth.AuthenticatedSession, error)
-	StartSignUpSession(ctx context.Context, email string, challengeToken string, displayName string, handle string) (auth.AuthenticatedSession, error)
+	ConfirmPasswordReset(ctx context.Context, email string, confirmationCode string, newPassword string) error
+	ConfirmSignUp(ctx context.Context, email string, confirmationCode string) (auth.AuthenticatedSession, error)
 	Logout(ctx context.Context, rawSessionToken string) error
+	ReAuthenticate(ctx context.Context, rawSessionToken string, password string) (auth.AuthenticatedSession, error)
+	SignIn(ctx context.Context, email string, password string) (auth.AuthenticatedSession, error)
+	StartPasswordReset(ctx context.Context, email string) (auth.FanAuthAcceptedStep, error)
+	StartSignUp(ctx context.Context, email string, displayName string, handle string, password string) (auth.FanAuthAcceptedStep, error)
 }
 
 // AuthCookieConfig は auth session cookie の transport 設定です。
@@ -27,25 +29,36 @@ type AuthCookieConfig struct {
 	Secure bool
 }
 
-type authChallengeRequest struct {
-	Email string `json:"email"`
+type signInRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
-type authSessionRequest struct {
-	ChallengeToken string `json:"challengeToken"`
-	Email          string `json:"email"`
+type signUpRequest struct {
+	DisplayName string `json:"displayName"`
+	Email       string `json:"email"`
+	Handle      string `json:"handle"`
+	Password    string `json:"password"`
 }
 
-type authSignUpSessionRequest struct {
-	ChallengeToken string `json:"challengeToken"`
-	DisplayName    string `json:"displayName"`
-	Email          string `json:"email"`
-	Handle         string `json:"handle"`
+type confirmationRequest struct {
+	ConfirmationCode string `json:"confirmationCode"`
+	Email            string `json:"email"`
 }
 
-type authChallengeResponseData struct {
-	ChallengeToken string `json:"challengeToken"`
-	ExpiresAt      string `json:"expiresAt"`
+type passwordResetConfirmRequest struct {
+	ConfirmationCode string `json:"confirmationCode"`
+	Email            string `json:"email"`
+	NewPassword      string `json:"newPassword"`
+}
+
+type reAuthRequest struct {
+	Password string `json:"password"`
+}
+
+type acceptedStepResponseData struct {
+	DeliveryDestinationHint *string `json:"deliveryDestinationHint"`
+	NextStep                string  `json:"nextStep"`
 }
 
 // registerFanAuthRoutes は fan auth transport を router に登録します。
@@ -55,17 +68,23 @@ func registerFanAuthRoutes(router gin.IRouter, service FanAuthService, cookieCon
 	}
 
 	authGroup := router.Group("/api/fan/auth")
-	authGroup.POST("/sign-in/challenges", func(c *gin.Context) {
-		handleAuthChallengeIssue(c, "fan_auth_sign_in_challenge", "invalid_email", "email is invalid", service.IssueSignInChallenge)
+	authGroup.POST("/sign-in", func(c *gin.Context) {
+		handleSignIn(c, service, cookieConfig)
 	})
-	authGroup.POST("/sign-up/challenges", func(c *gin.Context) {
-		handleAuthChallengeIssue(c, "fan_auth_sign_up_challenge", "invalid_email", "email is invalid", service.IssueSignUpChallenge)
+	authGroup.POST("/sign-up", func(c *gin.Context) {
+		handleSignUp(c, service)
 	})
-	authGroup.POST("/sign-in/session", func(c *gin.Context) {
-		handleAuthSessionStart(c, "fan_auth_sign_in_session", service.StartSignInSession, cookieConfig)
+	authGroup.POST("/sign-up/confirm", func(c *gin.Context) {
+		handleSignUpConfirm(c, service, cookieConfig)
 	})
-	authGroup.POST("/sign-up/session", func(c *gin.Context) {
-		handleAuthSignUpSessionStart(c, "fan_auth_sign_up_session", service.StartSignUpSession, cookieConfig)
+	authGroup.POST("/password-reset", func(c *gin.Context) {
+		handlePasswordReset(c, service)
+	})
+	authGroup.POST("/password-reset/confirm", func(c *gin.Context) {
+		handlePasswordResetConfirm(c, service)
+	})
+	authGroup.POST("/re-auth", func(c *gin.Context) {
+		handleReAuth(c, service, cookieConfig)
 	})
 	authGroup.DELETE("/session", func(c *gin.Context) {
 		rawSessionToken, _ := c.Cookie(auth.SessionCookieName)
@@ -79,32 +98,124 @@ func registerFanAuthRoutes(router gin.IRouter, service FanAuthService, cookieCon
 	})
 }
 
-func handleAuthChallengeIssue(
-	c *gin.Context,
-	requestScope string,
-	invalidCode string,
-	invalidMessage string,
-	issue func(context.Context, string) (auth.IssuedChallenge, error),
-) {
-	var request authChallengeRequest
-	if !decodeAuthJSON(c, &request, invalidCode, invalidMessage, requestScope) {
+func handleSignIn(c *gin.Context, service FanAuthService, cookieConfig AuthCookieConfig) {
+	var request signInRequest
+	if !decodeAuthJSON(c, &request, "invalid_email", "email is invalid", "fan_auth_sign_in") {
 		return
 	}
 
-	challenge, err := issue(c.Request.Context(), request.Email)
+	session, err := service.SignIn(c.Request.Context(), request.Email, request.Password)
 	if err != nil {
-		if writeMappedAuthError(c, err, requestScope) {
+		if writeMappedAuthError(c, err, "fan_auth_sign_in") {
 			return
 		}
-
-		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", requestScope)
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_sign_in")
 		return
 	}
 
-	c.JSON(http.StatusOK, responseEnvelope[authChallengeResponseData]{
-		Data: &authChallengeResponseData{
-			ChallengeToken: challenge.Token,
-			ExpiresAt:      challenge.ExpiresAt.Format(time.RFC3339),
+	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
+	c.Status(http.StatusNoContent)
+}
+
+func handleSignUp(c *gin.Context, service FanAuthService) {
+	var request signUpRequest
+	if !decodeAuthJSON(c, &request, "invalid_email", "email is invalid", "fan_auth_sign_up") {
+		return
+	}
+
+	step, err := service.StartSignUp(c.Request.Context(), request.Email, request.DisplayName, request.Handle, request.Password)
+	if err != nil {
+		if writeMappedAuthError(c, err, "fan_auth_sign_up") {
+			return
+		}
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_sign_up")
+		return
+	}
+
+	writeAcceptedAuthStep(c, "fan_auth_sign_up_accepted", step)
+}
+
+func handleSignUpConfirm(c *gin.Context, service FanAuthService, cookieConfig AuthCookieConfig) {
+	var request confirmationRequest
+	if !decodeAuthJSON(c, &request, "invalid_confirmation_code", "confirmation code is invalid", "fan_auth_sign_up_confirm") {
+		return
+	}
+
+	session, err := service.ConfirmSignUp(c.Request.Context(), request.Email, request.ConfirmationCode)
+	if err != nil {
+		if writeMappedAuthError(c, err, "fan_auth_sign_up_confirm") {
+			return
+		}
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_sign_up_confirm")
+		return
+	}
+
+	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
+	c.Status(http.StatusNoContent)
+}
+
+func handlePasswordReset(c *gin.Context, service FanAuthService) {
+	var request struct {
+		Email string `json:"email"`
+	}
+	if !decodeAuthJSON(c, &request, "invalid_email", "email is invalid", "fan_auth_password_reset") {
+		return
+	}
+
+	step, err := service.StartPasswordReset(c.Request.Context(), request.Email)
+	if err != nil {
+		if writeMappedAuthError(c, err, "fan_auth_password_reset") {
+			return
+		}
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_password_reset")
+		return
+	}
+
+	writeAcceptedAuthStep(c, "fan_auth_password_reset_accepted", step)
+}
+
+func handlePasswordResetConfirm(c *gin.Context, service FanAuthService) {
+	var request passwordResetConfirmRequest
+	if !decodeAuthJSON(c, &request, "invalid_confirmation_code", "confirmation code is invalid", "fan_auth_password_reset_confirm") {
+		return
+	}
+
+	if err := service.ConfirmPasswordReset(c.Request.Context(), request.Email, request.ConfirmationCode, request.NewPassword); err != nil {
+		if writeMappedAuthError(c, err, "fan_auth_password_reset_confirm") {
+			return
+		}
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_password_reset_confirm")
+		return
+	}
+
+	c.Status(http.StatusNoContent)
+}
+
+func handleReAuth(c *gin.Context, service FanAuthService, cookieConfig AuthCookieConfig) {
+	var request reAuthRequest
+	if !decodeAuthJSON(c, &request, "invalid_password", "password is invalid", "fan_auth_re_auth") {
+		return
+	}
+
+	rawSessionToken, _ := c.Cookie(auth.SessionCookieName)
+	session, err := service.ReAuthenticate(c.Request.Context(), rawSessionToken, request.Password)
+	if err != nil {
+		if writeMappedAuthError(c, err, "fan_auth_re_auth") {
+			return
+		}
+		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", "fan_auth_re_auth")
+		return
+	}
+
+	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
+	c.Status(http.StatusNoContent)
+}
+
+func writeAcceptedAuthStep(c *gin.Context, requestScope string, step auth.FanAuthAcceptedStep) {
+	c.JSON(http.StatusOK, responseEnvelope[acceptedStepResponseData]{
+		Data: &acceptedStepResponseData{
+			DeliveryDestinationHint: step.DeliveryDestinationHint,
+			NextStep:                step.NextStep,
 		},
 		Meta: responseMeta{
 			Page:      nil,
@@ -112,62 +223,6 @@ func handleAuthChallengeIssue(
 		},
 		Error: nil,
 	})
-}
-
-func handleAuthSessionStart(
-	c *gin.Context,
-	requestScope string,
-	start func(context.Context, string, string) (auth.AuthenticatedSession, error),
-	cookieConfig AuthCookieConfig,
-) {
-	var request authSessionRequest
-	if !decodeAuthJSON(c, &request, "invalid_challenge", "challenge is invalid", requestScope) {
-		return
-	}
-
-	session, err := start(c.Request.Context(), request.Email, request.ChallengeToken)
-	if err != nil {
-		if writeMappedAuthError(c, err, requestScope) {
-			return
-		}
-
-		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", requestScope)
-		return
-	}
-
-	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
-	c.Status(http.StatusNoContent)
-}
-
-func handleAuthSignUpSessionStart(
-	c *gin.Context,
-	requestScope string,
-	start func(context.Context, string, string, string, string) (auth.AuthenticatedSession, error),
-	cookieConfig AuthCookieConfig,
-) {
-	var request authSignUpSessionRequest
-	if !decodeAuthJSON(c, &request, "invalid_challenge", "challenge is invalid", requestScope) {
-		return
-	}
-
-	session, err := start(
-		c.Request.Context(),
-		request.Email,
-		request.ChallengeToken,
-		request.DisplayName,
-		request.Handle,
-	)
-	if err != nil {
-		if writeMappedAuthError(c, err, requestScope) {
-			return
-		}
-
-		writeAuthError(c, http.StatusInternalServerError, "internal_error", "auth request could not be completed", requestScope)
-		return
-	}
-
-	setSessionCookie(c, session.Token, session.ExpiresAt, cookieConfig)
-	c.Status(http.StatusNoContent)
 }
 
 func decodeAuthJSON[T any](c *gin.Context, target *T, invalidCode string, invalidMessage string, requestScope string) bool {
@@ -196,16 +251,26 @@ func writeMappedAuthError(c *gin.Context, err error, requestScope string) bool {
 		writeAuthError(c, http.StatusBadRequest, "invalid_email", "email is invalid", requestScope)
 	case errors.Is(err, auth.ErrInvalidDisplayName):
 		writeAuthError(c, http.StatusBadRequest, "invalid_display_name", "display name is invalid", requestScope)
-	case errors.Is(err, auth.ErrEmailNotFound):
-		writeAuthError(c, http.StatusNotFound, "email_not_found", "email was not found", requestScope)
-	case errors.Is(err, auth.ErrEmailAlreadyRegistered):
-		writeAuthError(c, http.StatusConflict, "email_already_registered", "email is already registered", requestScope)
-	case errors.Is(err, auth.ErrInvalidChallenge):
-		writeAuthError(c, http.StatusBadRequest, "invalid_challenge", "challenge is invalid", requestScope)
 	case errors.Is(err, auth.ErrInvalidHandle):
 		writeAuthError(c, http.StatusBadRequest, "invalid_handle", "handle is invalid", requestScope)
+	case errors.Is(err, auth.ErrInvalidPassword):
+		writeAuthError(c, http.StatusBadRequest, "invalid_password", "password is invalid", requestScope)
+	case errors.Is(err, auth.ErrInvalidConfirmationCode):
+		writeAuthError(c, http.StatusBadRequest, "invalid_confirmation_code", "confirmation code is invalid", requestScope)
+	case errors.Is(err, auth.ErrConfirmationCodeExpired):
+		writeAuthError(c, http.StatusBadRequest, "confirmation_code_expired", "confirmation code has expired", requestScope)
+	case errors.Is(err, auth.ErrPasswordPolicyViolation):
+		writeAuthError(c, http.StatusBadRequest, "password_policy_violation", "password does not satisfy the policy", requestScope)
+	case errors.Is(err, auth.ErrInvalidCredentials):
+		writeAuthError(c, http.StatusUnauthorized, "invalid_credentials", "email or password is invalid", requestScope)
+	case errors.Is(err, auth.ErrAuthenticationRequired), errors.Is(err, auth.ErrSessionNotFound):
+		writeAuthError(c, http.StatusUnauthorized, "auth_required", "authentication is required", requestScope)
+	case errors.Is(err, auth.ErrConfirmationRequired), errors.Is(err, auth.ErrEmailVerificationRequired):
+		writeAuthError(c, http.StatusForbidden, "confirmation_required", "email confirmation is required", requestScope)
 	case errors.Is(err, auth.ErrHandleAlreadyTaken):
 		writeAuthError(c, http.StatusConflict, "handle_already_taken", "handle is already taken", requestScope)
+	case errors.Is(err, auth.ErrRateLimited):
+		writeAuthError(c, http.StatusTooManyRequests, "rate_limited", "auth request was rate limited", requestScope)
 	default:
 		return false
 	}

@@ -15,6 +15,7 @@ type cognitoSessionRepositoryStub struct {
 	createIdentity                            func(context.Context, CreateIdentityInput) (Identity, error)
 	createSession                             func(context.Context, CreateSessionInput) (SessionRecord, error)
 	createUserWithIdentityAndSession          func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error)
+	createUserWithIdentityProfileAndSession   func(context.Context, CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error)
 	recordIdentityAuthentication              func(context.Context, RecordIdentityAuthenticationInput) (Identity, error)
 	refreshSessionRecentAuthenticatedAtByHash func(context.Context, string, time.Time) (SessionRecord, error)
 }
@@ -44,6 +45,13 @@ func (s cognitoSessionRepositoryStub) CreateUserWithIdentityAndSession(
 	input CreateUserWithIdentityAndSessionInput,
 ) (SessionRecord, error) {
 	return s.createUserWithIdentityAndSession(ctx, input)
+}
+
+func (s cognitoSessionRepositoryStub) CreateUserWithIdentityProfileAndSession(
+	ctx context.Context,
+	input CreateUserWithIdentityProfileAndSessionInput,
+) (SessionRecord, error) {
+	return s.createUserWithIdentityProfileAndSession(ctx, input)
 }
 
 func (s cognitoSessionRepositoryStub) RecordIdentityAuthentication(
@@ -76,6 +84,353 @@ func TestNewCognitoSessionManagerInitializesDefaults(t *testing.T) {
 	}
 	if manager.newSessionToken == nil {
 		t.Fatal("NewCognitoSessionManager() newSessionToken = nil")
+	}
+}
+
+func TestCognitoSessionManagerStartSignUpSessionCreatesProfileForNewUser(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1711000300, 0).UTC()
+
+	manager := NewCognitoSessionManager(cognitoSessionRepositoryStub{
+		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) {
+			return Identity{}, ErrIdentityNotFound
+		},
+		getIdentityByEmail: func(context.Context, string) (Identity, error) {
+			return Identity{}, ErrIdentityNotFound
+		},
+		createIdentity: func(context.Context, CreateIdentityInput) (Identity, error) {
+			t.Fatal("CreateIdentity() should not be called")
+			return Identity{}, nil
+		},
+		createSession: func(context.Context, CreateSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityAndSession: func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityProfileAndSession: func(_ context.Context, input CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error) {
+			if input.DisplayName != "Mina" {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() displayName got %q want %q", input.DisplayName, "Mina")
+			}
+			if input.Handle != "mina" {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() handle got %q want %q", input.Handle, "mina")
+			}
+			if input.Provider != identityProviderCognito {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() provider got %q want %q", input.Provider, identityProviderCognito)
+			}
+			if input.ProviderSubject != "cognito-subject" {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() subject got %q want %q", input.ProviderSubject, "cognito-subject")
+			}
+			if input.EmailNormalized == nil || *input.EmailNormalized != "fan@example.com" {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() email got %v want %q", input.EmailNormalized, "fan@example.com")
+			}
+			if input.SessionTokenHash != HashSessionToken("session-token") {
+				t.Fatalf("CreateUserWithIdentityProfileAndSession() session hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
+			}
+
+			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil
+		},
+		recordIdentityAuthentication: func(context.Context, RecordIdentityAuthenticationInput) (Identity, error) {
+			t.Fatal("RecordIdentityAuthentication() should not be called")
+			return Identity{}, nil
+		},
+		refreshSessionRecentAuthenticatedAtByHash: func(context.Context, string, time.Time) (SessionRecord, error) {
+			t.Fatal("RefreshSessionRecentAuthenticatedAtByTokenHash() should not be called")
+			return SessionRecord{}, nil
+		},
+	})
+	manager.now = func() time.Time { return now }
+	manager.newSessionToken = func() (string, error) { return "session-token", nil }
+
+	got, err := manager.StartSignUpSession(context.Background(), CognitoSessionInput{
+		Subject:         "cognito-subject",
+		Email:           "fan@example.com",
+		EmailVerified:   true,
+		AuthenticatedAt: now,
+	}, "Mina", "@mina")
+	if err != nil {
+		t.Fatalf("StartSignUpSession() error = %v, want nil", err)
+	}
+	if got.Token != "session-token" {
+		t.Fatalf("StartSignUpSession() token got %q want %q", got.Token, "session-token")
+	}
+}
+
+func TestCognitoSessionManagerStartSignUpSessionUsesExistingIdentity(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1711000310, 0).UTC()
+	userID := uuid.New()
+	identityID := uuid.New()
+
+	manager := NewCognitoSessionManager(cognitoSessionRepositoryStub{
+		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) {
+			return Identity{ID: identityID, UserID: userID}, nil
+		},
+		getIdentityByEmail: func(context.Context, string) (Identity, error) {
+			t.Fatal("GetIdentityByEmail() should not be called")
+			return Identity{}, nil
+		},
+		createIdentity: func(context.Context, CreateIdentityInput) (Identity, error) {
+			t.Fatal("CreateIdentity() should not be called")
+			return Identity{}, nil
+		},
+		createSession: func(_ context.Context, input CreateSessionInput) (SessionRecord, error) {
+			if input.UserID != userID {
+				t.Fatalf("CreateSession() userID got %s want %s", input.UserID, userID)
+			}
+			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil
+		},
+		createUserWithIdentityAndSession: func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityProfileAndSession: func(context.Context, CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityProfileAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		recordIdentityAuthentication: func(_ context.Context, input RecordIdentityAuthenticationInput) (Identity, error) {
+			if input.ID != identityID {
+				t.Fatalf("RecordIdentityAuthentication() id got %s want %s", input.ID, identityID)
+			}
+			return Identity{}, nil
+		},
+		refreshSessionRecentAuthenticatedAtByHash: func(context.Context, string, time.Time) (SessionRecord, error) {
+			t.Fatal("RefreshSessionRecentAuthenticatedAtByTokenHash() should not be called")
+			return SessionRecord{}, nil
+		},
+	})
+	manager.now = func() time.Time { return now }
+	manager.newSessionToken = func() (string, error) { return "session-token", nil }
+
+	got, err := manager.StartSignUpSession(context.Background(), CognitoSessionInput{
+		Subject:         "cognito-subject",
+		Email:           "fan@example.com",
+		EmailVerified:   true,
+		AuthenticatedAt: now,
+	}, "Mina", "@mina")
+	if err != nil {
+		t.Fatalf("StartSignUpSession() error = %v, want nil", err)
+	}
+	if got.Token != "session-token" {
+		t.Fatalf("StartSignUpSession() token got %q want %q", got.Token, "session-token")
+	}
+}
+
+func TestCognitoSessionManagerStartSignUpSessionBridgesLegacyIdentity(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1711000320, 0).UTC()
+	userID := uuid.New()
+	identityID := uuid.New()
+
+	manager := NewCognitoSessionManager(cognitoSessionRepositoryStub{
+		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) {
+			return Identity{}, ErrIdentityNotFound
+		},
+		getIdentityByEmail: func(_ context.Context, emailNormalized string) (Identity, error) {
+			if emailNormalized != "fan@example.com" {
+				t.Fatalf("GetIdentityByEmail() email got %q want %q", emailNormalized, "fan@example.com")
+			}
+			return Identity{UserID: userID}, nil
+		},
+		createIdentity: func(_ context.Context, input CreateIdentityInput) (Identity, error) {
+			if input.UserID != userID {
+				t.Fatalf("CreateIdentity() userID got %s want %s", input.UserID, userID)
+			}
+			return Identity{ID: identityID, UserID: userID}, nil
+		},
+		createSession: func(_ context.Context, input CreateSessionInput) (SessionRecord, error) {
+			if input.UserID != userID {
+				t.Fatalf("CreateSession() userID got %s want %s", input.UserID, userID)
+			}
+			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil
+		},
+		createUserWithIdentityAndSession: func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityProfileAndSession: func(context.Context, CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityProfileAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		recordIdentityAuthentication: func(_ context.Context, input RecordIdentityAuthenticationInput) (Identity, error) {
+			if input.ID != identityID {
+				t.Fatalf("RecordIdentityAuthentication() id got %s want %s", input.ID, identityID)
+			}
+			return Identity{}, nil
+		},
+		refreshSessionRecentAuthenticatedAtByHash: func(context.Context, string, time.Time) (SessionRecord, error) {
+			t.Fatal("RefreshSessionRecentAuthenticatedAtByTokenHash() should not be called")
+			return SessionRecord{}, nil
+		},
+	})
+	manager.now = func() time.Time { return now }
+	manager.newSessionToken = func() (string, error) { return "session-token", nil }
+
+	got, err := manager.StartSignUpSession(context.Background(), CognitoSessionInput{
+		Subject:         "cognito-subject",
+		Email:           "fan@example.com",
+		EmailVerified:   true,
+		AuthenticatedAt: now,
+	}, "Mina", "@mina")
+	if err != nil {
+		t.Fatalf("StartSignUpSession() error = %v, want nil", err)
+	}
+	if got.Token != "session-token" {
+		t.Fatalf("StartSignUpSession() token got %q want %q", got.Token, "session-token")
+	}
+}
+
+func TestCognitoSessionManagerStartSignUpSessionMapsHandleConflict(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1711000330, 0).UTC()
+
+	manager := NewCognitoSessionManager(cognitoSessionRepositoryStub{
+		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) {
+			return Identity{}, ErrIdentityNotFound
+		},
+		getIdentityByEmail: func(context.Context, string) (Identity, error) {
+			return Identity{}, ErrIdentityNotFound
+		},
+		createIdentity: func(context.Context, CreateIdentityInput) (Identity, error) {
+			t.Fatal("CreateIdentity() should not be called")
+			return Identity{}, nil
+		},
+		createSession: func(context.Context, CreateSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityAndSession: func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityProfileAndSession: func(context.Context, CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error) {
+			return SessionRecord{}, ErrHandleAlreadyTaken
+		},
+		recordIdentityAuthentication: func(context.Context, RecordIdentityAuthenticationInput) (Identity, error) {
+			t.Fatal("RecordIdentityAuthentication() should not be called")
+			return Identity{}, nil
+		},
+		refreshSessionRecentAuthenticatedAtByHash: func(context.Context, string, time.Time) (SessionRecord, error) {
+			t.Fatal("RefreshSessionRecentAuthenticatedAtByTokenHash() should not be called")
+			return SessionRecord{}, nil
+		},
+	})
+	manager.now = func() time.Time { return now }
+	manager.newSessionToken = func() (string, error) { return "session-token", nil }
+
+	if _, err := manager.StartSignUpSession(context.Background(), CognitoSessionInput{
+		Subject:         "cognito-subject",
+		Email:           "fan@example.com",
+		EmailVerified:   true,
+		AuthenticatedAt: now,
+	}, "Mina", "@mina"); !errors.Is(err, ErrHandleAlreadyTaken) {
+		t.Fatalf("StartSignUpSession() error got %v want %v", err, ErrHandleAlreadyTaken)
+	}
+}
+
+func TestCognitoSessionManagerStartSignUpSessionRecoversIdentityRace(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1711000340, 0).UTC()
+	userID := uuid.New()
+	identityID := uuid.New()
+	getIdentityByProviderAndSubjectCallCount := 0
+	getIdentityByEmailCallCount := 0
+
+	manager := NewCognitoSessionManager(cognitoSessionRepositoryStub{
+		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) {
+			getIdentityByProviderAndSubjectCallCount++
+			return Identity{}, ErrIdentityNotFound
+		},
+		getIdentityByEmail: func(_ context.Context, emailNormalized string) (Identity, error) {
+			getIdentityByEmailCallCount++
+			if emailNormalized != "fan@example.com" {
+				t.Fatalf("GetIdentityByEmail() email got %q want %q", emailNormalized, "fan@example.com")
+			}
+			if getIdentityByEmailCallCount == 1 {
+				return Identity{}, ErrIdentityNotFound
+			}
+
+			return Identity{UserID: userID}, nil
+		},
+		createIdentity: func(_ context.Context, input CreateIdentityInput) (Identity, error) {
+			if input.UserID != userID {
+				t.Fatalf("CreateIdentity() userID got %s want %s", input.UserID, userID)
+			}
+			if input.Provider != identityProviderCognito {
+				t.Fatalf("CreateIdentity() provider got %q want %q", input.Provider, identityProviderCognito)
+			}
+			if input.ProviderSubject != "cognito-subject" {
+				t.Fatalf("CreateIdentity() provider subject got %q want %q", input.ProviderSubject, "cognito-subject")
+			}
+
+			return Identity{ID: identityID, UserID: userID}, nil
+		},
+		createSession: func(_ context.Context, input CreateSessionInput) (SessionRecord, error) {
+			if input.UserID != userID {
+				t.Fatalf("CreateSession() userID got %s want %s", input.UserID, userID)
+			}
+			if input.SessionTokenHash != HashSessionToken("session-token") {
+				t.Fatalf("CreateSession() session hash got %q want %q", input.SessionTokenHash, HashSessionToken("session-token"))
+			}
+			if !input.RecentAuthenticatedAt.Equal(now) {
+				t.Fatalf("CreateSession() recent_authenticated_at got %s want %s", input.RecentAuthenticatedAt, now)
+			}
+
+			return SessionRecord{ExpiresAt: input.ExpiresAt}, nil
+		},
+		createUserWithIdentityAndSession: func(context.Context, CreateUserWithIdentityAndSessionInput) (SessionRecord, error) {
+			t.Fatal("CreateUserWithIdentityAndSession() should not be called")
+			return SessionRecord{}, nil
+		},
+		createUserWithIdentityProfileAndSession: func(context.Context, CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error) {
+			return SessionRecord{}, ErrIdentityAlreadyExists
+		},
+		recordIdentityAuthentication: func(_ context.Context, input RecordIdentityAuthenticationInput) (Identity, error) {
+			if input.ID != identityID {
+				t.Fatalf("RecordIdentityAuthentication() id got %s want %s", input.ID, identityID)
+			}
+			if input.EmailNormalized != "fan@example.com" {
+				t.Fatalf("RecordIdentityAuthentication() email got %q want %q", input.EmailNormalized, "fan@example.com")
+			}
+
+			return Identity{}, nil
+		},
+		refreshSessionRecentAuthenticatedAtByHash: func(context.Context, string, time.Time) (SessionRecord, error) {
+			t.Fatal("RefreshSessionRecentAuthenticatedAtByTokenHash() should not be called")
+			return SessionRecord{}, nil
+		},
+	})
+	manager.now = func() time.Time { return now }
+	manager.newSessionToken = func() (string, error) { return "session-token", nil }
+
+	got, err := manager.StartSignUpSession(context.Background(), CognitoSessionInput{
+		Subject:         "cognito-subject",
+		Email:           "fan@example.com",
+		EmailVerified:   true,
+		AuthenticatedAt: now,
+	}, "Mina", "@mina")
+	if err != nil {
+		t.Fatalf("StartSignUpSession() error = %v, want nil", err)
+	}
+	if got.Token != "session-token" {
+		t.Fatalf("StartSignUpSession() token got %q want %q", got.Token, "session-token")
+	}
+	if getIdentityByProviderAndSubjectCallCount != 2 {
+		t.Fatalf(
+			"GetIdentityByProviderAndSubject() call count got %d want %d",
+			getIdentityByProviderAndSubjectCallCount,
+			2,
+		)
+	}
+	if getIdentityByEmailCallCount != 2 {
+		t.Fatalf("GetIdentityByEmail() call count got %d want %d", getIdentityByEmailCallCount, 2)
 	}
 }
 
