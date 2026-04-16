@@ -30,8 +30,9 @@ describe("CreatorUploadPage", () => {
     render(await CreatorUploadPage());
 
     expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/creator");
+    expect(screen.getByText("新しい動画")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "本編とショートを追加" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "アップロード" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "保存してアップロード" })).toBeDisabled();
   });
 
   it("renders the login-required state for unauthenticated viewers", async () => {

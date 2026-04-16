@@ -62,7 +62,7 @@ describe("CreatorUploadForm", () => {
 
     render(<CreatorUploadForm />);
 
-    const submitButton = screen.getByRole("button", { name: "アップロード" });
+    const submitButton = screen.getByRole("button", { name: "保存してアップロード" });
 
     expect(submitButton).toBeDisabled();
     expect(screen.getByText("本編動画を追加してください")).toBeInTheDocument();
@@ -96,9 +96,11 @@ describe("CreatorUploadForm", () => {
 
     await user.click(screen.getByRole("button", { name: "ショート欄を追加" }));
     expect(screen.getByLabelText("ショート動画 2 ファイル")).toBeInTheDocument();
+    expect(screen.queryByText("1本")).not.toBeInTheDocument();
 
     await user.upload(screen.getByLabelText("ショート動画 2 ファイル"), createVideoFile("short-2.mp4"));
     expect(screen.getByText("short-2.mp4")).toBeInTheDocument();
+    expect(screen.getByText("1本")).toBeInTheDocument();
 
     const [firstRemoveButton] = screen.getAllByRole("button", { name: "ショート欄を削除" });
 
@@ -181,7 +183,7 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
     await fillRequiredMetadata(user);
     await user.type(screen.getByLabelText("ショート動画 1 の caption"), "quiet rooftop preview。");
-    await user.click(screen.getByRole("button", { name: "アップロード" }));
+    await user.click(screen.getByRole("button", { name: "保存してアップロード" }));
 
     await waitFor(() => {
       expect(createCreatorUploadPackage).toHaveBeenCalledTimes(1);
@@ -278,7 +280,7 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
     await fillRequiredMetadata(user);
-    await user.click(screen.getByRole("button", { name: "アップロード" }));
+    await user.click(screen.getByRole("button", { name: "保存してアップロード" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "ショート動画 1のアップロードに失敗しました。再試行してください。 再試行するか、ファイルを選び直してください。",
@@ -329,7 +331,7 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
     await fillRequiredMetadata(user);
 
-    const submitButton = screen.getByRole("button", { name: "アップロード" });
+    const submitButton = screen.getByRole("button", { name: "保存してアップロード" });
 
     await Promise.all([
       user.click(submitButton),
@@ -430,7 +432,7 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
     await fillRequiredMetadata(user);
-    await user.click(screen.getByRole("button", { name: "アップロード" }));
+    await user.click(screen.getByRole("button", { name: "保存してアップロード" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "アップロード準備の有効期限が切れました。再試行してください。 再試行するか、ファイルを選び直してください。",
@@ -505,7 +507,7 @@ describe("CreatorUploadForm", () => {
     await user.upload(screen.getByLabelText("本編動画ファイル"), createVideoFile("main.mp4"));
     await user.upload(screen.getByLabelText("ショート動画 1 ファイル"), createVideoFile("short-1.mp4"));
     await fillRequiredMetadata(user);
-    await user.click(screen.getByRole("button", { name: "アップロード" }));
+    await user.click(screen.getByRole("button", { name: "保存してアップロード" }));
 
     await waitFor(() => {
       expect(completeCreatorUploadPackage).toHaveBeenCalledWith({
