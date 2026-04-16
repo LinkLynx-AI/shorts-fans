@@ -15,6 +15,7 @@ import {
 import { cn } from "@/shared/lib";
 
 import {
+  type CreatorUploadSubmissionState,
   type CreatorUploadTransferState,
   getCreatorUploadPendingMessage,
   getCreatorUploadSelectedShortCount,
@@ -94,8 +95,12 @@ function getTransferStateLabel(
   return { label: "未選択", tone: "default" };
 }
 
-function getPrimarySubmitLabel(submitLabel: string, submissionStateKind: string): string {
+function getPrimarySubmitLabel(submitLabel: string, submissionStateKind: CreatorUploadSubmissionState["kind"]): string {
   return submissionStateKind === "idle" ? "保存してアップロード" : submitLabel;
+}
+
+function getSelectedShortCountLabel(count: number): string {
+  return count > 0 ? `${count}本` : "未選択";
 }
 
 function UploadPicker({
@@ -170,7 +175,7 @@ export function CreatorUploadForm() {
   const errorMessage = draft.submissionState.kind === "error" ? draft.submissionState.message : null;
   const successState = draft.submissionState.kind === "success" ? draft.submissionState : null;
   const mainStatus = getTransferStateLabel(draft.mainFile, draft.mainTransferState);
-  const shortSlotCountLabel = `${getCreatorUploadSelectedShortCount(draft)} videos`;
+  const shortSlotCountLabel = getSelectedShortCountLabel(getCreatorUploadSelectedShortCount(draft));
 
   function handleMainFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null;

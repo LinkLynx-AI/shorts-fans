@@ -77,7 +77,7 @@ describe("CreatorUploadForm", () => {
 
     expect(screen.getByText("short-1.mp4")).toBeInTheDocument();
     expect(submitButton).toBeDisabled();
-    expect(screen.getByText("1 videos")).toBeInTheDocument();
+    expect(screen.getByText("1本")).toBeInTheDocument();
 
     await user.type(screen.getByLabelText("価格（円）"), "1800");
     expect(submitButton).toBeDisabled();
@@ -96,11 +96,11 @@ describe("CreatorUploadForm", () => {
 
     await user.click(screen.getByRole("button", { name: "ショート欄を追加" }));
     expect(screen.getByLabelText("ショート動画 2 ファイル")).toBeInTheDocument();
-    expect(screen.getByText("0 videos")).toBeInTheDocument();
+    expect(screen.queryByText("1本")).not.toBeInTheDocument();
 
     await user.upload(screen.getByLabelText("ショート動画 2 ファイル"), createVideoFile("short-2.mp4"));
     expect(screen.getByText("short-2.mp4")).toBeInTheDocument();
-    expect(screen.getByText("1 videos")).toBeInTheDocument();
+    expect(screen.getByText("1本")).toBeInTheDocument();
 
     const [firstRemoveButton] = screen.getAllByRole("button", { name: "ショート欄を削除" });
 
@@ -112,7 +112,7 @@ describe("CreatorUploadForm", () => {
 
     expect(screen.queryByLabelText("ショート動画 2 ファイル")).not.toBeInTheDocument();
     expect(screen.getByText("short-2.mp4")).toBeInTheDocument();
-    expect(screen.getByText("1 videos")).toBeInTheDocument();
+    expect(screen.getByText("1本")).toBeInTheDocument();
   });
 
   it("renders the connected upload success state after submit", async () => {

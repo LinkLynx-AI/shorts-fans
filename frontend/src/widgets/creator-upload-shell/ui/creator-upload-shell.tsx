@@ -14,7 +14,7 @@ export function CreatorUploadShell() {
           <div className="grid min-h-[74px] grid-cols-[40px_1fr_40px] items-center px-4 pt-[12px]">
             <Link
               aria-label="Back"
-              className="inline-flex size-9 items-center justify-center rounded-full text-foreground transition hover:bg-[#f5f8fb]"
+              className="inline-flex size-9 items-center justify-center rounded-full text-foreground transition hover:bg-[#f5f8fb] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/60"
               href="/creator"
             >
               <ArrowLeft className="size-5" strokeWidth={2.1} />
