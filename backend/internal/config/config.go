@@ -145,7 +145,6 @@ func (c Config) ValidateFanAuth() error {
 		value string
 	}{
 		{name: "AWS_REGION", value: c.AWSRegion},
-		{name: cognitoUserPoolIDEnv, value: c.CognitoUserPoolID},
 		{name: cognitoUserPoolClientIDEnv, value: c.CognitoUserPoolClientID},
 	}
 

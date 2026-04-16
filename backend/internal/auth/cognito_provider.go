@@ -43,7 +43,6 @@ type cognitoPublicAPI interface {
 // CognitoClient は fan auth が使う Cognito public API を包みます。
 type CognitoClient struct {
 	api          cognitoPublicAPI
-	userPoolID   string
 	userClientID string
 	now          func() time.Time
 }

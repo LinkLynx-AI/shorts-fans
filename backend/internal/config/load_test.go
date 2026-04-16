@@ -94,7 +94,6 @@ func TestLoadFallsBackToLegacySQSQueueURL(t *testing.T) {
 func TestValidateFanAuthRequiresCognitoRuntimeValues(t *testing.T) {
 	cfg := Config{
 		AWSRegion:               "ap-northeast-1",
-		CognitoUserPoolID:       "ap-northeast-1_example",
 		CognitoUserPoolClientID: "exampleclientid",
 	}
 
@@ -113,7 +112,7 @@ func TestValidateFanAuthReportsMissingValues(t *testing.T) {
 		t.Fatal("ValidateFanAuth() error = nil, want missing env error")
 	}
 
-	want := "missing required environment variables: COGNITO_USER_POOL_ID, COGNITO_USER_POOL_CLIENT_ID"
+	want := "missing required environment variables: COGNITO_USER_POOL_CLIENT_ID"
 	if err.Error() != want {
 		t.Fatalf("ValidateFanAuth() error got %q want %q", err.Error(), want)
 	}

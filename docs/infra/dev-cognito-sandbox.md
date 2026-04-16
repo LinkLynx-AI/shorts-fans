@@ -204,6 +204,7 @@ aws cognito-idp admin-delete-user \
 
 ## 後続 task への handoff
 
-- `SHO-168` は `AWS_REGION`、`COGNITO_USER_POOL_ID`、`COGNITO_USER_POOL_CLIENT_ID` を backend runtime へ渡せば実接続を始められます。
+- `SHO-168` の current backend runtime は `AWS_REGION` と `COGNITO_USER_POOL_CLIENT_ID` を使って public Cognito API へ接続します。
+- `COGNITO_USER_POOL_ID` は CLI verification の `admin-delete-user` や将来の issuer / admin API integration では引き続き使えるため、Terraform output として維持します。
 - App Client が secretless なので、backend は `USER_PASSWORD_AUTH` / sign-up / password reset 系の public Cognito API をそのまま扱う前提です。
 - issuer/JWKS を使う token validation を後続で入れる場合は `cognito_user_pool_issuer_url` を起点にします。
