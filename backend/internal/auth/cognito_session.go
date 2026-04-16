@@ -24,6 +24,7 @@ type cognitoSessionRepository interface {
 	CreateIdentity(ctx context.Context, input CreateIdentityInput) (Identity, error)
 	CreateSession(ctx context.Context, input CreateSessionInput) (SessionRecord, error)
 	CreateUserWithIdentityAndSession(ctx context.Context, input CreateUserWithIdentityAndSessionInput) (SessionRecord, error)
+	CreateUserWithIdentityProfileAndSession(ctx context.Context, input CreateUserWithIdentityProfileAndSessionInput) (SessionRecord, error)
 	RecordIdentityAuthentication(ctx context.Context, input RecordIdentityAuthenticationInput) (Identity, error)
 	RefreshSessionRecentAuthenticatedAtByTokenHash(
 		ctx context.Context,
@@ -87,6 +88,54 @@ func (m *CognitoSessionManager) StartSession(ctx context.Context, input CognitoS
 	}
 
 	return m.createUserAndSession(ctx, normalized)
+}
+
+// StartSignUpSession は sign-up draft を使って Cognito principal の app session を開始します。
+func (m *CognitoSessionManager) StartSignUpSession(
+	ctx context.Context,
+	input CognitoSessionInput,
+	displayName string,
+	handle string,
+) (AuthenticatedSession, error) {
+	if m == nil || m.repository == nil {
+		return AuthenticatedSession{}, fmt.Errorf("cognito session manager が初期化されていません")
+	}
+
+	normalized, err := m.normalizeInput(input)
+	if err != nil {
+		return AuthenticatedSession{}, err
+	}
+	normalizedDisplayName, normalizedHandle, err := normalizeSignUpProfileInput(displayName, handle)
+	if err != nil {
+		return AuthenticatedSession{}, err
+	}
+
+	identity, err := m.repository.GetIdentityByProviderAndSubject(ctx, identityProviderCognito, normalized.subject)
+	switch {
+	case err == nil:
+		if err := m.recordAuthentication(ctx, identity.ID, normalized.email, normalized.authenticatedAt); err != nil {
+			return AuthenticatedSession{}, err
+		}
+
+		return m.issueSession(ctx, identity.UserID, normalized.authenticatedAt)
+	case !errors.Is(err, ErrIdentityNotFound):
+		return AuthenticatedSession{}, fmt.Errorf("cognito identity 取得 subject=%s: %w", normalized.subject, err)
+	}
+
+	legacyIdentity, err := m.repository.GetIdentityByEmail(ctx, normalized.email)
+	switch {
+	case err == nil:
+		identity, err = m.ensureCognitoIdentity(ctx, legacyIdentity.UserID, normalized)
+		if err != nil {
+			return AuthenticatedSession{}, err
+		}
+
+		return m.issueSession(ctx, identity.UserID, normalized.authenticatedAt)
+	case !errors.Is(err, ErrIdentityNotFound):
+		return AuthenticatedSession{}, fmt.Errorf("legacy email identity 取得 email=%s: %w", normalized.email, err)
+	}
+
+	return m.createUserProfileAndSession(ctx, normalized, normalizedDisplayName, normalizedHandle)
 }
 
 // RefreshRecentAuthentication は既存 session の recent auth proof を更新します。
@@ -266,6 +315,56 @@ func (m *CognitoSessionManager) createUserAndSession(
 		}
 
 		return AuthenticatedSession{}, fmt.Errorf("cognito user/session 作成 subject=%s: %w", input.subject, err)
+	}
+
+	return AuthenticatedSession{
+		Token:     rawSessionToken,
+		ExpiresAt: session.ExpiresAt,
+	}, nil
+}
+
+func (m *CognitoSessionManager) createUserProfileAndSession(
+	ctx context.Context,
+	input normalizedCognitoSessionInput,
+	displayName string,
+	handle string,
+) (AuthenticatedSession, error) {
+	if m.newSessionToken == nil {
+		return AuthenticatedSession{}, fmt.Errorf("session token generator が初期化されていません")
+	}
+
+	rawSessionToken, err := m.newSessionToken()
+	if err != nil {
+		return AuthenticatedSession{}, fmt.Errorf("cognito sign up session token 生成 subject=%s: %w", input.subject, err)
+	}
+
+	issuedAt := m.now().UTC()
+	email := input.email
+	session, err := m.repository.CreateUserWithIdentityProfileAndSession(ctx, CreateUserWithIdentityProfileAndSessionInput{
+		DisplayName:           displayName,
+		Handle:                handle,
+		Provider:              identityProviderCognito,
+		ProviderSubject:       input.subject,
+		EmailNormalized:       &email,
+		SessionTokenHash:      HashSessionToken(rawSessionToken),
+		VerifiedAt:            &input.authenticatedAt,
+		LastAuthenticatedAt:   &input.authenticatedAt,
+		ExpiresAt:             issuedAt.Add(defaultSessionTTL),
+		RecentAuthenticatedAt: input.authenticatedAt,
+	})
+	if err != nil {
+		if errors.Is(err, ErrIdentityAlreadyExists) {
+			return m.recoverConflictedUserCreation(ctx, input, rawSessionToken, issuedAt)
+		}
+		if errors.Is(err, ErrHandleAlreadyTaken) {
+			return AuthenticatedSession{}, ErrHandleAlreadyTaken
+		}
+
+		return AuthenticatedSession{}, fmt.Errorf(
+			"cognito sign up identity/profile/session 一括作成 subject=%s: %w",
+			input.subject,
+			err,
+		)
 	}
 
 	return AuthenticatedSession{

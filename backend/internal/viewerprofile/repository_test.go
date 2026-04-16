@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,6 +23,18 @@ type stubQueries struct {
 	getUserProfileByUser    func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error)
 	updateCreatorProfile    func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	updateUserProfile       func(context.Context, sqlc.UpdateUserProfileParams) (sqlc.AppUserProfile, error)
+}
+
+type handleReservationReaderStub struct {
+	isHandleReserved func(context.Context, string) (bool, error)
+}
+
+func (s handleReservationReaderStub) IsHandleReserved(ctx context.Context, handle string) (bool, error) {
+	if s.isHandleReserved == nil {
+		return false, nil
+	}
+
+	return s.isHandleReserved(ctx, handle)
 }
 
 func (s stubQueries) CreateUserProfile(ctx context.Context, arg sqlc.CreateUserProfileParams) (sqlc.AppUserProfile, error) {
@@ -180,6 +193,15 @@ func TestNewRepositoryHelperInitializesQueryFactory(t *testing.T) {
 	}
 }
 
+func TestWithHandleReservationReaderSupportsNilRepository(t *testing.T) {
+	t.Parallel()
+
+	var repository *Repository
+	if repository.WithHandleReservationReader(handleReservationReaderStub{}) != nil {
+		t.Fatal("WithHandleReservationReader() on nil repository should return nil")
+	}
+}
+
 func TestCreateProfileNormalizesInputAndReturnsProfile(t *testing.T) {
 	t.Parallel()
 
@@ -263,6 +285,24 @@ func TestCreateProfileMapsHandleConflict(t *testing.T) {
 				Code:           "23505",
 				ConstraintName: userProfilesHandleUniqueConstraint,
 			}
+		},
+	})
+
+	if _, err := repository.CreateProfile(context.Background(), CreateProfileInput{
+		UserID:      uuid.New(),
+		DisplayName: "Mina",
+		Handle:      "mina",
+	}); !errors.Is(err, ErrHandleAlreadyTaken) {
+		t.Fatalf("CreateProfile() error got %v want %v", err, ErrHandleAlreadyTaken)
+	}
+}
+
+func TestCreateProfileRejectsReservedHandle(t *testing.T) {
+	t.Parallel()
+
+	repository := newRepository(stubQueries{}).WithHandleReservationReader(handleReservationReaderStub{
+		isHandleReserved: func(context.Context, string) (bool, error) {
+			return true, nil
 		},
 	})
 
@@ -458,6 +498,133 @@ func TestUpdateProfileRequiresInitializedRepository(t *testing.T) {
 	var repository *Repository
 	if _, err := repository.UpdateProfile(context.Background(), UpdateProfileInput{}); err == nil {
 		t.Fatal("UpdateProfile() error = nil, want initialization error")
+	}
+}
+
+func TestUpdateProfileRejectsReservedHandle(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	repository := &Repository{
+		txBeginner: &txBeginnerStub{tx: &txStub{}},
+		newQueries: func(sqlc.DBTX) queries {
+			return stubQueries{
+				getUserProfileByUser: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return validUserProfileRow(userID, "Mina", "current", nil, time.Unix(1710000190, 0).UTC()), nil
+				},
+			}
+		},
+		handleReservationReader: handleReservationReaderStub{
+			isHandleReserved: func(context.Context, string) (bool, error) {
+				return true, nil
+			},
+		},
+	}
+
+	if _, err := repository.UpdateProfile(context.Background(), UpdateProfileInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Handle:      "mina",
+	}); !errors.Is(err, ErrHandleAlreadyTaken) {
+		t.Fatalf("UpdateProfile() error got %v want %v", err, ErrHandleAlreadyTaken)
+	}
+}
+
+func TestUpdateProfileReturnsReservationLookupError(t *testing.T) {
+	t.Parallel()
+
+	repository := &Repository{
+		txBeginner: &txBeginnerStub{tx: &txStub{}},
+		newQueries: func(sqlc.DBTX) queries {
+			return stubQueries{}
+		},
+		handleReservationReader: handleReservationReaderStub{
+			isHandleReserved: func(context.Context, string) (bool, error) {
+				return false, fmt.Errorf("redis unavailable")
+			},
+		},
+	}
+
+	if _, err := repository.UpdateProfile(context.Background(), UpdateProfileInput{
+		UserID:      uuid.New(),
+		DisplayName: "Mina",
+		Handle:      "mina",
+	}); err == nil || !strings.Contains(err.Error(), "redis unavailable") {
+		t.Fatalf("UpdateProfile() error got %v want reservation lookup error", err)
+	}
+}
+
+func TestUpdateCreatorProfileSyncRejectsReservedHandle(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.New()
+	repository := &Repository{
+		txBeginner: &txBeginnerStub{tx: &txStub{}},
+		newQueries: func(sqlc.DBTX) queries {
+			return stubQueries{
+				getUserProfileByUser: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return validUserProfileRow(userID, "Mina", "current", nil, time.Unix(1710000195, 0).UTC()), nil
+				},
+			}
+		},
+		handleReservationReader: handleReservationReaderStub{
+			isHandleReserved: func(context.Context, string) (bool, error) {
+				return true, nil
+			},
+		},
+	}
+
+	if _, err := repository.UpdateCreatorProfileSync(context.Background(), UpdateProfileInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Handle:      "mina",
+	}, "bio"); !errors.Is(err, ErrHandleAlreadyTaken) {
+		t.Fatalf("UpdateCreatorProfileSync() error got %v want %v", err, ErrHandleAlreadyTaken)
+	}
+}
+
+func TestUpdateProfileAllowsReservedHandleAlreadyOwnedByCurrentUser(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1710000199, 0).UTC()
+	userID := uuid.New()
+	tx := &txStub{}
+
+	repository := &Repository{
+		txBeginner: &txBeginnerStub{tx: tx},
+		newQueries: func(sqlc.DBTX) queries {
+			return stubQueries{
+				getUserProfileByUser: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return validUserProfileRow(userID, "Mina", "mina", nil, now), nil
+				},
+				updateUserProfile: func(context.Context, sqlc.UpdateUserProfileParams) (sqlc.AppUserProfile, error) {
+					return validUserProfileRow(userID, "Mina", "mina", nil, now), nil
+				},
+				getCreatorProfileByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return sqlc.AppCreatorProfile{}, pgx.ErrNoRows
+				},
+			}
+		},
+		handleReservationReader: handleReservationReaderStub{
+			isHandleReserved: func(context.Context, string) (bool, error) {
+				return true, nil
+			},
+		},
+	}
+
+	got, err := repository.UpdateProfile(context.Background(), UpdateProfileInput{
+		UserID:      userID,
+		DisplayName: "Mina",
+		Handle:      "mina",
+	})
+	if err != nil {
+		t.Fatalf("UpdateProfile() error = %v, want nil", err)
+	}
+	if got.Handle != "mina" {
+		t.Fatalf("UpdateProfile() handle got %q want %q", got.Handle, "mina")
+	}
+	if !tx.committed {
+		t.Fatal("UpdateProfile() did not commit transaction")
 	}
 }
 

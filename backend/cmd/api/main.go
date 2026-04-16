@@ -97,9 +97,25 @@ func main() {
 	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
-	viewerProfileRepository := viewerprofile.NewRepository(pool)
+	signUpDraftStore := auth.NewRedisSignUpDraftStore(redisClient)
+	viewerProfileRepository := viewerprofile.NewRepository(pool).WithHandleReservationReader(signUpDraftStore)
 	viewerBootstrapReader := auth.NewReader(authRepository)
-	authLifecycle := auth.NewLifecycle(authRepository)
+	cognitoClient, err := auth.NewCognitoClient(ctx, auth.CognitoConfig{
+		Region:           cfg.AWSRegion,
+		UserPoolClientID: cfg.CognitoUserPoolClientID,
+	})
+	if err != nil {
+		logger.Error("failed to initialize cognito client", "error", err)
+		os.Exit(1)
+	}
+	authLifecycle := auth.NewFanAuthService(
+		cognitoClient,
+		auth.NewCognitoSessionManager(authRepository),
+		authRepository,
+		viewerBootstrapReader,
+		signUpDraftStore,
+		auth.NewRedisCooldownStore(redisClient),
+	)
 	modeSwitcher := auth.NewModeSwitcher(authRepository)
 	shortDisplayDelivery, err := media.NewDelivery(
 		media.DeliveryConfig{

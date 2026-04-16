@@ -91,6 +91,9 @@ func (c Config) ValidateAPI() error {
 	if len(missing) > 0 {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
+	if err := c.ValidateFanAuth(); err != nil {
+		return err
+	}
 
 	if err := c.validateMediaSandbox(true); err != nil {
 		return err

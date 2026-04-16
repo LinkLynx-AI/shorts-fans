@@ -24,6 +24,8 @@ func TestValidateAPI(t *testing.T) {
 		PostgresDSN:                     "postgres://example",
 		RedisAddr:                       "localhost:6379",
 		AWSRegion:                       "ap-northeast-1",
+		CognitoUserPoolID:               "ap-northeast-1_example",
+		CognitoUserPoolClientID:         "exampleclientid",
 		MediaJobsQueueURL:               "https://example.com/queue",
 		MediaRawBucketName:              "raw-bucket",
 		MediaShortPublicBucketName:      "short-bucket",
@@ -53,8 +55,10 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		PostgresDSN: "postgres://example",
-		RedisAddr:   "localhost:6379",
+		PostgresDSN:             "postgres://example",
+		RedisAddr:               "localhost:6379",
+		CognitoUserPoolID:       "ap-northeast-1_example",
+		CognitoUserPoolClientID: "exampleclientid",
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
@@ -69,6 +73,8 @@ func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
 		PostgresDSN:                "postgres://example",
 		RedisAddr:                  "localhost:6379",
 		AWSRegion:                  "ap-northeast-1",
+		CognitoUserPoolID:          "ap-northeast-1_example",
+		CognitoUserPoolClientID:    "exampleclientid",
 		MediaJobsQueueURL:          "https://example.com/queue",
 		MediaRawBucketName:         "raw-bucket",
 		MediaShortPublicBucketName: "short-bucket",

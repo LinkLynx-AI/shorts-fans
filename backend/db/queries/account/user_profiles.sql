@@ -18,6 +18,12 @@ FROM app.user_profiles
 WHERE user_id = $1
 LIMIT 1;
 
+-- name: GetUserProfileByHandle :one
+SELECT *
+FROM app.user_profiles
+WHERE handle = sqlc.arg(handle)
+LIMIT 1;
+
 -- name: UpdateUserProfile :one
 UPDATE app.user_profiles
 SET

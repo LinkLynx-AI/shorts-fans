@@ -43,11 +43,17 @@ type queries interface {
 	UpdateUserProfile(ctx context.Context, arg sqlc.UpdateUserProfileParams) (sqlc.AppUserProfile, error)
 }
 
+// HandleReservationReader は active sign-up の handle reservation を参照します。
+type HandleReservationReader interface {
+	IsHandleReserved(ctx context.Context, handle string) (bool, error)
+}
+
 // Repository は shared viewer profile 永続化をまとめます。
 type Repository struct {
-	txBeginner postgres.TxBeginner
-	queries    queries
-	newQueries func(sqlc.DBTX) queries
+	txBeginner              postgres.TxBeginner
+	queries                 queries
+	newQueries              func(sqlc.DBTX) queries
+	handleReservationReader HandleReservationReader
 }
 
 // Profile は shared viewer profile の domain model です。
@@ -100,6 +106,16 @@ func newRepository(q queries) *Repository {
 	}
 }
 
+// WithHandleReservationReader は sign-up 中の handle reservation checker を設定します。
+func (r *Repository) WithHandleReservationReader(reader HandleReservationReader) *Repository {
+	if r == nil {
+		return nil
+	}
+
+	r.handleReservationReader = reader
+	return r
+}
+
 // CreateProfile は shared viewer profile を作成します。
 func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput) (Profile, error) {
 	if r == nil || r.queries == nil {
@@ -108,6 +124,9 @@ func (r *Repository) CreateProfile(ctx context.Context, input CreateProfileInput
 
 	displayName, handle, err := normalizeProfileInput(input.DisplayName, input.Handle)
 	if err != nil {
+		return Profile{}, err
+	}
+	if err := r.ensureHandleAvailable(ctx, handle); err != nil {
 		return Profile{}, err
 	}
 
@@ -175,6 +194,9 @@ func (r *Repository) updateProfile(ctx context.Context, input UpdateProfileInput
 	var result Profile
 	err = postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
+		if err := r.ensureHandleAvailableForUpdate(ctx, q, input.UserID, handle); err != nil {
+			return err
+		}
 
 		row, updateErr := q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
 			UserID:      postgres.UUIDToPG(input.UserID),
@@ -236,6 +258,48 @@ func (r *Repository) updateProfile(ctx context.Context, input UpdateProfileInput
 	}
 
 	return result, nil
+}
+
+func (r *Repository) ensureHandleAvailable(ctx context.Context, handle string) error {
+	if r == nil || r.handleReservationReader == nil {
+		return nil
+	}
+
+	reserved, err := r.handleReservationReader.IsHandleReserved(ctx, handle)
+	if err != nil {
+		return fmt.Errorf("viewer handle reservation 取得 handle=%s: %w", handle, err)
+	}
+	if reserved {
+		return ErrHandleAlreadyTaken
+	}
+
+	return nil
+}
+
+func (r *Repository) ensureHandleAvailableForUpdate(ctx context.Context, q queries, userID uuid.UUID, handle string) error {
+	if err := r.ensureHandleAvailable(ctx, handle); err == nil {
+		return nil
+	} else if !errors.Is(err, ErrHandleAlreadyTaken) {
+		return err
+	}
+
+	if q == nil {
+		return ErrHandleAlreadyTaken
+	}
+
+	currentProfile, getErr := q.GetUserProfileByUserID(ctx, postgres.UUIDToPG(userID))
+	if getErr != nil {
+		if errors.Is(getErr, pgx.ErrNoRows) {
+			return ErrHandleAlreadyTaken
+		}
+		return fmt.Errorf("viewer profile 取得 user=%s: %w", userID, getErr)
+	}
+
+	if strings.TrimSpace(currentProfile.Handle) == handle {
+		return nil
+	}
+
+	return ErrHandleAlreadyTaken
 }
 
 func normalizeProfileInput(displayName string, handle string) (string, string, error) {

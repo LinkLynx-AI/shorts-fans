@@ -52,6 +52,27 @@ func (q *Queries) CreateUserProfile(ctx context.Context, arg CreateUserProfilePa
 	return i, err
 }
 
+const getUserProfileByHandle = `-- name: GetUserProfileByHandle :one
+SELECT user_id, display_name, handle, avatar_url, created_at, updated_at
+FROM app.user_profiles
+WHERE handle = $1
+LIMIT 1
+`
+
+func (q *Queries) GetUserProfileByHandle(ctx context.Context, handle string) (AppUserProfile, error) {
+	row := q.db.QueryRow(ctx, getUserProfileByHandle, handle)
+	var i AppUserProfile
+	err := row.Scan(
+		&i.UserID,
+		&i.DisplayName,
+		&i.Handle,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getUserProfileByUserID = `-- name: GetUserProfileByUserID :one
 SELECT user_id, display_name, handle, avatar_url, created_at, updated_at
 FROM app.user_profiles
