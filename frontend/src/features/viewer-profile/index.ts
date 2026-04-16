@@ -6,6 +6,7 @@ export {
   createViewerProfileAvatarUpload,
   uploadViewerProfileAvatarTarget,
 } from "./api/avatar-upload";
+export { ViewerProfileEditorForm } from "./ui/viewer-profile-editor-form";
 export { ViewerProfileSettingsPanel } from "./ui/viewer-profile-settings-panel";
 export { ProfileEditorPanel } from "./ui/profile-editor-panel";
 export { SharedViewerProfileFields } from "./ui/shared-viewer-profile-fields";
