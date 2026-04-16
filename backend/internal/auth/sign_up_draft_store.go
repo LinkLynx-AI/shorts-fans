@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	signUpDraftKeyPrefix        = "fan_auth_sign_up_draft:"
-	signUpHandleReservationKey  = "fan_auth_sign_up_handle:"
+	signUpDraftKeyPrefix       = "fan_auth_sign_up_draft:"
+	signUpHandleReservationKey = "fan_auth_sign_up_handle:"
 )
 
 // ErrSignUpDraftNotFound は sign-up draft が見つからないことを表します。

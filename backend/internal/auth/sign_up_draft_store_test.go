@@ -10,10 +10,10 @@ import (
 )
 
 type signUpDraftRedisClientStub struct {
-	values  map[string]string
-	delErr  error
-	getErr  error
-	setErr  error
+	values   map[string]string
+	delErr   error
+	getErr   error
+	setErr   error
 	setNXErr error
 }
 

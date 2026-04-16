@@ -64,11 +64,11 @@ func (s fanAuthSessionManagerStub) StartSignUpSession(
 
 type fanAuthRepositoryStub struct {
 	getIdentityByProviderAndSubject func(context.Context, string, string) (Identity, error)
-	getIdentityByNormalizedEmail func(context.Context, string) (Identity, error)
-	getPreferredEmailByUserID    func(context.Context, uuid.UUID) (string, error)
-	handleExists                 func(context.Context, string) (bool, error)
-	revokeActiveSession          func(context.Context, string, time.Time) (SessionRecord, error)
-	updateActiveModeByTokenHash  func(context.Context, string, ActiveMode) (SessionRecord, error)
+	getIdentityByNormalizedEmail    func(context.Context, string) (Identity, error)
+	getPreferredEmailByUserID       func(context.Context, uuid.UUID) (string, error)
+	handleExists                    func(context.Context, string) (bool, error)
+	revokeActiveSession             func(context.Context, string, time.Time) (SessionRecord, error)
+	updateActiveModeByTokenHash     func(context.Context, string, ActiveMode) (SessionRecord, error)
 }
 
 func (s fanAuthRepositoryStub) GetIdentityByProviderAndSubject(ctx context.Context, provider string, providerSubject string) (Identity, error) {
@@ -180,10 +180,10 @@ func TestFanAuthServiceSignInUsesDraftProfileWhenPresent(t *testing.T) {
 		},
 		fanAuthRepositoryStub{
 			getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
-			getIdentityByNormalizedEmail: func(context.Context, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
-			getPreferredEmailByUserID:    func(context.Context, uuid.UUID) (string, error) { return "", nil },
-			handleExists:                 func(context.Context, string) (bool, error) { return false, nil },
-			revokeActiveSession:          func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
+			getIdentityByNormalizedEmail:    func(context.Context, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
+			getPreferredEmailByUserID:       func(context.Context, uuid.UUID) (string, error) { return "", nil },
+			handleExists:                    func(context.Context, string) (bool, error) { return false, nil },
+			revokeActiveSession:             func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
 		},
 		fanAuthViewerReaderStub{
 			readCurrentViewer: func(context.Context, string) (Bootstrap, error) { return Bootstrap{}, nil },
@@ -304,14 +304,16 @@ func TestFanAuthServiceSignInFallsBackWhenDraftStoreIsUnavailableForExistingIden
 				}
 				return Identity{ID: uuid.New(), UserID: userID}, nil
 			},
-			getPreferredEmailByUserID:    func(context.Context, uuid.UUID) (string, error) { return "", ErrIdentityNotFound },
-			handleExists:                 func(context.Context, string) (bool, error) { return false, nil },
-			revokeActiveSession:          func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
-			updateActiveModeByTokenHash:  func(context.Context, string, ActiveMode) (SessionRecord, error) { return SessionRecord{}, nil },
+			getPreferredEmailByUserID:   func(context.Context, uuid.UUID) (string, error) { return "", ErrIdentityNotFound },
+			handleExists:                func(context.Context, string) (bool, error) { return false, nil },
+			revokeActiveSession:         func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
+			updateActiveModeByTokenHash: func(context.Context, string, ActiveMode) (SessionRecord, error) { return SessionRecord{}, nil },
 		},
 		defaultFanAuthViewerReaderStub(),
 		signUpDraftStoreStub{
-			getDraft:    func(context.Context, string) (SignUpDraft, error) { return SignUpDraft{}, errors.New("redis unavailable") },
+			getDraft: func(context.Context, string) (SignUpDraft, error) {
+				return SignUpDraft{}, errors.New("redis unavailable")
+			},
 			deleteDraft: func(context.Context, string) error { return nil },
 			saveDraft:   func(context.Context, string, SignUpDraft, time.Duration) error { return nil },
 		},
@@ -378,7 +380,9 @@ func TestFanAuthServiceSignInFallsBackWhenDraftStoreIsUnavailableForExistingSubj
 		},
 		defaultFanAuthViewerReaderStub(),
 		signUpDraftStoreStub{
-			getDraft:    func(context.Context, string) (SignUpDraft, error) { return SignUpDraft{}, errors.New("redis unavailable") },
+			getDraft: func(context.Context, string) (SignUpDraft, error) {
+				return SignUpDraft{}, errors.New("redis unavailable")
+			},
 			deleteDraft: func(context.Context, string) error { return nil },
 			saveDraft:   func(context.Context, string, SignUpDraft, time.Duration) error { return nil },
 		},
@@ -1780,11 +1784,11 @@ func defaultFanAuthSessionManagerStub() fanAuthSessionManagerStub {
 func defaultFanAuthRepositoryStub() fanAuthRepositoryStub {
 	return fanAuthRepositoryStub{
 		getIdentityByProviderAndSubject: func(context.Context, string, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
-		getIdentityByNormalizedEmail: func(context.Context, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
-		getPreferredEmailByUserID:    func(context.Context, uuid.UUID) (string, error) { return "", ErrIdentityNotFound },
-		handleExists:                 func(context.Context, string) (bool, error) { return false, nil },
-		revokeActiveSession:          func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
-		updateActiveModeByTokenHash:  func(context.Context, string, ActiveMode) (SessionRecord, error) { return SessionRecord{}, nil },
+		getIdentityByNormalizedEmail:    func(context.Context, string) (Identity, error) { return Identity{}, ErrIdentityNotFound },
+		getPreferredEmailByUserID:       func(context.Context, uuid.UUID) (string, error) { return "", ErrIdentityNotFound },
+		handleExists:                    func(context.Context, string) (bool, error) { return false, nil },
+		revokeActiveSession:             func(context.Context, string, time.Time) (SessionRecord, error) { return SessionRecord{}, nil },
+		updateActiveModeByTokenHash:     func(context.Context, string, ActiveMode) (SessionRecord, error) { return SessionRecord{}, nil },
 	}
 }
 
