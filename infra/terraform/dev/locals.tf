@@ -12,6 +12,8 @@ locals {
   main_private_bucket_name            = "${local.resource_prefix}-main-private-${local.bucket_suffix}"
   cognito_user_pool_name              = "${local.resource_prefix}-fan-auth"
   cognito_user_pool_client_name       = "${local.resource_prefix}-fan-auth-app-client"
+  cognito_email_from_display_name     = "shortsfans"
+  cognito_email_from_formatted        = trimspace(var.cognito_email_from_address) == "" ? null : format("%s <%s>", local.cognito_email_from_display_name, trimspace(var.cognito_email_from_address))
 
   media_jobs_queue_name     = "${local.resource_prefix}-media-jobs"
   media_jobs_dlq_queue_name = "${local.resource_prefix}-media-jobs-dlq"
