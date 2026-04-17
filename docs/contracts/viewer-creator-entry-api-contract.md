@@ -18,7 +18,6 @@
 - creator onboarding intake payload、required docs、証跡 upload の concrete schema
 - shared viewer profile の作成 / 編集
 - admin review UI と review decision mutation
-- self-serve resubmit mutation
 - creator dashboard / creator home 自体の read 契約
 
 ## Canonical Sources
@@ -41,7 +40,7 @@
 | method | path | auth | notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/viewer/creator-registration` | required | current viewer の creator registration status read |
-| `POST` | `/api/viewer/creator-registration` | required | `draft` から creator registration を submit |
+| `POST` | `/api/viewer/creator-registration` | required | `draft` submit と eligible `rejected` からの self-serve resubmit |
 | `PUT` | `/api/viewer/active-mode` | required | `fan` / `creator` の active mode switch |
 
 ## Shared Rules
@@ -158,7 +157,7 @@
 | field | type | notes |
 | --- | --- | --- |
 | `canSubmit` | `boolean` | `draft` のときだけ `true` |
-| `canResubmit` | `boolean` | self-serve resubmit mutation 未提供のため、この leaf では常に `false` |
+| `canResubmit` | `boolean` | `rejected` かつ self-serve resubmit が許可され、残回数があるときだけ `true` |
 | `canEnterCreatorMode` | `boolean` | approved creator capability を持つときだけ `true` |
 
 ### Status Rules
@@ -168,7 +167,7 @@
 - `approved` は `surface.kind = creator_workspace`、`surface.workspacePreview = null`、`actions.canEnterCreatorMode = true` を返します。
 - `rejection` object は `state = rejected` のときだけ返し、それ以外は `null` です。
 - `selfServeResubmitRemaining` は `2 - selfServeResubmitCount` を返し、負値にはしません。
-- self-serve resubmit mutation は後続 leaf へ委譲するため、この leaf では `actions.canResubmit = false` を維持します。
+- `actions.canResubmit = true` になるのは、`state = rejected` かつ `isResubmitEligible = true`、`isSupportReviewRequired = false`、`selfServeResubmitRemaining > 0` を同時に満たすときだけです。
 
 ### Error Contract
 
@@ -194,11 +193,13 @@
 ### Submit Rules
 
 - target は current viewer 自身の onboarding case だけです。
-- onboarding case が `draft` の場合だけ、現在保存済みの draft を `submitted` へ遷移します。
+- onboarding case が `draft` の場合は initial submit として `submitted` へ遷移します。
+- onboarding case が eligible な `rejected` の場合は self-serve resubmit として `submitted` へ再遷移します。
 - onboarding case 未開始の viewer は、先に `docs/contracts/viewer-creator-registration-intake-api-contract.md` で draft を保存してから submit します。
 - submit 成功は creator capability 付与や public creator profile 公開を意味しません。
 - submit 後も `GET /api/viewer/bootstrap` では `canAccessCreatorMode = false`、`activeMode = fan` を返します。
 - concrete な intake payload、required docs、evidence validation は `docs/contracts/viewer-creator-registration-intake-api-contract.md` を正とします。
+- self-serve resubmit 成功時は `selfServeResubmitCount` を `+1` し、rejection metadata を clear します。
 
 ### Error Contract
 
@@ -209,13 +210,14 @@
 | `400` | `invalid_handle` | shared viewer profile の handle が不正 |
 | `401` | `auth_required` | session 不在 |
 | `409` | `registration_incomplete` | required intake / evidence が不足している |
-| `409` | `registration_state_conflict` | `draft` 以外から initial submit を要求 |
+| `409` | `registration_state_conflict` | `draft` でも eligible `rejected` でもない state から submit / resubmit を要求 |
 | `500` | `internal_error` | unexpected failure |
 
 ## Rejected / Resubmit
 
 - `rejected` status と rejection metadata 自体は `GET /api/viewer/creator-registration` で読めます。
-- self-serve resubmit mutation はこの leaf の scope 外とし、後続 task で transport / UX を固定します。
+- eligible な fixable reject は同じ `POST /api/viewer/creator-registration` を使って self-serve resubmit します。
+- support review required の reject と `suspended` は self-serve resubmit 不可です。
 
 ## `PUT /api/viewer/active-mode`
 

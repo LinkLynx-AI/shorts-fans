@@ -19,6 +19,7 @@ type repositoryQueriesStub struct {
 	createCreatorCapability            func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	createCreatorProfile               func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	getCreatorCapabilityByUserID       func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	getCreatorCapabilityByUserIDLocked func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	getCreatorProfileByUserID          func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	getCreatorRegistrationIntakeByUser func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	getUserProfileByUserID             func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error)
@@ -48,6 +49,16 @@ func (s repositoryQueriesStub) GetCreatorCapabilityByUserID(ctx context.Context,
 		panic("unexpected GetCreatorCapabilityByUserID call")
 	}
 	return s.getCreatorCapabilityByUserID(ctx, userID)
+}
+
+func (s repositoryQueriesStub) GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+	if s.getCreatorCapabilityByUserIDLocked != nil {
+		return s.getCreatorCapabilityByUserIDLocked(ctx, userID)
+	}
+	if s.getCreatorCapabilityByUserID != nil {
+		return s.getCreatorCapabilityByUserID(ctx, userID)
+	}
+	panic("unexpected GetCreatorCapabilityByUserIDForUpdate call")
 }
 
 func (s repositoryQueriesStub) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -210,6 +221,44 @@ func TestRepositoryGetIntakeBuildsEditableSnapshot(t *testing.T) {
 	}
 }
 
+func TestRepositoryGetIntakeAllowsEligibleRejectedResubmit(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("23232323-2323-2323-2323-232323232323")
+	capability := testCapability(userID, StateRejected)
+	capability.IsResubmitEligible = true
+	capability.SelfServeResubmitCount = 1
+
+	repo := newRepository(repositoryQueriesStub{
+		getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+			return testUserProfile(userID), nil
+		},
+		getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+			return capability, nil
+		},
+		getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+			return testCreatorProfile(userID, "retry bio"), nil
+		},
+		getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+			return testIntake(userID), nil
+		},
+		listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+			return testEvidenceRows(userID), nil
+		},
+	})
+
+	intake, err := repo.GetIntake(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("GetIntake() error = %v, want nil", err)
+	}
+	if intake.IsReadOnly {
+		t.Fatal("GetIntake() IsReadOnly = true, want false for eligible rejected")
+	}
+	if !intake.CanSubmit {
+		t.Fatal("GetIntake() CanSubmit = false, want true for eligible rejected")
+	}
+}
+
 func TestRepositoryPrepareEvidenceUploadCreatesDraftCapability(t *testing.T) {
 	t.Parallel()
 
@@ -250,11 +299,16 @@ func TestRepositoryPrepareEvidenceUploadCreatesDraftCapability(t *testing.T) {
 	}
 }
 
-func TestRepositorySaveEvidenceReplacesPreviousObject(t *testing.T) {
+func TestRepositoryPrepareEvidenceUploadAllowsEligibleRejected(t *testing.T) {
 	t.Parallel()
 
-	userID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	userID := uuid.MustParse("34343434-3434-3434-3434-343434343434")
 	tx := &repositoryTxStub{}
+	capability := testCapability(userID, StateRejected)
+	capability.IsResubmitEligible = true
+	capability.SelfServeResubmitCount = 1
+	lockedCapabilityLoaded := false
+
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
 			begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
@@ -264,7 +318,48 @@ func TestRepositorySaveEvidenceReplacesPreviousObject(t *testing.T) {
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
 				},
-				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
+					return capability, nil
+				},
+				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testCreatorProfile(userID, "retry bio"), nil
+				},
+				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+					return testIntake(userID), nil
+				},
+			}
+		},
+	}
+
+	if err := repo.PrepareEvidenceUpload(context.Background(), userID); err != nil {
+		t.Fatalf("PrepareEvidenceUpload() error = %v, want nil", err)
+	}
+	if !tx.committed {
+		t.Fatal("PrepareEvidenceUpload() committed = false, want true")
+	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("PrepareEvidenceUpload() did not load capability with row lock")
+	}
+}
+
+func TestRepositorySaveEvidenceReplacesPreviousObject(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	tx := &repositoryTxStub{}
+	lockedCapabilityLoaded := false
+	repo := &Repository{
+		txBeginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
 					return testCapability(userID, StateDraft), nil
 				},
 				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -312,6 +407,9 @@ func TestRepositorySaveEvidenceReplacesPreviousObject(t *testing.T) {
 	}
 	if !tx.committed {
 		t.Fatal("SaveEvidence() committed = false, want true")
+	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("SaveEvidence() did not load capability with row lock")
 	}
 }
 
@@ -429,6 +527,7 @@ func TestRepositorySaveIntakeUpdatesExistingDraftProfile(t *testing.T) {
 	existingCapability := testCapability(userID, StateDraft)
 	existingProfile := testCreatorProfile(userID, "before")
 	var savedIntake sqlc.AppCreatorRegistrationIntake
+	lockedCapabilityLoaded := false
 
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
@@ -438,6 +537,10 @@ func TestRepositorySaveIntakeUpdatesExistingDraftProfile(t *testing.T) {
 			return repositoryQueriesStub{
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return profile, nil
+				},
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
+					return existingCapability, nil
 				},
 				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
 					return existingCapability, nil
@@ -505,6 +608,9 @@ func TestRepositorySaveIntakeUpdatesExistingDraftProfile(t *testing.T) {
 	if existingProfile.Handle != "updated.creator" {
 		t.Fatalf("SaveIntake() updated handle got %q want %q", existingProfile.Handle, "updated.creator")
 	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("SaveIntake() did not load capability with row lock")
+	}
 }
 
 func TestRepositorySubmitTransitionsToSubmitted(t *testing.T) {
@@ -512,6 +618,7 @@ func TestRepositorySubmitTransitionsToSubmitted(t *testing.T) {
 
 	userID := uuid.MustParse("66666666-6666-6666-6666-666666666666")
 	tx := &repositoryTxStub{}
+	lockedCapabilityLoaded := false
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
 			begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
@@ -520,6 +627,10 @@ func TestRepositorySubmitTransitionsToSubmitted(t *testing.T) {
 			return repositoryQueriesStub{
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
+					return testCapability(userID, StateDraft), nil
 				},
 				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
 					return testCapability(userID, StateDraft), nil
@@ -561,6 +672,99 @@ func TestRepositorySubmitTransitionsToSubmitted(t *testing.T) {
 	if !tx.committed {
 		t.Fatal("Submit() committed = false, want true")
 	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("Submit() did not load capability with row lock")
+	}
+}
+
+func TestRepositorySubmitTransitionsEligibleRejectedToSubmitted(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("67676767-6767-6767-6767-676767676767")
+	tx := &repositoryTxStub{}
+	rejectedAt := time.Unix(1710000600, 0).UTC()
+	existing := testCapability(userID, StateRejected)
+	existing.IsResubmitEligible = true
+	existing.SelfServeResubmitCount = 1
+	existing.RejectedAt = postgres.TimeToPG(&rejectedAt)
+	reason := "documents_incomplete"
+	existing.RejectionReasonCode = postgres.TextToPG(&reason)
+	lockedCapabilityLoaded := false
+
+	repo := &Repository{
+		txBeginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
+					return existing, nil
+				},
+				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testCreatorProfile(userID, "retry bio"), nil
+				},
+				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+					return testIntake(userID), nil
+				},
+				listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+					return testEvidenceRows(userID), nil
+				},
+				updateCreatorCapabilityState: func(_ context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
+					if arg.State != StateSubmitted {
+						t.Fatalf("UpdateCreatorCapabilityState() state got %q want %q", arg.State, StateSubmitted)
+					}
+					if arg.SelfServeResubmitCount != 2 {
+						t.Fatalf("UpdateCreatorCapabilityState() resubmit count got %d want %d", arg.SelfServeResubmitCount, 2)
+					}
+					if arg.RejectionReasonCode.Valid {
+						t.Fatalf("UpdateCreatorCapabilityState() rejection reason got %#v want empty", arg.RejectionReasonCode)
+					}
+					if arg.IsResubmitEligible {
+						t.Fatal("UpdateCreatorCapabilityState() isResubmitEligible = true, want false")
+					}
+					if arg.IsSupportReviewRequired {
+						t.Fatal("UpdateCreatorCapabilityState() isSupportReviewRequired = true, want false")
+					}
+					if arg.RejectedAt.Valid {
+						t.Fatal("UpdateCreatorCapabilityState() rejectedAt valid, want empty")
+					}
+					row := existing
+					row.State = StateSubmitted
+					row.SelfServeResubmitCount = arg.SelfServeResubmitCount
+					row.RejectionReasonCode = pgtype.Text{}
+					row.IsResubmitEligible = false
+					row.IsSupportReviewRequired = false
+					row.SubmittedAt = arg.SubmittedAt
+					row.RejectedAt = pgtype.Timestamptz{}
+					return row, nil
+				},
+			}
+		},
+	}
+
+	registration, err := repo.Submit(context.Background(), userID)
+	if err != nil {
+		t.Fatalf("Submit() error = %v, want nil", err)
+	}
+	if registration.State != StateSubmitted {
+		t.Fatalf("Submit() state got %q want %q", registration.State, StateSubmitted)
+	}
+	if registration.Actions.CanResubmit {
+		t.Fatal("Submit() Actions.CanResubmit = true, want false after resubmit")
+	}
+	if registration.Rejection != nil {
+		t.Fatalf("Submit() rejection got %#v want nil", registration.Rejection)
+	}
+	if !tx.committed {
+		t.Fatal("Submit() committed = false, want true")
+	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("Submit() did not load capability with row lock")
+	}
 }
 
 func TestRegistrationHelpersAndNormalization(t *testing.T) {
@@ -601,16 +805,42 @@ func TestRegistrationHelpersAndNormalization(t *testing.T) {
 	if rejected.Rejection == nil || rejected.Rejection.SelfServeResubmitRemain != 0 {
 		t.Fatalf("buildRegistration() rejected Rejection got %#v want remain 0", rejected.Rejection)
 	}
+	if rejected.Actions.CanResubmit {
+		t.Fatal("buildRegistration() rejected CanResubmit = true, want false when remain is exhausted")
+	}
 	if rejected.Surface.Kind != "read_only_onboarding" {
 		t.Fatalf("buildRegistration() rejected surface got %q want %q", rejected.Surface.Kind, "read_only_onboarding")
+	}
+
+	eligibleRejectedCapability := testCapability(userID, StateRejected)
+	eligibleRejectedCapability.IsResubmitEligible = true
+	eligibleRejectedCapability.SelfServeResubmitCount = 1
+	eligibleRejected, err := buildRegistration(registrationSnapshot{
+		capability:     ptrCapability(eligibleRejectedCapability),
+		creatorProfile: ptrCreatorProfile(testCreatorProfile(userID, "bio")),
+		intake:         ptrIntake(testIntake(userID)),
+		userProfile:    testUserProfile(userID),
+	})
+	if err != nil {
+		t.Fatalf("buildRegistration() eligible rejected error = %v, want nil", err)
+	}
+	if !eligibleRejected.Actions.CanResubmit {
+		t.Fatal("buildRegistration() eligible rejected CanResubmit = false, want true")
 	}
 
 	if _, err := buildRegistration(registrationSnapshot{}); err == nil {
 		t.Fatal("buildRegistration() error = nil, want error without capability")
 	}
 
-	if err := ensureDraftEditable(&sqlc.AppCreatorCapability{State: StateSubmitted}); !errors.Is(err, ErrRegistrationStateConflict) {
-		t.Fatalf("ensureDraftEditable() error got %v want %v", err, ErrRegistrationStateConflict)
+	if err := ensureCapabilityEditable(&sqlc.AppCreatorCapability{State: StateSubmitted}); !errors.Is(err, ErrRegistrationStateConflict) {
+		t.Fatalf("ensureCapabilityEditable() error got %v want %v", err, ErrRegistrationStateConflict)
+	}
+	if err := ensureCapabilityEditable(&sqlc.AppCreatorCapability{
+		State:                  StateRejected,
+		IsResubmitEligible:     true,
+		SelfServeResubmitCount: 1,
+	}); err != nil {
+		t.Fatalf("ensureCapabilityEditable() eligible rejected error = %v, want nil", err)
 	}
 
 	existing := testCapability(userID, StateDraft)
@@ -772,7 +1002,7 @@ func TestLoadSnapshotAndUpsertDraftProfileErrors(t *testing.T) {
 			return sqlc.AppUserProfile{}, pgx.ErrNoRows
 		},
 	})
-	if _, err := repo.loadSnapshot(context.Background(), repo.queries, userID, false); !errors.Is(err, ErrSharedProfileNotFound) {
+	if _, err := repo.loadSnapshot(context.Background(), repo.queries, userID, false, false); !errors.Is(err, ErrSharedProfileNotFound) {
 		t.Fatalf("loadSnapshot() error got %v want %v", err, ErrSharedProfileNotFound)
 	}
 
@@ -978,6 +1208,43 @@ func TestRepositoryGetRegistrationAndWriteConflicts(t *testing.T) {
 		UserID:        userID,
 	}); !errors.Is(err, ErrRegistrationStateConflict) {
 		t.Fatalf("SaveEvidence() conflict error got %v want %v", err, ErrRegistrationStateConflict)
+	}
+
+	supportOnlyTx := &repositoryTxStub{}
+	supportOnlyCapability := testCapability(userID, StateRejected)
+	supportOnlyCapability.IsSupportReviewRequired = true
+	supportOnlyCapability.SelfServeResubmitCount = 2
+
+	supportOnlyRepo := &Repository{
+		txBeginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) { return supportOnlyTx, nil },
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return supportOnlyCapability, nil
+				},
+				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testCreatorProfile(userID, "blocked bio"), nil
+				},
+				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+					return testIntake(userID), nil
+				},
+				listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+					return testEvidenceRows(userID), nil
+				},
+			}
+		},
+	}
+
+	if _, err := supportOnlyRepo.SaveIntake(context.Background(), SaveIntakeInput{
+		CreatorBio: "bio",
+		UserID:     userID,
+	}); !errors.Is(err, ErrRegistrationStateConflict) {
+		t.Fatalf("SaveIntake() support-only rejected error got %v want %v", err, ErrRegistrationStateConflict)
 	}
 }
 
