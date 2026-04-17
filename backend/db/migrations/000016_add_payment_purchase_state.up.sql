@@ -91,6 +91,10 @@ CREATE INDEX idx_main_purchase_attempts_provider_purchase_ref
     ON app.main_purchase_attempts (provider_purchase_ref)
     WHERE provider_purchase_ref IS NOT NULL;
 
+CREATE UNIQUE INDEX idx_main_purchase_attempts_provider_transaction_ref
+    ON app.main_purchase_attempts (provider_transaction_ref)
+    WHERE provider_transaction_ref IS NOT NULL;
+
 CREATE UNIQUE INDEX idx_main_purchase_attempts_user_main_inflight
     ON app.main_purchase_attempts (user_id, main_id)
     WHERE status IN ('processing', 'pending');
