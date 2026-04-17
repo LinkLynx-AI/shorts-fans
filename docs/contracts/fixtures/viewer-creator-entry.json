@@ -1,4 +1,301 @@
 {
+  "GET /api/viewer/creator-registration": {
+    "notStarted": {
+      "body": {
+        "data": {
+          "registration": null
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_not_started_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "draft": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "draft",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": null,
+              "approvedAt": null,
+              "rejectedAt": null,
+              "suspendedAt": null
+            },
+            "rejection": null,
+            "surface": {
+              "kind": "read_only_onboarding",
+              "workspacePreview": "static_mock"
+            },
+            "actions": {
+              "canSubmit": true,
+              "canResubmit": false,
+              "canEnterCreatorMode": false
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_draft_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "submitted": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "submitted",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": "2026-04-16T09:30:00Z",
+              "approvedAt": null,
+              "rejectedAt": null,
+              "suspendedAt": null
+            },
+            "rejection": null,
+            "surface": {
+              "kind": "read_only_onboarding",
+              "workspacePreview": "static_mock"
+            },
+            "actions": {
+              "canSubmit": false,
+              "canResubmit": false,
+              "canEnterCreatorMode": false
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_submitted_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "approved": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "approved",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": "2026-04-16T09:30:00Z",
+              "approvedAt": "2026-04-17T03:15:00Z",
+              "rejectedAt": null,
+              "suspendedAt": null
+            },
+            "rejection": null,
+            "surface": {
+              "kind": "creator_workspace",
+              "workspacePreview": null
+            },
+            "actions": {
+              "canSubmit": false,
+              "canResubmit": false,
+              "canEnterCreatorMode": true
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_approved_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "rejectedEligible": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "rejected",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": "2026-04-16T09:30:00Z",
+              "approvedAt": null,
+              "rejectedAt": "2026-04-17T01:20:00Z",
+              "suspendedAt": null
+            },
+            "rejection": {
+              "reasonCode": "documents_incomplete",
+              "isResubmitEligible": true,
+              "isSupportReviewRequired": false,
+              "selfServeResubmitCount": 1,
+              "selfServeResubmitRemaining": 1
+            },
+            "surface": {
+              "kind": "read_only_onboarding",
+              "workspacePreview": "static_mock"
+            },
+            "actions": {
+              "canSubmit": false,
+              "canResubmit": true,
+              "canEnterCreatorMode": false
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_rejected_eligible_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "rejectedSupportOnly": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "rejected",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": "2026-04-12T08:00:00Z",
+              "approvedAt": null,
+              "rejectedAt": "2026-04-17T01:20:00Z",
+              "suspendedAt": null
+            },
+            "rejection": {
+              "reasonCode": "impersonation_suspected",
+              "isResubmitEligible": false,
+              "isSupportReviewRequired": true,
+              "selfServeResubmitCount": 2,
+              "selfServeResubmitRemaining": 0
+            },
+            "surface": {
+              "kind": "read_only_onboarding",
+              "workspacePreview": "static_mock"
+            },
+            "actions": {
+              "canSubmit": false,
+              "canResubmit": false,
+              "canEnterCreatorMode": false
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_rejected_support_001"
+        },
+        "error": null
+      },
+      "status": 200
+    },
+    "suspended": {
+      "body": {
+        "data": {
+          "registration": {
+            "state": "suspended",
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorDraft": {
+              "bio": "quiet rooftop の continuation を中心に投稿します。"
+            },
+            "review": {
+              "submittedAt": "2026-04-12T08:00:00Z",
+              "approvedAt": "2026-04-14T10:00:00Z",
+              "rejectedAt": null,
+              "suspendedAt": "2026-04-17T02:10:00Z"
+            },
+            "rejection": null,
+            "surface": {
+              "kind": "read_only_onboarding",
+              "workspacePreview": "static_mock"
+            },
+            "actions": {
+              "canSubmit": false,
+              "canResubmit": false,
+              "canEnterCreatorMode": false
+            }
+          }
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_status_suspended_001"
+        },
+        "error": null
+      },
+      "status": 200
+    }
+  },
   "POST /api/viewer/creator-registration": {
     "request": {},
     "success": {
@@ -31,6 +328,40 @@
         }
       },
       "status": 400
+    },
+    "stateConflict": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "registration_state_conflict",
+          "message": "creator registration cannot be submitted from the current state"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_state_conflict_001"
+        }
+      },
+      "status": 409
+    }
+  },
+  "POST /api/viewer/creator-registration/resubmit": {
+    "request": {},
+    "success": {
+      "status": 204
+    },
+    "resubmitNotAllowed": {
+      "body": {
+        "data": null,
+        "error": {
+          "code": "resubmit_not_allowed",
+          "message": "creator registration resubmit is not allowed"
+        },
+        "meta": {
+          "page": null,
+          "requestId": "req_viewer_creator_registration_resubmit_not_allowed_001"
+        }
+      },
+      "status": 409
     }
   },
   "PUT /api/viewer/active-mode": {
