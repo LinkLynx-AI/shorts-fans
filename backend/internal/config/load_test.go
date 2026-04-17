@@ -19,6 +19,7 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	t.Setenv("CREATOR_AVATAR_UPLOAD_BUCKET_NAME", "avatar-upload-bucket")
 	t.Setenv("CREATOR_AVATAR_DELIVERY_BUCKET_NAME", "avatar-delivery-bucket")
 	t.Setenv("CREATOR_AVATAR_BASE_URL", "https://example.com/avatar")
+	t.Setenv("CREATOR_REVIEW_EVIDENCE_BUCKET_NAME", "creator-review-evidence-bucket")
 
 	cfg := Load()
 
@@ -69,6 +70,9 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 	}
 	if cfg.CreatorAvatarBaseURL != "https://example.com/avatar" {
 		t.Fatalf("Load() creator avatar base url got %q want %q", cfg.CreatorAvatarBaseURL, "https://example.com/avatar")
+	}
+	if cfg.CreatorReviewEvidenceBucketName != "creator-review-evidence-bucket" {
+		t.Fatalf("Load() creator review evidence bucket got %q want %q", cfg.CreatorReviewEvidenceBucketName, "creator-review-evidence-bucket")
 	}
 }
 

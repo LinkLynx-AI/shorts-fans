@@ -1,8 +1,14 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { viewerSessionCookieName } from "@/entities/viewer";
 import { buildFanLoginHref } from "@/features/fan-auth";
 import { getFanAuthGateState } from "@/features/fan-auth-gate";
-import { CreatorRegistrationPanel } from "@/features/creator-entry";
+import {
+  CreatorRegistrationPanel,
+  fetchCreatorRegistration,
+  getCreatorEntryErrorCode,
+} from "@/features/creator-entry";
 
 export default async function CreatorRegisterPage() {
   const viewerState = await getFanAuthGateState();
@@ -14,7 +20,28 @@ export default async function CreatorRegisterPage() {
   }
 
   if (currentViewer.canAccessCreatorMode) {
-    redirect(currentViewer.activeMode === "creator" ? "/creator" : "/fan/creator/success");
+    redirect(currentViewer.activeMode === "creator" ? "/creator" : "/fan");
+    return null;
+  }
+
+  const sessionToken = (await cookies()).get(viewerSessionCookieName)?.value;
+  if (!sessionToken) {
+    redirect(buildFanLoginHref());
+    return null;
+  }
+
+  let registration = null;
+  try {
+    registration = await fetchCreatorRegistration({ sessionToken });
+  } catch (error) {
+    if (getCreatorEntryErrorCode(error) === "not_found") {
+      redirect("/fan/settings/profile");
+      return null;
+    }
+  }
+
+  if (registration?.state === "submitted") {
+    redirect("/fan/creator/success");
     return null;
   }
 

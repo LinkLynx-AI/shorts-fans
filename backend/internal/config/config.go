@@ -21,6 +21,7 @@ const (
 	avatarUploadBucketEnv      = "CREATOR_AVATAR_UPLOAD_BUCKET_NAME"
 	avatarDeliveryBucketEnv    = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
 	avatarBaseURLEnv           = "CREATOR_AVATAR_BASE_URL"
+	reviewEvidenceBucketEnv    = "CREATOR_REVIEW_EVIDENCE_BUCKET_NAME"
 )
 
 // Config は backend コマンドの実行時設定を保持します。
@@ -41,6 +42,7 @@ type Config struct {
 	CreatorAvatarUploadBucketName   string
 	CreatorAvatarDeliveryBucketName string
 	CreatorAvatarBaseURL            string
+	CreatorReviewEvidenceBucketName string
 }
 
 // Load はプロセス環境変数から設定を読み込み、既定値を適用します。
@@ -67,6 +69,7 @@ func LoadFromEnv(lookup func(string) string) Config {
 		CreatorAvatarUploadBucketName:   trimmedLookup(lookup, avatarUploadBucketEnv),
 		CreatorAvatarDeliveryBucketName: trimmedLookup(lookup, avatarDeliveryBucketEnv),
 		CreatorAvatarBaseURL:            trimmedLookup(lookup, avatarBaseURLEnv),
+		CreatorReviewEvidenceBucketName: trimmedLookup(lookup, reviewEvidenceBucketEnv),
 	}
 
 	if cfg.AppEnv == "" {
@@ -106,6 +109,7 @@ func (c Config) ValidateAPI() error {
 		{name: avatarUploadBucketEnv, value: c.CreatorAvatarUploadBucketName},
 		{name: avatarDeliveryBucketEnv, value: c.CreatorAvatarDeliveryBucketName},
 		{name: avatarBaseURLEnv, value: c.CreatorAvatarBaseURL},
+		{name: reviewEvidenceBucketEnv, value: c.CreatorReviewEvidenceBucketName},
 	}
 
 	var missingAvatar []string

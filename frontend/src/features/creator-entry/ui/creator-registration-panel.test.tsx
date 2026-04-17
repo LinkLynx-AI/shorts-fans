@@ -5,16 +5,7 @@ import {
   waitFor,
 } from "@testing-library/react";
 
-import {
-  CurrentViewerProvider,
-  ViewerSessionProvider,
-  getCurrentViewerBootstrap,
-} from "@/entities/viewer";
-import { ApiError } from "@/shared/api";
-import {
-  CreatorRegistrationPanel,
-  registerCreator,
-} from "@/features/creator-entry";
+import { CreatorRegistrationPanel } from "@/features/creator-entry";
 
 const mockedRouter = vi.hoisted(() => ({
   back: vi.fn(),
@@ -23,6 +14,15 @@ const mockedRouter = vi.hoisted(() => ({
   push: vi.fn(),
   refresh: vi.fn(),
   replace: vi.fn(),
+}));
+
+const apiMocks = vi.hoisted(() => ({
+  completeCreatorRegistrationEvidenceUpload: vi.fn(),
+  createCreatorRegistrationEvidenceUpload: vi.fn(),
+  fetchCreatorRegistrationIntake: vi.fn(),
+  registerCreator: vi.fn(),
+  saveCreatorRegistrationIntake: vi.fn(),
+  uploadCreatorRegistrationEvidenceTarget: vi.fn(),
 }));
 
 vi.mock("next/navigation", async () => {
@@ -34,34 +34,7 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-vi.mock("@/entities/viewer", async () => {
-  const actual = await vi.importActual<typeof import("@/entities/viewer")>("@/entities/viewer");
-
-  return {
-    ...actual,
-    getCurrentViewerBootstrap: vi.fn(),
-  };
-});
-
-vi.mock("@/features/creator-entry/api/register-creator", () => ({
-  registerCreator: vi.fn(),
-}));
-
-function renderPanel() {
-  return render(
-    <ViewerSessionProvider hasSession>
-      <CurrentViewerProvider
-        currentViewer={{
-          activeMode: "fan",
-          canAccessCreatorMode: false,
-          id: "viewer_123",
-        }}
-      >
-        <CreatorRegistrationPanel />
-      </CurrentViewerProvider>
-    </ViewerSessionProvider>,
-  );
-}
+vi.mock("@/features/creator-entry/api", () => apiMocks);
 
 describe("CreatorRegistrationPanel", () => {
   beforeEach(() => {
@@ -71,67 +44,150 @@ describe("CreatorRegistrationPanel", () => {
     mockedRouter.push.mockReset();
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
-    vi.mocked(getCurrentViewerBootstrap).mockReset();
-    vi.mocked(registerCreator).mockReset();
+    apiMocks.completeCreatorRegistrationEvidenceUpload.mockReset();
+    apiMocks.createCreatorRegistrationEvidenceUpload.mockReset();
+    apiMocks.fetchCreatorRegistrationIntake.mockReset();
+    apiMocks.registerCreator.mockReset();
+    apiMocks.saveCreatorRegistrationIntake.mockReset();
+    apiMocks.uploadCreatorRegistrationEvidenceTarget.mockReset();
   });
 
-  it("renders a confirm-only registration surface", () => {
-    renderPanel();
-
-    expect(screen.getByRole("heading", { name: "Creator登録を始める" })).toBeInTheDocument();
-    expect(screen.getByText(/signup と profile settings で fan \/ creator 共通/)).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Display name" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Handle" })).not.toBeInTheDocument();
-  });
-
-  it("submits registration and routes to the success screen after bootstrap sync", async () => {
-    const user = userEvent.setup();
-
-    vi.mocked(registerCreator).mockResolvedValue(undefined);
-    vi.mocked(getCurrentViewerBootstrap).mockResolvedValue({
-      activeMode: "fan",
-      canAccessCreatorMode: true,
-      id: "viewer_123",
+  it("loads the intake draft and renders the shared profile preview", async () => {
+    apiMocks.fetchCreatorRegistrationIntake.mockResolvedValue({
+      acceptsConsentResponsibility: false,
+      birthDate: null,
+      canSubmit: false,
+      creatorBio: "quiet rooftop",
+      declaresNoProhibitedCategory: false,
+      evidences: [],
+      isReadOnly: false,
+      legalName: "Mina Rei",
+      payoutRecipientName: "",
+      payoutRecipientType: null,
+      registrationState: "draft",
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
     });
 
-    renderPanel();
+    render(<CreatorRegistrationPanel />);
 
-    await user.click(screen.getByRole("button", { name: "申し込む" }));
+    expect(await screen.findByRole("heading", { name: "Creator審査申請を始める" })).toBeInTheDocument();
+    expect(screen.getByText("Mina")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("quiet rooftop")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("Mina Rei")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profile settings を開く" })).toHaveAttribute("href", "/fan/settings/profile");
+  });
+
+  it("saves the current draft and routes to the success page on submit", async () => {
+    const user = userEvent.setup();
+
+    apiMocks.fetchCreatorRegistrationIntake.mockResolvedValue({
+      acceptsConsentResponsibility: false,
+      birthDate: "",
+      canSubmit: false,
+      creatorBio: "",
+      declaresNoProhibitedCategory: false,
+      evidences: [
+        {
+          fileName: "government-id.png",
+          fileSizeBytes: 1024,
+          kind: "government_id",
+          mimeType: "image/png",
+          uploadedAt: "2026-04-17T10:30:00.000Z",
+        },
+        {
+          fileName: "bank-proof.pdf",
+          fileSizeBytes: 2048,
+          kind: "payout_proof",
+          mimeType: "application/pdf",
+          uploadedAt: "2026-04-17T10:32:00.000Z",
+        },
+      ],
+      isReadOnly: false,
+      legalName: "",
+      payoutRecipientName: "",
+      payoutRecipientType: null,
+      registrationState: "draft",
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
+    });
+    apiMocks.saveCreatorRegistrationIntake.mockResolvedValue({
+      acceptsConsentResponsibility: true,
+      birthDate: "1999-04-02",
+      canSubmit: true,
+      creatorBio: "quiet rooftop",
+      declaresNoProhibitedCategory: true,
+      evidences: [
+        {
+          fileName: "government-id.png",
+          fileSizeBytes: 1024,
+          kind: "government_id",
+          mimeType: "image/png",
+          uploadedAt: "2026-04-17T10:30:00.000Z",
+        },
+        {
+          fileName: "bank-proof.pdf",
+          fileSizeBytes: 2048,
+          kind: "payout_proof",
+          mimeType: "application/pdf",
+          uploadedAt: "2026-04-17T10:32:00.000Z",
+        },
+      ],
+      isReadOnly: false,
+      legalName: "Mina Rei",
+      payoutRecipientName: "Mina Rei",
+      payoutRecipientType: "self",
+      registrationState: "draft",
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
+    });
+    apiMocks.registerCreator.mockResolvedValue(undefined);
+
+    render(<CreatorRegistrationPanel />);
+
+    await screen.findByRole("heading", { name: "Creator審査申請を始める" });
+
+    await user.type(screen.getByRole("textbox", { name: "Bio" }), "quiet rooftop");
+    await user.type(screen.getByRole("textbox", { name: "Legal name" }), "Mina Rei");
+    await user.type(screen.getByLabelText("Birth date"), "1999-04-02");
+    await user.click(screen.getByLabelText("自分名義"));
+    await user.type(screen.getByRole("textbox", { name: "Payout recipient name" }), "Mina Rei");
+    await user.click(screen.getByRole("checkbox", { name: /prohibited category/i }));
+    await user.click(screen.getByRole("checkbox", { name: /consent/i }));
+    await user.click(screen.getByRole("button", { name: "審査申請を送信する" }));
 
     await waitFor(() => {
-      expect(registerCreator).toHaveBeenCalledWith();
-      expect(getCurrentViewerBootstrap).toHaveBeenCalledWith({
-        credentials: "include",
-      });
+      expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledWith(
+        {
+          acceptsConsentResponsibility: true,
+          birthDate: "1999-04-02",
+          creatorBio: "quiet rooftop",
+          declaresNoProhibitedCategory: true,
+          legalName: "Mina Rei",
+          payoutRecipientName: "Mina Rei",
+          payoutRecipientType: "self",
+        },
+      );
+      expect(apiMocks.registerCreator).toHaveBeenCalledWith();
       expect(mockedRouter.push).toHaveBeenCalledWith("/fan/creator/success");
     });
   });
 
-  it("shows the mapped API error returned by registration", async () => {
-    const user = userEvent.setup();
+  it("keeps the save action disabled when the initial intake fetch fails", async () => {
+    apiMocks.fetchCreatorRegistrationIntake.mockRejectedValue(new Error("boom"));
 
-    vi.mocked(registerCreator).mockRejectedValue(
-      new ApiError("API request failed with a non-success status.", {
-        code: "http",
-        details: JSON.stringify({
-          error: {
-            code: "handle_already_taken",
-            message: "handle is already taken",
-          },
-          meta: {
-            requestId: "req_handle_taken",
-          },
-        }),
-        status: 409,
-      }),
-    );
+    render(<CreatorRegistrationPanel />);
 
-    renderPanel();
-
-    await user.click(screen.getByRole("button", { name: "申し込む" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "そのhandleは既に使われています。別のhandleを入力してください。",
-    );
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "下書きを保存する" })).toBeDisabled();
   });
 });

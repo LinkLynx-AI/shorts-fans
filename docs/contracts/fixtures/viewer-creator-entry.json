@@ -186,7 +186,7 @@
             },
             "actions": {
               "canSubmit": false,
-              "canResubmit": true,
+              "canResubmit": false,
               "canEnterCreatorMode": false
             }
           }
@@ -339,26 +339,6 @@
         "meta": {
           "page": null,
           "requestId": "req_viewer_creator_registration_state_conflict_001"
-        }
-      },
-      "status": 409
-    }
-  },
-  "POST /api/viewer/creator-registration/resubmit": {
-    "request": {},
-    "success": {
-      "status": 204
-    },
-    "resubmitNotAllowed": {
-      "body": {
-        "data": null,
-        "error": {
-          "code": "resubmit_not_allowed",
-          "message": "creator registration resubmit is not allowed"
-        },
-        "meta": {
-          "page": null,
-          "requestId": "req_viewer_creator_registration_resubmit_not_allowed_001"
         }
       },
       "status": 409

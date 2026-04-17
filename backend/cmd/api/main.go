@@ -14,6 +14,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/config"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorregistration"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanmain"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
@@ -90,6 +91,7 @@ func main() {
 	}
 
 	creatorRepository := creator.NewRepository(pool, delivery)
+	creatorRegistrationRepository := creatorregistration.NewRepository(pool)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
@@ -155,6 +157,18 @@ func main() {
 		logger.Error("failed to initialize creator avatar service", "error", err)
 		os.Exit(1)
 	}
+	creatorRegistrationEvidenceService, err := creatorregistration.NewEvidenceUploadService(
+		creatorregistration.ServiceConfig{
+			EvidenceBucketName: cfg.CreatorReviewEvidenceBucketName,
+		},
+		s3Client,
+		creatorregistration.NewRedisEvidenceUploadStore(redisClient),
+		creatorRegistrationRepository,
+	)
+	if err != nil {
+		logger.Error("failed to initialize creator registration evidence upload service", "error", err)
+		os.Exit(1)
+	}
 
 	server := httpserver.New(
 		httpserver.Config{
@@ -177,7 +191,8 @@ func main() {
 			FanShortPin:                  shortsRepository,
 			CreatorFollow:                creatorRepository,
 			CreatorAvatarUpload:          creatorAvatarService,
-			CreatorRegistration:          creatorRepository,
+			CreatorRegistration:          creatorRegistrationRepository,
+			CreatorRegistrationEvidence:  creatorRegistrationEvidenceService,
 			FanProfileLibrary:            fanProfileRepository,
 			FanProfileOverview:           fanProfileRepository,
 			FanProfileFollowing:          fanProfileRepository,
