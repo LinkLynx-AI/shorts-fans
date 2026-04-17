@@ -18,19 +18,20 @@ import (
 
 const (
 	fanShortUnlockRequestScope     = "fan_short_unlock"
+	fanMainPurchaseRequestScope    = "fan_main_purchase"
 	fanMainAccessEntryRequestScope = "fan_main_access_entry"
 	fanMainPlaybackRequestScope    = "fan_main_playback"
 	fanMainAuthRequiredMessage     = "authentication required"
 )
 
 type unlockSurfaceResponseData struct {
-	Access          mainAccessStatePayload   `json:"access"`
-	Creator         creatorSummary           `json:"creator"`
-	Main            unlockMainSummaryPayload `json:"main"`
-	MainAccessEntry mainAccessEntryPayload   `json:"mainAccessEntry"`
-	Setup           unlockSetupPayload       `json:"setup"`
-	Short           unlockShortSummary       `json:"short"`
-	UnlockCta       unlockCtaStatePayload    `json:"unlockCta"`
+	Access       mainAccessStatePayload     `json:"access"`
+	Creator      creatorSummary             `json:"creator"`
+	EntryContext entryContextPayload        `json:"entryContext"`
+	Main         unlockMainSummaryPayload   `json:"main"`
+	Purchase     unlockPurchaseStatePayload `json:"purchase"`
+	Short        unlockShortSummary         `json:"short"`
+	UnlockCta    unlockCtaStatePayload      `json:"unlockCta"`
 }
 
 type unlockMainSummaryPayload struct {
@@ -48,26 +49,66 @@ type unlockShortSummary struct {
 	PreviewDurationSeconds int64      `json:"previewDurationSeconds"`
 }
 
-type unlockSetupPayload struct {
+type entryContextPayload struct {
+	AccessEntryPath string `json:"accessEntryPath"`
+	PurchasePath    string `json:"purchasePath"`
+	Token           string `json:"token"`
+}
+
+type purchaseSetupPayload struct {
 	Required                bool `json:"required"`
 	RequiresAgeConfirmation bool `json:"requiresAgeConfirmation"`
+	RequiresCardSetup       bool `json:"requiresCardSetup"`
 	RequiresTermsAcceptance bool `json:"requiresTermsAcceptance"`
 }
 
-type mainAccessEntryPayload struct {
-	RoutePath string `json:"routePath"`
-	Token     string `json:"token"`
+type savedCardSummaryPayload struct {
+	Brand           string `json:"brand"`
+	Last4           string `json:"last4"`
+	PaymentMethodID string `json:"paymentMethodId"`
+}
+
+type unlockPurchaseStatePayload struct {
+	PendingReason       *string                   `json:"pendingReason"`
+	SavedPaymentMethods []savedCardSummaryPayload `json:"savedPaymentMethods"`
+	Setup               purchaseSetupPayload      `json:"setup"`
+	State               string                    `json:"state"`
+	SupportedCardBrands []string                  `json:"supportedCardBrands"`
 }
 
 type mainAccessEntryRequestPayload struct {
-	AcceptedAge   bool   `json:"acceptedAge"`
-	AcceptedTerms bool   `json:"acceptedTerms"`
-	EntryToken    string `json:"entryToken"`
-	FromShortID   string `json:"fromShortId"`
+	EntryToken  string `json:"entryToken"`
+	FromShortID string `json:"fromShortId"`
 }
 
 type mainAccessEntryResponseData struct {
 	Href string `json:"href"`
+}
+
+type mainPurchasePaymentMethodPayload struct {
+	CardSetupToken  string `json:"cardSetupToken"`
+	Mode            string `json:"mode"`
+	PaymentMethodID string `json:"paymentMethodId"`
+}
+
+type mainPurchaseRequestPayload struct {
+	AcceptedAge   bool                             `json:"acceptedAge"`
+	AcceptedTerms bool                             `json:"acceptedTerms"`
+	EntryToken    string                           `json:"entryToken"`
+	FromShortID   string                           `json:"fromShortId"`
+	PaymentMethod mainPurchasePaymentMethodPayload `json:"paymentMethod"`
+}
+
+type purchaseOutcomePayload struct {
+	CanRetry      bool    `json:"canRetry"`
+	FailureReason *string `json:"failureReason"`
+	Status        string  `json:"status"`
+}
+
+type mainPurchaseResponseData struct {
+	Access       mainAccessStatePayload `json:"access"`
+	EntryContext *entryContextPayload   `json:"entryContext"`
+	Purchase     purchaseOutcomePayload `json:"purchase"`
 }
 
 type mainAccessStatePayload struct {
@@ -107,6 +148,12 @@ func registerFanUnlockMainRoutes(
 		handleFanShortUnlock(c, service, shortDisplayAssets)
 	})
 
+	mainPurchaseGroup := router.Group("/")
+	mainPurchaseGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainPurchaseRequestScope, fanMainAuthRequiredMessage))
+	mainPurchaseGroup.POST("/api/fan/mains/:mainId/purchase", func(c *gin.Context) {
+		handleFanMainPurchase(c, service)
+	})
+
 	mainAccessEntryGroup := router.Group("/")
 	mainAccessEntryGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainAccessEntryRequestScope, fanMainAuthRequiredMessage))
 	mainAccessEntryGroup.POST("/api/fan/mains/:mainId/access-entry", func(c *gin.Context) {
@@ -137,29 +184,31 @@ func handleFanShortUnlock(
 		return
 	}
 
-	unlock, err := service.GetUnlockSurface(c.Request.Context(), viewer.ID, sessionBinding, shortID)
+	unlockSurface, err := service.GetUnlockSurface(c.Request.Context(), viewer.ID, sessionBinding, shortID)
 	if err != nil {
 		switch {
 		case errors.Is(err, fanmain.ErrShortUnlockNotFound):
 			writeNotFoundError(c, fanShortUnlockRequestScope, "short was not found")
+		case errors.Is(err, fanmain.ErrMainLocked):
+			writeFanMainLockedError(c, fanShortUnlockRequestScope, "main is not available for unlock")
 		default:
 			writeInternalServerError(c, fanShortUnlockRequestScope)
 		}
 		return
 	}
 
-	shortPayload, err := buildUnlockShortSummary(unlock.Short, shortDisplayAssets)
+	shortPayload, err := buildUnlockShortSummary(unlockSurface.Short, shortDisplayAssets)
 	if err != nil {
 		writeInternalServerError(c, fanShortUnlockRequestScope)
 		return
 	}
 
 	creatorPayload, err := buildCreatorSummaryFields(
-		unlock.Creator.ID,
-		unlock.Creator.DisplayName,
-		unlock.Creator.Handle,
-		unlock.Creator.AvatarURL,
-		unlock.Creator.Bio,
+		unlockSurface.Creator.ID,
+		unlockSurface.Creator.DisplayName,
+		unlockSurface.Creator.Handle,
+		unlockSurface.Creator.AvatarURL,
+		unlockSurface.Creator.Bio,
 	)
 	if err != nil {
 		writeInternalServerError(c, fanShortUnlockRequestScope)
@@ -168,32 +217,102 @@ func handleFanShortUnlock(
 
 	c.JSON(http.StatusOK, responseEnvelope[unlockSurfaceResponseData]{
 		Data: &unlockSurfaceResponseData{
-			Access:  buildMainAccessStatePayload(unlock.Access),
-			Creator: creatorPayload,
+			Access:       buildMainAccessStatePayload(unlockSurface.Access),
+			Creator:      creatorPayload,
+			EntryContext: buildEntryContextPayload(unlockSurface.Main.ID, unlockSurface.MainAccessToken),
 			Main: unlockMainSummaryPayload{
-				DurationSeconds: unlock.Main.DurationSeconds,
-				ID:              mainPublicID(unlock.Main.ID),
-				PriceJPY:        unlock.Main.PriceJPY,
+				DurationSeconds: unlockSurface.Main.DurationSeconds,
+				ID:              mainPublicID(unlockSurface.Main.ID),
+				PriceJPY:        unlockSurface.Main.PriceJPY,
 			},
-			MainAccessEntry: mainAccessEntryPayload{
-				RoutePath: buildMainAccessEntryRoutePath(unlock.Main.ID),
-				Token:     unlock.MainAccessToken,
-			},
-			Setup: unlockSetupPayload{
-				Required:                unlock.Setup.Required,
-				RequiresAgeConfirmation: unlock.Setup.RequiresAgeConfirmation,
-				RequiresTermsAcceptance: unlock.Setup.RequiresTermsAcceptance,
-			},
-			Short: shortPayload,
-			UnlockCta: unlockCtaStatePayload{
-				MainDurationSeconds:   unlock.UnlockCta.MainDurationSeconds,
-				PriceJPY:              unlock.UnlockCta.PriceJPY,
-				ResumePositionSeconds: unlock.UnlockCta.ResumePositionSeconds,
-				State:                 unlock.UnlockCta.State,
-			},
+			Purchase:  buildUnlockPurchaseStatePayload(unlockSurface.Purchase),
+			Short:     shortPayload,
+			UnlockCta: buildFanMainUnlockCtaStatePayload(unlockSurface.UnlockCta),
 		},
 		Meta: responseMeta{
 			RequestID: newRequestID(fanShortUnlockRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
+func handleFanMainPurchase(c *gin.Context, service FanUnlockMainService) {
+	viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(c)
+	if !ok {
+		writeInternalServerError(c, fanMainPurchaseRequestScope)
+		return
+	}
+
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeNotFoundError(c, fanMainPurchaseRequestScope, "main or short was not found")
+		return
+	}
+
+	var request mainPurchaseRequestPayload
+	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+		writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
+		return
+	}
+
+	fromShortID, err := shorts.ParsePublicShortID(request.FromShortID)
+	if err != nil {
+		writeNotFoundError(c, fanMainPurchaseRequestScope, "main or short was not found")
+		return
+	}
+
+	result, err := service.PurchaseMain(c.Request.Context(), sessionBinding, fanmain.PurchaseInput{
+		AcceptedAge:   request.AcceptedAge,
+		AcceptedTerms: request.AcceptedTerms,
+		EntryToken:    request.EntryToken,
+		FromShortID:   fromShortID,
+		MainID:        mainID,
+		PaymentMethod: fanmain.PurchasePaymentMethodInput{
+			CardSetupToken:  request.PaymentMethod.CardSetupToken,
+			Mode:            request.PaymentMethod.Mode,
+			PaymentMethodID: request.PaymentMethod.PaymentMethodID,
+		},
+		ViewerID: viewer.ID,
+		ViewerIP: c.ClientIP(),
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, fanmain.ErrInvalidPurchaseRequest):
+			writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
+		case errors.Is(err, fanmain.ErrPurchaseNotFound):
+			writeNotFoundError(c, fanMainPurchaseRequestScope, "main or short was not found")
+		case errors.Is(err, fanmain.ErrMainLocked):
+			writeFanMainLockedError(c, fanMainPurchaseRequestScope, "main purchase could not be started")
+		default:
+			writeInternalServerError(c, fanMainPurchaseRequestScope)
+		}
+		return
+	}
+
+	var entryContext *entryContextPayload
+	if result.EntryToken != nil {
+		payload := buildEntryContextPayload(mainID, *result.EntryToken)
+		entryContext = &payload
+	}
+
+	statusCode := http.StatusOK
+	if result.Purchase.Status == "pending" {
+		statusCode = http.StatusAccepted
+	}
+
+	c.JSON(statusCode, responseEnvelope[mainPurchaseResponseData]{
+		Data: &mainPurchaseResponseData{
+			Access:       buildMainAccessStatePayload(result.Access),
+			EntryContext: entryContext,
+			Purchase: purchaseOutcomePayload{
+				CanRetry:      result.Purchase.CanRetry,
+				FailureReason: result.Purchase.FailureReason,
+				Status:        result.Purchase.Status,
+			},
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(fanMainPurchaseRequestScope),
 			Page:      nil,
 		},
 		Error: nil,
@@ -226,12 +345,10 @@ func handleFanMainAccessEntry(c *gin.Context, service FanUnlockMainService) {
 	}
 
 	issued, err := service.IssueAccessEntry(c.Request.Context(), sessionBinding, fanmain.AccessEntryInput{
-		AcceptedAge:   request.AcceptedAge,
-		AcceptedTerms: request.AcceptedTerms,
-		EntryToken:    request.EntryToken,
-		FromShortID:   fromShortID,
-		MainID:        mainID,
-		ViewerID:      viewer.ID,
+		EntryToken:  request.EntryToken,
+		FromShortID: fromShortID,
+		MainID:      mainID,
+		ViewerID:    viewer.ID,
 	})
 	if err != nil {
 		switch {
@@ -348,7 +465,19 @@ func handleFanMainPlayback(
 	})
 }
 
-func buildMainAccessEntryRoutePath(mainID uuid.UUID) string {
+func buildEntryContextPayload(mainID uuid.UUID, token string) entryContextPayload {
+	return entryContextPayload{
+		AccessEntryPath: buildMainAccessEntryPath(mainID),
+		PurchasePath:    buildMainPurchasePath(mainID),
+		Token:           token,
+	}
+}
+
+func buildMainPurchasePath(mainID uuid.UUID) string {
+	return fmt.Sprintf("/api/fan/mains/%s/purchase", mainPublicID(mainID))
+}
+
+func buildMainAccessEntryPath(mainID uuid.UUID) string {
 	return fmt.Sprintf("/api/fan/mains/%s/access-entry", mainPublicID(mainID))
 }
 
@@ -357,6 +486,39 @@ func buildMainAccessStatePayload(state fanmain.MainAccessState) mainAccessStateP
 		MainID: mainPublicID(state.MainID),
 		Reason: state.Reason,
 		Status: state.Status,
+	}
+}
+
+func buildFanMainUnlockCtaStatePayload(state fanmain.UnlockCtaState) unlockCtaStatePayload {
+	return unlockCtaStatePayload{
+		MainDurationSeconds:   state.MainDurationSeconds,
+		PriceJPY:              state.PriceJPY,
+		ResumePositionSeconds: state.ResumePositionSeconds,
+		State:                 state.State,
+	}
+}
+
+func buildUnlockPurchaseStatePayload(state fanmain.UnlockPurchaseState) unlockPurchaseStatePayload {
+	savedMethods := make([]savedCardSummaryPayload, 0, len(state.SavedPaymentMethods))
+	for _, method := range state.SavedPaymentMethods {
+		savedMethods = append(savedMethods, savedCardSummaryPayload{
+			Brand:           method.Brand,
+			Last4:           method.Last4,
+			PaymentMethodID: method.PaymentMethodID,
+		})
+	}
+
+	return unlockPurchaseStatePayload{
+		PendingReason:       state.PendingReason,
+		SavedPaymentMethods: savedMethods,
+		Setup: purchaseSetupPayload{
+			Required:                state.Setup.Required,
+			RequiresAgeConfirmation: state.Setup.RequiresAgeConfirmation,
+			RequiresCardSetup:       state.Setup.RequiresCardSetup,
+			RequiresTermsAcceptance: state.Setup.RequiresTermsAcceptance,
+		},
+		State:               state.State,
+		SupportedCardBrands: append([]string(nil), state.SupportedCardBrands...),
 	}
 }
 
