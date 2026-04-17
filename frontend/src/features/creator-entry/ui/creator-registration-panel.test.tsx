@@ -77,12 +77,12 @@ describe("CreatorRegistrationPanel", () => {
 
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
-    expect(await screen.findByRole("heading", { name: "Creator審査申請を始める" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Approval 後に解放される creator workspace" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "クリエイター登録を始める" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "利用開始後に使える画面" })).toBeInTheDocument();
     expect(screen.getByText("Mina")).toBeInTheDocument();
     expect(screen.getByDisplayValue("quiet rooftop")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Mina Rei")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Profile settings を開く" })).toHaveAttribute("href", "/fan/settings/profile");
+    expect(screen.getByRole("link", { name: "編集する" })).toHaveAttribute("href", "/fan/settings/profile");
   });
 
   it("saves the current draft and routes to the success page on submit", async () => {
@@ -101,13 +101,6 @@ describe("CreatorRegistrationPanel", () => {
           kind: "government_id",
           mimeType: "image/png",
           uploadedAt: "2026-04-17T10:30:00.000Z",
-        },
-        {
-          fileName: "bank-proof.pdf",
-          fileSizeBytes: 2048,
-          kind: "payout_proof",
-          mimeType: "application/pdf",
-          uploadedAt: "2026-04-17T10:32:00.000Z",
         },
       ],
       isReadOnly: false,
@@ -158,16 +151,16 @@ describe("CreatorRegistrationPanel", () => {
 
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
-    await screen.findByRole("heading", { name: "Creator審査申請を始める" });
+    await screen.findByRole("heading", { name: "クリエイター登録を始める" });
 
-    await user.type(screen.getByRole("textbox", { name: "Bio" }), "quiet rooftop");
-    await user.type(screen.getByRole("textbox", { name: "Legal name" }), "Mina Rei");
-    await user.type(screen.getByLabelText("Birth date"), "1999-04-02");
+    await user.type(screen.getByRole("textbox", { name: "紹介文" }), "quiet rooftop");
+    await user.type(screen.getByRole("textbox", { name: "氏名" }), "Mina Rei");
+    await user.type(screen.getByLabelText("生年月日"), "1999-04-02");
     await user.click(screen.getByLabelText("自分名義"));
-    await user.type(screen.getByRole("textbox", { name: "Payout recipient name" }), "Mina Rei");
-    await user.click(screen.getByRole("checkbox", { name: /prohibited category/i }));
-    await user.click(screen.getByRole("checkbox", { name: /consent/i }));
-    expect(screen.getByRole("button", { name: "審査申請を送信する" })).toBeDisabled();
+    await user.type(screen.getByRole("textbox", { name: "受取名" }), "Mina Rei");
+    await user.click(screen.getByRole("checkbox", { name: /禁止されている内容/ }));
+    await user.click(screen.getByRole("checkbox", { name: /出演者の同意/ }));
+    expect(screen.getByRole("button", { name: "申請を送る" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "下書きを保存する" }));
     await waitFor(() => {
       expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledWith(
@@ -182,7 +175,7 @@ describe("CreatorRegistrationPanel", () => {
         },
       );
     });
-    await user.click(screen.getByRole("button", { name: "審査申請を送信する" }));
+    await user.click(screen.getByRole("button", { name: "申請を送る" }));
 
     await waitFor(() => {
       expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledTimes(2);
@@ -348,13 +341,13 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    await screen.findByRole("heading", { name: "サポート確認が必要です" });
+    await screen.findByRole("heading", { name: "運営確認が必要です" });
 
     expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "再申請を送信する" })).not.toBeInTheDocument();
-    expect(screen.queryByText("セルフ再申請の残回数: 1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "再申請する" })).not.toBeInTheDocument();
+    expect(screen.queryByText("再申請できる残り回数: 1")).not.toBeInTheDocument();
 
-    for (const button of screen.getAllByRole("button", { name: "証跡を選択する" })) {
+    for (const button of screen.getAllByRole("button", { name: "書類をアップロード" })) {
       expect(button).toBeDisabled();
     }
   });
@@ -432,11 +425,16 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "修正して再申請する" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "申請が差し戻されました" })).toBeInTheDocument();
+    expect(screen.getByText("再申請")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "編集する" })).toHaveAttribute("href", "/fan/settings/profile");
     expect(screen.getByRole("button", { name: "修正内容を保存する" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "再申請を送信する" })).toBeInTheDocument();
-    expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "再申請する" })).toBeInTheDocument();
+    expect(screen.getByText("必要な書類または入力内容に不足があります。内容を見直して再度申請してください。")).toBeInTheDocument();
+    expect(screen.getByText("残り申請回数：1回", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText("要修正")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "新しい書類をアップロード" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "書類を差し替える" })).toHaveLength(2);
   });
 
   it("recovers eligible rejected detail when the server-side status fetch was unavailable", async () => {
@@ -509,9 +507,9 @@ describe("CreatorRegistrationPanel", () => {
 
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
-    expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByText("セルフ再申請の残回数: 1")).toBeInTheDocument();
-    expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "申請が差し戻されました" })).toBeInTheDocument();
+    expect(screen.getByText("残り申請回数：1回", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("必要な書類または入力内容に不足があります。内容を見直して再度申請してください。")).toBeInTheDocument();
   });
 
   it("shows generic resubmit guidance when rejected detail cannot be recovered", async () => {
@@ -537,9 +535,9 @@ describe("CreatorRegistrationPanel", () => {
 
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
-    expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "修正ポイントを確認して再申請する" })).toBeInTheDocument();
-    expect(screen.getByText("差し戻しになった入力と証跡を見直す")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "申請が差し戻されました" })).toBeInTheDocument();
+    expect(screen.getByText("表示された内容を見直し、必要な修正をしてから再度申請してください。")).toBeInTheDocument();
+    expect(screen.queryByText("残り申請回数：", { exact: false })).not.toBeInTheDocument();
   });
 
   it("refreshes the surface after a registration state conflict closes resubmit", async () => {
@@ -699,12 +697,12 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    await screen.findByRole("heading", { name: "修正して再申請する" });
+    await screen.findByRole("heading", { name: "申請が差し戻されました" });
 
-    await user.click(screen.getByRole("button", { name: "修正内容を保存する" }));
+    await user.click(screen.getByRole("button", { name: "再申請する" }));
 
-    expect(await screen.findByRole("heading", { name: "サポート確認が必要です" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "修正内容を保存する" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "運営確認が必要です" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "再申請する" })).not.toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("現在の申請状態ではこの操作を実行できません。");
   });
 
@@ -799,10 +797,10 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect((await screen.findAllByRole("heading", { name: "再申請は利用できません" })).length).toBe(2);
+    expect(await screen.findByRole("heading", { name: "再申請は利用できません" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
-    expect(screen.queryByText("サポート確認が必要です")).not.toBeInTheDocument();
-    expect(screen.getByText("セルフ再申請の残回数: 0")).toBeInTheDocument();
+    expect(screen.queryByText("運営確認が必要です")).not.toBeInTheDocument();
+    expect(screen.getByText("再申請できる残り回数: 0")).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1, name: "再申請は利用できません" })).toBeInTheDocument();
   });
 
@@ -830,7 +828,7 @@ describe("CreatorRegistrationPanel", () => {
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
     expect(await screen.findByRole("heading", { name: "審査状態を再確認してください" })).toBeInTheDocument();
-    expect(screen.queryByText("サポート確認が必要です")).not.toBeInTheDocument();
+    expect(screen.queryByText("運営確認が必要です")).not.toBeInTheDocument();
     expect(screen.queryByText("再申請は利用できません")).not.toBeInTheDocument();
   });
 
@@ -925,11 +923,11 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.queryByText("サポート確認が必要です")).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "申請が差し戻されました" })).toBeInTheDocument();
+    expect(screen.queryByText("運営確認が必要です")).not.toBeInTheDocument();
     expect(screen.queryByText("次の対応: 運営確認が必要です")).not.toBeInTheDocument();
-    expect(screen.getByText("セルフ再申請の残回数: 1")).toBeInTheDocument();
-    expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
+    expect(screen.getByText("残り申請回数：1回", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText("必要な書類または入力内容に不足があります。内容を見直して再度申請してください。")).toBeInTheDocument();
   });
 
   it("refreshes read-only rejected detail before keeping a subtype-specific surface", async () => {
@@ -1023,9 +1021,9 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "サポート確認が必要です" })).toBeInTheDocument();
-    expect((await screen.findAllByRole("heading", { name: "再申請は利用できません" })).length).toBe(2);
-    expect(screen.queryByRole("heading", { name: "サポート確認が必要です" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "運営確認が必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "再申請は利用できません" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "運営確認が必要です" })).not.toBeInTheDocument();
   });
 
   it("falls back to the generic rejected surface when a read-only subtype cannot be refreshed", async () => {
@@ -1087,9 +1085,9 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "サポート確認が必要です" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "運営確認が必要です" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "審査状態を再確認してください" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "サポート確認が必要です" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "運営確認が必要です" })).not.toBeInTheDocument();
   });
 
   it("uses the server registration on the first paint while intake is still loading", () => {
@@ -1133,8 +1131,8 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByText("申請フォームを読み込んでいます...")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "申請が差し戻されました" })).toBeInTheDocument();
+    expect(screen.getByText("再申請")).toBeInTheDocument();
   });
 
   it("redirects away from the register surface when intake resolves to approved", async () => {
@@ -1216,10 +1214,10 @@ describe("CreatorRegistrationPanel", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { name: "Creator利用は停止中です" })).toBeInTheDocument();
-    expect(screen.getByText("Suspended")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "停止中のため再申請できません" })).toBeInTheDocument();
+    expect(screen.getByText("利用停止中")).toBeInTheDocument();
     expect(screen.getByText("停止中のため再申請できません")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "審査申請を送信する" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "申請を送る" })).not.toBeInTheDocument();
   });
 });
