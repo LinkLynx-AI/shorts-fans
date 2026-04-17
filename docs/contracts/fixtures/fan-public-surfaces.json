@@ -126,7 +126,7 @@
           ]
         },
         "meta": {
-          "requestId": "req_feed_recommended_public_fallback_001",
+          "requestId": "req_feed_recommended_public_001",
           "page": {
             "nextCursor": "feed:recommended:cursor:001",
             "hasNext": true
