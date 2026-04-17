@@ -5,6 +5,7 @@
 **/.env
 **/.env.local
 **/.env.*.local
+**/.next-admin/
 
 # Terraform local working files should stay outside tracked diffs.
 **/.terraform/

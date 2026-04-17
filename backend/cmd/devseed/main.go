@@ -44,6 +44,7 @@ func main() {
 		"fan_user_id", summary.FanUserID.String(),
 		"fan_session_token", summary.FanSessionToken,
 		"main_id", summary.MainID.String(),
+		"submitted_review_user_id", summary.SubmittedReviewUserID.String(),
 		"short_ids", uuidStrings(summary.ShortIDs),
 	)
 }

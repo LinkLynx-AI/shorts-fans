@@ -92,6 +92,15 @@ func main() {
 
 	creatorRepository := creator.NewRepository(pool, delivery)
 	creatorRegistrationRepository := creatorregistration.NewRepository(pool)
+	adminCreatorReviewService, err := creatorregistration.NewReviewService(
+		creatorregistration.ReviewServiceConfig{},
+		s3Client,
+		creatorRegistrationRepository,
+	)
+	if err != nil {
+		logger.Error("failed to initialize creator registration review service", "error", err)
+		os.Exit(1)
+	}
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
@@ -178,6 +187,7 @@ func main() {
 		logger,
 		httpserver.HandlerConfig{
 			AppEnv:                       cfg.AppEnv,
+			AdminCreatorReview:           adminCreatorReviewService,
 			CreatorSearch:                creatorRepository,
 			CreatorWorkspace:             creatorRepository,
 			CreatorWorkspaceMainPrice:    creatorRepository,

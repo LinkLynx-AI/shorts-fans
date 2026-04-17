@@ -12,9 +12,20 @@ pnpm dev
 
 ブラウザで `http://localhost:3000` を開くと確認できます。
 
+admin review UI を確認するときは、別ターミナルで次を使います。
+
+```bash
+pnpm dev:admin
+```
+
+ブラウザで `http://localhost:3001/admin` を開くと、local admin の creator review UI を確認できます。
+この script は admin route を有効化する専用 env を付けたうえで `127.0.0.1:3001` に loopback bind します。
+開発中に `pnpm dev` と同時起動できるよう、admin 側は `.next-admin/` を専用 `distDir` として使います。
+
 ## Scripts
 
 - `pnpm dev`: 開発サーバーを起動
+- `pnpm dev:admin`: admin review UI 用に専用 env を有効化し、`127.0.0.1:3001` へ loopback bind して `.next-admin/` を使う開発サーバーを起動
 - `pnpm lint`: ESLint を実行
 - `pnpm lint:eslint`: ESLint だけを実行
 - `pnpm fsd:check`: FSD checker を実行
