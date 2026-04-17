@@ -3,6 +3,7 @@ package httpserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorregistration"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
@@ -131,6 +133,53 @@ func TestAdminCreatorReviewQueueGetReturnsItems(t *testing.T) {
 	}
 }
 
+func TestAdminCreatorReviewQueueGetMapsInvalidState(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv: developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{
+			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
+				return nil, creatorregistration.ErrInvalidReviewState
+			},
+		},
+	})
+
+	req := newLoopbackAdminRequest(http.MethodGet, "/api/admin/creator-reviews?state=draft", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/admin/creator-reviews status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_review_state"`) {
+		t.Fatalf("GET /api/admin/creator-reviews body got %q want invalid_review_state", rec.Body.String())
+	}
+}
+
+func TestAdminCreatorReviewQueueGetMapsUnexpectedErrorAsInternal(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv: developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{
+			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
+				return nil, errors.New("boom")
+			},
+		},
+	})
+
+	req := newLoopbackAdminRequest(http.MethodGet, "/api/admin/creator-reviews", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/admin/creator-reviews status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
 func TestAdminCreatorReviewCaseGetMapsNotFound(t *testing.T) {
 	t.Parallel()
 
@@ -153,6 +202,49 @@ func TestAdminCreatorReviewCaseGetMapsNotFound(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
 		t.Fatalf("GET /api/admin/creator-reviews/:userId body got %q want not_found", rec.Body.String())
+	}
+}
+
+func TestAdminCreatorReviewCaseGetRejectsInvalidUserID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv:             developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{},
+	})
+
+	req := newLoopbackAdminRequest(http.MethodGet, "/api/admin/creator-reviews/not-a-uuid", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/admin/creator-reviews/:userId status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("GET /api/admin/creator-reviews/:userId body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestAdminCreatorReviewCaseGetMapsUnexpectedErrorAsInternal(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv: developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{
+			getCase: func(context.Context, uuid.UUID) (creatorregistration.ReviewCase, error) {
+				return creatorregistration.ReviewCase{}, errors.New("boom")
+			},
+		},
+	})
+
+	req := newLoopbackAdminRequest(http.MethodGet, "/api/admin/creator-reviews/11111111-1111-1111-1111-111111111111", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/admin/creator-reviews/:userId status got %d want %d", rec.Code, http.StatusInternalServerError)
 	}
 }
 
@@ -256,6 +348,99 @@ func TestAdminCreatorReviewDecisionPostMapsValidationErrors(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `"code":"review_reason_required"`) {
 		t.Fatalf("POST /api/admin/creator-reviews/:userId/decision body got %q want review_reason_required", rec.Body.String())
+	}
+}
+
+func TestAdminCreatorReviewDecisionPostRejectsInvalidUserID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv:             developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{},
+	})
+
+	req := newLoopbackAdminRequest(
+		http.MethodPost,
+		"/api/admin/creator-reviews/not-a-uuid/decision",
+		bytes.NewBufferString(`{"decision":"approved"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/admin/creator-reviews/:userId/decision status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+}
+
+func TestAdminCreatorReviewDecisionPostRejectsInvalidJSON(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv:             developmentAppEnv,
+		AdminCreatorReview: adminCreatorReviewServiceStub{},
+	})
+
+	req := newLoopbackAdminRequest(
+		http.MethodPost,
+		"/api/admin/creator-reviews/11111111-1111-1111-1111-111111111111/decision",
+		bytes.NewBufferString(`{"decision":"approved","unexpected":true}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/admin/creator-reviews/:userId/decision status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("POST /api/admin/creator-reviews/:userId/decision body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestWriteAdminCreatorReviewError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		err        error
+		wantCode   string
+		wantMapped bool
+		wantStatus int
+	}{
+		{err: creatorregistration.ErrInvalidReviewState, wantCode: "invalid_review_state", wantMapped: true, wantStatus: http.StatusBadRequest},
+		{err: creatorregistration.ErrInvalidReviewDecision, wantCode: "invalid_review_decision", wantMapped: true, wantStatus: http.StatusBadRequest},
+		{err: creatorregistration.ErrReviewDecisionReasonRequired, wantCode: "review_reason_required", wantMapped: true, wantStatus: http.StatusBadRequest},
+		{err: creatorregistration.ErrReviewDecisionMetadataConflict, wantCode: "review_decision_metadata_conflict", wantMapped: true, wantStatus: http.StatusBadRequest},
+		{err: creatorregistration.ErrRegistrationStateConflict, wantCode: "review_state_conflict", wantMapped: true, wantStatus: http.StatusConflict},
+		{err: creatorregistration.ErrReviewCaseNotFound, wantCode: "not_found", wantMapped: true, wantStatus: http.StatusNotFound},
+		{err: creatorregistration.ErrSharedProfileNotFound, wantCode: "not_found", wantMapped: true, wantStatus: http.StatusNotFound},
+		{err: errors.New("boom"), wantMapped: false},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.wantCode, func(t *testing.T) {
+			t.Parallel()
+
+			rec := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(rec)
+
+			gotMapped := writeAdminCreatorReviewError(c, tt.err, "admin_creator_review_test")
+			if gotMapped != tt.wantMapped {
+				t.Fatalf("writeAdminCreatorReviewError() mapped got %t want %t", gotMapped, tt.wantMapped)
+			}
+			if !tt.wantMapped {
+				return
+			}
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("writeAdminCreatorReviewError() status got %d want %d", rec.Code, tt.wantStatus)
+			}
+			if !strings.Contains(rec.Body.String(), `"code":"`+tt.wantCode+`"`) {
+				t.Fatalf("writeAdminCreatorReviewError() body got %q want code %q", rec.Body.String(), tt.wantCode)
+			}
+		})
 	}
 }
 
