@@ -2,7 +2,6 @@ package devseed
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/golang-migrate/migrate/v4"
 	pgmigrate "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -22,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const integrationPostgresDSNEnv = "POSTGRES_DSN"
@@ -30,14 +28,8 @@ const integrationPostgresDSNEnv = "POSTGRES_DSN"
 func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	t.Parallel()
 
-	ctx, dsn, cleanup := newSeedTestDatabase(t)
+	ctx, pool, cleanup := newSeedTestDatabase(t)
 	defer cleanup()
-
-	pool, err := postgres.NewPool(ctx, dsn)
-	if err != nil {
-		t.Fatalf("postgres.NewPool() error = %v, want nil", err)
-	}
-	defer pool.Close()
 
 	summary, err := Run(ctx, pool)
 	if err != nil {
@@ -51,6 +43,9 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if summary.MainID != mainID {
 		t.Fatalf("Run() main id got %s want %s", summary.MainID, mainID)
+	}
+	if summary.SubmittedReviewUserID != reviewUserID {
+		t.Fatalf("Run() submitted review user id got %s want %s", summary.SubmittedReviewUserID, reviewUserID)
 	}
 	if len(summary.ShortIDs) != len(publicShorts) {
 		t.Fatalf("Run() short id count got %d want %d", len(summary.ShortIDs), len(publicShorts))
@@ -70,6 +65,14 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if capability.State != "approved" {
 		t.Fatalf("GetCreatorCapabilityByUserID() state got %q want %q", capability.State, "approved")
+	}
+
+	reviewCapability, err := queries.GetCreatorCapabilityByUserID(ctx, uuidToPG(reviewUserID))
+	if err != nil {
+		t.Fatalf("GetCreatorCapabilityByUserID() review error = %v, want nil", err)
+	}
+	if reviewCapability.State != "submitted" {
+		t.Fatalf("GetCreatorCapabilityByUserID() review state got %q want %q", reviewCapability.State, "submitted")
 	}
 
 	profile, err := queries.GetCreatorProfileByUserID(ctx, uuidToPG(creatorUserID))
@@ -95,6 +98,20 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if publicProfile.UserID != uuidToPG(creatorUserID) {
 		t.Fatalf("GetPublicCreatorProfileByHandle() user_id got %s want %s", publicProfile.UserID, uuidToPG(creatorUserID))
+	}
+
+	submittedQueue, err := queries.ListCreatorRegistrationReviewCasesByState(ctx, "submitted")
+	if err != nil {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() error = %v, want nil", err)
+	}
+	if len(submittedQueue) != 1 {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() len got %d want 1", len(submittedQueue))
+	}
+	if submittedQueue[0].UserID != uuidToPG(reviewUserID) {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() user id got %s want %s", submittedQueue[0].UserID, uuidToPG(reviewUserID))
+	}
+	if submittedQueue[0].State != "submitted" {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() state got %q want %q", submittedQueue[0].State, "submitted")
 	}
 
 	main, err := queries.GetUnlockableMainByID(ctx, uuidToPG(mainID))
@@ -155,9 +172,12 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 		t.Fatal("GetCurrentViewerBySessionTokenHash() creator can_access_creator_mode = false, want true")
 	}
 
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 2)
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_capabilities", 1)
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_profiles", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.user_profiles", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_capabilities", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_profiles", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_registration_intakes", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_registration_evidences", 2)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.media_assets", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.mains", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.shorts", 2)
@@ -182,7 +202,8 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 		t.Fatalf("GetCreatorProfileByUserID() after rerun bio got %q want %q", profile.Bio, creatorBio)
 	}
 
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.user_profiles", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.media_assets", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.shorts", 2)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
@@ -191,7 +212,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 }
 
-func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
+func newSeedTestDatabase(t *testing.T) (context.Context, *pgxpool.Pool, func()) {
 	t.Helper()
 
 	dsn := strings.TrimSpace(os.Getenv(integrationPostgresDSNEnv))
@@ -218,8 +239,7 @@ func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
 
 	tempConfig := baseConfig.Copy()
 	tempConfig.Database = tempDatabaseName
-	tempDSN := tempConfig.ConnString()
-	migrator := newTestMigrator(t, tempDSN)
+	migrator := newTestMigrator(t, tempConfig)
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
@@ -227,13 +247,38 @@ func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
 
+	poolConfig, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pgxpool.ParseConfig() error = %v, want nil", err)
+	}
+	poolConfig.ConnConfig.Database = tempDatabaseName
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pgxpool.NewWithConfig() error = %v, want nil", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pool.Ping() error = %v, want nil", err)
+	}
+
 	cleanup := func() {
+		pool.Close()
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
 		adminConn.Close(ctx)
 	}
 
-	return ctx, tempDSN, cleanup
+	return ctx, pool, cleanup
 }
 
 func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx.Conn, error) {
@@ -252,13 +297,10 @@ func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx
 	return nil, fmt.Errorf("connect admin database: %w", lastErr)
 }
 
-func newTestMigrator(t *testing.T, dsn string) *migrate.Migrate {
+func newTestMigrator(t *testing.T, config *pgx.ConnConfig) *migrate.Migrate {
 	t.Helper()
 
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open() error = %v, want nil", err)
-	}
+	db := stdlib.OpenDB(*config)
 
 	driver, err := pgmigrate.WithInstance(db, &pgmigrate.Config{})
 	if err != nil {

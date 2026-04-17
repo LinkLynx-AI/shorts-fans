@@ -23,6 +23,26 @@ output "cognito_user_pool_issuer_url" {
   value       = format("https://%s", aws_cognito_user_pool.fan_auth.endpoint)
 }
 
+output "cognito_email_sending_account" {
+  description = "Configured Cognito email delivery mode for dev fan auth."
+  value       = var.cognito_use_ses_developer_email ? "DEVELOPER" : "COGNITO_DEFAULT"
+}
+
+output "cognito_email_from_address" {
+  description = "Branded FROM address prepared for Cognito SES delivery."
+  value       = local.cognito_email_from_formatted
+}
+
+output "cognito_ses_email_identity_arn" {
+  description = "SES email identity ARN created for Cognito sender branding."
+  value       = trimspace(var.cognito_email_from_address) == "" ? null : aws_sesv2_email_identity.cognito_sender[0].arn
+}
+
+output "cognito_ses_email_identity_verification_status" {
+  description = "Last refreshed SES sender identity verification status recorded in Terraform state. Manual SES verification changes require terraform refresh/plan/apply before this output updates."
+  value       = trimspace(var.cognito_email_from_address) == "" ? null : aws_sesv2_email_identity.cognito_sender[0].verification_status
+}
+
 output "raw_bucket_name" {
   description = "Private raw upload bucket name."
   value       = aws_s3_bucket.raw.bucket

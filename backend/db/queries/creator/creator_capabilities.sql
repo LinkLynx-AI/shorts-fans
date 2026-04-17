@@ -34,6 +34,13 @@ FROM app.creator_capabilities
 WHERE user_id = $1
 LIMIT 1;
 
+-- name: GetCreatorCapabilityByUserIDForUpdate :one
+SELECT *
+FROM app.creator_capabilities
+WHERE user_id = $1
+LIMIT 1
+FOR UPDATE;
+
 -- name: UpdateCreatorCapabilityState :one
 UPDATE app.creator_capabilities
 SET

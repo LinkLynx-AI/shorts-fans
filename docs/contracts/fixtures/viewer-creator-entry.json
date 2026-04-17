@@ -186,7 +186,7 @@
             },
             "actions": {
               "canSubmit": false,
-              "canResubmit": false,
+              "canResubmit": true,
               "canEnterCreatorMode": false
             }
           }
@@ -301,6 +301,9 @@
     "success": {
       "status": 204
     },
+    "resubmitSuccess": {
+      "status": 204
+    },
     "invalidDisplayName": {
       "body": {
         "data": null,
@@ -334,7 +337,7 @@
         "data": null,
         "error": {
           "code": "registration_state_conflict",
-          "message": "creator registration cannot be submitted from the current state"
+          "message": "creator registration state does not allow this action"
         },
         "meta": {
           "page": null,

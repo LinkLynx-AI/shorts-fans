@@ -23,6 +23,7 @@
 - [contracts/viewer-profile-api-contract.md](contracts/viewer-profile-api-contract.md): sign-up / fan settings / creator workspace で共有する viewer profile の transport 契約
 - [contracts/viewer-creator-entry-api-contract.md](contracts/viewer-creator-entry-api-contract.md): fan profile から始める creator registration / active mode switch の transport 契約
 - [contracts/viewer-creator-registration-intake-api-contract.md](contracts/viewer-creator-registration-intake-api-contract.md): creator registration intake draft / evidence upload の transport 契約
+- [contracts/admin-creator-review-api-contract.md](contracts/admin-creator-review-api-contract.md): local admin 向け creator review queue / detail / decision transport 契約
 - [contracts/creator-workspace-api-contract.md](contracts/creator-workspace-api-contract.md): `/creator` workspace の creator info / overview / revision summary 契約
 - [contracts/creator-workspace-owner-preview-api-contract.md](contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail と short caption 更新契約
 - [contracts/creator-workspace-main-price-api-contract.md](contracts/creator-workspace-main-price-api-contract.md): creator owner が本編価格を変更する private mutation 契約

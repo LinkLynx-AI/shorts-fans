@@ -41,8 +41,10 @@ var (
 	ErrInvalidLegalName          = errors.New("creator registration legal name が不正です")
 	ErrInvalidPayoutRecipient    = errors.New("creator registration payout recipient が不正です")
 	ErrInvalidPayoutRecipientTyp = errors.New("creator registration payout recipient type が不正です")
+	ErrInvalidReviewState        = errors.New("creator registration review state が不正です")
 	ErrRegistrationIncomplete    = errors.New("creator registration intake が不足しています")
 	ErrRegistrationStateConflict = errors.New("creator registration state conflict")
+	ErrReviewCaseNotFound        = errors.New("creator registration review case が見つかりません")
 	ErrSharedProfileNotFound     = errors.New("shared viewer profile が見つかりません")
 )
 
@@ -50,10 +52,12 @@ type queries interface {
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	CreateCreatorProfile(ctx context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	GetCreatorRegistrationIntakeByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	GetUserProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppUserProfile, error)
 	ListCreatorRegistrationEvidencesByUserID(ctx context.Context, userID pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error)
+	ListCreatorRegistrationReviewCasesByState(ctx context.Context, state string) ([]sqlc.ListCreatorRegistrationReviewCasesByStateRow, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	UpsertCreatorRegistrationEvidence(ctx context.Context, arg sqlc.UpsertCreatorRegistrationEvidenceParams) (sqlc.AppCreatorRegistrationEvidence, error)
@@ -218,7 +222,7 @@ func (r *Repository) GetRegistration(ctx context.Context, userID uuid.UUID) (*Re
 		return nil, fmt.Errorf("creator registration repository が初期化されていません")
 	}
 
-	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, false)
+	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +244,7 @@ func (r *Repository) GetIntake(ctx context.Context, userID uuid.UUID) (Intake, e
 		return Intake{}, fmt.Errorf("creator registration repository が初期化されていません")
 	}
 
-	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, true)
+	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, true, false)
 	if err != nil {
 		return Intake{}, err
 	}
@@ -256,11 +260,11 @@ func (r *Repository) PrepareEvidenceUpload(ctx context.Context, userID uuid.UUID
 
 	return postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, userID, false)
+		snapshot, err := r.loadSnapshot(ctx, q, userID, false, true)
 		if err != nil {
 			return err
 		}
-		if err := ensureDraftEditable(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		_, err = ensureDraftCapability(ctx, q, userID, snapshot.capability)
@@ -277,11 +281,11 @@ func (r *Repository) SaveEvidence(ctx context.Context, input SaveEvidenceInput) 
 	var result SaveEvidenceResult
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, loadErr := r.loadSnapshot(ctx, q, input.UserID, true)
+		snapshot, loadErr := r.loadSnapshot(ctx, q, input.UserID, true, true)
 		if loadErr != nil {
 			return loadErr
 		}
-		if err := ensureDraftEditable(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		if _, err := ensureDraftCapability(ctx, q, input.UserID, snapshot.capability); err != nil {
@@ -331,11 +335,11 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 	var intake Intake
 	err = postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, loadErr := r.loadSnapshot(ctx, q, normalized.userID, true)
+		snapshot, loadErr := r.loadSnapshot(ctx, q, normalized.userID, true, true)
 		if loadErr != nil {
 			return loadErr
 		}
-		if err := ensureDraftEditable(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		if _, err := ensureDraftCapability(ctx, q, normalized.userID, snapshot.capability); err != nil {
@@ -356,7 +360,7 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 			return fmt.Errorf("creator registration intake 保存 user=%s: %w", normalized.userID, err)
 		}
 
-		updatedSnapshot, err := r.loadSnapshot(ctx, q, normalized.userID, true)
+		updatedSnapshot, err := r.loadSnapshot(ctx, q, normalized.userID, true, false)
 		if err != nil {
 			return err
 		}
@@ -379,14 +383,14 @@ func (r *Repository) Submit(ctx context.Context, userID uuid.UUID) (Registration
 	var registration Registration
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, userID, true)
+		snapshot, err := r.loadSnapshot(ctx, q, userID, true, true)
 		if err != nil {
 			return err
 		}
 		if snapshot.capability == nil {
 			return ErrRegistrationIncomplete
 		}
-		if snapshot.capability.State != StateDraft {
+		if !canCapabilitySubmit(snapshot.capability) {
 			return ErrRegistrationStateConflict
 		}
 		if !isSnapshotComplete(snapshot) {
@@ -394,12 +398,16 @@ func (r *Repository) Submit(ctx context.Context, userID uuid.UUID) (Registration
 		}
 
 		now := time.Now().UTC()
+		nextResubmitCount := snapshot.capability.SelfServeResubmitCount
+		if snapshot.capability.State == StateRejected {
+			nextResubmitCount++
+		}
 		updatedCapability, err := q.UpdateCreatorCapabilityState(ctx, sqlc.UpdateCreatorCapabilityStateParams{
 			State:                    StateSubmitted,
 			RejectionReasonCode:      pgtype.Text{},
 			IsResubmitEligible:       false,
 			IsSupportReviewRequired:  false,
-			SelfServeResubmitCount:   snapshot.capability.SelfServeResubmitCount,
+			SelfServeResubmitCount:   nextResubmitCount,
 			KycProviderCaseRef:       snapshot.capability.KycProviderCaseRef,
 			PayoutProviderAccountRef: snapshot.capability.PayoutProviderAccountRef,
 			SubmittedAt:              postgres.TimeToPG(&now),
@@ -442,9 +450,9 @@ func buildIntake(snapshot registrationSnapshot) Intake {
 	}
 	if snapshot.capability != nil {
 		intake.RegistrationState = &snapshot.capability.State
-		intake.IsReadOnly = snapshot.capability.State != StateDraft
+		intake.IsReadOnly = !isCapabilityEditable(snapshot.capability)
 	}
-	intake.CanSubmit = !intake.IsReadOnly && isSnapshotComplete(snapshot)
+	intake.CanSubmit = isCapabilityEditable(snapshot.capability) && isSnapshotComplete(snapshot)
 
 	return intake
 }
@@ -457,7 +465,7 @@ func buildRegistration(snapshot registrationSnapshot) (Registration, error) {
 	registration := Registration{
 		Actions: Actions{
 			CanEnterCreatorMode: snapshot.capability.State == StateApproved,
-			CanResubmit:         false,
+			CanResubmit:         canCapabilitySelfServeResubmit(*snapshot.capability),
 			CanSubmit:           snapshot.capability.State == StateDraft,
 		},
 		CreatorDraft: CreatorDraft{
@@ -544,18 +552,21 @@ func ensureDraftCapability(ctx context.Context, q queries, userID uuid.UUID, cap
 	return row, nil
 }
 
-func ensureDraftEditable(capability *sqlc.AppCreatorCapability) error {
-	if capability == nil {
-		return nil
-	}
-	if capability.State != StateDraft {
+func ensureCapabilityEditable(capability *sqlc.AppCreatorCapability) error {
+	if !isCapabilityEditable(capability) {
 		return ErrRegistrationStateConflict
 	}
 
 	return nil
 }
 
-func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UUID, includeEvidences bool) (registrationSnapshot, error) {
+func (r *Repository) loadSnapshot(
+	ctx context.Context,
+	q queries,
+	userID uuid.UUID,
+	includeEvidences bool,
+	lockCapability bool,
+) (registrationSnapshot, error) {
 	userProfile, err := q.GetUserProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -566,7 +577,7 @@ func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UU
 
 	snapshot := registrationSnapshot{userProfile: userProfile}
 
-	capability, err := q.GetCreatorCapabilityByUserID(ctx, postgres.UUIDToPG(userID))
+	capability, err := loadCapability(ctx, q, userID, lockCapability)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return registrationSnapshot{}, fmt.Errorf("creator registration capability 取得 user=%s: %w", userID, err)
@@ -602,6 +613,15 @@ func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UU
 	}
 
 	return snapshot, nil
+}
+
+func loadCapability(ctx context.Context, q queries, userID uuid.UUID, lockCapability bool) (sqlc.AppCreatorCapability, error) {
+	userPGID := postgres.UUIDToPG(userID)
+	if lockCapability {
+		return q.GetCreatorCapabilityByUserIDForUpdate(ctx, userPGID)
+	}
+
+	return q.GetCreatorCapabilityByUserID(ctx, userPGID)
 }
 
 func isSnapshotComplete(snapshot registrationSnapshot) bool {
@@ -641,6 +661,39 @@ func isSnapshotComplete(snapshot registrationSnapshot) bool {
 	_, hasGovernmentID := kinds[EvidenceKindGovernmentID]
 	_, hasPayoutProof := kinds[EvidenceKindPayoutProof]
 	return hasGovernmentID && hasPayoutProof
+}
+
+func canCapabilitySelfServeResubmit(capability sqlc.AppCreatorCapability) bool {
+	if capability.State != StateRejected {
+		return false
+	}
+	if !capability.IsResubmitEligible || capability.IsSupportReviewRequired {
+		return false
+	}
+
+	return maxInt32(0, 2-capability.SelfServeResubmitCount) > 0
+}
+
+func canCapabilitySubmit(capability *sqlc.AppCreatorCapability) bool {
+	if capability == nil {
+		return false
+	}
+	if capability.State == StateDraft {
+		return true
+	}
+
+	return canCapabilitySelfServeResubmit(*capability)
+}
+
+func isCapabilityEditable(capability *sqlc.AppCreatorCapability) bool {
+	if capability == nil {
+		return true
+	}
+	if capability.State == StateDraft {
+		return true
+	}
+
+	return canCapabilitySelfServeResubmit(*capability)
 }
 
 func mapCreatorProfileWriteError(err error) error {

@@ -39,6 +39,31 @@ FROM app.creator_registration_evidences
 WHERE user_id = $1
 ORDER BY kind ASC;
 
+-- name: ListCreatorRegistrationReviewCasesByState :many
+SELECT
+    c.user_id,
+    c.state,
+    c.submitted_at,
+    c.approved_at,
+    c.rejected_at,
+    c.suspended_at,
+    u.display_name,
+    u.handle,
+    u.avatar_url,
+    COALESCE(p.bio, '') AS creator_bio,
+    COALESCE(i.legal_name, '') AS legal_name
+FROM app.creator_capabilities AS c
+JOIN app.user_profiles AS u
+    ON u.user_id = c.user_id
+LEFT JOIN app.creator_profiles AS p
+    ON p.user_id = c.user_id
+LEFT JOIN app.creator_registration_intakes AS i
+    ON i.user_id = c.user_id
+WHERE c.state = sqlc.arg(state)
+ORDER BY
+    COALESCE(c.submitted_at, c.approved_at, c.rejected_at, c.suspended_at) DESC,
+    c.user_id ASC;
+
 -- name: UpsertCreatorRegistrationEvidence :one
 INSERT INTO app.creator_registration_evidences (
     user_id,

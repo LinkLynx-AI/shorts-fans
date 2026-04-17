@@ -73,6 +73,78 @@ func (q *Queries) ListCreatorRegistrationEvidencesByUserID(ctx context.Context, 
 	return items, nil
 }
 
+const listCreatorRegistrationReviewCasesByState = `-- name: ListCreatorRegistrationReviewCasesByState :many
+SELECT
+    c.user_id,
+    c.state,
+    c.submitted_at,
+    c.approved_at,
+    c.rejected_at,
+    c.suspended_at,
+    u.display_name,
+    u.handle,
+    u.avatar_url,
+    COALESCE(p.bio, '') AS creator_bio,
+    COALESCE(i.legal_name, '') AS legal_name
+FROM app.creator_capabilities AS c
+JOIN app.user_profiles AS u
+    ON u.user_id = c.user_id
+LEFT JOIN app.creator_profiles AS p
+    ON p.user_id = c.user_id
+LEFT JOIN app.creator_registration_intakes AS i
+    ON i.user_id = c.user_id
+WHERE c.state = $1
+ORDER BY
+    COALESCE(c.submitted_at, c.approved_at, c.rejected_at, c.suspended_at) DESC,
+    c.user_id ASC
+`
+
+type ListCreatorRegistrationReviewCasesByStateRow struct {
+	UserID      pgtype.UUID
+	State       string
+	SubmittedAt pgtype.Timestamptz
+	ApprovedAt  pgtype.Timestamptz
+	RejectedAt  pgtype.Timestamptz
+	SuspendedAt pgtype.Timestamptz
+	DisplayName string
+	Handle      string
+	AvatarUrl   pgtype.Text
+	CreatorBio  string
+	LegalName   string
+}
+
+func (q *Queries) ListCreatorRegistrationReviewCasesByState(ctx context.Context, state string) ([]ListCreatorRegistrationReviewCasesByStateRow, error) {
+	rows, err := q.db.Query(ctx, listCreatorRegistrationReviewCasesByState, state)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCreatorRegistrationReviewCasesByStateRow
+	for rows.Next() {
+		var i ListCreatorRegistrationReviewCasesByStateRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.State,
+			&i.SubmittedAt,
+			&i.ApprovedAt,
+			&i.RejectedAt,
+			&i.SuspendedAt,
+			&i.DisplayName,
+			&i.Handle,
+			&i.AvatarUrl,
+			&i.CreatorBio,
+			&i.LegalName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertCreatorRegistrationEvidence = `-- name: UpsertCreatorRegistrationEvidence :one
 INSERT INTO app.creator_registration_evidences (
     user_id,

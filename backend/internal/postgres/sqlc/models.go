@@ -234,6 +234,101 @@ type AppPublicShort struct {
 	UpdatedAt            pgtype.Timestamptz
 }
 
+type AppRecommendationEvent struct {
+	ID              pgtype.UUID
+	ViewerUserID    pgtype.UUID
+	EventKind       string
+	CreatorUserID   pgtype.UUID
+	CanonicalMainID pgtype.UUID
+	ShortID         pgtype.UUID
+	OccurredAt      pgtype.Timestamptz
+	IdempotencyKey  string
+	CreatedAt       pgtype.Timestamptz
+	UpdatedAt       pgtype.Timestamptz
+}
+
+type AppRecommendationShortGlobalFeature struct {
+	ShortID                pgtype.UUID
+	CreatorUserID          pgtype.UUID
+	CanonicalMainID        pgtype.UUID
+	ImpressionCount        int64
+	LastImpressionAt       pgtype.Timestamptz
+	ViewStartCount         int64
+	LastViewStartAt        pgtype.Timestamptz
+	ViewCompletionCount    int64
+	LastViewCompletionAt   pgtype.Timestamptz
+	RewatchLoopCount       int64
+	LastRewatchLoopAt      pgtype.Timestamptz
+	MainClickCount         int64
+	LastMainClickAt        pgtype.Timestamptz
+	UnlockConversionCount  int64
+	LastUnlockConversionAt pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+type AppRecommendationViewerCreatorFeature struct {
+	ViewerUserID           pgtype.UUID
+	CreatorUserID          pgtype.UUID
+	ImpressionCount        int64
+	LastImpressionAt       pgtype.Timestamptz
+	ViewStartCount         int64
+	LastViewStartAt        pgtype.Timestamptz
+	ViewCompletionCount    int64
+	LastViewCompletionAt   pgtype.Timestamptz
+	RewatchLoopCount       int64
+	LastRewatchLoopAt      pgtype.Timestamptz
+	ProfileClickCount      int64
+	LastProfileClickAt     pgtype.Timestamptz
+	MainClickCount         int64
+	LastMainClickAt        pgtype.Timestamptz
+	UnlockConversionCount  int64
+	LastUnlockConversionAt pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+type AppRecommendationViewerMainFeature struct {
+	ViewerUserID           pgtype.UUID
+	CanonicalMainID        pgtype.UUID
+	CreatorUserID          pgtype.UUID
+	ImpressionCount        int64
+	LastImpressionAt       pgtype.Timestamptz
+	ViewStartCount         int64
+	LastViewStartAt        pgtype.Timestamptz
+	ViewCompletionCount    int64
+	LastViewCompletionAt   pgtype.Timestamptz
+	RewatchLoopCount       int64
+	LastRewatchLoopAt      pgtype.Timestamptz
+	MainClickCount         int64
+	LastMainClickAt        pgtype.Timestamptz
+	UnlockConversionCount  int64
+	LastUnlockConversionAt pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
+type AppRecommendationViewerShortFeature struct {
+	ViewerUserID           pgtype.UUID
+	ShortID                pgtype.UUID
+	CreatorUserID          pgtype.UUID
+	CanonicalMainID        pgtype.UUID
+	ImpressionCount        int64
+	LastImpressionAt       pgtype.Timestamptz
+	ViewStartCount         int64
+	LastViewStartAt        pgtype.Timestamptz
+	ViewCompletionCount    int64
+	LastViewCompletionAt   pgtype.Timestamptz
+	RewatchLoopCount       int64
+	LastRewatchLoopAt      pgtype.Timestamptz
+	MainClickCount         int64
+	LastMainClickAt        pgtype.Timestamptz
+	UnlockConversionCount  int64
+	LastUnlockConversionAt pgtype.Timestamptz
+	CreatedAt              pgtype.Timestamptz
+	UpdatedAt              pgtype.Timestamptz
+}
+
 type AppShort struct {
 	ID                   pgtype.UUID
 	CreatorUserID        pgtype.UUID

@@ -154,6 +154,13 @@ type CreatorWorkspaceShortCaptionWriter interface {
 	UpdateWorkspaceShortCaption(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID, caption string) (creator.WorkspaceShortCaptionMutationResult, error)
 }
 
+// AdminCreatorReviewService は localhost 向け creator review admin transport を表します。
+type AdminCreatorReviewService interface {
+	ApplyDecision(ctx context.Context, input creatorregistration.ReviewDecisionInput) (creatorregistration.ReviewCase, error)
+	GetCase(ctx context.Context, userID uuid.UUID) (creatorregistration.ReviewCase, error)
+	ListCases(ctx context.Context, state string) ([]creatorregistration.ReviewQueueItem, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -177,6 +184,7 @@ type FanProfileLibraryReader interface {
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv                       string
+	AdminCreatorReview           AdminCreatorReviewService
 	CreatorSearch                CreatorSearchReader
 	CreatorWorkspace             CreatorWorkspaceReader
 	CreatorWorkspaceMainPrice    CreatorWorkspaceMainPriceWriter
@@ -302,6 +310,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.ViewerActiveMode,
 		config.ViewerBootstrap,
 	)
+	registerAdminCreatorReviewRoutes(router, config.AppEnv, config.AdminCreatorReview)
 
 	return router
 }

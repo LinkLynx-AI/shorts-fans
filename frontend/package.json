@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
+    "dev:admin": "ADMIN_UI_ENABLED=1 next dev --hostname 127.0.0.1 --port 3001",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "pnpm lint:eslint && pnpm fsd:check",

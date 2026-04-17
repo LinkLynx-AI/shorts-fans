@@ -41,7 +41,7 @@ func (r *Repository) ApplyReviewDecision(ctx context.Context, input ReviewDecisi
 	var registration Registration
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, input.UserID, false)
+		snapshot, err := r.loadSnapshot(ctx, q, input.UserID, false, true)
 		if err != nil {
 			return err
 		}

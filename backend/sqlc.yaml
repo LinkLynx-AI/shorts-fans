@@ -16,7 +16,8 @@ sql:
       - "db/migrations/000012_add_user_profiles.up.sql"
       - "db/migrations/000013_add_cognito_session_foundation.up.sql"
       - "db/migrations/000014_add_creator_registration_intake.up.sql"
-      - "db/migrations/000015_add_payment_purchase_state.up.sql"
+      - "db/migrations/000015_add_recommendation_foundation.up.sql"
+      - "db/migrations/000016_add_payment_purchase_state.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

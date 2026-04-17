@@ -26,6 +26,7 @@ func TestRepositoryApplyReviewDecisionApprovesSubmittedCapability(t *testing.T) 
 	existing.RejectionReasonCode = postgres.TextToPG(&reason)
 	existing.IsResubmitEligible = true
 	existing.IsSupportReviewRequired = true
+	lockedCapabilityLoaded := false
 
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
@@ -36,7 +37,8 @@ func TestRepositoryApplyReviewDecisionApprovesSubmittedCapability(t *testing.T) 
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
 				},
-				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
 					return existing, nil
 				},
 				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -107,6 +109,9 @@ func TestRepositoryApplyReviewDecisionApprovesSubmittedCapability(t *testing.T) 
 	if !tx.committed {
 		t.Fatal("ApplyReviewDecision() committed = false, want true")
 	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("ApplyReviewDecision() did not load capability with row lock")
+	}
 }
 
 func TestRepositoryApplyReviewDecisionRejectsSubmittedCapability(t *testing.T) {
@@ -119,6 +124,7 @@ func TestRepositoryApplyReviewDecisionRejectsSubmittedCapability(t *testing.T) {
 	existing.SubmittedAt = postgres.TimeToPG(&submittedAt)
 	existing.SelfServeResubmitCount = 1
 	reason := " documents_blurry "
+	lockedCapabilityLoaded := false
 
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
@@ -129,7 +135,8 @@ func TestRepositoryApplyReviewDecisionRejectsSubmittedCapability(t *testing.T) {
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
 				},
-				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
 					return existing, nil
 				},
 				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -201,6 +208,9 @@ func TestRepositoryApplyReviewDecisionRejectsSubmittedCapability(t *testing.T) {
 	if !tx.committed {
 		t.Fatal("ApplyReviewDecision() committed = false, want true")
 	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("ApplyReviewDecision() did not load capability with row lock")
+	}
 }
 
 func TestRepositoryApplyReviewDecisionSuspendsApprovedCapability(t *testing.T) {
@@ -213,6 +223,7 @@ func TestRepositoryApplyReviewDecisionSuspendsApprovedCapability(t *testing.T) {
 	existing := testCapability(userID, StateApproved)
 	existing.SubmittedAt = postgres.TimeToPG(&submittedAt)
 	existing.ApprovedAt = postgres.TimeToPG(&approvedAt)
+	lockedCapabilityLoaded := false
 
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
@@ -223,7 +234,8 @@ func TestRepositoryApplyReviewDecisionSuspendsApprovedCapability(t *testing.T) {
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
 				},
-				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
 					return existing, nil
 				},
 				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -283,6 +295,9 @@ func TestRepositoryApplyReviewDecisionSuspendsApprovedCapability(t *testing.T) {
 	if !tx.committed {
 		t.Fatal("ApplyReviewDecision() committed = false, want true")
 	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("ApplyReviewDecision() did not load capability with row lock")
+	}
 }
 
 func TestRepositoryApplyReviewDecisionValidatesInput(t *testing.T) {
@@ -290,6 +305,7 @@ func TestRepositoryApplyReviewDecisionValidatesInput(t *testing.T) {
 
 	userID := uuid.MustParse("18181818-1818-1818-1818-181818181818")
 	existing := testCapability(userID, StateSubmitted)
+	lockedCapabilityLoaded := false
 	repo := &Repository{
 		txBeginner: repositoryTxBeginnerStub{
 			begin: func(context.Context) (pgx.Tx, error) { return &repositoryTxStub{}, nil },
@@ -299,7 +315,8 @@ func TestRepositoryApplyReviewDecisionValidatesInput(t *testing.T) {
 				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
 					return testUserProfile(userID), nil
 				},
-				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					lockedCapabilityLoaded = true
 					return existing, nil
 				},
 				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -317,6 +334,9 @@ func TestRepositoryApplyReviewDecisionValidatesInput(t *testing.T) {
 		UserID:   userID,
 	}); !errors.Is(err, ErrInvalidReviewDecision) {
 		t.Fatalf("ApplyReviewDecision() invalid decision got %v want %v", err, ErrInvalidReviewDecision)
+	}
+	if !lockedCapabilityLoaded {
+		t.Fatal("ApplyReviewDecision() validation did not load capability with row lock")
 	}
 
 	blankReason := "   "

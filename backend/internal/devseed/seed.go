@@ -14,6 +14,7 @@ import (
 var (
 	creatorUserID = uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	fanUserID     = uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	reviewUserID  = uuid.MustParse("99999999-9999-9999-9999-999999999999")
 
 	mainID        = uuid.MustParse("33333333-3333-3333-3333-333333333333")
 	shortAID      = uuid.MustParse("44444444-4444-4444-4444-444444444444")
@@ -22,18 +23,20 @@ var (
 	shortAAssetID = uuid.MustParse("77777777-7777-7777-7777-777777777777")
 	shortBAssetID = uuid.MustParse("88888888-8888-8888-8888-888888888888")
 
-	creatorApprovedAt       = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
-	creatorPublishedAt      = time.Date(2026, 1, 2, 9, 30, 0, 0, time.UTC)
-	mainApprovedAt          = time.Date(2026, 1, 2, 10, 0, 0, 0, time.UTC)
-	shortAApprovedAt        = time.Date(2026, 1, 2, 10, 30, 0, 0, time.UTC)
-	shortAPublishedAt       = time.Date(2026, 1, 2, 11, 0, 0, 0, time.UTC)
-	shortBApprovedAt        = time.Date(2026, 1, 2, 11, 30, 0, 0, time.UTC)
-	shortBPublishedAt       = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
-	fanFollowedAt           = time.Date(2026, 1, 2, 12, 30, 0, 0, time.UTC)
-	fanUnlockedAt           = time.Date(2026, 1, 2, 13, 0, 0, 0, time.UTC)
-	fanPinnedShortAt        = time.Date(2026, 1, 2, 13, 30, 0, 0, time.UTC)
-	fanSessionExpiresAt     = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
-	creatorSessionExpiresAt = time.Date(2026, 12, 31, 0, 5, 0, 0, time.UTC)
+	creatorApprovedAt        = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
+	creatorPublishedAt       = time.Date(2026, 1, 2, 9, 30, 0, 0, time.UTC)
+	mainApprovedAt           = time.Date(2026, 1, 2, 10, 0, 0, 0, time.UTC)
+	shortAApprovedAt         = time.Date(2026, 1, 2, 10, 30, 0, 0, time.UTC)
+	shortAPublishedAt        = time.Date(2026, 1, 2, 11, 0, 0, 0, time.UTC)
+	shortBApprovedAt         = time.Date(2026, 1, 2, 11, 30, 0, 0, time.UTC)
+	shortBPublishedAt        = time.Date(2026, 1, 2, 12, 0, 0, 0, time.UTC)
+	fanFollowedAt            = time.Date(2026, 1, 2, 12, 30, 0, 0, time.UTC)
+	fanUnlockedAt            = time.Date(2026, 1, 2, 13, 0, 0, 0, time.UTC)
+	fanPinnedShortAt         = time.Date(2026, 1, 2, 13, 30, 0, 0, time.UTC)
+	fanSessionExpiresAt      = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
+	creatorSessionExpiresAt  = time.Date(2026, 12, 31, 0, 5, 0, 0, time.UTC)
+	reviewSubmittedAt        = time.Date(2026, 4, 17, 8, 0, 0, 0, time.UTC)
+	reviewEvidenceUploadedAt = time.Date(2026, 4, 17, 7, 45, 0, 0, time.UTC)
 )
 
 const (
@@ -41,6 +44,18 @@ const (
 	creatorHandle      = "mikaaoi"
 	creatorAvatarURL   = "https://cdn.example.com/mock/creator/avatar-mika-aoi.jpg"
 	creatorBio         = "Public shorts から paid main へつながる creator mock profile."
+
+	fanDisplayName = "Kana Mori"
+	fanHandle      = "kanamori"
+
+	reviewDisplayName = "Mina Rei"
+	reviewHandle      = "minarei_review"
+	reviewAvatarURL   = "https://cdn.example.com/mock/review/mina-rei-avatar.jpg"
+	reviewCreatorBio  = "quiet rooftop と low light preview を中心に投稿予定です。"
+	reviewLegalName   = "Mina Rei"
+	reviewBirthDate   = "1999-04-02"
+	reviewPayoutName  = "Mina Rei"
+	reviewPayoutType  = "self"
 
 	mainPriceMinor = int64(1200)
 	mainCurrency   = "JPY"
@@ -106,12 +121,13 @@ var publicShorts = []shortSeed{
 
 // Summary は dev seed 適用後に利用しやすい主要 ID を返します。
 type Summary struct {
-	CreatorUserID       uuid.UUID
-	FanUserID           uuid.UUID
-	MainID              uuid.UUID
-	ShortIDs            []uuid.UUID
-	FanSessionToken     string
-	CreatorSessionToken string
+	CreatorUserID         uuid.UUID
+	FanUserID             uuid.UUID
+	MainID                uuid.UUID
+	SubmittedReviewUserID uuid.UUID
+	ShortIDs              []uuid.UUID
+	FanSessionToken       string
+	CreatorSessionToken   string
 }
 
 // Run はローカル開発用の固定 mock data を idempotent に投入します。
@@ -127,10 +143,34 @@ func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
 		if err := upsertUser(ctx, tx, fanUserID); err != nil {
 			return err
 		}
+		if err := upsertUser(ctx, tx, reviewUserID); err != nil {
+			return err
+		}
+		if err := upsertUserProfile(ctx, tx, creatorUserID, creatorDisplayName, creatorHandle, creatorAvatarURL); err != nil {
+			return err
+		}
+		if err := upsertUserProfile(ctx, tx, fanUserID, fanDisplayName, fanHandle, ""); err != nil {
+			return err
+		}
+		if err := upsertUserProfile(ctx, tx, reviewUserID, reviewDisplayName, reviewHandle, reviewAvatarURL); err != nil {
+			return err
+		}
 		if err := upsertCreatorCapability(ctx, tx); err != nil {
 			return err
 		}
 		if err := upsertCreatorProfile(ctx, tx); err != nil {
+			return err
+		}
+		if err := upsertSubmittedReviewCapability(ctx, tx); err != nil {
+			return err
+		}
+		if err := upsertSubmittedReviewCreatorProfile(ctx, tx); err != nil {
+			return err
+		}
+		if err := upsertSubmittedReviewIntake(ctx, tx); err != nil {
+			return err
+		}
+		if err := upsertSubmittedReviewEvidences(ctx, tx); err != nil {
 			return err
 		}
 		for _, asset := range mediaAssets {
@@ -173,12 +213,13 @@ func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
 	}
 
 	return Summary{
-		CreatorUserID:       creatorUserID,
-		FanUserID:           fanUserID,
-		MainID:              mainID,
-		ShortIDs:            shortIDs,
-		FanSessionToken:     fanSessionToken,
-		CreatorSessionToken: creatorSessionToken,
+		CreatorUserID:         creatorUserID,
+		FanUserID:             fanUserID,
+		MainID:                mainID,
+		SubmittedReviewUserID: reviewUserID,
+		ShortIDs:              shortIDs,
+		FanSessionToken:       fanSessionToken,
+		CreatorSessionToken:   creatorSessionToken,
 	}, nil
 }
 
@@ -189,6 +230,39 @@ func upsertUser(ctx context.Context, tx pgx.Tx, userID uuid.UUID) error {
 		ON CONFLICT (id) DO NOTHING
 	`, userID); err != nil {
 		return fmt.Errorf("users upsert user_id=%s: %w", userID, err)
+	}
+
+	return nil
+}
+
+func upsertUserProfile(
+	ctx context.Context,
+	tx pgx.Tx,
+	userID uuid.UUID,
+	displayName string,
+	handle string,
+	avatarURL string,
+) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.user_profiles (
+			user_id,
+			display_name,
+			handle,
+			avatar_url
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			NULLIF($4, '')
+		)
+		ON CONFLICT (user_id) DO UPDATE
+		SET
+			display_name = EXCLUDED.display_name,
+			handle = EXCLUDED.handle,
+			avatar_url = EXCLUDED.avatar_url,
+			updated_at = CURRENT_TIMESTAMP
+	`, userID, displayName, handle, avatarURL); err != nil {
+		return fmt.Errorf("user_profiles upsert user_id=%s: %w", userID, err)
 	}
 
 	return nil
@@ -271,6 +345,170 @@ func upsertCreatorProfile(ctx context.Context, tx pgx.Tx) error {
 			updated_at = CURRENT_TIMESTAMP
 	`, creatorUserID, creatorDisplayName, creatorHandle, creatorAvatarURL, creatorBio, creatorPublishedAt); err != nil {
 		return fmt.Errorf("creator_profiles upsert user_id=%s: %w", creatorUserID, err)
+	}
+
+	return nil
+}
+
+func upsertSubmittedReviewCapability(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.creator_capabilities (
+			user_id,
+			state,
+			rejection_reason_code,
+			is_resubmit_eligible,
+			is_support_review_required,
+			self_serve_resubmit_count,
+			kyc_provider_case_ref,
+			payout_provider_account_ref,
+			submitted_at,
+			approved_at,
+			rejected_at,
+			suspended_at
+		) VALUES (
+			$1,
+			'submitted',
+			NULL,
+			FALSE,
+			FALSE,
+			0,
+			NULL,
+			NULL,
+			$2,
+			NULL,
+			NULL,
+			NULL
+		)
+		ON CONFLICT (user_id) DO UPDATE
+		SET
+			state = EXCLUDED.state,
+			rejection_reason_code = EXCLUDED.rejection_reason_code,
+			is_resubmit_eligible = EXCLUDED.is_resubmit_eligible,
+			is_support_review_required = EXCLUDED.is_support_review_required,
+			self_serve_resubmit_count = EXCLUDED.self_serve_resubmit_count,
+			kyc_provider_case_ref = EXCLUDED.kyc_provider_case_ref,
+			payout_provider_account_ref = EXCLUDED.payout_provider_account_ref,
+			submitted_at = EXCLUDED.submitted_at,
+			approved_at = EXCLUDED.approved_at,
+			rejected_at = EXCLUDED.rejected_at,
+			suspended_at = EXCLUDED.suspended_at,
+			updated_at = CURRENT_TIMESTAMP
+	`, reviewUserID, reviewSubmittedAt); err != nil {
+		return fmt.Errorf("creator_capabilities upsert submitted review user_id=%s: %w", reviewUserID, err)
+	}
+
+	return nil
+}
+
+func upsertSubmittedReviewCreatorProfile(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.creator_profiles (
+			user_id,
+			display_name,
+			handle,
+			avatar_url,
+			bio,
+			published_at
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			NULL
+		)
+		ON CONFLICT (user_id) DO UPDATE
+		SET
+			display_name = EXCLUDED.display_name,
+			handle = EXCLUDED.handle,
+			avatar_url = EXCLUDED.avatar_url,
+			bio = EXCLUDED.bio,
+			updated_at = CURRENT_TIMESTAMP
+	`, reviewUserID, reviewDisplayName, reviewHandle, reviewAvatarURL, reviewCreatorBio); err != nil {
+		return fmt.Errorf("creator_profiles upsert submitted review user_id=%s: %w", reviewUserID, err)
+	}
+
+	return nil
+}
+
+func upsertSubmittedReviewIntake(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.creator_registration_intakes (
+			user_id,
+			legal_name,
+			birth_date,
+			payout_recipient_type,
+			payout_recipient_name,
+			declares_no_prohibited_category,
+			accepts_consent_responsibility
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			TRUE,
+			TRUE
+		)
+		ON CONFLICT (user_id) DO UPDATE
+		SET
+			legal_name = EXCLUDED.legal_name,
+			birth_date = EXCLUDED.birth_date,
+			payout_recipient_type = EXCLUDED.payout_recipient_type,
+			payout_recipient_name = EXCLUDED.payout_recipient_name,
+			declares_no_prohibited_category = EXCLUDED.declares_no_prohibited_category,
+			accepts_consent_responsibility = EXCLUDED.accepts_consent_responsibility,
+			updated_at = CURRENT_TIMESTAMP
+	`, reviewUserID, reviewLegalName, reviewBirthDate, reviewPayoutType, reviewPayoutName); err != nil {
+		return fmt.Errorf("creator_registration_intakes upsert user_id=%s: %w", reviewUserID, err)
+	}
+
+	return nil
+}
+
+func upsertSubmittedReviewEvidences(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.creator_registration_evidences (
+			user_id,
+			kind,
+			file_name,
+			mime_type,
+			file_size_bytes,
+			storage_bucket,
+			storage_key,
+			uploaded_at
+		) VALUES
+			(
+				$1,
+				'government_id',
+				$2,
+				'image/png',
+				183442,
+				'mock-private-evidence-bucket',
+				$3,
+				$4
+			),
+			(
+				$1,
+				'payout_proof',
+				$5,
+				'application/pdf',
+				84512,
+				'mock-private-evidence-bucket',
+				$6,
+				$4
+			)
+		ON CONFLICT (user_id, kind) DO UPDATE
+		SET
+			file_name = EXCLUDED.file_name,
+			mime_type = EXCLUDED.mime_type,
+			file_size_bytes = EXCLUDED.file_size_bytes,
+			storage_bucket = EXCLUDED.storage_bucket,
+			storage_key = EXCLUDED.storage_key,
+			uploaded_at = EXCLUDED.uploaded_at,
+			updated_at = CURRENT_TIMESTAMP
+	`, reviewUserID, "government-id.png", "mock/review/mina-rei/government-id.png", reviewEvidenceUploadedAt, "bank-proof.pdf", "mock/review/mina-rei/bank-proof.pdf"); err != nil {
+		return fmt.Errorf("creator_registration_evidences upsert user_id=%s: %w", reviewUserID, err)
 	}
 
 	return nil
