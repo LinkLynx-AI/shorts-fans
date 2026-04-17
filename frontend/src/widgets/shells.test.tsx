@@ -100,7 +100,7 @@ describe("widgets", () => {
 
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
     expect(
-      await screen.findByRole("dialog", { name: "続けるにはログインが必要です" }),
+      await screen.findByRole("dialog", { name: "続けるには認証が必要です" }),
     ).toBeInTheDocument();
   });
 

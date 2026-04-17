@@ -176,6 +176,7 @@ export function FanAuthDialog({
             }
           }}
         >
+          <Dialog.Title className="sr-only">続けるには認証が必要です</Dialog.Title>
           <Dialog.Description className="sr-only">
             email と password を中心に fan auth を完了する shared modal
           </Dialog.Description>

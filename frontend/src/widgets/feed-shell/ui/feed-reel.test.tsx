@@ -358,7 +358,7 @@ describe("FeedReel", () => {
 
     await user.click(screen.getByRole("button", { name: "Pin short" }));
 
-    expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when the backend returns auth_required for pin", async () => {
@@ -397,7 +397,7 @@ describe("FeedReel", () => {
     await user.click(screen.getByRole("button", { name: "Pin short" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+      expect(screen.getByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
     });
   });
 

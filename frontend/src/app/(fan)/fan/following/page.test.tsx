@@ -123,6 +123,6 @@ describe("FollowingPage", () => {
 
     renderWithFanAuthDialog(await FollowingPage());
 
-    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 });

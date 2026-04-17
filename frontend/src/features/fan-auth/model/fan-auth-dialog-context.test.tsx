@@ -122,7 +122,7 @@ describe("FanAuthDialogProvider", () => {
     ).toHaveTextContent(
       "認証自体は完了しましたが、状態反映の確認に失敗しました。画面を更新して確認してください。",
     );
-    expect(screen.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("closes re-auth without refreshing the route or re-reading bootstrap", async () => {
@@ -216,6 +216,6 @@ describe("FanAuthDialogProvider", () => {
       expect(mockedRouter.push).toHaveBeenCalledWith("/fan");
     });
 
-    expect(screen.queryByRole("dialog", { name: "続けるにはログインが必要です" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "続けるには認証が必要です" })).not.toBeInTheDocument();
   });
 });

@@ -326,7 +326,7 @@ describe("FanPage", () => {
       }),
     );
 
-    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when the viewer profile api responds with auth_required", async () => {
@@ -370,7 +370,7 @@ describe("FanPage", () => {
       }),
     );
 
-    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when the pinned shorts api responds with auth_required", async () => {
@@ -406,7 +406,7 @@ describe("FanPage", () => {
       }),
     );
 
-    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when the library api responds with auth_required", async () => {
@@ -444,7 +444,7 @@ describe("FanPage", () => {
       }),
     );
 
-    expect(await screen.findByRole("dialog", { name: "続けるにはログインが必要です" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
   it("returns to the previous route when the auth-required fan dialog is dismissed", async () => {
