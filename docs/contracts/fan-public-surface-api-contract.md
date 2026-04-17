@@ -13,6 +13,7 @@
 - `docs/ssot/product/ui/fan-surfaces.md`
 - `docs/ssot/product/content/content-model.md`
 - `docs/ssot/product/content/short-main-linkage.md`
+- `docs/ssot/business/data/data-strategy.md`
 
 ## Endpoint Summary
 
@@ -38,10 +39,27 @@
 #### Response
 
 - `data.tab`: request と同じ tab
-- `data.items`: `FeedItem[]`
+- `data.items`: `FeedItem[]`。item order 自体が resolved feed order を表します
 - `meta.page`: `CursorPageInfo`
-- `recommended` は `published_at DESC, id DESC` の newest-first で返します。
-- `following` も同じ cursor 順序で返します。
+
+#### Ranking Semantics
+
+- `recommended` は `public short` を候補集合にし、request 時点で解決された recommendation order を返します。
+- `recommended` は auth optional のまま維持し、unauthenticated viewer に対しても閲覧可能な fallback order を返せます。newest-first 固定には戻しません。
+- `following` は follow 中 creator の `public short` だけを候補集合にし、その中で解決された recommendation order を返します。
+- この contract は concrete score formula や feature set を固定しませんが、`short -> main -> unlock` の主導線を壊さない順序解決を前提にします。
+
+#### Order Interpretation
+
+- resolved order は単純な recency 順を保証しません。consumer は同一 creator や同一 canonical main の item が返却順で間引かれたり、間隔を空けて並ぶ場合があることを前提にします。
+- consumer は、viewer がすでに unlock 済みの canonical main に紐づく short や、server 側で十分視聴済みとして扱われる short が、他の eligible candidate より後ろに出る場合があることを前提にします。
+- raw score、feature set、weight、threshold、suppression formula の具体値はこの contract では固定しません。
+
+#### Cursor Semantics
+
+- `cursor` は resolved order を継続取得するための opaque token です。
+- cursor や payload から `publishedAt` keyset、rank key、recommendation reason を推測できることは保証しません。
+- pagination は `recommended` / `following` の ordering semantics を維持したまま次ページへ進むために使います。
 
 ### `FeedItem`
 
@@ -204,7 +222,7 @@
 ## Out-of-scope Guardrails
 
 - `like` と `comment` は返さない
-- ranking explanation や debug field は返さない
+- raw score、ranking explanation、recommendation reason、debug field は返さない
 - `main` の direct listing は返さない
 - recommendation や related creators は返さない
 

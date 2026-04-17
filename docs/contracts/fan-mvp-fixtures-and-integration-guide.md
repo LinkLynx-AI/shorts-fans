@@ -83,7 +83,7 @@
 | --- | --- | --- | --- |
 | `SHO-169` | `shared fan auth modal` | `fan-auth-modal-ui-contract.md` + `fan-auth-api-contract.md` | `signInSuccess`, `signInInvalidCredentials`, `signInConfirmationRequired`, `signUpAccepted`, `signUpConfirmSuccess`, `passwordResetAccepted`, `passwordResetConfirmSuccess`, `reAuthSuccess`, `logoutSuccess` |
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
-| `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
+| `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `following_ranked`, `following_empty`, `following_auth_required`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-115` | `creator profile follow CTA` | `fan-creator-follow-api-contract.md` | `follow_success`, `follow_auth_required`, `follow_not_found`, `follow_repeat`, `unfollow_success`, `unfollow_auth_required`, `unfollow_not_found`, `unfollow_repeat` |
@@ -102,6 +102,8 @@
 
 ## Scenario Rules
 
+- feed fixture の `items` 順序は recommendation output の representative example であり、`publishedAt DESC` や newest-first を意味しません。
+- feed `cursor` は recommendation order を継続取得する opaque token として扱い、sort key や ranking reason を表しません。
 - `empty` は `200` 成功系で表現します。
 - `not_found` は `404 + error.code = not_found` で表現します。
 - `locked` は `403 + error.code = main_locked` で表現します。
@@ -113,3 +115,4 @@
 - fixture は UI 専用 mock ではなく transport contract の canonical example です。
 - 新しい business rule を fixture 側に追加しません。未知の仕様を補うのではなく、既存 contract の例示に留めます。
 - 1 つの scenario が複数 endpoint にまたがる場合でも、各 endpoint fixture を正とします。frontend 側で scenario 名だけに依存しません。
+- downstream は feed fixture の item order から raw score や recommendation reason を逆算しません。payload shape と contract に書かれた semantics を正とします。
