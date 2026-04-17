@@ -122,6 +122,8 @@ terraform destroy -var-file=terraform.tfvars
 - `cognito_ses_email_identity_arn`
 - `cognito_ses_email_identity_verification_status`
 
+`cognito_ses_email_identity_verification_status` は Terraform state 上の最終 refresh 値です。SES verification mail の承認直後は自動で更新されないため、再度 `terraform plan` / `terraform apply` か state refresh を行ってから確認します。
+
 backend fan auth 実装が読む env 名は次に揃えます。
 
 | Terraform output | backend env |

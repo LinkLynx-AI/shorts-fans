@@ -39,7 +39,7 @@ output "cognito_ses_email_identity_arn" {
 }
 
 output "cognito_ses_email_identity_verification_status" {
-  description = "Current SES sender identity verification status after the latest refresh."
+  description = "Last refreshed SES sender identity verification status recorded in Terraform state. Manual SES verification changes require terraform refresh/plan/apply before this output updates."
   value       = trimspace(var.cognito_email_from_address) == "" ? null : aws_sesv2_email_identity.cognito_sender[0].verification_status
 }
 
