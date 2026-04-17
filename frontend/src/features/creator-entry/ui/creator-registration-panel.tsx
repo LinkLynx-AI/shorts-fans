@@ -5,8 +5,12 @@ import { useRef } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage, Button, SurfacePanel } from "@/shared/ui";
 
-import { creatorRegistrationEvidenceKinds } from "../api/contracts";
+import {
+  creatorRegistrationEvidenceKinds,
+  type CreatorRegistrationStatus,
+} from "../api/contracts";
 import { useCreatorRegistration } from "../model/use-creator-registration";
+import { CreatorRegistrationStaticWorkspacePreview } from "./creator-registration-static-workspace-preview";
 
 const evidenceFieldLabels = {
   government_id: {
@@ -18,6 +22,40 @@ const evidenceFieldLabels = {
     label: "Payout Proof",
   },
 } as const;
+
+const onboardingChecklist = [
+  "年齢要件と本人確認書類をそろえる",
+  "売上受取主体が確認できる payout proof を出す",
+  "禁止カテゴリ非該当と consent responsibility を確認する",
+  "approval 前は creator dashboard / upload は開かない",
+] as const;
+
+type RegistrationSurfaceKind =
+  | "draft"
+  | "not_started"
+  | "rejected_closed"
+  | "rejected_resubmit"
+  | "rejected_support"
+  | "rejected_unknown"
+  | "submitted"
+  | "suspended";
+
+type RegistrationPanelCopy = {
+  description: string;
+  eyebrow: string;
+  saveLabel: string;
+  submitLabel: string;
+  title: string;
+};
+
+type RegistrationStatusCard = {
+  body: string;
+  checklist: readonly string[];
+  ctaLabel: string | null;
+  eyebrow: string;
+  meta: readonly string[];
+  title: string;
+};
 
 function buildAvatarFallback(displayName: string) {
   const trimmed = displayName.trim();
@@ -41,11 +79,262 @@ function formatEvidenceDate(uploadedAt: string) {
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function formatStatusTimestamp(timestamp: string | null) {
+  if (!timestamp) {
+    return null;
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.valueOf())) {
+    return null;
+  }
+
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function resolveRegistrationSurfaceKind(
+  registration: CreatorRegistrationStatus | null,
+  registrationState: string | null,
+  isReadOnly: boolean,
+): RegistrationSurfaceKind {
+  if (registration?.state === "submitted" || registrationState === "submitted") {
+    return "submitted";
+  }
+  if (registration?.state === "suspended" || registrationState === "suspended") {
+    return "suspended";
+  }
+  if (registration?.state === "rejected" || registrationState === "rejected") {
+    if (registration === null) {
+      return isReadOnly ? "rejected_unknown" : "rejected_resubmit";
+    }
+    if (registration?.actions.canResubmit || !isReadOnly) {
+      return "rejected_resubmit";
+    }
+    if (registration?.rejection?.isSupportReviewRequired) {
+      return "rejected_support";
+    }
+
+    return "rejected_closed";
+  }
+  if (registrationState === "draft") {
+    return "draft";
+  }
+
+  return "not_started";
+}
+
+function resolvePanelCopy(surfaceKind: RegistrationSurfaceKind): RegistrationPanelCopy {
+  switch (surfaceKind) {
+    case "rejected_resubmit":
+      return {
+        description:
+          "却下理由を確認し、必要な項目だけ修正して同じ onboarding flow から再申請できます。creator mode や upload workspace は引き続き開きません。",
+        eyebrow: "creator rejected",
+        saveLabel: "修正内容を保存する",
+        submitLabel: "再申請を送信する",
+        title: "修正して再申請する",
+      };
+    case "rejected_support":
+      return {
+        description:
+          "現在の却下内容は self-serve では解消できません。この surface は read-only のまま next action を確認するために使います。",
+        eyebrow: "creator rejected",
+        saveLabel: "下書きを保存する",
+        submitLabel: "再申請を送信する",
+        title: "サポート確認が必要です",
+      };
+    case "rejected_closed":
+      return {
+        description:
+          "この onboarding case では self-serve resubmit を開けません。却下理由と残回数を確認するための read-only surface として扱います。",
+        eyebrow: "creator rejected",
+        saveLabel: "下書きを保存する",
+        submitLabel: "再申請を送信する",
+        title: "再申請は利用できません",
+      };
+    case "rejected_unknown":
+      return {
+        description:
+          "rejected status の詳細をいま確認できません。support review required か上限到達かをこの surface だけでは判定できないため、時間を置いて再読み込みしてください。",
+        eyebrow: "creator rejected",
+        saveLabel: "下書きを保存する",
+        submitLabel: "再申請を送信する",
+        title: "審査状態を再確認してください",
+      };
+    case "suspended":
+      return {
+        description:
+          "Creator 利用は現在停止中です。review 状態が更新されるまで、creator mode や upload workspace は引き続き開きません。",
+        eyebrow: "creator suspended",
+        saveLabel: "下書きを保存する",
+        submitLabel: "審査申請を送信する",
+        title: "Creator利用は停止中です",
+      };
+    case "draft":
+      return {
+        description:
+          "shared profile の表示名、handle、avatar は fan / creator 共通です。この面では preview のみ行い、必要な証跡と creator 固有の bio を追加します。",
+        eyebrow: "creator onboarding",
+        saveLabel: "下書きを保存する",
+        submitLabel: "審査申請を送信する",
+        title: "Creator審査申請を始める",
+      };
+    case "submitted":
+      return {
+        description: "審査状況の確認が完了するまでお待ちください。",
+        eyebrow: "creator submitted",
+        saveLabel: "下書きを保存する",
+        submitLabel: "審査申請を送信する",
+        title: "審査申請を受け付けました",
+      };
+    case "not_started":
+    default:
+      return {
+        description:
+          "shared profile の表示名、handle、avatar は fan / creator 共通です。この面では preview のみ行い、必要な証跡と creator 固有の bio を追加します。",
+        eyebrow: "creator onboarding",
+        saveLabel: "下書きを保存する",
+        submitLabel: "審査申請を送信する",
+        title: "Creator審査申請を始める",
+      };
+  }
+}
+
+function resolveReasonChecklist(reasonCode: string | null): readonly string[] {
+  switch (reasonCode) {
+    case "documents_incomplete":
+      return [
+        "不足している証跡をアップロードし直す",
+        "legal name / birth date / payout recipient の空欄を埋める",
+        "保存後に同じ flow から再申請する",
+      ];
+    case "documents_blurry":
+      return [
+        "判別できる解像度で本人確認書類を再提出する",
+        "見切れや反射がないファイルへ差し替える",
+        "更新後に再申請する",
+      ];
+    case "payout_info_incomplete":
+      return [
+        "payout recipient type と受取名義を見直す",
+        "payout proof を最新ファイルへ差し替える",
+        "修正後に再申請する",
+      ];
+    case "profile_mismatch":
+      return [
+        "shared profile の表示名と提出情報の不一致を直す",
+        "必要なら profile settings で表示名や handle を更新する",
+        "反映後に再申請する",
+      ];
+    case "impersonation_suspected":
+      return [
+        "現在は self-serve での再申請はできません",
+        "review 側の確認が終わるまで read-only のままです",
+      ];
+    default:
+      return [
+        "status explanation を確認する",
+        "必要な項目が分かる場合だけ修正し、案内に従って再申請する",
+      ];
+  }
+}
+
+function resolveStatusCard(
+  registration: CreatorRegistrationStatus | null,
+  surfaceKind: RegistrationSurfaceKind,
+): RegistrationStatusCard | null {
+  if (registration === null) {
+    if (surfaceKind !== "rejected_resubmit") {
+      return null;
+    }
+
+    return {
+      body:
+        "rejected detail の再取得には失敗しましたが、self-serve resubmit 自体は開いています。差し戻しになった項目を中心に見直し、同じ onboarding surface から再申請してください。",
+      checklist: [
+        "差し戻しになった入力と証跡を見直す",
+        "保存後に同じ flow から再申請する",
+      ],
+      ctaLabel: "Edit And Resubmit",
+      eyebrow: "Resubmit available",
+      meta: [],
+      title: "修正ポイントを確認して再申請する",
+    };
+  }
+
+  if (!registration) {
+    return null;
+  }
+
+  if (registration.state === "rejected") {
+    const rejectedAt = formatStatusTimestamp(registration.review.rejectedAt);
+    const remaining = registration.rejection?.selfServeResubmitRemaining ?? 0;
+    const reasonCode = registration.rejection?.reasonCode ?? null;
+    const showRemaining = registration.rejection !== null && !registration.rejection.isSupportReviewRequired;
+    const meta = [
+      rejectedAt ? `Rejected at: ${rejectedAt}` : null,
+      showRemaining
+        ? `Self-serve remaining: ${remaining}`
+        : null,
+    ].filter((value): value is string => value !== null);
+
+    if (registration.actions.canResubmit) {
+      return {
+        body:
+          "fixable reject として判定されています。必要な項目だけ修正し、同じ onboarding surface から self-serve で再申請できます。",
+        checklist: resolveReasonChecklist(reasonCode),
+        ctaLabel: "Edit And Resubmit",
+        eyebrow: "Resubmit available",
+        meta,
+        title: "再申請できます",
+      };
+    }
+
+    return {
+      body:
+        registration.rejection?.isSupportReviewRequired
+          ? "support review required の状態です。いまは self-serve では再申請できず、この surface は確認用の read-only です。"
+          : "self-serve resubmit の残回数がなく、この onboarding case では再申請できません。next action の案内がある場合だけ従ってください。",
+      checklist: resolveReasonChecklist(reasonCode),
+      ctaLabel: null,
+      eyebrow: registration.rejection?.isSupportReviewRequired ? "Review required" : "Resubmit unavailable",
+      meta: registration.rejection?.isSupportReviewRequired
+        ? [...meta, "Next action: support review required"]
+        : meta,
+      title: registration.rejection?.isSupportReviewRequired ? "運営確認が必要です" : "再申請は利用できません",
+    };
+  }
+
+  if (registration.state === "suspended") {
+    const suspendedAt = formatStatusTimestamp(registration.review.suspendedAt);
+
+    return {
+      body:
+        "creator capability は停止中です。approval 前 surface だけを read-only で表示し、creator mode / upload / submission package は引き続き閉じたままにします。",
+      checklist: [
+        "creator mode は再開まで利用できません",
+        "この surface では内容確認のみ行えます",
+      ],
+      ctaLabel: null,
+      eyebrow: "Suspended",
+      meta: suspendedAt ? [`Suspended at: ${suspendedAt}`] : [],
+      title: "停止中のため再申請できません",
+    };
+  }
+
+  return null;
+}
+
 /**
  * fan profile から始める creator registration intake panel を表示する。
  */
-export function CreatorRegistrationPanel() {
+export function CreatorRegistrationPanel({
+  initialRegistration = null,
+}: {
+  initialRegistration?: CreatorRegistrationStatus | null;
+}) {
   const evidenceInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const formRef = useRef<HTMLFormElement | null>(null);
   const {
     acceptsConsentResponsibility,
     birthDate,
@@ -62,6 +351,7 @@ export function CreatorRegistrationPanel() {
     legalName,
     payoutRecipientName,
     payoutRecipientType,
+    registration,
     registrationState,
     saveDraft,
     setAcceptsConsentResponsibility,
@@ -76,27 +366,91 @@ export function CreatorRegistrationPanel() {
     submitDisabled,
     successMessage,
     uploadEvidence,
-  } = useCreatorRegistration();
+  } = useCreatorRegistration(initialRegistration);
+
+  const surfaceKind = resolveRegistrationSurfaceKind(registration, registrationState, isReadOnly);
+  const panelCopy = resolvePanelCopy(surfaceKind);
+  const statusCard = resolveStatusCard(registration, surfaceKind);
+  const showFormActions = hasLoaded && !isReadOnly && surfaceKind !== "submitted";
+
+  const scrollToForm = () => {
+    formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("creator-registration-bio")?.focus();
+  };
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-[440px] flex-col px-4 pb-28 pt-5">
       <SurfacePanel className="w-full px-5 py-6 text-foreground">
         <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">
-          creator onboarding
+          {panelCopy.eyebrow}
         </p>
         <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
-          Creator審査申請を始める
+          {panelCopy.title}
         </h1>
-        <p className="mt-3 text-sm leading-6 text-muted">
-          shared profile の表示名、handle、avatar は fan / creator 共通です。
-          この面では preview のみ行い、必要な証跡と creator 固有の bio を追加します。
-        </p>
+        <p className="mt-3 text-sm leading-6 text-muted">{panelCopy.description}</p>
 
         {isLoading ? (
           <div className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-5 text-sm leading-6 text-muted">
             申請フォームを読み込んでいます...
           </div>
         ) : null}
+
+        {statusCard ? (
+          <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+              {statusCard.eyebrow}
+            </p>
+            <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.02em] text-foreground">
+              {statusCard.title}
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{statusCard.body}</p>
+
+            {statusCard.meta.length > 0 ? (
+              <div className="mt-4 rounded-[18px] border border-white/90 bg-white/92 px-4 py-4 text-sm leading-6 text-muted">
+                {statusCard.meta.map((item) => (
+                  <p key={item}>{item}</p>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="mt-4 grid gap-2">
+              {statusCard.checklist.map((item) => (
+                <div
+                  className="rounded-[18px] border border-white/85 bg-white/90 px-4 py-3 text-sm leading-6 text-foreground"
+                  key={item}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+
+            {statusCard.ctaLabel ? (
+              <div className="mt-4">
+                <Button className="w-full" disabled={isBusy || isReadOnly} onClick={scrollToForm} type="button">
+                  {statusCard.ctaLabel}
+                </Button>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+            Onboarding checklist
+          </p>
+          <div className="mt-4 grid gap-2">
+            {onboardingChecklist.map((item) => (
+              <div
+                className="rounded-[18px] border border-white/90 bg-white/92 px-4 py-3 text-sm leading-6 text-foreground"
+                key={item}
+              >
+                {item}
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <CreatorRegistrationStaticWorkspacePreview />
 
         {sharedProfile ? (
           <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
@@ -134,6 +488,7 @@ export function CreatorRegistrationPanel() {
             event.preventDefault();
             void submit();
           }}
+          ref={formRef}
         >
           <section className="grid gap-4">
             <label className="grid gap-1.5" htmlFor="creator-registration-bio">
@@ -332,12 +687,6 @@ export function CreatorRegistrationPanel() {
             </label>
           </section>
 
-          {registrationState && registrationState !== "draft" && registrationState !== "submitted" ? (
-            <p className="rounded-[18px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-3 text-sm leading-6 text-muted">
-              現在の申請状態は `{registrationState}` です。この状態の詳細 surface は後続 task で実装予定のため、ここでは編集を停止しています。
-            </p>
-          ) : null}
-
           {successMessage ? (
             <p className="rounded-[18px] border border-[rgba(26,152,80,0.22)] bg-[rgba(245,255,249,0.95)] px-4 py-3 text-sm leading-6 text-[#197040]">
               {successMessage}
@@ -354,7 +703,7 @@ export function CreatorRegistrationPanel() {
             </p>
           ) : null}
 
-          {!hasLoaded ? null : (
+          {showFormActions ? (
             <div className="grid gap-3">
               <Button
                 className="w-full"
@@ -365,14 +714,14 @@ export function CreatorRegistrationPanel() {
                 type="button"
                 variant="secondary"
               >
-                {isSaving ? "下書きを保存中..." : "下書きを保存する"}
+                {isSaving ? "保存中..." : panelCopy.saveLabel}
               </Button>
 
               <Button className="w-full" disabled={submitDisabled} type="submit">
-                {isSubmitting ? "申請を送信中..." : "審査申請を送信する"}
+                {isSubmitting ? "送信中..." : panelCopy.submitLabel}
               </Button>
             </div>
-          )}
+          ) : null}
         </form>
 
         <div className="mt-4">

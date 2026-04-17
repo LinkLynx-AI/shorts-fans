@@ -40,10 +40,15 @@ export default async function CreatorRegisterPage() {
     }
   }
 
+  if (registration?.actions.canEnterCreatorMode) {
+    redirect(currentViewer.activeMode === "creator" ? "/creator" : "/fan");
+    return null;
+  }
+
   if (registration?.state === "submitted") {
     redirect("/fan/creator/success");
     return null;
   }
 
-  return <CreatorRegistrationPanel />;
+  return <CreatorRegistrationPanel initialRegistration={registration} />;
 }
