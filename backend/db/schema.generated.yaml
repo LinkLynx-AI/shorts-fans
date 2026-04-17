@@ -18,6 +18,7 @@ source:
         - 000012_add_user_profiles.up.sql
         - 000013_add_cognito_session_foundation.up.sql
         - 000014_add_creator_registration_intake.up.sql
+        - 000015_add_recommendation_foundation.up.sql
 schemas:
     - name: app
       tables:
@@ -962,6 +963,649 @@ schemas:
               columns:
                 - short_id
               definition: CREATE INDEX idx_pinned_shorts_short_id ON app.pinned_shorts USING btree (short_id)
+        - name: recommendation_events
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: viewer_user_id
+              type: uuid
+              nullable: false
+            - name: event_kind
+              type: text
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: true
+            - name: canonical_main_id
+              type: uuid
+              nullable: true
+            - name: short_id
+              type: uuid
+              nullable: true
+            - name: occurred_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: idempotency_key
+              type: text
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: recommendation_events_canonical_main_id_fkey
+              columns:
+                - canonical_main_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_events_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+            - name: recommendation_events_main_identity_fkey
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+                    - creator_user_id
+            - name: recommendation_events_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_events_short_identity_fkey
+              columns:
+                - short_id
+                - creator_user_id
+                - canonical_main_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+                    - creator_user_id
+                    - canonical_main_id
+            - name: recommendation_events_viewer_user_id_fkey
+              columns:
+                - viewer_user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: recommendation_events_check
+              expression: CHECK (creator_user_id IS NOT NULL OR canonical_main_id IS NOT NULL OR short_id IS NOT NULL)
+            - name: recommendation_events_check1
+              expression: CHECK (short_id IS NULL OR canonical_main_id IS NOT NULL)
+            - name: recommendation_events_check2
+              expression: CHECK (canonical_main_id IS NULL OR creator_user_id IS NOT NULL)
+            - name: recommendation_events_check3
+              expression: CHECK (short_id IS NULL OR creator_user_id IS NOT NULL)
+            - name: recommendation_events_event_kind_check
+              expression: CHECK (event_kind = ANY (ARRAY['impression'::text, 'view_start'::text, 'view_completion'::text, 'rewatch_loop'::text, 'profile_click'::text, 'main_click'::text, 'unlock_conversion'::text]))
+            - name: recommendation_events_idempotency_key_check
+              expression: CHECK (length(btrim(idempotency_key)) > 0)
+            - name: recommendation_events_payload_shape_check
+              expression: CHECK ((event_kind = ANY (ARRAY['impression'::text, 'view_start'::text, 'view_completion'::text, 'rewatch_loop'::text])) AND creator_user_id IS NOT NULL AND canonical_main_id IS NOT NULL AND short_id IS NOT NULL OR event_kind = 'profile_click'::text AND creator_user_id IS NOT NULL AND canonical_main_id IS NULL AND short_id IS NULL OR (event_kind = ANY (ARRAY['main_click'::text, 'unlock_conversion'::text])) AND creator_user_id IS NOT NULL AND canonical_main_id IS NOT NULL)
+          indexes:
+            - name: recommendation_events_creator_user_id_idx
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX recommendation_events_creator_user_id_idx ON app.recommendation_events USING btree (creator_user_id)
+            - name: recommendation_events_main_identity_idx
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              definition: CREATE INDEX recommendation_events_main_identity_idx ON app.recommendation_events USING btree (canonical_main_id, creator_user_id)
+            - name: recommendation_events_short_identity_idx
+              columns:
+                - short_id
+                - creator_user_id
+                - canonical_main_id
+              definition: CREATE INDEX recommendation_events_short_identity_idx ON app.recommendation_events USING btree (short_id, creator_user_id, canonical_main_id)
+            - name: recommendation_events_viewer_idempotency_key_idx
+              columns:
+                - viewer_user_id
+                - idempotency_key
+              unique: true
+              definition: CREATE UNIQUE INDEX recommendation_events_viewer_idempotency_key_idx ON app.recommendation_events USING btree (viewer_user_id, idempotency_key)
+            - name: recommendation_events_viewer_occurred_at_idx
+              columns:
+                - viewer_user_id
+                - occurred_at
+                - id
+              definition: CREATE INDEX recommendation_events_viewer_occurred_at_idx ON app.recommendation_events USING btree (viewer_user_id, occurred_at DESC, id DESC)
+        - name: recommendation_short_global_features
+          columns:
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: canonical_main_id
+              type: uuid
+              nullable: false
+            - name: impression_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_impression_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_start_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_start_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_completion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_completion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: rewatch_loop_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_rewatch_loop_at
+              type: timestamp with time zone
+              nullable: true
+            - name: main_click_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_main_click_at
+              type: timestamp with time zone
+              nullable: true
+            - name: unlock_conversion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_unlock_conversion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - short_id
+          foreign_keys:
+            - name: recommendation_short_global_features_canonical_main_id_fkey
+              columns:
+                - canonical_main_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_short_global_features_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+            - name: recommendation_short_global_features_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_short_global_features_short_identity_fkey
+              columns:
+                - short_id
+                - creator_user_id
+                - canonical_main_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+                    - creator_user_id
+                    - canonical_main_id
+          check_constraints:
+            - name: recommendation_short_global_featu_unlock_conversion_count_check
+              expression: CHECK (unlock_conversion_count >= 0)
+            - name: recommendation_short_global_feature_view_completion_count_check
+              expression: CHECK (view_completion_count >= 0)
+            - name: recommendation_short_global_features_impression_count_check
+              expression: CHECK (impression_count >= 0)
+            - name: recommendation_short_global_features_main_click_count_check
+              expression: CHECK (main_click_count >= 0)
+            - name: recommendation_short_global_features_rewatch_loop_count_check
+              expression: CHECK (rewatch_loop_count >= 0)
+            - name: recommendation_short_global_features_view_start_count_check
+              expression: CHECK (view_start_count >= 0)
+          indexes:
+            - name: recommendation_short_global_features_creator_user_id_idx
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX recommendation_short_global_features_creator_user_id_idx ON app.recommendation_short_global_features USING btree (creator_user_id)
+            - name: recommendation_short_global_features_main_identity_idx
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              definition: CREATE INDEX recommendation_short_global_features_main_identity_idx ON app.recommendation_short_global_features USING btree (canonical_main_id, creator_user_id)
+        - name: recommendation_viewer_creator_features
+          columns:
+            - name: viewer_user_id
+              type: uuid
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: impression_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_impression_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_start_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_start_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_completion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_completion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: rewatch_loop_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_rewatch_loop_at
+              type: timestamp with time zone
+              nullable: true
+            - name: profile_click_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_profile_click_at
+              type: timestamp with time zone
+              nullable: true
+            - name: main_click_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_main_click_at
+              type: timestamp with time zone
+              nullable: true
+            - name: unlock_conversion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_unlock_conversion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - viewer_user_id
+            - creator_user_id
+          foreign_keys:
+            - name: recommendation_viewer_creator_features_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+            - name: recommendation_viewer_creator_features_viewer_user_id_fkey
+              columns:
+                - viewer_user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: recommendation_viewer_creator_fea_unlock_conversion_count_check
+              expression: CHECK (unlock_conversion_count >= 0)
+            - name: recommendation_viewer_creator_featu_view_completion_count_check
+              expression: CHECK (view_completion_count >= 0)
+            - name: recommendation_viewer_creator_feature_profile_click_count_check
+              expression: CHECK (profile_click_count >= 0)
+            - name: recommendation_viewer_creator_features_impression_count_check
+              expression: CHECK (impression_count >= 0)
+            - name: recommendation_viewer_creator_features_main_click_count_check
+              expression: CHECK (main_click_count >= 0)
+            - name: recommendation_viewer_creator_features_rewatch_loop_count_check
+              expression: CHECK (rewatch_loop_count >= 0)
+            - name: recommendation_viewer_creator_features_view_start_count_check
+              expression: CHECK (view_start_count >= 0)
+          indexes:
+            - name: recommendation_viewer_creator_features_creator_user_id_idx
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX recommendation_viewer_creator_features_creator_user_id_idx ON app.recommendation_viewer_creator_features USING btree (creator_user_id)
+        - name: recommendation_viewer_main_features
+          columns:
+            - name: viewer_user_id
+              type: uuid
+              nullable: false
+            - name: canonical_main_id
+              type: uuid
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: impression_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_impression_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_start_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_start_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_completion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_completion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: rewatch_loop_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_rewatch_loop_at
+              type: timestamp with time zone
+              nullable: true
+            - name: main_click_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_main_click_at
+              type: timestamp with time zone
+              nullable: true
+            - name: unlock_conversion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_unlock_conversion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - viewer_user_id
+            - canonical_main_id
+          foreign_keys:
+            - name: recommendation_viewer_main_features_canonical_main_id_fkey
+              columns:
+                - canonical_main_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_viewer_main_features_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+            - name: recommendation_viewer_main_features_main_identity_fkey
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+                    - creator_user_id
+            - name: recommendation_viewer_main_features_viewer_user_id_fkey
+              columns:
+                - viewer_user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: recommendation_viewer_main_featur_unlock_conversion_count_check
+              expression: CHECK (unlock_conversion_count >= 0)
+            - name: recommendation_viewer_main_features_impression_count_check
+              expression: CHECK (impression_count >= 0)
+            - name: recommendation_viewer_main_features_main_click_count_check
+              expression: CHECK (main_click_count >= 0)
+            - name: recommendation_viewer_main_features_rewatch_loop_count_check
+              expression: CHECK (rewatch_loop_count >= 0)
+            - name: recommendation_viewer_main_features_view_completion_count_check
+              expression: CHECK (view_completion_count >= 0)
+            - name: recommendation_viewer_main_features_view_start_count_check
+              expression: CHECK (view_start_count >= 0)
+          indexes:
+            - name: recommendation_viewer_main_features_creator_user_id_idx
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX recommendation_viewer_main_features_creator_user_id_idx ON app.recommendation_viewer_main_features USING btree (creator_user_id)
+            - name: recommendation_viewer_main_features_main_identity_idx
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              definition: CREATE INDEX recommendation_viewer_main_features_main_identity_idx ON app.recommendation_viewer_main_features USING btree (canonical_main_id, creator_user_id)
+        - name: recommendation_viewer_short_features
+          columns:
+            - name: viewer_user_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: canonical_main_id
+              type: uuid
+              nullable: false
+            - name: impression_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_impression_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_start_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_start_at
+              type: timestamp with time zone
+              nullable: true
+            - name: view_completion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_view_completion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: rewatch_loop_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_rewatch_loop_at
+              type: timestamp with time zone
+              nullable: true
+            - name: main_click_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_main_click_at
+              type: timestamp with time zone
+              nullable: true
+            - name: unlock_conversion_count
+              type: bigint
+              nullable: false
+              default: "0"
+            - name: last_unlock_conversion_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - viewer_user_id
+            - short_id
+          foreign_keys:
+            - name: recommendation_viewer_short_features_canonical_main_id_fkey
+              columns:
+                - canonical_main_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_viewer_short_features_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+            - name: recommendation_viewer_short_features_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: recommendation_viewer_short_features_short_identity_fkey
+              columns:
+                - short_id
+                - creator_user_id
+                - canonical_main_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+                    - creator_user_id
+                    - canonical_main_id
+            - name: recommendation_viewer_short_features_viewer_user_id_fkey
+              columns:
+                - viewer_user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: recommendation_viewer_short_featu_unlock_conversion_count_check
+              expression: CHECK (unlock_conversion_count >= 0)
+            - name: recommendation_viewer_short_feature_view_completion_count_check
+              expression: CHECK (view_completion_count >= 0)
+            - name: recommendation_viewer_short_features_impression_count_check
+              expression: CHECK (impression_count >= 0)
+            - name: recommendation_viewer_short_features_main_click_count_check
+              expression: CHECK (main_click_count >= 0)
+            - name: recommendation_viewer_short_features_rewatch_loop_count_check
+              expression: CHECK (rewatch_loop_count >= 0)
+            - name: recommendation_viewer_short_features_view_start_count_check
+              expression: CHECK (view_start_count >= 0)
+          indexes:
+            - name: recommendation_viewer_short_features_creator_user_id_idx
+              columns:
+                - creator_user_id
+              definition: CREATE INDEX recommendation_viewer_short_features_creator_user_id_idx ON app.recommendation_viewer_short_features USING btree (creator_user_id)
+            - name: recommendation_viewer_short_features_main_identity_idx
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              definition: CREATE INDEX recommendation_viewer_short_features_main_identity_idx ON app.recommendation_viewer_short_features USING btree (canonical_main_id, creator_user_id)
+            - name: recommendation_viewer_short_features_short_identity_idx
+              columns:
+                - short_id
+                - creator_user_id
+                - canonical_main_id
+              definition: CREATE INDEX recommendation_viewer_short_features_short_identity_idx ON app.recommendation_viewer_short_features USING btree (short_id, creator_user_id, canonical_main_id)
         - name: shorts
           columns:
             - name: id
@@ -1035,6 +1679,11 @@ schemas:
                     - id
                     - creator_user_id
           unique_constraints:
+            - name: recommendation_shorts_identity_unique
+              columns:
+                - id
+                - creator_user_id
+                - canonical_main_id
             - name: shorts_media_asset_id_key
               columns:
                 - media_asset_id

@@ -53,13 +53,22 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
 	}
 
-	_, err = queries.CreateCreatorProfile(ctx, sqlc.CreateCreatorProfileParams{
-		UserID:      user.ID,
-		DisplayName: pgText("draft-profile"),
-		Bio:         "draft bio",
-	})
-	if err != nil {
-		t.Fatalf("CreateCreatorProfile() error = %v, want nil", err)
+	if _, err := conn.Exec(
+		ctx,
+		`INSERT INTO app.creator_profiles (
+			user_id,
+			display_name,
+			avatar_url,
+			bio,
+			published_at
+		) VALUES ($1, $2, $3, $4, $5)`,
+		user.ID,
+		"draft-profile",
+		nil,
+		"draft bio",
+		nil,
+	); err != nil {
+		t.Fatalf("Exec(insert creator_profiles at migration 3) error = %v, want nil", err)
 	}
 
 	assertRelationExists(t, ctx, conn, "app.creator_profile_drafts", false)
@@ -82,8 +91,12 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 		t.Fatalf("creator_profile_drafts bio got %q want %q", draftBio, "draft bio")
 	}
 
-	if _, err := queries.GetCreatorProfileByUserID(ctx, user.ID); !errors.Is(err, pgx.ErrNoRows) {
-		t.Fatalf("GetCreatorProfileByUserID() after down error got %v want %v", err, pgx.ErrNoRows)
+	var profileCount int
+	if err := conn.QueryRow(ctx, "SELECT count(*) FROM app.creator_profiles WHERE user_id = $1", user.ID).Scan(&profileCount); err != nil {
+		t.Fatalf("QueryRow(creator_profiles count after down) error = %v, want nil", err)
+	}
+	if profileCount != 0 {
+		t.Fatalf("creator_profiles count after down got %d want %d", profileCount, 0)
 	}
 
 	if err := migrator.Migrate(3); err != nil && !errors.Is(err, migrate.ErrNoChange) {
@@ -92,18 +105,28 @@ func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 	assertMigrationVersion(t, migrator, 3)
 	assertRelationExists(t, ctx, conn, "app.creator_profile_drafts", false)
 
-	profile, err := queries.GetCreatorProfileByUserID(ctx, user.ID)
-	if err != nil {
-		t.Fatalf("GetCreatorProfileByUserID() after re-up error = %v, want nil", err)
+	var (
+		displayName pgtype.Text
+		bio         string
+		publishedAt pgtype.Timestamptz
+	)
+	if err := conn.QueryRow(
+		ctx,
+		`SELECT display_name, bio, published_at
+		FROM app.creator_profiles
+		WHERE user_id = $1`,
+		user.ID,
+	).Scan(&displayName, &bio, &publishedAt); err != nil {
+		t.Fatalf("QueryRow(creator_profiles after re-up) error = %v, want nil", err)
 	}
-	if got := textFromPG(profile.DisplayName); got != "draft-profile" {
-		t.Fatalf("GetCreatorProfileByUserID() display_name got %q want %q", got, "draft-profile")
+	if got := textFromPG(displayName); got != "draft-profile" {
+		t.Fatalf("creator_profiles display_name got %q want %q", got, "draft-profile")
 	}
-	if profile.Bio != "draft bio" {
-		t.Fatalf("GetCreatorProfileByUserID() bio got %q want %q", profile.Bio, "draft bio")
+	if bio != "draft bio" {
+		t.Fatalf("creator_profiles bio got %q want %q", bio, "draft bio")
 	}
-	if profile.PublishedAt.Valid {
-		t.Fatalf("GetCreatorProfileByUserID() published_at valid got %t want false", profile.PublishedAt.Valid)
+	if publishedAt.Valid {
+		t.Fatalf("creator_profiles published_at valid got %t want false", publishedAt.Valid)
 	}
 }
 
@@ -114,7 +137,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 13)
+	assertMigrationVersion(t, migrator, 15)
 
 	queries := sqlc.New(conn)
 	now := time.Now().UTC()
@@ -378,8 +401,8 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 		t.Fatalf("GetActiveAuthSessionByTokenHash() after revoke error got %v want %v", err, pgx.ErrNoRows)
 	}
 
-	if err := migrator.Steps(-1); err != nil {
-		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
+	if err := migrator.Migrate(12); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(12) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 12)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
@@ -412,7 +435,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 13)
+	assertMigrationVersion(t, migrator, 15)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
@@ -458,7 +481,7 @@ func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 13)
+	assertMigrationVersion(t, migrator, 15)
 
 	queries := sqlc.New(conn)
 	now := time.Unix(1710000000, 0).UTC()
@@ -556,6 +579,402 @@ func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	}
 	if fanCount != 0 {
 		t.Fatalf("CountCreatorFollowersByCreatorUserID() after unfollow got %d want %d", fanCount, 0)
+	}
+}
+
+func TestRecommendationFoundationMigrationRoundTrip(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 15)
+	assertRelationExists(t, ctx, conn, "app.recommendation_events", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_short_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_creator_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_main_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_short_global_features", true)
+
+	if err := migrator.Steps(-1); err != nil {
+		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 14)
+	assertRelationExists(t, ctx, conn, "app.recommendation_events", false)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_short_features", false)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_creator_features", false)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_main_features", false)
+	assertRelationExists(t, ctx, conn, "app.recommendation_short_global_features", false)
+
+	if err := migrator.Migrate(15); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(15) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 15)
+	assertRelationExists(t, ctx, conn, "app.recommendation_events", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_short_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_creator_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_viewer_main_features", true)
+	assertRelationExists(t, ctx, conn, "app.recommendation_short_global_features", true)
+}
+
+func TestRecommendationQueriesEnforceIdentityConsistency(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+	fixture := createRecommendationFixture(t, ctx, queries, now)
+
+	_, err := queries.InsertRecommendationEvent(ctx, sqlc.InsertRecommendationEventParams{
+		ViewerUserID:    fixture.ViewerUserID,
+		EventKind:       "impression",
+		CreatorUserID:   fixture.CreatorUserID,
+		CanonicalMainID: fixture.AlternateMainID,
+		ShortID:         fixture.ShortID,
+		OccurredAt:      pgTime(now.Add(5 * time.Minute)),
+		IdempotencyKey:  "recommendation-short-mismatch",
+	})
+	assertPgConstraintError(t, err, "23503", "recommendation_events_short_identity_fkey")
+
+	_, err = queries.InsertRecommendationEvent(ctx, sqlc.InsertRecommendationEventParams{
+		ViewerUserID:   fixture.ViewerUserID,
+		EventKind:      "view_start",
+		CreatorUserID:  fixture.CreatorUserID,
+		OccurredAt:     pgTime(now.Add(7 * time.Minute)),
+		IdempotencyKey: "recommendation-invalid-shape",
+	})
+	assertPgConstraintError(t, err, "23514", "recommendation_events_payload_shape_check")
+
+	_, err = queries.UpsertRecommendationViewerMainFeatures(ctx, sqlc.UpsertRecommendationViewerMainFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		CreatorUserID:         fixture.OtherCreatorUserID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(now.Add(10 * time.Minute)),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	assertPgConstraintError(t, err, "23503", "recommendation_viewer_main_features_main_identity_fkey")
+}
+
+func TestRecommendationAggregateUpsertsRejectExistingRowIdentityConflict(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+	fixture := createRecommendationFixture(t, ctx, queries, now)
+	initialAt := now.Add(30 * time.Minute)
+
+	rowsAffected, err := queries.UpsertRecommendationViewerShortFeatures(ctx, sqlc.UpsertRecommendationViewerShortFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() initial error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() initial rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationViewerShortFeatures(ctx, sqlc.UpsertRecommendationViewerShortFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.AlternateMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt.Add(time.Minute)),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() mismatch error = %v, want nil", err)
+	}
+	if rowsAffected != 0 {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() mismatch rows affected got %d want %d", rowsAffected, 0)
+	}
+
+	shortRows, err := queries.ListRecommendationViewerShortFeaturesByViewerAndShortIDs(ctx, sqlc.ListRecommendationViewerShortFeaturesByViewerAndShortIDsParams{
+		ViewerUserID: fixture.ViewerUserID,
+		ShortIds:     []pgtype.UUID{fixture.ShortID},
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() error = %v, want nil", err)
+	}
+	if len(shortRows) != 1 || shortRows[0].ImpressionCount != 1 {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() got %#v", shortRows)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationViewerMainFeatures(ctx, sqlc.UpsertRecommendationViewerMainFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		CreatorUserID:         fixture.CreatorUserID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerMainFeatures() initial error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationViewerMainFeatures() initial rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationViewerMainFeatures(ctx, sqlc.UpsertRecommendationViewerMainFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		CreatorUserID:         fixture.OtherCreatorUserID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt.Add(time.Minute)),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerMainFeatures() mismatch error = %v, want nil", err)
+	}
+	if rowsAffected != 0 {
+		t.Fatalf("UpsertRecommendationViewerMainFeatures() mismatch rows affected got %d want %d", rowsAffected, 0)
+	}
+
+	mainRows, err := queries.ListRecommendationViewerMainFeaturesByViewerAndMainIDs(ctx, sqlc.ListRecommendationViewerMainFeaturesByViewerAndMainIDsParams{
+		ViewerUserID:     fixture.ViewerUserID,
+		CanonicalMainIds: []pgtype.UUID{fixture.CanonicalMainID},
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendationViewerMainFeaturesByViewerAndMainIDs() error = %v, want nil", err)
+	}
+	if len(mainRows) != 1 || mainRows[0].ImpressionCount != 1 {
+		t.Fatalf("ListRecommendationViewerMainFeaturesByViewerAndMainIDs() got %#v", mainRows)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationShortGlobalFeatures(ctx, sqlc.UpsertRecommendationShortGlobalFeaturesParams{
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationShortGlobalFeatures() initial error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationShortGlobalFeatures() initial rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationShortGlobalFeatures(ctx, sqlc.UpsertRecommendationShortGlobalFeaturesParams{
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.AlternateMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(initialAt.Add(time.Minute)),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationShortGlobalFeatures() mismatch error = %v, want nil", err)
+	}
+	if rowsAffected != 0 {
+		t.Fatalf("UpsertRecommendationShortGlobalFeatures() mismatch rows affected got %d want %d", rowsAffected, 0)
+	}
+
+	globalRows, err := queries.ListRecommendationShortGlobalFeaturesByShortIDs(ctx, []pgtype.UUID{fixture.ShortID})
+	if err != nil {
+		t.Fatalf("ListRecommendationShortGlobalFeaturesByShortIDs() error = %v, want nil", err)
+	}
+	if len(globalRows) != 1 || globalRows[0].ImpressionCount != 1 {
+		t.Fatalf("ListRecommendationShortGlobalFeaturesByShortIDs() got %#v", globalRows)
+	}
+}
+
+func TestRecommendationDuplicateEventSequenceDoesNotDoubleCount(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+	fixture := createRecommendationFixture(t, ctx, queries, now)
+	occurredAt := now.Add(15 * time.Minute)
+
+	insertParams := sqlc.InsertRecommendationEventParams{
+		ViewerUserID:    fixture.ViewerUserID,
+		EventKind:       "impression",
+		CreatorUserID:   fixture.CreatorUserID,
+		CanonicalMainID: fixture.CanonicalMainID,
+		ShortID:         fixture.ShortID,
+		OccurredAt:      pgTime(occurredAt),
+		IdempotencyKey:  "recommendation-dup-1",
+	}
+
+	firstRow, err := queries.InsertRecommendationEvent(ctx, insertParams)
+	if err != nil {
+		t.Fatalf("InsertRecommendationEvent() first call error = %v, want nil", err)
+	}
+
+	rowsAffected, err := queries.UpsertRecommendationViewerShortFeatures(ctx, sqlc.UpsertRecommendationViewerShortFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(occurredAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() first call error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() first call rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	_, err = queries.InsertRecommendationEvent(ctx, insertParams)
+	if !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("InsertRecommendationEvent() duplicate call error got %v want %v", err, pgx.ErrNoRows)
+	}
+
+	secondRow, err := queries.GetRecommendationEventByViewerAndIdempotencyKey(ctx, sqlc.GetRecommendationEventByViewerAndIdempotencyKeyParams{
+		ViewerUserID:   fixture.ViewerUserID,
+		IdempotencyKey: insertParams.IdempotencyKey,
+	})
+	if err != nil {
+		t.Fatalf("GetRecommendationEventByViewerAndIdempotencyKey() error = %v, want nil", err)
+	}
+	if secondRow.ID != firstRow.ID {
+		t.Fatalf("GetRecommendationEventByViewerAndIdempotencyKey() id got %v want %v", secondRow.ID, firstRow.ID)
+	}
+
+	rows, err := queries.ListRecommendationViewerShortFeaturesByViewerAndShortIDs(ctx, sqlc.ListRecommendationViewerShortFeaturesByViewerAndShortIDsParams{
+		ViewerUserID: fixture.ViewerUserID,
+		ShortIds:     []pgtype.UUID{fixture.ShortID},
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() error = %v, want nil", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() len got %d want %d", len(rows), 1)
+	}
+	if rows[0].ImpressionCount != 1 {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() impression_count got %d want %d", rows[0].ImpressionCount, 1)
+	}
+	if !rows[0].LastImpressionAt.Valid || !rows[0].LastImpressionAt.Time.Equal(occurredAt) {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() last_impression_at got %#v want %s", rows[0].LastImpressionAt, occurredAt)
+	}
+}
+
+func TestRecommendationViewerShortFeatureUpsertKeepsLatestTimestamp(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+	fixture := createRecommendationFixture(t, ctx, queries, now)
+	latestAt := now.Add(20 * time.Minute)
+	olderAt := now.Add(10 * time.Minute)
+
+	rowsAffected, err := queries.UpsertRecommendationViewerShortFeatures(ctx, sqlc.UpsertRecommendationViewerShortFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(latestAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() latest event error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() latest event rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	rowsAffected, err = queries.UpsertRecommendationViewerShortFeatures(ctx, sqlc.UpsertRecommendationViewerShortFeaturesParams{
+		ViewerUserID:          fixture.ViewerUserID,
+		ShortID:               fixture.ShortID,
+		CreatorUserID:         fixture.CreatorUserID,
+		CanonicalMainID:       fixture.CanonicalMainID,
+		ImpressionCount:       1,
+		LastImpressionAt:      pgTime(olderAt),
+		ViewStartCount:        0,
+		ViewCompletionCount:   0,
+		RewatchLoopCount:      0,
+		MainClickCount:        0,
+		UnlockConversionCount: 0,
+	})
+	if err != nil {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() older event error = %v, want nil", err)
+	}
+	if rowsAffected != 1 {
+		t.Fatalf("UpsertRecommendationViewerShortFeatures() older event rows affected got %d want %d", rowsAffected, 1)
+	}
+
+	rows, err := queries.ListRecommendationViewerShortFeaturesByViewerAndShortIDs(ctx, sqlc.ListRecommendationViewerShortFeaturesByViewerAndShortIDsParams{
+		ViewerUserID: fixture.ViewerUserID,
+		ShortIds:     []pgtype.UUID{fixture.ShortID},
+	})
+	if err != nil {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() error = %v, want nil", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() len got %d want %d", len(rows), 1)
+	}
+	if rows[0].ImpressionCount != 2 {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() impression_count got %d want %d", rows[0].ImpressionCount, 2)
+	}
+	if !rows[0].LastImpressionAt.Valid || !rows[0].LastImpressionAt.Time.Equal(latestAt) {
+		t.Fatalf("ListRecommendationViewerShortFeaturesByViewerAndShortIDs() last_impression_at got %#v want %s", rows[0].LastImpressionAt, latestAt)
 	}
 }
 
@@ -720,7 +1139,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() to latest error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 13)
+	assertMigrationVersion(t, migrator, 15)
 
 	profileA, err := queries.GetCreatorProfileByUserID(ctx, creatorA.ID)
 	if err != nil {
@@ -730,22 +1149,25 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCreatorProfileByUserID(creatorB) error = %v, want nil", err)
 	}
-	if profileA.Handle != "minarei" {
-		t.Fatalf("creatorA handle got %q want %q", profileA.Handle, "minarei")
-	}
-	if !strings.HasPrefix(profileB.Handle, "minarei_") {
-		t.Fatalf("creatorB handle got %q want prefix %q", profileB.Handle, "minarei_")
-	}
 	if profileA.Handle == profileB.Handle {
 		t.Fatalf("backfilled handles got duplicate %q want unique handles", profileA.Handle)
 	}
+	var primaryCreatorID pgtype.UUID
+	switch {
+	case profileA.Handle == "minarei" && strings.HasPrefix(profileB.Handle, "minarei_"):
+		primaryCreatorID = creatorA.ID
+	case profileB.Handle == "minarei" && strings.HasPrefix(profileA.Handle, "minarei_"):
+		primaryCreatorID = creatorB.ID
+	default:
+		t.Fatalf("backfilled handles got creatorA=%q creatorB=%q want one exact and one suffixed handle", profileA.Handle, profileB.Handle)
+	}
 
-	gotByHandle, err := queries.GetPublicCreatorProfileByHandle(ctx, profileA.Handle)
+	gotByHandle, err := queries.GetPublicCreatorProfileByHandle(ctx, "minarei")
 	if err != nil {
 		t.Fatalf("GetPublicCreatorProfileByHandle() error = %v, want nil", err)
 	}
-	if gotByHandle.UserID != creatorA.ID {
-		t.Fatalf("GetPublicCreatorProfileByHandle() user got %v want %v", gotByHandle.UserID, creatorA.ID)
+	if gotByHandle.UserID != primaryCreatorID {
+		t.Fatalf("GetPublicCreatorProfileByHandle() user got %v want %v", gotByHandle.UserID, primaryCreatorID)
 	}
 
 	privateProfile, err := queries.GetCreatorProfileByUserID(ctx, creatorPrivate.ID)
@@ -1256,6 +1678,106 @@ func createReadyMediaAsset(ctx context.Context, queries *sqlc.Queries, creatorUs
 		MimeType:        "video/mp4",
 		DurationMs:      pgInt64(1000),
 	})
+}
+
+type recommendationFixture struct {
+	ViewerUserID       pgtype.UUID
+	CreatorUserID      pgtype.UUID
+	OtherCreatorUserID pgtype.UUID
+	CanonicalMainID    pgtype.UUID
+	AlternateMainID    pgtype.UUID
+	ShortID            pgtype.UUID
+}
+
+func createRecommendationFixture(t *testing.T, ctx context.Context, queries *sqlc.Queries, now time.Time) recommendationFixture {
+	t.Helper()
+
+	viewer, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(viewer) error = %v, want nil", err)
+	}
+	creator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creator) error = %v, want nil", err)
+	}
+	otherCreator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(otherCreator) error = %v, want nil", err)
+	}
+
+	for _, creatorUserID := range []pgtype.UUID{creator.ID, otherCreator.ID} {
+		if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+			UserID:                  creatorUserID,
+			State:                   "approved",
+			IsResubmitEligible:      false,
+			IsSupportReviewRequired: false,
+			SelfServeResubmitCount:  0,
+			ApprovedAt:              pgTime(now),
+		}); err != nil {
+			t.Fatalf("CreateCreatorCapability(%v) error = %v, want nil", creatorUserID, err)
+		}
+	}
+
+	mainAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "recommendation-main")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(main) error = %v, want nil", err)
+	}
+	alternateMainAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "recommendation-main-alt")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(alternate main) error = %v, want nil", err)
+	}
+	shortAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "recommendation-short")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(short) error = %v, want nil", err)
+	}
+
+	canonicalMain, err := queries.CreateMain(ctx, sqlc.CreateMainParams{
+		CreatorUserID:       creator.ID,
+		MediaAssetID:        mainAsset.ID,
+		State:               "approved_for_unlock",
+		PriceMinor:          1200,
+		CurrencyCode:        "JPY",
+		OwnershipConfirmed:  true,
+		ConsentConfirmed:    true,
+		ApprovedForUnlockAt: pgTime(now.Add(time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateMain(canonical) error = %v, want nil", err)
+	}
+	alternateMain, err := queries.CreateMain(ctx, sqlc.CreateMainParams{
+		CreatorUserID:       creator.ID,
+		MediaAssetID:        alternateMainAsset.ID,
+		State:               "approved_for_unlock",
+		PriceMinor:          900,
+		CurrencyCode:        "JPY",
+		OwnershipConfirmed:  true,
+		ConsentConfirmed:    true,
+		ApprovedForUnlockAt: pgTime(now.Add(2 * time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateMain(alternate) error = %v, want nil", err)
+	}
+
+	short, err := queries.CreateShort(ctx, sqlc.CreateShortParams{
+		CreatorUserID:        creator.ID,
+		CanonicalMainID:      canonicalMain.ID,
+		MediaAssetID:         shortAsset.ID,
+		State:                "approved_for_publish",
+		ApprovedForPublishAt: pgTime(now.Add(3 * time.Hour)),
+		PublishedAt:          pgTime(now.Add(4 * time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateShort() error = %v, want nil", err)
+	}
+
+	return recommendationFixture{
+		ViewerUserID:       viewer.ID,
+		CreatorUserID:      creator.ID,
+		OtherCreatorUserID: otherCreator.ID,
+		CanonicalMainID:    canonicalMain.ID,
+		AlternateMainID:    alternateMain.ID,
+		ShortID:            short.ID,
+	}
 }
 
 func assertUUIDSet(t *testing.T, label string, got []pgtype.UUID, want []pgtype.UUID) {
