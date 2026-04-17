@@ -187,3 +187,36 @@ resource "aws_iam_policy" "creator_avatar_app_access" {
   name   = "${local.resource_prefix}-creator-avatar-app-access"
   policy = data.aws_iam_policy_document.creator_avatar_app_access.json
 }
+
+data "aws_iam_policy_document" "creator_review_evidence_app_access" {
+  statement {
+    sid    = "ListCreatorReviewEvidenceBucket"
+    effect = "Allow"
+    actions = [
+      "s3:GetBucketLocation",
+      "s3:ListBucket",
+    ]
+    resources = [
+      aws_s3_bucket.creator_review_evidence.arn,
+    ]
+  }
+
+  statement {
+    sid    = "ManageCreatorReviewEvidenceObjects"
+    effect = "Allow"
+    actions = [
+      "s3:AbortMultipartUpload",
+      "s3:DeleteObject",
+      "s3:GetObject",
+      "s3:PutObject",
+    ]
+    resources = [
+      "${aws_s3_bucket.creator_review_evidence.arn}/*",
+    ]
+  }
+}
+
+resource "aws_iam_policy" "creator_review_evidence_app_access" {
+  name   = "${local.resource_prefix}-creator-review-evidence-app-access"
+  policy = data.aws_iam_policy_document.creator_review_evidence_app_access.json
+}

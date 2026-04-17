@@ -291,6 +291,104 @@ resource "aws_s3_bucket_lifecycle_configuration" "creator_avatar_delivery" {
   }
 }
 
+resource "aws_s3_bucket" "creator_review_evidence" {
+  bucket = local.creator_review_evidence_bucket_name
+}
+
+resource "aws_s3_bucket_ownership_controls" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+data "aws_iam_policy_document" "creator_review_evidence_access" {
+  statement {
+    sid    = "DenyInsecureTransport"
+    effect = "Deny"
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.creator_review_evidence.arn,
+      "${aws_s3_bucket.creator_review_evidence.arn}/*",
+    ]
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
+resource "aws_s3_bucket_policy" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+  policy = data.aws_iam_policy_document.creator_review_evidence_access.json
+
+  depends_on = [
+    aws_s3_bucket_ownership_controls.creator_review_evidence,
+    aws_s3_bucket_public_access_block.creator_review_evidence,
+  ]
+}
+
+resource "aws_s3_bucket_cors_configuration" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+
+  cors_rule {
+    allowed_headers = ["*"]
+    allowed_methods = ["HEAD", "PUT"]
+    allowed_origins = var.allowed_app_origins
+    expose_headers  = ["ETag"]
+    max_age_seconds = 300
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "creator_review_evidence" {
+  bucket = aws_s3_bucket.creator_review_evidence.id
+
+  rule {
+    id     = "expire-pending-review-evidence-after-1-day"
+    status = "Enabled"
+
+    filter {
+      prefix = "creator-registration-evidence/"
+    }
+
+    expiration {
+      days = 1
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 1
+    }
+  }
+}
+
 resource "aws_s3_bucket" "short_public" {
   bucket = local.short_public_bucket_name
 }

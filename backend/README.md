@@ -194,7 +194,7 @@ coverage check は既定で `cmd/*`、generated code の `internal/postgres/sqlc
 
 `MEDIA_JOBS_QUEUE_URL` は旧名 `SQS_QUEUE_URL` を後方互換 alias として受け付けますが、以後は `MEDIA_JOBS_QUEUE_URL` を正とします。
 
-ルート `Makefile` 経由で `make backend-run` を使う場合は、shell から直接 `COGNITO_USER_POOL_CLIENT_ID` を export するのではなく、`BACKEND_COGNITO_USER_POOL_CLIENT_ID` を設定します。Makefile がそれを backend process 用の `COGNITO_USER_POOL_CLIENT_ID` へ引き渡します。`BACKEND_COGNITO_USER_POOL_ID` も従来どおり渡せますが、現状の `cmd/api` fail fast では必須ではありません。
+ルート `Makefile` 経由で `make backend-run` を使う場合は、shell から直接 `COGNITO_USER_POOL_CLIENT_ID` や `CREATOR_REVIEW_EVIDENCE_BUCKET_NAME` を export するのではなく、`BACKEND_COGNITO_USER_POOL_CLIENT_ID`、`BACKEND_CREATOR_REVIEW_EVIDENCE_BUCKET_NAME` など `BACKEND_*` 側の変数を設定します。Makefile がそれらを backend process 用の runtime env へ引き渡します。`BACKEND_COGNITO_USER_POOL_ID` は従来どおり渡せますが、現状の `cmd/api` fail fast では必須ではありません。
 
 `cmd/api` は `POSTGRES_DSN`、`REDIS_ADDR`、media sandbox 用 env 一式、および creator avatar upload / delivery / review evidence 用 env 一式を必須にします。creator upload endpoint、creator registration avatar upload endpoint、creator registration evidence upload endpoint が常時有効なため、`AWS_REGION`、media bucket / queue / role 設定、avatar bucket / base URL 設定、review evidence bucket 設定が不足している場合は fail fast します。`cmd/worker` は creator avatar env を要求しませんが、media sandbox を有効にして起動する場合は `POSTGRES_DSN` と media queue / bucket / role 設定が必要です。
 
