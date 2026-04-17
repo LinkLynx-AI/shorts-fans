@@ -78,7 +78,7 @@ describe("CreatorRegistrationPanel", () => {
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
     expect(await screen.findByRole("heading", { name: "Creator審査申請を始める" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Approval後に解放される creator workspace" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Approval 後に解放される creator workspace" })).toBeInTheDocument();
     expect(screen.getByText("Mina")).toBeInTheDocument();
     expect(screen.getByDisplayValue("quiet rooftop")).toBeInTheDocument();
     expect(screen.getByDisplayValue("Mina Rei")).toBeInTheDocument();
@@ -350,9 +350,9 @@ describe("CreatorRegistrationPanel", () => {
 
     await screen.findByRole("heading", { name: "サポート確認が必要です" });
 
-    expect(screen.queryByRole("button", { name: "Edit And Resubmit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "再申請を送信する" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Self-serve remaining: 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("セルフ再申請の残回数: 1")).not.toBeInTheDocument();
 
     for (const button of screen.getAllByRole("button", { name: "証跡を選択する" })) {
       expect(button).toBeDisabled();
@@ -433,7 +433,7 @@ describe("CreatorRegistrationPanel", () => {
     );
 
     expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Edit And Resubmit" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "修正して再申請する" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "修正内容を保存する" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "再申請を送信する" })).toBeInTheDocument();
     expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
@@ -510,7 +510,7 @@ describe("CreatorRegistrationPanel", () => {
     render(<CreatorRegistrationPanel initialRegistration={null} />);
 
     expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
-    expect(screen.getByText("Self-serve remaining: 1")).toBeInTheDocument();
+    expect(screen.getByText("セルフ再申請の残回数: 1")).toBeInTheDocument();
     expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
   });
 
@@ -800,10 +800,10 @@ describe("CreatorRegistrationPanel", () => {
     );
 
     expect((await screen.findAllByRole("heading", { name: "再申請は利用できません" })).length).toBe(2);
-    expect(screen.queryByRole("button", { name: "Edit And Resubmit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
     expect(screen.queryByText("サポート確認が必要です")).not.toBeInTheDocument();
-    expect(screen.getByText("Self-serve remaining: 0")).toBeInTheDocument();
-    expect(screen.getByText("Resubmit unavailable")).toBeInTheDocument();
+    expect(screen.getByText("セルフ再申請の残回数: 0")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "再申請は利用できません" })).toBeInTheDocument();
   });
 
   it("shows a generic rejected fallback when status detail is unavailable", async () => {
@@ -927,8 +927,8 @@ describe("CreatorRegistrationPanel", () => {
 
     expect(await screen.findByRole("heading", { name: "修正して再申請する" })).toBeInTheDocument();
     expect(screen.queryByText("サポート確認が必要です")).not.toBeInTheDocument();
-    expect(screen.queryByText("Next action: support review required")).not.toBeInTheDocument();
-    expect(screen.getByText("Self-serve remaining: 1")).toBeInTheDocument();
+    expect(screen.queryByText("次の対応: 運営確認が必要です")).not.toBeInTheDocument();
+    expect(screen.getByText("セルフ再申請の残回数: 1")).toBeInTheDocument();
     expect(screen.getByText("不足している証跡をアップロードし直す")).toBeInTheDocument();
   });
 
@@ -1219,7 +1219,7 @@ describe("CreatorRegistrationPanel", () => {
     expect(await screen.findByRole("heading", { name: "Creator利用は停止中です" })).toBeInTheDocument();
     expect(screen.getByText("Suspended")).toBeInTheDocument();
     expect(screen.getByText("停止中のため再申請できません")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Edit And Resubmit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "修正して再申請する" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "審査申請を送信する" })).not.toBeInTheDocument();
   });
 });

@@ -832,15 +832,15 @@ func TestRegistrationHelpersAndNormalization(t *testing.T) {
 		t.Fatal("buildRegistration() error = nil, want error without capability")
 	}
 
-	if err := ensureDraftEditable(&sqlc.AppCreatorCapability{State: StateSubmitted}); !errors.Is(err, ErrRegistrationStateConflict) {
-		t.Fatalf("ensureDraftEditable() error got %v want %v", err, ErrRegistrationStateConflict)
+	if err := ensureCapabilityEditable(&sqlc.AppCreatorCapability{State: StateSubmitted}); !errors.Is(err, ErrRegistrationStateConflict) {
+		t.Fatalf("ensureCapabilityEditable() error got %v want %v", err, ErrRegistrationStateConflict)
 	}
-	if err := ensureDraftEditable(&sqlc.AppCreatorCapability{
+	if err := ensureCapabilityEditable(&sqlc.AppCreatorCapability{
 		State:                  StateRejected,
 		IsResubmitEligible:     true,
 		SelfServeResubmitCount: 1,
 	}); err != nil {
-		t.Fatalf("ensureDraftEditable() eligible rejected error = %v, want nil", err)
+		t.Fatalf("ensureCapabilityEditable() eligible rejected error = %v, want nil", err)
 	}
 
 	existing := testCapability(userID, StateDraft)

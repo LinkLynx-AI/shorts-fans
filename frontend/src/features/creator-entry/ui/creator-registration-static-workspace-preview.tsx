@@ -28,7 +28,7 @@ export function CreatorRegistrationStaticWorkspacePreview() {
         Workspace preview
       </p>
       <h2 className="mt-2 text-[18px] font-semibold tracking-[-0.02em] text-foreground">
-        Approval後に解放される creator workspace
+        Approval 後に解放される creator workspace
       </h2>
       <p className="mt-2 text-sm leading-6 text-muted">
         これは操作用の dashboard ではなく、approval 後に何が解放されるかを伝える static mock です。

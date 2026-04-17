@@ -42,7 +42,7 @@
 - shared viewer profile を修正したい場合は `docs/contracts/viewer-profile-api-contract.md` の `/api/viewer/profile` を使います。
 - `bio` は creator 固有 draft としてこの surface で編集できます。
 - intake / evidence の編集は `draft` と eligible な `rejected` だけに許可します。
-- `submitted / approved / support-only rejected / suspended` は `409 registration_state_conflict` を返します。
+- `submitted / approved / suspended`、および `rejected` でも `isReadOnly=true` / `isSupportReviewRequired=true` な case は `409 registration_state_conflict` を返します。
 - evidence object は private bucket に保存し、この contract では download URL や public asset URL を返しません。
 - required evidence kind は `government_id` と `payout_proof` の 2 種類です。
 - allowed mime type は `image/jpeg`、`image/png`、`image/webp`、`application/pdf` です。

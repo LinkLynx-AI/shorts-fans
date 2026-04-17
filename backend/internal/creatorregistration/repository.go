@@ -261,7 +261,7 @@ func (r *Repository) PrepareEvidenceUpload(ctx context.Context, userID uuid.UUID
 		if err != nil {
 			return err
 		}
-		if err := ensureEditableCapability(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		_, err = ensureDraftCapability(ctx, q, userID, snapshot.capability)
@@ -282,7 +282,7 @@ func (r *Repository) SaveEvidence(ctx context.Context, input SaveEvidenceInput) 
 		if loadErr != nil {
 			return loadErr
 		}
-		if err := ensureEditableCapability(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		if _, err := ensureDraftCapability(ctx, q, input.UserID, snapshot.capability); err != nil {
@@ -336,7 +336,7 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 		if loadErr != nil {
 			return loadErr
 		}
-		if err := ensureEditableCapability(snapshot.capability); err != nil {
+		if err := ensureCapabilityEditable(snapshot.capability); err != nil {
 			return err
 		}
 		if _, err := ensureDraftCapability(ctx, q, normalized.userID, snapshot.capability); err != nil {
@@ -549,16 +549,12 @@ func ensureDraftCapability(ctx context.Context, q queries, userID uuid.UUID, cap
 	return row, nil
 }
 
-func ensureDraftEditable(capability *sqlc.AppCreatorCapability) error {
+func ensureCapabilityEditable(capability *sqlc.AppCreatorCapability) error {
 	if !isCapabilityEditable(capability) {
 		return ErrRegistrationStateConflict
 	}
 
 	return nil
-}
-
-func ensureEditableCapability(capability *sqlc.AppCreatorCapability) error {
-	return ensureDraftEditable(capability)
 }
 
 func (r *Repository) loadSnapshot(

@@ -255,8 +255,8 @@ function resolveStatusCard(
         "差し戻しになった入力と証跡を見直す",
         "保存後に同じ flow から再申請する",
       ],
-      ctaLabel: "Edit And Resubmit",
-      eyebrow: "Resubmit available",
+      ctaLabel: "修正して再申請する",
+      eyebrow: "再申請できます",
       meta: [],
       title: "修正ポイントを確認して再申請する",
     };
@@ -272,9 +272,9 @@ function resolveStatusCard(
     const reasonCode = registration.rejection?.reasonCode ?? null;
     const showRemaining = registration.rejection !== null && !registration.rejection.isSupportReviewRequired;
     const meta = [
-      rejectedAt ? `Rejected at: ${rejectedAt}` : null,
+      rejectedAt ? `却下日時: ${rejectedAt}` : null,
       showRemaining
-        ? `Self-serve remaining: ${remaining}`
+        ? `セルフ再申請の残回数: ${remaining}`
         : null,
     ].filter((value): value is string => value !== null);
 
@@ -283,8 +283,8 @@ function resolveStatusCard(
         body:
           "fixable reject として判定されています。必要な項目だけ修正し、同じ onboarding surface から self-serve で再申請できます。",
         checklist: resolveReasonChecklist(reasonCode),
-        ctaLabel: "Edit And Resubmit",
-        eyebrow: "Resubmit available",
+        ctaLabel: "修正して再申請する",
+        eyebrow: "再申請できます",
         meta,
         title: "再申請できます",
       };
@@ -297,9 +297,9 @@ function resolveStatusCard(
           : "self-serve resubmit の残回数がなく、この onboarding case では再申請できません。next action の案内がある場合だけ従ってください。",
       checklist: resolveReasonChecklist(reasonCode),
       ctaLabel: null,
-      eyebrow: registration.rejection?.isSupportReviewRequired ? "Review required" : "Resubmit unavailable",
+      eyebrow: registration.rejection?.isSupportReviewRequired ? "運営確認が必要です" : "再申請は利用できません",
       meta: registration.rejection?.isSupportReviewRequired
-        ? [...meta, "Next action: support review required"]
+        ? [...meta, "次の対応: 運営確認が必要です"]
         : meta,
       title: registration.rejection?.isSupportReviewRequired ? "運営確認が必要です" : "再申請は利用できません",
     };
@@ -317,7 +317,7 @@ function resolveStatusCard(
       ],
       ctaLabel: null,
       eyebrow: "Suspended",
-      meta: suspendedAt ? [`Suspended at: ${suspendedAt}`] : [],
+      meta: suspendedAt ? [`停止日時: ${suspendedAt}`] : [],
       title: "停止中のため再申請できません",
     };
   }
