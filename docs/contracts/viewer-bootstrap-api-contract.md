@@ -80,9 +80,9 @@
 
 - unauthenticated viewer は `200` で `data.currentViewer = null` を返します。
 - authenticated viewer は `200` で `data.currentViewer` を返します。
-- `activeMode = creator` でも approved creator capability がない場合、bootstrap 応答上は `activeMode = fan` に正規化します。
-- creator registration status が `draft / submitted / rejected / suspended` の viewer は、status detail に関係なく `canAccessCreatorMode = false` を返します。
-- `canAccessCreatorMode` は approved creator capability がある場合だけ `true` です。
+- `canAccessCreatorMode` は approved creator capability が現在有効な場合だけ `true` です。
+- creator registration status が `draft / submitted / rejected / suspended` の viewer は、過去に approved だった履歴の有無に関係なく、bootstrap 上は approved creator capability が現在有効ではないものとして扱い、`canAccessCreatorMode = false` を返します。
+- `activeMode` は `canAccessCreatorMode` に従って正規化します。つまり、viewer の保存値が `creator` でも `canAccessCreatorMode = false` の場合、bootstrap 応答上は `activeMode = fan` を返します。
 - creator registration status detail、rejection metadata、required docs、checklist は bootstrap に載せません。必要なら `GET /api/viewer/creator-registration` を再読します。
 - fan surface の relation state や counts は返しません。
 
