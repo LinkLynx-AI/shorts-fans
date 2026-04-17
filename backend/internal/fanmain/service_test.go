@@ -1124,6 +1124,122 @@ func TestPurchaseMainIdempotencyAndInflightShortCircuits(t *testing.T) {
 	})
 }
 
+func TestPurchaseMainCreateConflictRecovery(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reloaded idempotent attempt after conflict", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := newServiceFixture()
+		cardSetupToken := fixture.cardSetupToken(t)
+		idempotencyLookups := 0
+
+		service := fixture.newService(stubPaymentRepository{
+			getMainPurchaseAttemptByIdempotencyKey: func(context.Context, string) (payment.MainPurchaseAttempt, error) {
+				idempotencyLookups++
+				if idempotencyLookups == 1 {
+					return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptNotFound
+				}
+
+				return payment.MainPurchaseAttempt{
+					MainID: fixture.mainID,
+					Status: payment.PurchaseAttemptStatusSucceeded,
+				}, nil
+			},
+			createMainPurchaseAttempt: func(context.Context, payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+				return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptConflict
+			},
+		}, stubPurchaseGateway{
+			charge: func(context.Context, payment.ChargeInput) (payment.ChargeResult, error) {
+				t.Fatal("Charge() was called unexpectedly")
+				return payment.ChargeResult{}, nil
+			},
+		})
+
+		result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+			AcceptedAge:   true,
+			AcceptedTerms: true,
+			EntryToken:    fixture.entryToken(t),
+			FromShortID:   fixture.shortID,
+			MainID:        fixture.mainID,
+			PaymentMethod: PurchasePaymentMethodInput{
+				Mode:           payment.PaymentMethodModeNewCard,
+				CardSetupToken: cardSetupToken,
+			},
+			ViewerID: fixture.viewerID,
+		})
+		if err != nil {
+			t.Fatalf("PurchaseMain() error = %v, want nil", err)
+		}
+		if idempotencyLookups != 2 {
+			t.Fatalf("GetMainPurchaseAttemptByIdempotencyKeyForUpdate() calls got %d want %d", idempotencyLookups, 2)
+		}
+		if result.Purchase.Status != "succeeded" || result.Access.Reason != "purchased" {
+			t.Fatalf("PurchaseMain() got %#v want succeeded/purchased", result)
+		}
+	})
+
+	t.Run("falls back to inflight attempt after conflict", func(t *testing.T) {
+		t.Parallel()
+
+		fixture := newServiceFixture()
+		cardSetupToken := fixture.cardSetupToken(t)
+		idempotencyLookups := 0
+		inflightLookups := 0
+
+		service := fixture.newService(stubPaymentRepository{
+			getMainPurchaseAttemptByIdempotencyKey: func(context.Context, string) (payment.MainPurchaseAttempt, error) {
+				idempotencyLookups++
+				return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptNotFound
+			},
+			getLatestInflightMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+				inflightLookups++
+				if inflightLookups == 1 {
+					return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptNotFound
+				}
+
+				return payment.MainPurchaseAttempt{
+					MainID: fixture.mainID,
+					Status: payment.PurchaseAttemptStatusPending,
+				}, nil
+			},
+			createMainPurchaseAttempt: func(context.Context, payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+				return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptConflict
+			},
+		}, stubPurchaseGateway{
+			charge: func(context.Context, payment.ChargeInput) (payment.ChargeResult, error) {
+				t.Fatal("Charge() was called unexpectedly")
+				return payment.ChargeResult{}, nil
+			},
+		})
+
+		result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+			AcceptedAge:   true,
+			AcceptedTerms: true,
+			EntryToken:    fixture.entryToken(t),
+			FromShortID:   fixture.shortID,
+			MainID:        fixture.mainID,
+			PaymentMethod: PurchasePaymentMethodInput{
+				Mode:           payment.PaymentMethodModeNewCard,
+				CardSetupToken: cardSetupToken,
+			},
+			ViewerID: fixture.viewerID,
+		})
+		if err != nil {
+			t.Fatalf("PurchaseMain() error = %v, want nil", err)
+		}
+		if idempotencyLookups != 2 {
+			t.Fatalf("GetMainPurchaseAttemptByIdempotencyKeyForUpdate() calls got %d want %d", idempotencyLookups, 2)
+		}
+		if inflightLookups != 2 {
+			t.Fatalf("GetLatestInflightMainPurchaseAttemptForUpdate() calls got %d want %d", inflightLookups, 2)
+		}
+		if result.Purchase.Status != "pending" || result.Access.Reason != "unlock_required" {
+			t.Fatalf("PurchaseMain() got %#v want pending/locked", result)
+		}
+	})
+}
+
 func TestPurchaseMainTransactionalRepositoryAcquiresLockBeforeAttemptChecks(t *testing.T) {
 	t.Parallel()
 
@@ -1239,6 +1355,140 @@ func TestCurrencyNumericCode(t *testing.T) {
 	if _, err := currencyNumericCode("USD"); err == nil {
 		t.Fatal("currencyNumericCode(USD) error = nil, want error")
 	}
+}
+
+func TestPurchaseServiceHelpers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("repository helper validation", func(t *testing.T) {
+		t.Parallel()
+
+		service := &Service{}
+		viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+		mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+		if _, err := service.listSavedPaymentMethods(context.Background(), viewerID); err == nil {
+			t.Fatal("listSavedPaymentMethods() error = nil, want uninitialized repository")
+		}
+		if _, err := service.getInflightAttempt(context.Background(), viewerID, mainID); err == nil {
+			t.Fatal("getInflightAttempt() error = nil, want uninitialized repository")
+		}
+		if _, err := service.getLatestSucceededAttempt(context.Background(), viewerID, mainID); err == nil {
+			t.Fatal("getLatestSucceededAttempt() error = nil, want uninitialized repository")
+		}
+	})
+
+	t.Run("mark unknown charge pending", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Unix(1_710_000_000, 0).UTC()
+		attempt := payment.MainPurchaseAttempt{
+			ID:     uuid.MustParse("77777777-7777-7777-7777-777777777777"),
+			MainID: uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		}
+		updates := 0
+		service := &Service{
+			now: func() time.Time { return now },
+			paymentRepository: stubPaymentRepository{
+				updateMainPurchaseAttemptOutcome: func(_ context.Context, input payment.UpdateMainPurchaseAttemptOutcomeInput) (payment.MainPurchaseAttempt, error) {
+					updates++
+					if input.ID != attempt.ID || input.Status != payment.PurchaseAttemptStatusPending {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() input got %+v", input)
+					}
+					if input.PendingReason == nil || *input.PendingReason != payment.PendingReasonProviderProcessing {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() pending reason got %#v want provider_processing", input.PendingReason)
+					}
+					if input.ProviderProcessedAt == nil || !input.ProviderProcessedAt.Equal(now) {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() processedAt got %#v want %s", input.ProviderProcessedAt, now)
+					}
+
+					return attempt, nil
+				},
+			},
+		}
+
+		result, err := service.markUnknownChargePending(context.Background(), attempt)
+		if err != nil {
+			t.Fatalf("markUnknownChargePending() error = %v, want nil", err)
+		}
+		if updates != 1 {
+			t.Fatalf("markUnknownChargePending() updates got %d want %d", updates, 1)
+		}
+		if result.Purchase.Status != "pending" || result.Access.Reason != "unlock_required" {
+			t.Fatalf("markUnknownChargePending() got %#v want pending/locked", result)
+		}
+	})
+
+	t.Run("mark internal charge failure", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Unix(1_710_000_000, 0).UTC()
+		attempt := payment.MainPurchaseAttempt{
+			ID: uuid.MustParse("77777777-7777-7777-7777-777777777777"),
+		}
+		updates := 0
+		service := &Service{
+			now: func() time.Time { return now },
+			paymentRepository: stubPaymentRepository{
+				updateMainPurchaseAttemptOutcome: func(_ context.Context, input payment.UpdateMainPurchaseAttemptOutcomeInput) (payment.MainPurchaseAttempt, error) {
+					updates++
+					if input.ID != attempt.ID || input.Status != payment.PurchaseAttemptStatusFailed {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() input got %+v", input)
+					}
+					if input.FailureReason == nil || *input.FailureReason != payment.FailureReasonPurchaseDeclined {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() failure reason got %#v want purchase_declined", input.FailureReason)
+					}
+					if input.ProviderProcessedAt == nil || !input.ProviderProcessedAt.Equal(now) {
+						t.Fatalf("UpdateMainPurchaseAttemptOutcome() processedAt got %#v want %s", input.ProviderProcessedAt, now)
+					}
+
+					return attempt, nil
+				},
+			},
+		}
+
+		if err := service.markInternalChargeFailure(context.Background(), attempt); err != nil {
+			t.Fatalf("markInternalChargeFailure() error = %v, want nil", err)
+		}
+		if updates != 1 {
+			t.Fatalf("markInternalChargeFailure() updates got %d want %d", updates, 1)
+		}
+	})
+
+	t.Run("record purchase unlock ignores already unlocked", func(t *testing.T) {
+		t.Parallel()
+
+		viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+		mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+		purchasedAt := time.Unix(1_710_000_000, 0).UTC()
+		providerRef := "purchase-ref-1"
+		recorded := 0
+		service := &Service{
+			unlockRecorder: stubUnlockRecorder{
+				recordMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+					recorded++
+					if input.UserID != viewerID || input.MainID != mainID {
+						t.Fatalf("RecordMainUnlock() input got %+v", input)
+					}
+					if input.PaymentProviderPurchaseRef == nil || *input.PaymentProviderPurchaseRef != providerRef {
+						t.Fatalf("RecordMainUnlock() provider ref got %#v want %q", input.PaymentProviderPurchaseRef, providerRef)
+					}
+					if input.PurchasedAt == nil || !input.PurchasedAt.Equal(purchasedAt) {
+						t.Fatalf("RecordMainUnlock() purchasedAt got %#v want %s", input.PurchasedAt, purchasedAt)
+					}
+
+					return unlock.MainUnlock{}, unlock.ErrAlreadyUnlocked
+				},
+			},
+		}
+
+		if err := service.recordPurchaseUnlock(context.Background(), viewerID, mainID, purchasedAt, &providerRef); err != nil {
+			t.Fatalf("recordPurchaseUnlock() error = %v, want nil", err)
+		}
+		if recorded != 1 {
+			t.Fatalf("recordPurchaseUnlock() calls got %d want %d", recorded, 1)
+		}
+	})
 }
 
 type serviceFixture struct {

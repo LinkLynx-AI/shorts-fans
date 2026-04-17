@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type repositoryStubQueries struct {
@@ -90,6 +91,45 @@ func (s repositoryStubQueries) UpdateMainPurchaseAttemptOutcome(ctx context.Cont
 func (s repositoryStubQueries) UpsertUserPaymentMethod(ctx context.Context, arg sqlc.UpsertUserPaymentMethodParams) (sqlc.AppUserPaymentMethod, error) {
 	return s.upsertPaymentMethod(ctx, arg)
 }
+
+type txBeginnerStub struct {
+	begin func(context.Context) (pgx.Tx, error)
+}
+
+func (s txBeginnerStub) Begin(ctx context.Context) (pgx.Tx, error) {
+	return s.begin(ctx)
+}
+
+type txStub struct {
+	commitErr   error
+	rollbackErr error
+	committed   bool
+	rolledBack  bool
+}
+
+func (tx *txStub) Begin(context.Context) (pgx.Tx, error) { return tx, nil }
+func (tx *txStub) Commit(context.Context) error {
+	tx.committed = true
+	return tx.commitErr
+}
+func (tx *txStub) Rollback(context.Context) error {
+	tx.rolledBack = true
+	return tx.rollbackErr
+}
+func (tx *txStub) CopyFrom(context.Context, pgx.Identifier, []string, pgx.CopyFromSource) (int64, error) {
+	return 0, nil
+}
+func (tx *txStub) SendBatch(context.Context, *pgx.Batch) pgx.BatchResults { return nil }
+func (tx *txStub) LargeObjects() pgx.LargeObjects                         { return pgx.LargeObjects{} }
+func (tx *txStub) Prepare(context.Context, string, string) (*pgconn.StatementDescription, error) {
+	return nil, nil
+}
+func (tx *txStub) Exec(context.Context, string, ...any) (pgconn.CommandTag, error) {
+	return pgconn.CommandTag{}, nil
+}
+func (tx *txStub) Query(context.Context, string, ...any) (pgx.Rows, error) { return nil, nil }
+func (tx *txStub) QueryRow(context.Context, string, ...any) pgx.Row        { return nil }
+func (tx *txStub) Conn() *pgx.Conn                                         { return nil }
 
 func TestRepositorySavedPaymentMethods(t *testing.T) {
 	t.Parallel()
@@ -193,6 +233,86 @@ func TestRepositorySavedPaymentMethods(t *testing.T) {
 	if touchArg.ID != pgUUID(methodID) || touchArg.UserID != pgUUID(userID) {
 		t.Fatalf("TouchSavedPaymentMethodLastUsedAt() args got %#v", touchArg)
 	}
+}
+
+func TestNewRepositoryAndRunInTx(t *testing.T) {
+	t.Parallel()
+
+	t.Run("new repository nil pool", func(t *testing.T) {
+		t.Parallel()
+
+		repo := NewRepository((*pgxpool.Pool)(nil))
+		if repo == nil {
+			t.Fatal("NewRepository(nil) = nil, want zero repository")
+		}
+		if repo.txBeginner != nil || repo.queries != nil || repo.newQueries != nil {
+			t.Fatalf("NewRepository(nil) got %#v want zero fields", repo)
+		}
+	})
+
+	t.Run("run in tx validates inputs", func(t *testing.T) {
+		t.Parallel()
+
+		repo := &Repository{}
+		if err := repo.RunInTx(context.Background(), func(TxRepository) error { return nil }); err == nil {
+			t.Fatal("RunInTx() error = nil, want uninitialized repository")
+		}
+
+		repo = &Repository{
+			txBeginner: txBeginnerStub{
+				begin: func(context.Context) (pgx.Tx, error) { return &txStub{}, nil },
+			},
+			newQueries: func(sqlc.DBTX) queries { return repositoryStubQueries{} },
+		}
+		if err := repo.RunInTx(context.Background(), nil); err == nil {
+			t.Fatal("RunInTx(nil callback) error = nil, want validation error")
+		}
+	})
+
+	t.Run("run in tx delegates to tx scoped repository", func(t *testing.T) {
+		t.Parallel()
+
+		tx := &txStub{}
+		userID := uuid.New()
+		mainID := uuid.New()
+		capturedTx := sqlc.DBTX(nil)
+		lockCalls := 0
+		txQueries := repositoryStubQueries{
+			acquireMainPurchaseLock: func(_ context.Context, arg sqlc.AcquireMainPurchaseLockParams) error {
+				lockCalls++
+				if arg.UserKey != userID.String() || arg.MainKey != mainID.String() {
+					t.Fatalf("AcquireMainPurchaseLock() args got %#v", arg)
+				}
+				return nil
+			},
+		}
+
+		repo := &Repository{
+			txBeginner: txBeginnerStub{
+				begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
+			},
+			newQueries: func(db sqlc.DBTX) queries {
+				capturedTx = db
+				return txQueries
+			},
+		}
+
+		err := repo.RunInTx(context.Background(), func(txRepo TxRepository) error {
+			return txRepo.AcquireMainPurchaseLock(context.Background(), userID, mainID)
+		})
+		if err != nil {
+			t.Fatalf("RunInTx() error = %v, want nil", err)
+		}
+		if capturedTx != tx {
+			t.Fatalf("RunInTx() tx got %v want %v", capturedTx, tx)
+		}
+		if lockCalls != 1 {
+			t.Fatalf("AcquireMainPurchaseLock() calls got %d want %d", lockCalls, 1)
+		}
+		if !tx.committed || tx.rolledBack {
+			t.Fatalf("RunInTx() commit state got committed=%t rolledBack=%t", tx.committed, tx.rolledBack)
+		}
+	})
 }
 
 func TestRepositoryPurchaseAttempts(t *testing.T) {

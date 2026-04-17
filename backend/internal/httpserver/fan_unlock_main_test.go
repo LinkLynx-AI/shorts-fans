@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -202,6 +203,62 @@ func TestFanMainPurchaseRouteReturnsAcceptedForPending(t *testing.T) {
 	}
 	if response.Data.EntryContext != nil {
 		t.Fatalf("response.Data.EntryContext got %#v want nil", response.Data.EntryContext)
+	}
+}
+
+func TestFanMainPurchaseRouteReturnsEntryContextForSuccess(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+		purchaseMain: func(_ context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error) {
+			if sessionBinding == "" || input.ViewerID != viewerID || input.MainID != mainID || input.FromShortID != shortID {
+				t.Fatalf("PurchaseMain() input got %+v session=%q", input, sessionBinding)
+			}
+
+			entryToken := "signed-entry-token"
+			return fanmain.PurchaseResult{
+				Access: fanmain.MainAccessState{
+					MainID: mainID,
+					Reason: "purchased",
+					Status: "unlocked",
+				},
+				EntryToken: &entryToken,
+				Purchase: fanmain.PurchaseOutcome{
+					CanRetry: false,
+					Status:   "succeeded",
+				},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/mains/main_33333333333333333333333333333333/purchase",
+		strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /api/fan/mains/:mainId/purchase status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[mainPurchaseResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil || response.Data.EntryContext == nil {
+		t.Fatalf("response.Data got %#v want entry context", response.Data)
+	}
+	if response.Data.EntryContext.AccessEntryPath != "/api/fan/mains/main_33333333333333333333333333333333/access-entry" {
+		t.Fatalf("response.Data.EntryContext got %#v", response.Data.EntryContext)
 	}
 }
 
@@ -434,6 +491,261 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 
 		if rec.Code != http.StatusNotFound {
 			t.Fatalf("GET /playback status got %d want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("purchase not found", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			purchaseMain: func(context.Context, string, fanmain.PurchaseInput) (fanmain.PurchaseResult, error) {
+				return fanmain.PurchaseResult{}, fanmain.ErrPurchaseNotFound
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("POST /purchase status got %d want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("purchase locked", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			purchaseMain: func(context.Context, string, fanmain.PurchaseInput) (fanmain.PurchaseResult, error) {
+				return fanmain.PurchaseResult{}, fanmain.ErrMainLocked
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("POST /purchase status got %d want %d", rec.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("access entry not found", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			issueAccessEntry: func(context.Context, string, fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error) {
+				return fanmain.AccessEntryResult{}, fanmain.ErrAccessEntryNotFound
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
+			strings.NewReader(`{"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222"}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("POST /access-entry status got %d want %d", rec.Code, http.StatusNotFound)
+		}
+	})
+
+	t.Run("access entry invalid request body", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
+			strings.NewReader(`{`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusBadRequest {
+			t.Fatalf("POST /access-entry status got %d want %d", rec.Code, http.StatusBadRequest)
+		}
+	})
+
+	t.Run("playback locked", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			getPlaybackSurface: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, string) (fanmain.PlaybackSurface, error) {
+				return fanmain.PlaybackSurface{}, fanmain.ErrMainLocked
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/fan/mains/main_33333333333333333333333333333333/playback?fromShortId=short_22222222222222222222222222222222&grant=signed-grant-token",
+			nil,
+		)
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Fatalf("GET /playback status got %d want %d", rec.Code, http.StatusForbidden)
+		}
+	})
+
+	t.Run("playback internal error", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			getPlaybackSurface: func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, string) (fanmain.PlaybackSurface, error) {
+				return fanmain.PlaybackSurface{}, errors.New("unexpected playback failure")
+			},
+		})
+
+		req := httptest.NewRequest(
+			http.MethodGet,
+			"/api/fan/mains/main_33333333333333333333333333333333/playback?fromShortId=short_22222222222222222222222222222222&grant=signed-grant-token",
+			nil,
+		)
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("GET /playback status got %d want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+
+	t.Run("unlock creator payload invalid", func(t *testing.T) {
+		t.Parallel()
+
+		viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+		shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+		mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+			getUnlockSurface: func(context.Context, uuid.UUID, string, uuid.UUID) (fanmain.UnlockSurface, error) {
+				return fanmain.UnlockSurface{
+					Access: fanmain.MainAccessState{
+						MainID: mainID,
+						Reason: "unlock_required",
+						Status: "locked",
+					},
+					Creator: fanmain.CreatorSummary{
+						DisplayName: "",
+						Handle:      "",
+						ID:          viewerID,
+					},
+					Main: fanmain.MainSummary{
+						DurationSeconds: 480,
+						ID:              mainID,
+						PriceJPY:        1800,
+					},
+					MainAccessToken: "signed-entry-token",
+					Purchase:        fanmain.UnlockPurchaseState{State: "purchase_ready"},
+					Short: fanmain.ShortSummary{
+						CanonicalMainID:        mainID,
+						CreatorUserID:          viewerID,
+						ID:                     shortID,
+						MediaAssetID:           uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+						PreviewDurationSeconds: 16,
+					},
+					UnlockCta: fanmain.UnlockCtaState{State: "unlock_available"},
+				}, nil
+			},
+		})
+
+		req := httptest.NewRequest(http.MethodGet, "/api/fan/shorts/short_22222222222222222222222222222222/unlock", nil)
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("GET /unlock status got %d want %d", rec.Code, http.StatusInternalServerError)
+		}
+	})
+}
+
+func TestFanUnlockMainHelpers(t *testing.T) {
+	t.Parallel()
+
+	t.Run("resolve authenticated viewer request", func(t *testing.T) {
+		t.Parallel()
+
+		viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+		ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		ctx.Request = req
+		ctx.Set(authenticatedViewerContextKey, auth.CurrentViewer{ID: viewerID})
+
+		viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(ctx)
+		if !ok || viewer.ID != viewerID || sessionBinding != auth.HashSessionToken("raw-session-token") {
+			t.Fatalf("resolveAuthenticatedViewerRequest() got viewer=%#v session=%q ok=%t", viewer, sessionBinding, ok)
+		}
+
+		ctxNoCookie, _ := gin.CreateTestContext(httptest.NewRecorder())
+		ctxNoCookie.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+		ctxNoCookie.Set(authenticatedViewerContextKey, auth.CurrentViewer{ID: viewerID})
+
+		if _, _, ok := resolveAuthenticatedViewerRequest(ctxNoCookie); ok {
+			t.Fatal("resolveAuthenticatedViewerRequest() ok = true, want false without cookie")
+		}
+	})
+
+	t.Run("build unlock short summary returns resolver error", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := buildUnlockShortSummary(
+			fanmain.ShortSummary{
+				CanonicalMainID:        uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+				CreatorUserID:          uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+				ID:                     uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+				MediaAssetID:           uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+				PreviewDurationSeconds: 16,
+			},
+			stubShortDisplayAssetResolver{
+				resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+					return media.VideoDisplayAsset{}, errors.New("asset lookup failed")
+				},
+			},
+		)
+		if err == nil {
+			t.Fatal("buildUnlockShortSummary() error = nil, want resolver error")
+		}
+	})
+
+	t.Run("resolve main playback boundary", func(t *testing.T) {
+		t.Parallel()
+
+		if got := resolveMainPlaybackBoundary("owner"); got != media.AccessBoundaryOwner {
+			t.Fatalf("resolveMainPlaybackBoundary(owner) got %s want %s", got, media.AccessBoundaryOwner)
+		}
+		if got := resolveMainPlaybackBoundary("unlocked"); got != media.AccessBoundaryPrivate {
+			t.Fatalf("resolveMainPlaybackBoundary(unlocked) got %s want %s", got, media.AccessBoundaryPrivate)
 		}
 	})
 }

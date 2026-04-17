@@ -325,6 +325,82 @@ func TestCCBillWebhookHandlerFindAttemptByPassThroughAndSucceededFailureNoop(t *
 	}
 }
 
+func TestCCBillWebhookHandlerSucceededSuccessNoopWhenRefsAlreadyMatch(t *testing.T) {
+	t.Parallel()
+
+	now := time.Unix(1_710_000_000, 0).UTC()
+	userID := uuid.New()
+	mainID := uuid.New()
+	shortID := uuid.New()
+	attemptID := uuid.New()
+	row := testMainPurchaseAttemptRow(attemptID, userID, mainID, shortID, nil, now)
+	row.Status = PurchaseAttemptStatusSucceeded
+	row.ProviderPurchaseRef = pgText("txn-1")
+	row.ProviderTransactionRef = pgText("txn-1")
+
+	repo := newRepository(repositoryStubQueries{
+		getAttemptForUpdate: func(_ context.Context, id pgtype.UUID) (sqlc.AppMainPurchaseAttempt, error) {
+			if id != pgUUID(attemptID) {
+				t.Fatalf("GetMainPurchaseAttemptByIDForUpdate() id got %v want %v", id, pgUUID(attemptID))
+			}
+			return row, nil
+		},
+		updateAttemptOutcome: func(context.Context, sqlc.UpdateMainPurchaseAttemptOutcomeParams) (sqlc.AppMainPurchaseAttempt, error) {
+			t.Fatal("UpdateMainPurchaseAttemptOutcome() was called unexpectedly")
+			return sqlc.AppMainPurchaseAttempt{}, nil
+		},
+		upsertPaymentMethod: func(context.Context, sqlc.UpsertUserPaymentMethodParams) (sqlc.AppUserPaymentMethod, error) {
+			t.Fatal("UpsertUserPaymentMethod() was called unexpectedly")
+			return sqlc.AppUserPaymentMethod{}, nil
+		},
+	})
+	handler := NewCCBillWebhookHandler(repo, webhookUnlockRecorderStub{
+		recordMainUnlock: func(context.Context, unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+			t.Fatal("RecordMainUnlock() was called unexpectedly")
+			return unlock.MainUnlock{}, nil
+		},
+	}, newWebhookTestClient(t))
+
+	err := handler.HandleWebhook(
+		context.Background(),
+		"203.0.113.10:443",
+		nil,
+		"application/json",
+		mustJSON(t, map[string]string{
+			"eventType":     ccbillWebhookEventNewSaleSuccess,
+			"transactionId": "txn-1",
+			"X-attemptId":   attemptID.String(),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("HandleWebhook() error = %v, want nil", err)
+	}
+}
+
+func TestCCBillWebhookHelperBranches(t *testing.T) {
+	t.Parallel()
+
+	handler := &CCBillWebhookHandler{
+		now: func() time.Time { return time.Unix(1_710_000_000, 0).UTC() },
+	}
+
+	if got := handler.eventProcessedAt(ccbillWebhookEvent{}); !got.Equal(time.Unix(1_710_000_000, 0).UTC()) {
+		t.Fatalf("eventProcessedAt() got %s want fallback now", got)
+	}
+	if mapCCBillCardType("MASTERCARD") != CardBrandMastercard {
+		t.Fatalf("mapCCBillCardType(MASTERCARD) got %q want %q", mapCCBillCardType("MASTERCARD"), CardBrandMastercard)
+	}
+	if mapCCBillCardType("JCB") != CardBrandJCB {
+		t.Fatalf("mapCCBillCardType(JCB) got %q want %q", mapCCBillCardType("JCB"), CardBrandJCB)
+	}
+	if mapCCBillCardType("other") != "" {
+		t.Fatalf("mapCCBillCardType(other) got %q want empty", mapCCBillCardType("other"))
+	}
+	if mapWebhookFailureReason("", stringPtr("plain decline")) != FailureReasonPurchaseDeclined {
+		t.Fatalf("mapWebhookFailureReason(default) got %q want %q", mapWebhookFailureReason("", stringPtr("plain decline")), FailureReasonPurchaseDeclined)
+	}
+}
+
 func mustJSON(t *testing.T, value any) []byte {
 	t.Helper()
 

@@ -3,6 +3,7 @@ package httpserver
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -113,5 +114,37 @@ func TestCCBillWebhookRouteRejectsInvalidPayload(t *testing.T) {
 	}
 	if response.Error == nil || response.Error.Code != "invalid_request" {
 		t.Fatalf("response.Error got %#v want invalid_request", response.Error)
+	}
+}
+
+func TestCCBillWebhookRouteReturnsInternalServerError(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		CCBillWebhook: stubPaymentWebhookHandler{
+			handleWebhook: func(context.Context, string, url.Values, string, []byte) error {
+				return errors.New("unexpected failure")
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/api/payments/ccbill/webhooks", strings.NewReader(`{}`))
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("POST /api/payments/ccbill/webhooks status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+}
+
+func TestDirectRemoteIP(t *testing.T) {
+	t.Parallel()
+
+	if got := directRemoteIP("192.0.2.1:1234"); got != "192.0.2.1" {
+		t.Fatalf("directRemoteIP(host:port) got %q want %q", got, "192.0.2.1")
+	}
+	if got := directRemoteIP("192.0.2.1"); got != "192.0.2.1" {
+		t.Fatalf("directRemoteIP(host) got %q want %q", got, "192.0.2.1")
 	}
 }

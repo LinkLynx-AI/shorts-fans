@@ -448,3 +448,59 @@ func TestCCBillClientHelpers(t *testing.T) {
 		t.Fatalf("int32PtrFromAny(string) got %#v want 7", got)
 	}
 }
+
+func TestCCBillClientAdditionalHelpers(t *testing.T) {
+	t.Parallel()
+
+	client, err := NewCCBillClient(CCBillConfig{
+		BackendClientID:     "backend-id",
+		BackendClientSecret: "backend-secret",
+		ClientAccountNumber: 900100,
+		ClientSubAccount:    1,
+		CurrencyCode:        392,
+		InitialPeriodDays:   30,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
+	}
+	now := time.Unix(1_710_000_000, 0).UTC()
+	client.now = func() time.Time { return now }
+
+	fallback := client.mapFailedChargeResult([]byte(" temporarily unavailable "))
+	if fallback.Status != PurchaseAttemptStatusFailed || fallback.FailureReason == nil || *fallback.FailureReason != FailureReasonPurchaseDeclined {
+		t.Fatalf("mapFailedChargeResult(text) got %#v want failed/purchase_declined", fallback)
+	}
+	if fallback.ProviderDeclineText == nil || *fallback.ProviderDeclineText != "temporarily unavailable" {
+		t.Fatalf("mapFailedChargeResult(text) decline text got %#v want trimmed text", fallback.ProviderDeclineText)
+	}
+
+	jsonResult := client.mapFailedChargeResult([]byte(`{"approved":false,"declineText":"needs 3ds approval"}`))
+	if jsonResult.Status != PurchaseAttemptStatusFailed || jsonResult.FailureReason == nil || *jsonResult.FailureReason != FailureReasonAuthenticationFailed {
+		t.Fatalf("mapFailedChargeResult(json) got %#v want authentication_failed", jsonResult)
+	}
+
+	tests := []struct {
+		name  string
+		value any
+		want  string
+	}{
+		{name: "nil", value: nil, want: ""},
+		{name: "string", value: "  hello ", want: "hello"},
+		{name: "int", value: 7, want: "7"},
+		{name: "int32", value: int32(8), want: "8"},
+		{name: "int64", value: int64(9), want: "9"},
+		{name: "json number", value: json.Number("10"), want: "10"},
+		{name: "default", value: struct{ Value string }{Value: "ok"}, want: "{ok}"},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := stringFromAny(tt.value); got != tt.want {
+				t.Fatalf("stringFromAny(%T) got %q want %q", tt.value, got, tt.want)
+			}
+		})
+	}
+}
