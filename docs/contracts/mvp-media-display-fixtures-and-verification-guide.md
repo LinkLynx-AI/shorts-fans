@@ -36,7 +36,7 @@
 | `upload complete` | `creator-upload-api-contract.md`, `mvp-media-workflow-contract.md` | `fixtures/creator-upload.json` | `cd backend && go test ./internal/creatorupload ./internal/httpserver` | completion request/validation/persistence と `processing_state = uploaded` の入口を確認する。現行 repo では backend contract test が主根拠。 |
 | `processing -> ready -> auto-publish` | `mvp-media-workflow-contract.md`, `media-display-access-contract.md` | なし | `cd backend && go test ./internal/media` | `processing` は internal boundary なので transport fixture は置かない。worker、materializer、state 遷移、auto-publish bridge は backend test を正とする。 |
 | `public short` | `fan-public-surface-api-contract.md`, `media-display-access-contract.md` | `fixtures/fan-public-surfaces.json` | `cd backend && go test ./internal/httpserver ./internal/media` / `cd frontend && pnpm test:e2e tests/e2e/route-shell.spec.ts` | public short の representative payload は fixture を正とし、frontend shell smoke は `frontend/scripts/mock-e2e-api-server.mjs` 経由で public surface fixture を読む。 |
-| `main playback` | `fan-unlock-main-api-contract.md`, `media-display-access-contract.md` | `fixtures/fan-unlock-main.json` | `cd backend && go test ./internal/httpserver ./internal/media` / `cd frontend && pnpm test:unit -- src/features/unlock-entry/api/request-unlock-surface.test.ts src/widgets/main-playback-surface/api/request-main-playback-surface.test.ts 'src/app/api/fan/mains/[mainId]/access-entry/route.test.ts'` / `cd frontend && pnpm test:e2e tests/e2e/route-shell.spec.ts` | short から unlock / access-entry / playback までを分けて確認する。shell E2E は short detail から unlocked / owner preview 遷移の回帰確認に使う。 |
+| `main playback` | `fan-unlock-main-api-contract.md`, `media-display-access-contract.md` | `fixtures/fan-unlock-main.json` | `cd backend && go test ./internal/httpserver ./internal/media` / `cd frontend && pnpm test:unit -- src/features/unlock-entry/api/request-unlock-surface.test.ts src/widgets/main-playback-surface/api/request-main-playback-surface.test.ts 'src/app/api/fan/mains/[mainId]/access-entry/route.test.ts'` / `cd frontend && pnpm test:e2e tests/e2e/route-shell.spec.ts` | `SHO-206` 時点の canonical flow は `unlock -> purchase -> access-entry -> playback`。現行 repo の verification entry は purchase 実装前の read / grant / playback root を示し、purchase-specific test 追加は `SHO-207` / `SHO-208` で追う。 |
 | `creator owner preview` | `creator-workspace-owner-preview-api-contract.md`, `media-display-access-contract.md` | `fixtures/creator-workspace-owner-preview.json` | `cd backend && go test ./internal/creator ./internal/httpserver ./internal/media` / `cd frontend && pnpm test:unit -- src/widgets/creator-mode-shell/api/get-creator-workspace-preview-collections.test.ts src/widgets/creator-mode-shell/api/get-creator-workspace-preview-detail.test.ts` | owner preview list/detail は transport fixture と fetcher/unit test が current consumer root。現時点で dedicated Playwright smoke はない。 |
 
 ## Verification Bundles
@@ -59,7 +59,7 @@ cd frontend && pnpm test:unit -- src/features/unlock-entry/api/request-unlock-su
 cd frontend && pnpm test:e2e tests/e2e/route-shell.spec.ts
 ```
 
-- unit 側は unlock / main playback / creator workspace owner preview の consumer parsing を確認します。
+- unit 側は unlock / main playback / creator workspace owner preview の consumer parsing を確認します。purchase mutation の consumer test は follow-up issue で追加します。
 - Playwright 側は feed から short detail、unlock、main playback、owner preview entry までの shell-level regression を確認します。
 
 ### Infra smoke

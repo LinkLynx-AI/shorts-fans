@@ -42,7 +42,7 @@
 | `main.durationSeconds` | `number` | main length |
 | `creator` | `CreatorSummary` | owner |
 | `entryShort` | `ShortSummary` | main へ戻るときの entry context として使う linked short |
-| `access` | `MainAccessState` | `unlocked` または `owner` |
+| `access` | `MainAccessState` | `unlocked` または `owner`。fan access reason は `purchased` |
 
 ### `FollowingItem`
 
@@ -119,7 +119,7 @@
 #### Interpretation Rules
 
 - `library` は canonical `main` の unlock access を持つ viewer、または owner preview viewer が main へ戻れる item の read surface として扱います。
-- wire 上の `reason = "session_unlocked"` は既存 vocabulary を維持するために使い続けますが、意味としては current session 限定ではなく unlock 済み fan access 全般を表します。
+- wire 上の `reason = "purchased"` は canonical `main` に対する durable purchase access を表します。current session に閉じた playback grant とは混ぜません。
 
 ### `GET /api/fan/profile/settings`
 

@@ -157,14 +157,14 @@
 | --- | --- | --- |
 | `mainId` | `string` | canonical main identifier |
 | `status` | `"locked" \| "unlocked" \| "owner"` | playback 可否に使う state |
-| `reason` | `"unlock_required" \| "session_unlocked" \| "owner_preview"` | `status` の解釈を固定する最小 field。`session_unlocked` は既存 wire 名を維持しつつ unlock 済み fan access を表す |
+| `reason` | `"unlock_required" \| "purchased" \| "owner_preview"` | `status` の解釈を固定する最小 field。fan access は current session grant ではなく durable purchase を表す |
 
 ### `UnlockCtaState`
 
 | field | type | notes |
 | --- | --- | --- |
-| `state` | `"unlock_available" \| "setup_required" \| "continue_main" \| "owner_preview" \| "unavailable"` | frontend はこの state から CTA label を組み立てる |
-| `priceJpy` | `number \| null` | `setup_required` と `unlock_available` で必須。現段階では reference price としてだけ使う |
+| `state` | `"unlock_available" \| "setup_required" \| "continue_main" \| "owner_preview" \| "unavailable"` | frontend はこの state から CTA label を組み立て、purchase 固有 state は unlock surface の `purchase` block で判断する |
+| `priceJpy` | `number \| null` | `setup_required` と `unlock_available` で必須。canonical main の purchase price |
 | `mainDurationSeconds` | `number \| null` | `setup_required` と `unlock_available` で必須 |
 | `resumePositionSeconds` | `number \| null` | `continue_main` で使う。viewer がすでに main access を持つ場合の再開 UI 用。その他は `null` |
 

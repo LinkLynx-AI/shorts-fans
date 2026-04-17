@@ -114,8 +114,8 @@
     },
     "mainAccessState": {
       "mainId": "main_aoi_blue_balcony",
-      "status": "locked",
-      "reason": "unlock_required"
+      "status": "unlocked",
+      "reason": "purchased"
     },
     "unlockCtaState": {
       "state": "unlock_available",
