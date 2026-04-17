@@ -41,8 +41,10 @@ var (
 	ErrInvalidLegalName          = errors.New("creator registration legal name が不正です")
 	ErrInvalidPayoutRecipient    = errors.New("creator registration payout recipient が不正です")
 	ErrInvalidPayoutRecipientTyp = errors.New("creator registration payout recipient type が不正です")
+	ErrInvalidReviewState        = errors.New("creator registration review state が不正です")
 	ErrRegistrationIncomplete    = errors.New("creator registration intake が不足しています")
 	ErrRegistrationStateConflict = errors.New("creator registration state conflict")
+	ErrReviewCaseNotFound        = errors.New("creator registration review case が見つかりません")
 	ErrSharedProfileNotFound     = errors.New("shared viewer profile が見つかりません")
 )
 
@@ -54,6 +56,7 @@ type queries interface {
 	GetCreatorRegistrationIntakeByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	GetUserProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppUserProfile, error)
 	ListCreatorRegistrationEvidencesByUserID(ctx context.Context, userID pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error)
+	ListCreatorRegistrationReviewCasesByState(ctx context.Context, state string) ([]sqlc.ListCreatorRegistrationReviewCasesByStateRow, error)
 	UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	UpdateCreatorProfile(ctx context.Context, arg sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	UpsertCreatorRegistrationEvidence(ctx context.Context, arg sqlc.UpsertCreatorRegistrationEvidenceParams) (sqlc.AppCreatorRegistrationEvidence, error)

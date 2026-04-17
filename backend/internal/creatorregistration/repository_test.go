@@ -23,6 +23,7 @@ type repositoryQueriesStub struct {
 	getCreatorRegistrationIntakeByUser func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	getUserProfileByUserID             func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error)
 	listCreatorRegistrationEvidences   func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error)
+	listCreatorRegistrationReviewCases func(context.Context, string) ([]sqlc.ListCreatorRegistrationReviewCasesByStateRow, error)
 	updateCreatorCapabilityState       func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error)
 	updateCreatorProfile               func(context.Context, sqlc.UpdateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	upsertCreatorRegistrationEvidence  func(context.Context, sqlc.UpsertCreatorRegistrationEvidenceParams) (sqlc.AppCreatorRegistrationEvidence, error)
@@ -76,6 +77,13 @@ func (s repositoryQueriesStub) ListCreatorRegistrationEvidencesByUserID(ctx cont
 		panic("unexpected ListCreatorRegistrationEvidencesByUserID call")
 	}
 	return s.listCreatorRegistrationEvidences(ctx, userID)
+}
+
+func (s repositoryQueriesStub) ListCreatorRegistrationReviewCasesByState(ctx context.Context, state string) ([]sqlc.ListCreatorRegistrationReviewCasesByStateRow, error) {
+	if s.listCreatorRegistrationReviewCases == nil {
+		panic("unexpected ListCreatorRegistrationReviewCasesByState call")
+	}
+	return s.listCreatorRegistrationReviewCases(ctx, state)
 }
 
 func (s repositoryQueriesStub) UpdateCreatorCapabilityState(ctx context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {

@@ -52,6 +52,9 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	if summary.MainID != mainID {
 		t.Fatalf("Run() main id got %s want %s", summary.MainID, mainID)
 	}
+	if summary.SubmittedReviewUserID != reviewUserID {
+		t.Fatalf("Run() submitted review user id got %s want %s", summary.SubmittedReviewUserID, reviewUserID)
+	}
 	if len(summary.ShortIDs) != len(publicShorts) {
 		t.Fatalf("Run() short id count got %d want %d", len(summary.ShortIDs), len(publicShorts))
 	}
@@ -70,6 +73,14 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if capability.State != "approved" {
 		t.Fatalf("GetCreatorCapabilityByUserID() state got %q want %q", capability.State, "approved")
+	}
+
+	reviewCapability, err := queries.GetCreatorCapabilityByUserID(ctx, uuidToPG(reviewUserID))
+	if err != nil {
+		t.Fatalf("GetCreatorCapabilityByUserID() review error = %v, want nil", err)
+	}
+	if reviewCapability.State != "submitted" {
+		t.Fatalf("GetCreatorCapabilityByUserID() review state got %q want %q", reviewCapability.State, "submitted")
 	}
 
 	profile, err := queries.GetCreatorProfileByUserID(ctx, uuidToPG(creatorUserID))
@@ -95,6 +106,20 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	}
 	if publicProfile.UserID != uuidToPG(creatorUserID) {
 		t.Fatalf("GetPublicCreatorProfileByHandle() user_id got %s want %s", publicProfile.UserID, uuidToPG(creatorUserID))
+	}
+
+	submittedQueue, err := queries.ListCreatorRegistrationReviewCasesByState(ctx, "submitted")
+	if err != nil {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() error = %v, want nil", err)
+	}
+	if len(submittedQueue) != 1 {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() len got %d want 1", len(submittedQueue))
+	}
+	if submittedQueue[0].UserID != uuidToPG(reviewUserID) {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() user id got %s want %s", submittedQueue[0].UserID, uuidToPG(reviewUserID))
+	}
+	if submittedQueue[0].State != "submitted" {
+		t.Fatalf("ListCreatorRegistrationReviewCasesByState() state got %q want %q", submittedQueue[0].State, "submitted")
 	}
 
 	main, err := queries.GetUnlockableMainByID(ctx, uuidToPG(mainID))
@@ -155,9 +180,12 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 		t.Fatal("GetCurrentViewerBySessionTokenHash() creator can_access_creator_mode = false, want true")
 	}
 
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 2)
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_capabilities", 1)
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_profiles", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.user_profiles", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_capabilities", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_profiles", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_registration_intakes", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_registration_evidences", 2)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.media_assets", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.mains", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.shorts", 2)
@@ -182,7 +210,8 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 		t.Fatalf("GetCreatorProfileByUserID() after rerun bio got %q want %q", profile.Bio, creatorBio)
 	}
 
-	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 2)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.users", 3)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.user_profiles", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.media_assets", 3)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.shorts", 2)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
