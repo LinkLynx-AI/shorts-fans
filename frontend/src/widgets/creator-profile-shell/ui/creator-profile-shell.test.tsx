@@ -14,7 +14,7 @@ import {
   useHasViewerSession,
 } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
-import { useFanAuthDialog } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 import {
   CreatorProfileShell,
   type CreatorProfileShellState,
@@ -53,7 +53,7 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
 
   return {
     ...actual,
-    useFanAuthDialog: vi.fn(),
+    useFanAuthDialogControls: vi.fn(),
   };
 });
 
@@ -61,7 +61,7 @@ const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
 const mockedUseCurrentViewer = vi.mocked(useCurrentViewer);
 const mockedUseHasViewerSession = vi.mocked(useHasViewerSession);
 const mockedUseCreatorModeEntry = vi.mocked(useCreatorModeEntry);
-const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const openFanAuthDialog = vi.fn();
 const enterCreatorMode = vi.fn();
 
@@ -147,9 +147,8 @@ describe("CreatorProfileShell", () => {
       errorMessage: null,
       isSubmitting: false,
     });
-    mockedUseFanAuthDialog.mockReturnValue({
+    mockedUseFanAuthDialogControls.mockReturnValue({
       closeFanAuthDialog: vi.fn(),
-      isFanAuthDialogOpen: false,
       openFanAuthDialog,
     });
   });

@@ -39,8 +39,22 @@ const unauthenticatedBootstrap = viewerBootstrapFixtures.unauthenticated;
 const e2eSessionToken = "e2e-viewer-session";
 const e2eCreatorSessionToken = "e2e-creator-session";
 const existingFanEmail = "fan@example.com";
-const signInChallengeToken = "e2e-sign-in-challenge";
-const signUpChallengeToken = "e2e-sign-up-challenge";
+const existingFanPassword = "VeryStrongPass123!";
+const passwordResetFanEmail = "resetfan@example.com";
+const passwordResetFanPassword = "ResetPass123!";
+const signUpConfirmationCode = "123456";
+const passwordResetConfirmationCode = "654321";
+const passwordByEmail = new Map([
+  [existingFanEmail, existingFanPassword],
+  [passwordResetFanEmail, passwordResetFanPassword],
+]);
+const pendingPasswordResetByEmail = new Set();
+const pendingSignUpDraftByEmail = new Map();
+const creatorSessionTokens = new Set([e2eCreatorSessionToken]);
+const fanSessionTokens = new Set([e2eSessionToken]);
+const sessionEmailByToken = new Map([
+  [e2eSessionToken, existingFanEmail],
+]);
 const creatorBaseStatsById = {
   creator_aoi_n: {
     fanCount: 19000,
@@ -200,16 +214,13 @@ function buildSearchResponse(query) {
 }
 
 function isAuthenticatedCreatorSessionToken(sessionToken) {
-  return (
-    typeof sessionToken === "string" &&
-    (sessionToken === e2eCreatorSessionToken || sessionToken.startsWith(`${e2eCreatorSessionToken}-`))
-  );
+  return typeof sessionToken === "string" && creatorSessionTokens.has(sessionToken);
 }
 
 function isAuthenticatedSessionToken(sessionToken) {
-  return isAuthenticatedCreatorSessionToken(sessionToken) || (
-    typeof sessionToken === "string" &&
-    (sessionToken === e2eSessionToken || sessionToken.startsWith(`${e2eSessionToken}-`))
+  return typeof sessionToken === "string" && (
+    creatorSessionTokens.has(sessionToken) ||
+    fanSessionTokens.has(sessionToken)
   );
 }
 
@@ -604,6 +615,18 @@ function isValidEmail(value) {
   return typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isValidDisplayName(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isValidHandle(value) {
+  return typeof value === "string" && /^@?[a-z0-9._]+$/i.test(value);
+}
+
+function isValidPassword(value) {
+  return typeof value === "string" && value.length >= 8;
+}
+
 function isAuthenticatedFanRequest(request) {
   return isAuthenticatedSessionToken(readCookieValue(request.headers.cookie, "shorts_fans_session"));
 }
@@ -854,9 +877,10 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-in/challenges") {
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-in") {
     void readJsonBody(request).then((body) => {
       const email = body?.email;
+      const password = body?.password;
 
       if (!isValidEmail(email)) {
         writeJson(request, response, 400, {
@@ -873,41 +897,69 @@ const server = http.createServer((request, response) => {
         return;
       }
 
-      if (email !== existingFanEmail) {
-        writeJson(request, response, 404, {
+      if (!isValidPassword(password)) {
+        writeJson(request, response, 400, {
           data: null,
           error: {
-            code: "email_not_found",
-            message: "email was not found",
+            code: "invalid_password",
+            message: "password is invalid",
           },
           meta: {
             page: null,
-            requestId: "req_e2e_sign_in_email_not_found_001",
+            requestId: "req_e2e_sign_in_invalid_password_001",
           },
         });
         return;
       }
 
-      writeJson(request, response, 200, {
-        data: {
-          challengeToken: signInChallengeToken,
-          expiresAt: "2026-04-07T12:00:00Z",
-        },
-        error: null,
-        meta: {
-          page: null,
-          requestId: "req_e2e_sign_in_challenge_001",
-        },
+      if (email === "pendingfan@example.com") {
+        writeJson(request, response, 403, {
+          data: null,
+          error: {
+            code: "confirmation_required",
+            message: "email confirmation is required",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_confirmation_required_001",
+          },
+        });
+        return;
+      }
+
+      const expectedPassword = typeof email === "string" ? passwordByEmail.get(email) : null;
+
+      if (!expectedPassword || password !== expectedPassword) {
+        writeJson(request, response, 401, {
+          data: null,
+          error: {
+            code: "invalid_credentials",
+            message: "email or password is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_in_invalid_credentials_001",
+          },
+        });
+        return;
+      }
+
+      const nextSessionToken = createE2ESessionToken();
+
+      fanSessionTokens.add(nextSessionToken);
+      viewerStateBySessionToken.set(nextSessionToken, buildDefaultViewerState());
+      sessionEmailByToken.set(nextSessionToken, email);
+
+      writeNoContent(request, response, {
+        "Set-Cookie": `shorts_fans_session=${nextSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;
   }
 
-  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up/challenges") {
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up") {
     void readJsonBody(request).then((body) => {
-      const email = body?.email;
-
-      if (!isValidEmail(email)) {
+      if (!isValidEmail(body?.email)) {
         writeJson(request, response, 400, {
           data: null,
           error: {
@@ -922,71 +974,156 @@ const server = http.createServer((request, response) => {
         return;
       }
 
-      if (email === existingFanEmail) {
-        writeJson(request, response, 409, {
+      if (!isValidDisplayName(body?.displayName)) {
+        writeJson(request, response, 400, {
           data: null,
           error: {
-            code: "email_already_registered",
-            message: "email is already registered",
+            code: "invalid_display_name",
+            message: "display name is invalid",
           },
           meta: {
             page: null,
-            requestId: "req_e2e_sign_up_conflict_001",
+            requestId: "req_e2e_sign_up_invalid_display_name_001",
           },
         });
         return;
+      }
+
+      if (!isValidHandle(body?.handle)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_handle",
+            message: "handle is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_invalid_handle_001",
+          },
+        });
+        return;
+      }
+
+      if (!isValidPassword(body?.password)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_password",
+            message: "password is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_invalid_password_001",
+          },
+        });
+        return;
+      }
+
+      if (typeof body.email === "string") {
+        pendingSignUpDraftByEmail.set(body.email, {
+          displayName: body.displayName,
+          handle: body.handle,
+          password: body.password,
+        });
       }
 
       writeJson(request, response, 200, {
         data: {
-          challengeToken: signUpChallengeToken,
-          expiresAt: "2026-04-07T12:00:00Z",
+          deliveryDestinationHint: "f***@example.com",
+          nextStep: "confirm_sign_up",
         },
         error: null,
         meta: {
           page: null,
-          requestId: "req_e2e_sign_up_challenge_001",
+          requestId: "req_e2e_sign_up_accepted_001",
         },
       });
     });
     return;
   }
 
-  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-in/session") {
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up/confirm") {
     void readJsonBody(request).then((body) => {
-      if (body?.email !== existingFanEmail) {
-        writeJson(request, response, 404, {
+      if (!isValidEmail(body?.email)) {
+        writeJson(request, response, 400, {
           data: null,
           error: {
-            code: "email_not_found",
-            message: "email was not found",
+            code: "invalid_email",
+            message: "email is invalid",
           },
           meta: {
             page: null,
-            requestId: "req_e2e_sign_in_session_missing_email_001",
+            requestId: "req_e2e_sign_up_confirm_invalid_email_001",
           },
         });
         return;
       }
 
-      if (body?.challengeToken !== signInChallengeToken) {
+      if (body?.confirmationCode === "000000") {
         writeJson(request, response, 400, {
           data: null,
           error: {
-            code: "invalid_challenge",
-            message: "challenge is invalid",
+            code: "confirmation_code_expired",
+            message: "confirmation code has expired",
           },
           meta: {
             page: null,
-            requestId: "req_e2e_sign_in_invalid_challenge_001",
+            requestId: "req_e2e_sign_up_confirm_expired_code_001",
+          },
+        });
+        return;
+      }
+
+      if (body?.confirmationCode !== signUpConfirmationCode) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_confirmation_code",
+            message: "confirmation code is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_confirm_invalid_code_001",
+          },
+        });
+        return;
+      }
+
+      if (typeof body.email !== "string" || !pendingSignUpDraftByEmail.has(body.email)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_confirmation_code",
+            message: "confirmation code is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_sign_up_confirm_missing_draft_001",
           },
         });
         return;
       }
 
       const nextSessionToken = createE2ESessionToken();
+      const pendingDraft =
+        typeof body.email === "string" ? pendingSignUpDraftByEmail.get(body.email) : undefined;
 
+      if (
+        typeof body.email === "string" &&
+        pendingDraft &&
+        typeof pendingDraft.displayName === "string" &&
+        typeof pendingDraft.handle === "string" &&
+        typeof pendingDraft.password === "string"
+      ) {
+        passwordByEmail.set(body.email, pendingDraft.password);
+        pendingSignUpDraftByEmail.delete(body.email);
+      }
+
+      fanSessionTokens.add(nextSessionToken);
       viewerStateBySessionToken.set(nextSessionToken, buildDefaultViewerState());
+      if (typeof body.email === "string") {
+        sessionEmailByToken.set(nextSessionToken, body.email);
+      }
 
       writeNoContent(request, response, {
         "Set-Cookie": `shorts_fans_session=${nextSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
@@ -995,44 +1132,141 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/sign-up/session") {
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/password-reset") {
     void readJsonBody(request).then((body) => {
-      if (body?.email === existingFanEmail) {
-        writeJson(request, response, 409, {
-          data: null,
-          error: {
-            code: "email_already_registered",
-            message: "email is already registered",
-          },
-          meta: {
-            page: null,
-            requestId: "req_e2e_sign_up_session_conflict_001",
-          },
-        });
-        return;
-      }
-
-      if (body?.challengeToken !== signUpChallengeToken) {
+      if (!isValidEmail(body?.email)) {
         writeJson(request, response, 400, {
           data: null,
           error: {
-            code: "invalid_challenge",
-            message: "challenge is invalid",
+            code: "invalid_email",
+            message: "email is invalid",
           },
           meta: {
             page: null,
-            requestId: "req_e2e_sign_up_invalid_challenge_001",
+            requestId: "req_e2e_password_reset_invalid_email_001",
           },
         });
         return;
       }
 
-      const nextSessionToken = createE2ESessionToken();
+      if (typeof body.email === "string") {
+        pendingPasswordResetByEmail.add(body.email);
+      }
 
-      viewerStateBySessionToken.set(nextSessionToken, buildDefaultViewerState());
+      writeJson(request, response, 200, {
+        data: {
+          deliveryDestinationHint: "f***@example.com",
+          nextStep: "confirm_password_reset",
+        },
+        error: null,
+        meta: {
+          page: null,
+          requestId: "req_e2e_password_reset_accepted_001",
+        },
+      });
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/password-reset/confirm") {
+    void readJsonBody(request).then((body) => {
+      if (body?.confirmationCode !== passwordResetConfirmationCode) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_confirmation_code",
+            message: "confirmation code is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_password_reset_confirm_invalid_code_001",
+          },
+        });
+        return;
+      }
+
+      if (!isValidPassword(body?.newPassword)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "password_policy_violation",
+            message: "password does not satisfy the policy",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_password_reset_confirm_policy_001",
+          },
+        });
+        return;
+      }
+
+      if (typeof body?.email !== "string" || !pendingPasswordResetByEmail.has(body.email)) {
+        writeJson(request, response, 400, {
+          data: null,
+          error: {
+            code: "invalid_confirmation_code",
+            message: "confirmation code is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_password_reset_confirm_missing_request_001",
+          },
+        });
+        return;
+      }
+
+      pendingPasswordResetByEmail.delete(body.email);
+
+      if (passwordByEmail.has(body.email)) {
+        passwordByEmail.set(body.email, body.newPassword);
+      }
+
+      writeNoContent(request, response);
+    });
+    return;
+  }
+
+  if (request.method === "POST" && requestUrl.pathname === "/api/fan/auth/re-auth") {
+    void readJsonBody(request).then((body) => {
+      if (!isAuthenticatedFanRequest(request)) {
+        writeAuthRequired(request, response, "req_e2e_reauth_auth_required_001", "fan re-auth requires authentication");
+        return;
+      }
+
+      const currentSessionToken = readCookieValue(request.headers.cookie, "shorts_fans_session");
+      const sessionEmail =
+        typeof currentSessionToken === "string" ? sessionEmailByToken.get(currentSessionToken) : undefined;
+      const expectedPassword =
+        typeof sessionEmail === "string" ? passwordByEmail.get(sessionEmail) : undefined;
+
+      if (!expectedPassword || body?.password !== expectedPassword) {
+        writeJson(request, response, 401, {
+          data: null,
+          error: {
+            code: "invalid_credentials",
+            message: "password is invalid",
+          },
+          meta: {
+            page: null,
+            requestId: "req_e2e_reauth_invalid_credentials_001",
+          },
+        });
+        return;
+      }
+
+      const rotatedSessionToken = createE2ESessionToken();
+      const currentViewerState = getViewerState(currentSessionToken);
+
+      fanSessionTokens.add(rotatedSessionToken);
+      if (currentViewerState) {
+        viewerStateBySessionToken.set(rotatedSessionToken, structuredClone(currentViewerState));
+      }
+      if (sessionEmail) {
+        sessionEmailByToken.set(rotatedSessionToken, sessionEmail);
+      }
 
       writeNoContent(request, response, {
-        "Set-Cookie": `shorts_fans_session=${nextSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
+        "Set-Cookie": `shorts_fans_session=${rotatedSessionToken}; Path=/; HttpOnly; SameSite=Lax`,
       });
     });
     return;

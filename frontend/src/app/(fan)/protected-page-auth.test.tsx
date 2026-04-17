@@ -1,52 +1,68 @@
-import { getFanAuthGateState } from "@/features/fan-auth-gate";
+import { render } from "@testing-library/react";
 
 import RootPage from "./page";
 
-const { cookiesMock, redirect } = vi.hoisted(() => ({
+const {
+  FeedShellMock,
+  cookiesMock,
+  getFollowingFeedShellStateMock,
+  loadFeedShellStateMock,
+} = vi.hoisted(() => ({
+  FeedShellMock: vi.fn(({ state }: { state: unknown }) => <div data-testid="feed-shell">{JSON.stringify(state)}</div>),
   cookiesMock: vi.fn(),
-  redirect: vi.fn(),
+  getFollowingFeedShellStateMock: vi.fn(() => ({
+    kind: "auth_required",
+    tab: "following",
+  })),
+  loadFeedShellStateMock: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
   cookies: cookiesMock,
 }));
 
+vi.mock("@/widgets/feed-shell", () => ({
+  FeedShell: FeedShellMock,
+  getFollowingFeedShellState: getFollowingFeedShellStateMock,
+  loadFeedShellState: loadFeedShellStateMock,
+}));
+
 vi.mock("next/navigation", async () => {
   const actual = await vi.importActual<typeof import("next/navigation")>("next/navigation");
-
   return {
     ...actual,
-    redirect,
-  };
-});
-
-vi.mock("@/features/fan-auth-gate", async () => {
-  const actual = await vi.importActual<typeof import("@/features/fan-auth-gate")>("@/features/fan-auth-gate");
-
-  return {
-    ...actual,
-    getFanAuthGateState: vi.fn(),
   };
 });
 
 describe("protected fan route auth gates", () => {
   afterEach(() => {
+    FeedShellMock.mockClear();
     cookiesMock.mockReset();
-    redirect.mockReset();
+    getFollowingFeedShellStateMock.mockClear();
+    loadFeedShellStateMock.mockReset();
   });
 
-  it("redirects unauthenticated following feed access to the login entry", async () => {
-    vi.mocked(getFanAuthGateState).mockResolvedValue({
-      currentViewer: null,
-      hasSession: false,
+  it("short-circuits unauthenticated following access into the auth-required shell state", async () => {
+    cookiesMock.mockResolvedValue({
+      get: vi.fn().mockReturnValue(undefined),
     });
 
-    await RootPage({
+    render(await RootPage({
       searchParams: Promise.resolve({
         tab: "following",
       }),
-    });
+    }));
 
-    expect(redirect).toHaveBeenCalledWith("/login");
+    expect(loadFeedShellStateMock).not.toHaveBeenCalled();
+    expect(getFollowingFeedShellStateMock).toHaveBeenCalledWith("auth_required");
+    expect(FeedShellMock).toHaveBeenCalledWith(
+      {
+        state: {
+          kind: "auth_required",
+          tab: "following",
+        },
+      },
+      undefined,
+    );
   });
 });

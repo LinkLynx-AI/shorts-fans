@@ -55,9 +55,12 @@ function renderFanHubShell(activeTab: "following" | "library" | "pinned") {
   );
 }
 
-function renderFeedShell(state: ReturnType<typeof getMockFeedShellState>) {
+function renderFeedShell(
+  state: ReturnType<typeof getFollowingFeedShellState> | ReturnType<typeof getMockFeedShellState>,
+  { hasSession = true }: { hasSession?: boolean } = {},
+) {
   return render(
-    <ViewerSessionProvider hasSession>
+    <ViewerSessionProvider hasSession={hasSession}>
       <CurrentViewerProvider currentViewer={null}>
         <FanAuthDialogProvider>
           <FeedShell state={state} />
@@ -80,7 +83,9 @@ describe("widgets", () => {
   });
 
   it("renders following empty state", () => {
-    render(<FeedShell state={getFollowingFeedShellState("empty")} />);
+    renderFeedShell(getFollowingFeedShellState("empty"), {
+      hasSession: false,
+    });
 
     expect(screen.getByRole("link", { name: /Following/i })).toHaveAttribute("aria-current", "page");
     expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
@@ -88,13 +93,15 @@ describe("widgets", () => {
     expect(screen.getByRole("link", { name: "creatorを探す" })).toHaveAttribute("href", "/search");
   });
 
-  it("renders following auth-required state", () => {
-    render(<FeedShell state={getFollowingFeedShellState("auth_required")} />);
+  it("renders following auth-required state and opens the shared modal", async () => {
+    renderFeedShell(getFollowingFeedShellState("auth_required"), {
+      hasSession: false,
+    });
 
-    expect(screen.getByRole("link", { name: /Following/i })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("link", { name: "Search" })).not.toBeInTheDocument();
     expect(screen.getByText("フォロー中を見るにはログインが必要です")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "ログインへ進む" })).toHaveAttribute("href", "/login");
+    expect(
+      await screen.findByRole("dialog", { name: "続けるには認証が必要です" }),
+    ).toBeInTheDocument();
   });
 
   it("renders the search UI and keeps query text", () => {

@@ -16,19 +16,30 @@ export function FanAuthEntryShell() {
   const {
     avatar,
     avatarInputKey,
+    canResend,
     clearAvatarSelection,
+    confirmationCode,
+    deliveryDestinationHint,
     displayName,
     email,
     errorMessage,
     handle,
+    hasConfirmedSignUp,
+    infoMessage,
     isSubmitting,
     mode,
+    newPassword,
+    password,
+    resend,
     selectAvatarFile,
+    setConfirmationCode,
     setDisplayName,
     setEmail,
     setHandle,
+    setMode,
+    setNewPassword,
+    setPassword,
     submit,
-    switchMode,
   } = useFanAuthEntry();
 
   return (
@@ -36,7 +47,10 @@ export function FanAuthEntryShell() {
       <FanAuthEntryPanel
         avatar={avatar}
         avatarInputKey={avatarInputKey}
+        canResend={canResend}
         clearAvatarSelection={clearAvatarSelection}
+        confirmationCode={confirmationCode}
+        deliveryDestinationHint={deliveryDestinationHint}
         displayName={displayName}
         dismissAction={(
           <Button
@@ -52,14 +66,22 @@ export function FanAuthEntryShell() {
         email={email}
         errorMessage={errorMessage}
         handle={handle}
+        hasConfirmedSignUp={hasConfirmedSignUp}
+        infoMessage={infoMessage}
         isSubmitting={isSubmitting}
         mode={mode}
+        newPassword={newPassword}
         onAvatarSelect={selectAvatarFile}
+        onConfirmationCodeChange={setConfirmationCode}
         onDisplayNameChange={setDisplayName}
         onEmailChange={setEmail}
         onHandleChange={setHandle}
-        onModeSwitch={switchMode}
+        onModeChange={setMode}
+        onNewPasswordChange={setNewPassword}
+        onPasswordChange={setPassword}
+        onResend={resend}
         onSubmit={submit}
+        password={password}
       />
     </main>
   );

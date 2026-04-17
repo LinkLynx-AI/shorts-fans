@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 
-import { buildFanLoginHref } from "@/features/fan-auth";
+import { FanAuthRequiredDialogTrigger } from "@/features/fan-auth";
 import { cn } from "@/shared/lib";
 import { Button, SurfacePanel } from "@/shared/ui";
 
 import type { FeedShellState } from "../model/mock-feed-shell";
+import { FeedAuthRequiredCtaButton } from "./feed-auth-required-cta-button";
 import { FeedReel } from "./feed-reel";
 
 type FeedShellProps = {
@@ -58,14 +59,12 @@ function FeedShellViewport({ children }: { children: ReactNode }) {
 
 function FeedFallbackState({
   activeTab,
-  ctaHref,
-  ctaLabel,
+  cta,
   description,
   title,
 }: {
   activeTab: "following" | "recommended";
-  ctaHref?: string;
-  ctaLabel?: string;
+  cta?: ReactNode;
   description: string;
   title: string;
 }) {
@@ -85,15 +84,7 @@ function FeedFallbackState({
             </p>
             <h2 className="mt-3 font-display text-[24px] font-semibold tracking-[-0.05em]">{title}</h2>
             <p className="mt-2 text-[14px] leading-6 text-white/78">{description}</p>
-            {ctaHref && ctaLabel ? (
-              <Button
-                asChild
-                className="mt-5 h-11 border border-white/18 bg-white text-foreground shadow-[0_16px_32px_rgba(255,255,255,0.18)] hover:bg-white/94"
-                size="sm"
-              >
-                <Link href={ctaHref}>{ctaLabel}</Link>
-              </Button>
-            ) : null}
+            {cta ? <div className="mt-5">{cta}</div> : null}
           </SurfacePanel>
         </div>
       </div>
@@ -118,8 +109,15 @@ export function FeedShell({ state }: FeedShellProps) {
       <FeedShellViewport>
         <FeedFallbackState
           activeTab={state.tab}
-          ctaHref="/search"
-          ctaLabel="creatorを探す"
+          cta={(
+            <Button
+              asChild
+              className="h-11 border border-white/18 bg-white text-foreground shadow-[0_16px_32px_rgba(255,255,255,0.18)] hover:bg-white/94"
+              size="sm"
+            >
+              <Link href="/search">creatorを探す</Link>
+            </Button>
+          )}
           description="気になる creator をフォローすると、新しい short がこの feed に流れてきます。"
           title="フォロー中の creator はまだいません"
         />
@@ -129,13 +127,15 @@ export function FeedShell({ state }: FeedShellProps) {
 
   return (
     <FeedShellViewport>
-      <FeedFallbackState
-        activeTab={state.tab}
-        ctaHref={buildFanLoginHref()}
-        ctaLabel="ログインへ進む"
-        description="ログインすると、フォロー中の short や unlock の続きからそのまま戻れます。"
-        title="フォロー中を見るにはログインが必要です"
-      />
+      <>
+        <FanAuthRequiredDialogTrigger />
+        <FeedFallbackState
+          activeTab={state.tab}
+          cta={<FeedAuthRequiredCtaButton />}
+          description="ログインすると、フォロー中の short や unlock の続きからそのまま戻れます。"
+          title="フォロー中を見るにはログインが必要です"
+        />
+      </>
     </FeedShellViewport>
   );
 }

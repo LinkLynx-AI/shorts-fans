@@ -13,7 +13,7 @@ import { getShortThemeStyle } from "@/entities/short";
 import { useCurrentViewer } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
 import {
-  useFanAuthDialog,
+  useFanAuthDialogControls,
   useFanLogoutEntry,
 } from "@/features/fan-auth";
 import {
@@ -204,7 +204,7 @@ export function FanHubShell({ headerProfile, state }: FanHubShellProps) {
     isSubmitting: isLogoutSubmitting,
     logout,
   } = useFanLogoutEntry();
-  const { openFanAuthDialog } = useFanAuthDialog();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const isAccountActionPending = isCreatorModeSubmitting || isLogoutSubmitting;
   const accountMenuErrorMessage = creatorModeErrorMessage ?? logoutErrorMessage;
 

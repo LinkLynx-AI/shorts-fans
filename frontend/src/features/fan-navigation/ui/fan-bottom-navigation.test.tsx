@@ -65,6 +65,6 @@ describe("fan navigation", () => {
 
     await user.click(screen.getByRole("link", { name: "マイ" }));
 
-    expect(screen.queryByRole("dialog", { name: "続けるにはログインが必要です" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "続けるには認証が必要です" })).not.toBeInTheDocument();
   });
 });

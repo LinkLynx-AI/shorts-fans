@@ -1,18 +1,19 @@
 import { z } from "zod";
 
-import { createApiUrl, ApiError } from "@/shared/api";
+import { ApiError, createApiUrl } from "@/shared/api";
 import { getClientEnv } from "@/shared/config";
 
 import {
+  fanAuthAcceptedNextStepSchema,
   FanAuthApiError,
   fanAuthErrorCodeSchema,
-  type FanAuthMode,
+  type FanAuthAcceptedNextStep,
 } from "../model/fan-auth";
 
-const fanAuthChallengeResponseSchema = z.object({
+const fanAuthAcceptedStepResponseSchema = z.object({
   data: z.object({
-    challengeToken: z.string().min(1),
-    expiresAt: z.string().datetime({ offset: true }),
+    deliveryDestinationHint: z.string().min(1).nullable(),
+    nextStep: fanAuthAcceptedNextStepSchema,
   }),
   error: z.null(),
   meta: z.object({
@@ -33,49 +34,88 @@ const fanAuthErrorResponseSchema = z.object({
   }),
 });
 
-type AuthenticateFanWithEmailOptions = {
+type FanAuthRequestOptions = {
   baseUrl?: string;
   fetcher?: typeof fetch;
 };
 
-type AuthenticateFanWithEmailInput = {
-  displayName?: string;
+type SignInFanInput = {
   email: string;
-  handle?: string;
-  mode: FanAuthMode;
+  password: string;
 };
+
+type SignUpFanInput = {
+  displayName: string;
+  email: string;
+  handle: string;
+  password: string;
+};
+
+type ConfirmFanSignUpInput = {
+  confirmationCode: string;
+  email: string;
+};
+
+type StartFanPasswordResetInput = {
+  email: string;
+};
+
+type ConfirmFanPasswordResetInput = {
+  confirmationCode: string;
+  email: string;
+  newPassword: string;
+};
+
+type ReAuthenticateFanInput = {
+  password: string;
+};
+
+export type FanAuthAcceptedStep = {
+  deliveryDestinationHint: string | null;
+  nextStep: FanAuthAcceptedNextStep;
+};
+
+function getFanAuthBaseUrl(baseUrl?: string): string {
+  return baseUrl ?? getClientEnv().NEXT_PUBLIC_API_BASE_URL;
+}
 
 async function sendFanAuthRequest(
   path: `/${string}`,
-  body: Record<string, string>,
-  options: AuthenticateFanWithEmailOptions,
+  {
+    baseUrl,
+    fetcher = fetch,
+  }: FanAuthRequestOptions,
+  init: {
+    body?: Record<string, string>;
+    method?: "DELETE" | "POST";
+  },
 ): Promise<Response> {
-  const fetcher = options.fetcher ?? fetch;
+  const requestInit: RequestInit = {
+    credentials: "include",
+    headers: init.body
+      ? {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        }
+      : {
+          Accept: "application/json",
+        },
+    method: init.method ?? "POST",
+    ...(init.body
+      ? {
+          body: JSON.stringify(init.body),
+        }
+      : {}),
+  };
 
   try {
-    return await fetcher(createApiUrl(getFanAuthBaseUrl(options.baseUrl), path), {
-      body: JSON.stringify(body),
-      credentials: "include",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      method: "POST",
-    });
+    return await fetcher(createApiUrl(getFanAuthBaseUrl(baseUrl), path), requestInit);
   } catch (error) {
     throw new ApiError("API request failed before a response was received.", {
       cause: error,
       code: "network",
     });
   }
-}
-
-function getFanAuthBaseUrl(baseUrl?: string): string {
-  return baseUrl ?? getClientEnv().NEXT_PUBLIC_API_BASE_URL;
-}
-
-function buildFanAuthPath(mode: FanAuthMode, boundary: "challenges" | "session"): `/${string}` {
-  return `/api/fan/auth/${mode}/${boundary}`;
 }
 
 async function parseFanAuthError(response: Response): Promise<FanAuthApiError | ApiError> {
@@ -108,18 +148,30 @@ async function parseFanAuthError(response: Response): Promise<FanAuthApiError | 
   });
 }
 
-async function issueFanAuthChallenge(
-  mode: FanAuthMode,
-  email: string,
-  options: AuthenticateFanWithEmailOptions,
-): Promise<string> {
-  const response = await sendFanAuthRequest(
-    buildFanAuthPath(mode, "challenges"),
-    {
-      email,
-    },
-    options,
-  );
+async function expectNoContent(
+  path: `/${string}`,
+  options: FanAuthRequestOptions,
+  body: Record<string, string>,
+): Promise<void> {
+  const response = await sendFanAuthRequest(path, options, {
+    body,
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw await parseFanAuthError(response);
+  }
+}
+
+async function expectAcceptedStep(
+  path: `/${string}`,
+  options: FanAuthRequestOptions,
+  body: Record<string, string>,
+): Promise<FanAuthAcceptedStep> {
+  const response = await sendFanAuthRequest(path, options, {
+    body,
+    method: "POST",
+  });
 
   if (!response.ok) {
     throw await parseFanAuthError(response);
@@ -137,7 +189,7 @@ async function issueFanAuthChallenge(
     });
   }
 
-  const parsed = fanAuthChallengeResponseSchema.safeParse(payload);
+  const parsed = fanAuthAcceptedStepResponseSchema.safeParse(payload);
 
   if (!parsed.success) {
     throw new ApiError("API response body did not match the expected schema.", {
@@ -148,53 +200,84 @@ async function issueFanAuthChallenge(
     });
   }
 
-  return parsed.data.data.challengeToken;
-}
-
-async function startFanAuthSession(
-  input: AuthenticateFanWithEmailInput,
-  challengeToken: string,
-  options: AuthenticateFanWithEmailOptions,
-): Promise<void> {
-  const response = await sendFanAuthRequest(
-    buildFanAuthPath(input.mode, "session"),
-    input.mode === "sign-up"
-      ? {
-          challengeToken,
-          displayName: input.displayName ?? "",
-          email: input.email,
-          handle: input.handle ?? "",
-        }
-      : {
-          challengeToken,
-          email: input.email,
-        },
-    options,
-  );
-
-  if (!response.ok) {
-    throw await parseFanAuthError(response);
-  }
+  return parsed.data.data;
 }
 
 /**
- * fan auth contract に従って email-only の sign in / sign up を完了する。
- *
- * Contract:
- * - `POST /api/fan/auth/{mode}/challenges` と `POST /api/fan/auth/{mode}/session` を順に実行する
- * - browser cookie を受け取れるよう `credentials: "include"` で送信する
- *
- * Errors:
- * - contract error は `FanAuthApiError`
- * - schema / network / malformed response は `ApiError`
- *
- * Side effects:
- * - backend fan auth endpoint へ network request を送る
+ * email/password で fan sign in を完了する。
  */
-export async function authenticateFanWithEmail(
-  input: AuthenticateFanWithEmailInput,
-  options: AuthenticateFanWithEmailOptions = {},
+export async function signInFan(
+  input: SignInFanInput,
+  options: FanAuthRequestOptions = {},
 ): Promise<void> {
-  const challengeToken = await issueFanAuthChallenge(input.mode, input.email, options);
-  await startFanAuthSession(input, challengeToken, options);
+  await expectNoContent("/api/fan/auth/sign-in", options, {
+    email: input.email,
+    password: input.password,
+  });
+}
+
+/**
+ * fan sign up を開始し、確認コード入力待ち step を返す。
+ */
+export async function signUpFan(
+  input: SignUpFanInput,
+  options: FanAuthRequestOptions = {},
+): Promise<FanAuthAcceptedStep> {
+  return expectAcceptedStep("/api/fan/auth/sign-up", options, {
+    displayName: input.displayName,
+    email: input.email,
+    handle: input.handle,
+    password: input.password,
+  });
+}
+
+/**
+ * sign-up confirmation code を消費して fan session を開始する。
+ */
+export async function confirmFanSignUp(
+  input: ConfirmFanSignUpInput,
+  options: FanAuthRequestOptions = {},
+): Promise<void> {
+  await expectNoContent("/api/fan/auth/sign-up/confirm", options, {
+    confirmationCode: input.confirmationCode,
+    email: input.email,
+  });
+}
+
+/**
+ * password reset の確認コード送信を開始する。
+ */
+export async function startFanPasswordReset(
+  input: StartFanPasswordResetInput,
+  options: FanAuthRequestOptions = {},
+): Promise<FanAuthAcceptedStep> {
+  return expectAcceptedStep("/api/fan/auth/password-reset", options, {
+    email: input.email,
+  });
+}
+
+/**
+ * password reset を confirmation code と新 password で完了する。
+ */
+export async function confirmFanPasswordReset(
+  input: ConfirmFanPasswordResetInput,
+  options: FanAuthRequestOptions = {},
+): Promise<void> {
+  await expectNoContent("/api/fan/auth/password-reset/confirm", options, {
+    confirmationCode: input.confirmationCode,
+    email: input.email,
+    newPassword: input.newPassword,
+  });
+}
+
+/**
+ * current session の fresh re-auth を更新する。
+ */
+export async function reAuthenticateFan(
+  input: ReAuthenticateFanInput,
+  options: FanAuthRequestOptions = {},
+): Promise<void> {
+  await expectNoContent("/api/fan/auth/re-auth", options, {
+    password: input.password,
+  });
 }

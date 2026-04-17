@@ -5,14 +5,14 @@ import {
   useRef,
 } from "react";
 
-import { useFanAuthDialog } from "../model/fan-auth-dialog-context";
+import { useFanAuthDialogControls } from "../model/fan-auth-dialog-context";
 
 /**
  * auth_required surface に到達したとき shared fan auth modal を開く。
  */
 export function FanAuthRequiredDialogTrigger() {
   const hasOpenedRef = useRef(false);
-  const { openFanAuthDialog } = useFanAuthDialog();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
 
   useEffect(() => {
     if (hasOpenedRef.current) {

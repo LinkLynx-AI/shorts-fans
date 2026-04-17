@@ -22,11 +22,21 @@ vi.mock("next/navigation", () => ({
 
 function renderWithViewerSession(
   ui: React.ReactElement,
-  { hasSession }: { hasSession: boolean },
+  {
+    currentViewer = null,
+    hasSession,
+  }: {
+    currentViewer?: {
+      activeMode: "creator" | "fan";
+      canAccessCreatorMode: boolean;
+      id: string;
+    } | null;
+    hasSession: boolean;
+  },
 ) {
   return render(
     <ViewerSessionProvider hasSession={hasSession}>
-      <CurrentViewerProvider currentViewer={null}>
+      <CurrentViewerProvider currentViewer={currentViewer}>
         <FanAuthDialogProvider>
           {ui}
         </FanAuthDialogProvider>
@@ -337,7 +347,7 @@ describe("FeedReel", () => {
     expect(await screen.findByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("redirects unauthenticated viewers to login when pin is tapped", async () => {
+  it("opens the shared auth dialog when an unauthenticated viewer pins a short", async () => {
     const user = userEvent.setup();
     const surface = buildPublicFeedSurface("following", "short_softlight");
 
@@ -348,10 +358,10 @@ describe("FeedReel", () => {
 
     await user.click(screen.getByRole("button", { name: "Pin short" }));
 
-    expect(push).toHaveBeenCalledWith("/login");
+    expect(screen.getByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
   });
 
-  it("redirects to login when the backend returns auth_required for pin", async () => {
+  it("opens the shared auth dialog when the backend returns auth_required for pin", async () => {
     const user = userEvent.setup();
     const surface = buildPublicFeedSurface("following", "short_softlight");
     vi.stubGlobal(
@@ -387,7 +397,7 @@ describe("FeedReel", () => {
     await user.click(screen.getByRole("button", { name: "Pin short" }));
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith("/login");
+      expect(screen.getByRole("dialog", { name: "続けるには認証が必要です" })).toBeInTheDocument();
     });
   });
 

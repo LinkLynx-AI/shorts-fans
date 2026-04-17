@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   getShortPinErrorMessage,
@@ -9,7 +8,7 @@ import {
   updateShortPin,
 } from "@/entities/short";
 import { useHasViewerSession } from "@/entities/viewer";
-import { buildFanLoginHref } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 
 type FeedPinSurface = {
   short: {
@@ -100,9 +99,9 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
   resolvePinState: (surface: FeedPinSurface) => FeedPinInteraction;
 } {
   const hasViewerSession = useHasViewerSession();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const pendingShortIdsRef = useRef<Set<string>>(new Set());
   const trackedShortIdsRef = useRef<Set<string>>(buildTrackedShortIds(surfaces));
-  const router = useRouter();
   const [pinStateByShortId, setPinStateByShortId] = useState<Record<string, FeedPinItemState>>(() =>
     buildFeedPinStateByShortId(surfaces),
   );
@@ -133,7 +132,9 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
           },
         };
       });
-      router.push(buildFanLoginHref());
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
       return;
     }
 
@@ -190,7 +191,9 @@ export function useFeedPinState({ surfaces }: { surfaces: readonly FeedPinSurfac
             },
           };
         });
-        router.push(buildFanLoginHref());
+        openFanAuthDialog({
+          postAuthNavigation: "none",
+        });
         return;
       }
 
