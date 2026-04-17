@@ -1,7 +1,6 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import {
   getShortPinErrorMessage,
@@ -9,7 +8,7 @@ import {
   updateShortPin,
 } from "@/entities/short";
 import { useHasViewerSession } from "@/entities/viewer";
-import { buildFanLoginHref } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 
 type UseShortPinStateOptions = {
   enabled?: boolean;
@@ -33,8 +32,8 @@ export function useShortPinState({
   shortId,
 }: UseShortPinStateOptions): UseShortPinStateResult {
   const hasViewerSession = useHasViewerSession();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const isPendingRef = useRef(false);
-  const router = useRouter();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isPending, setIsPending] = useState(false);
   const [isPinned, setIsPinned] = useState(initialIsPinned);
@@ -46,7 +45,9 @@ export function useShortPinState({
 
     if (!hasViewerSession) {
       setErrorMessage(null);
-      router.push(buildFanLoginHref());
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
       return;
     }
 
@@ -63,7 +64,9 @@ export function useShortPinState({
       setIsPinned(result.viewer.isPinned);
     }).catch((error: unknown) => {
       if (error instanceof ShortPinApiError && error.code === "auth_required") {
-        router.push(buildFanLoginHref());
+        openFanAuthDialog({
+          postAuthNavigation: "none",
+        });
         return;
       }
 

@@ -18,7 +18,7 @@ import {
   resolveCreatorProfileBackHref,
   type CreatorProfileRouteState,
 } from "@/features/creator-navigation";
-import { useFanAuthDialog } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 import { Button } from "@/shared/ui";
 
 import type {
@@ -133,7 +133,7 @@ export function CreatorProfileShell({
 }: CreatorProfileShellProps) {
   const { creator, shorts, stats, viewer } = state;
   const currentViewer = useCurrentViewer();
-  const { openFanAuthDialog } = useFanAuthDialog();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const hasViewerSession = useHasViewerSession();
   const {
     enterCreatorMode,
@@ -154,10 +154,14 @@ export function CreatorProfileShell({
     initialFanCount: stats.fanCount,
     initialIsFollowing: viewer.isFollowing,
     onAuthRequired: () => {
-      openFanAuthDialog();
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
     },
     onUnauthenticated: () => {
-      openFanAuthDialog();
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
     },
   });
   const primaryActionErrorMessage = isSelfProfile ? creatorModeEntryErrorMessage : errorMessage;

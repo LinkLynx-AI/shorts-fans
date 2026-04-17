@@ -13,16 +13,17 @@ import {
   getCreatorInitials,
 } from "@/entities/creator";
 import { getShortThemeStyle, type FeedTab } from "@/entities/short";
-import { useHasViewerSession } from "@/entities/viewer";
+import { useCurrentViewer, useHasViewerSession } from "@/entities/viewer";
 import {
   buildCreatorProfileHref,
   type CreatorProfileRouteOrigin,
 } from "@/features/creator-navigation";
 import {
-  buildFanLoginHref,
   isAuthRequiredApiError,
   isAuthRequiredResponse,
-  useFanAuthDialog,
+  isFreshAuthRequiredApiError,
+  isFreshAuthRequiredResponse,
+  useFanAuthDialogControls,
 } from "@/features/fan-auth";
 import {
   getUnlockEntryAction,
@@ -119,6 +120,21 @@ function calculatePlaybackProgress(currentTime: number, duration: number) {
   }
 
   return clampPlaybackProgress(currentTime / duration);
+}
+
+function buildUnlockStateKey(unlock: UnlockSurfaceModel): string {
+  return [
+    unlock.short.id,
+    unlock.main.id,
+    unlock.access.status,
+    unlock.access.reason,
+    unlock.unlockCta.state,
+    unlock.mainAccessEntry.routePath,
+    unlock.mainAccessEntry.token,
+    unlock.setup.required ? "setup-required" : "setup-optional",
+    unlock.setup.requiresAgeConfirmation ? "age-required" : "age-optional",
+    unlock.setup.requiresTermsAcceptance ? "terms-required" : "terms-optional",
+  ].join("::");
 }
 
 export type ImmersiveShortSurfaceProps =
@@ -504,16 +520,20 @@ function FeedCreatorBlock({
   short,
   variant = "default",
 }: FeedCreatorBlockProps) {
-  const { openFanAuthDialog } = useFanAuthDialog();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const { errorMessage, isFollowing, isPending, toggleFollow } = useCreatorFollowToggle({
     creatorId: creator.id,
     hasViewerSession,
     initialIsFollowing,
     onAuthRequired: () => {
-      openFanAuthDialog();
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
     },
     onUnauthenticated: () => {
-      openFanAuthDialog();
+      openFanAuthDialog({
+        postAuthNavigation: "none",
+      });
     },
     updateFollow: updateCreatorFollow,
   });
@@ -545,15 +565,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [feedPlaybackProgress, setFeedPlaybackProgress] = useState(0);
   const [isPaywallOpen, setIsPaywallOpen] = useState(false);
-  const [isResolvingUnlock, setIsResolvingUnlock] = useState(false);
   const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
-  const [resolvedFeedUnlockState, setResolvedFeedUnlockState] = useState<{
+  const [resolvedUnlockState, setResolvedUnlockState] = useState<{
+    baseUnlockKey: string;
     shortId: string;
+    viewerIdentityKey: string | null;
     unlock: UnlockSurfaceModel;
   } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const currentViewer = useCurrentViewer();
   const hasViewerSession = useHasViewerSession();
   const router = useRouter();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
   const detailPresentation = mode === "detail" ? props.presentation ?? "default" : "default";
@@ -566,9 +589,15 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const isActive = props.isActive ?? true;
   const pinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : detailPinState.errorMessage;
   const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : detailPinState.isPinned;
-  const resolvedFeedUnlock =
-    resolvedFeedUnlockState?.shortId === short.id ? resolvedFeedUnlockState.unlock : null;
-  const activeUnlock = resolvedFeedUnlock ?? unlock;
+  const propUnlockKey = buildUnlockStateKey(unlock);
+  const viewerIdentityKey = currentViewer?.id ?? null;
+  const resolvedUnlock =
+    resolvedUnlockState?.shortId === short.id &&
+    resolvedUnlockState.baseUnlockKey === propUnlockKey &&
+    resolvedUnlockState.viewerIdentityKey === viewerIdentityKey
+      ? resolvedUnlockState.unlock
+      : null;
+  const activeUnlock = resolvedUnlock ?? unlock;
   const unlockAction = getUnlockEntryAction(activeUnlock);
   const surfaceStyle = usesFeedPresentation ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
@@ -578,14 +607,143 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           tab: props.activeTab,
         })
       : buildCreatorProfileHref(creator.id, props.creatorProfileOrigin);
+  const usesApiBackedUnlockFlow = short.id.startsWith("short_");
 
-  const resetPaywallState = () => {
-    setAcceptAge(false);
-    setAcceptTerms(false);
+  const closePaywall = () => {
     setIsPaywallOpen(false);
   };
 
-  const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const resetPaywallSelections = () => {
+    setAcceptAge(false);
+    setAcceptTerms(false);
+  };
+
+  const resetPaywallState = () => {
+    resetPaywallSelections();
+    closePaywall();
+  };
+
+  const storeResolvedUnlock = (
+    nextUnlock: UnlockSurfaceModel,
+    resolvedViewerIdentityKey: string | null,
+  ) => {
+    setResolvedUnlockState({
+      baseUnlockKey: propUnlockKey,
+      shortId: short.id,
+      viewerIdentityKey: resolvedViewerIdentityKey,
+      unlock: nextUnlock,
+    });
+  };
+
+  const resolveUnlockSurfaceAfterAuth = async ({
+    resolvedViewerIdentityKey,
+  }: {
+    resolvedViewerIdentityKey: string | null;
+  }) => {
+    if (!usesApiBackedUnlockFlow) {
+      return null;
+    }
+
+    const nextUnlock = await requestUnlockSurfaceByShortId({
+      shortId: short.id,
+    });
+
+    storeResolvedUnlock(nextUnlock, resolvedViewerIdentityKey);
+
+    return nextUnlock;
+  };
+
+  const shouldOpenPaywallForUnlock = (targetUnlock: UnlockSurfaceModel) => {
+    const targetAction = getUnlockEntryAction(targetUnlock);
+
+    return targetAction === "open_paywall" || (usesFeedPresentation && targetUnlock.unlockCta.state === "unlock_available");
+  };
+
+  const restoreUnlockSurfaceAfterAuth = async ({
+    preservePaywallSelections,
+    restoredViewer,
+    targetUnlock,
+  }: {
+    preservePaywallSelections: boolean;
+    restoredViewer?: {
+      id: string;
+    } | null | undefined;
+    targetUnlock: UnlockSurfaceModel;
+  }) => {
+    let unlockAfterAuth = targetUnlock;
+    const restoredViewerIdentityKey = restoredViewer?.id ?? null;
+
+    if (usesApiBackedUnlockFlow) {
+      const nextUnlock = await resolveUnlockSurfaceAfterAuth({
+        resolvedViewerIdentityKey: restoredViewerIdentityKey,
+      });
+      if (nextUnlock) {
+        unlockAfterAuth = nextUnlock;
+      }
+    }
+
+    const shouldRestorePaywall = shouldOpenPaywallForUnlock(unlockAfterAuth);
+
+    if (!preservePaywallSelections) {
+      resetPaywallSelections();
+    }
+
+    closePaywall();
+
+    if (shouldRestorePaywall) {
+      setIsPaywallOpen(true);
+    }
+  };
+
+  const openReAuthDialog = ({
+    preservePaywallSelections = isPaywallOpen,
+    targetUnlock = activeUnlock,
+  }: {
+    preservePaywallSelections?: boolean;
+    targetUnlock?: UnlockSurfaceModel;
+  } = {}) => {
+    openFanAuthDialog({
+      allowClose: false,
+      initialMode: "re-auth",
+      onAfterAuthenticated:
+        usesApiBackedUnlockFlow || preservePaywallSelections
+          ? async (restoredViewer) => {
+              await restoreUnlockSurfaceAfterAuth({
+                preservePaywallSelections,
+                restoredViewer,
+                targetUnlock,
+              });
+            }
+          : undefined,
+      postAuthNavigation: "none",
+    });
+  };
+
+  const openAuthDialogForUnlock = (
+    targetUnlock: UnlockSurfaceModel = activeUnlock,
+    {
+      preservePaywallSelections = isPaywallOpen,
+    }: {
+      preservePaywallSelections?: boolean;
+    } = {},
+  ) => {
+    const shouldRefreshUnlockAfterAuth = usesApiBackedUnlockFlow;
+    const shouldRestoreUnlockAfterAuth =
+      shouldRefreshUnlockAfterAuth || preservePaywallSelections || shouldOpenPaywallForUnlock(targetUnlock);
+
+    openFanAuthDialog({
+      onAfterAuthenticated: shouldRestoreUnlockAfterAuth
+        ? async (restoredViewer) => {
+            await restoreUnlockSurfaceAfterAuth({
+              preservePaywallSelections,
+              restoredViewer,
+              targetUnlock,
+            });
+          }
+        : undefined,
+      postAuthNavigation: "none",
+    });
+  };
   const seekFeedPlayback = (nextProgress: number) => {
     if (!usesFeedPresentation) {
       return;
@@ -682,52 +840,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   };
 
   /**
-   * feed-like surface 用に server-generated unlock surface を解決する。
-   */
-  const resolveUnlockForAction = async (): Promise<UnlockSurfaceModel | null> => {
-    if (!usesFeedPresentation) {
-      return activeUnlock;
-    }
-
-    if (!activeUnlock.mainAccessEntry.token.startsWith("disabled-")) {
-      return activeUnlock;
-    }
-
-    if (resolvedFeedUnlock) {
-      return resolvedFeedUnlock;
-    }
-
-    setIsResolvingUnlock(true);
-
-    try {
-      const nextUnlock = await requestUnlockSurfaceByShortId({
-        shortId: short.id,
-      });
-
-      setResolvedFeedUnlockState({
-        shortId: short.id,
-        unlock: nextUnlock,
-      });
-
-      return nextUnlock;
-    } catch (error) {
-      if (isAuthRequiredApiError(error)) {
-        router.push(buildFanLoginHref());
-        return null;
-      }
-
-      throw error;
-    } finally {
-      setIsResolvingUnlock(false);
-    }
-  };
-
-  /**
    * main access entry を叩いて main playback へ遷移する。
    */
   const handleOpenMain = async (targetUnlock: UnlockSurfaceModel) => {
     if (!hasViewerSession) {
-      router.push(buildFanLoginHref());
+      openAuthDialogForUnlock(targetUnlock);
       return;
     }
 
@@ -778,8 +895,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         | null;
 
       if (!response.ok && isAuthRequiredResponse(payload)) {
-        resetPaywallState();
-        router.push(buildFanLoginHref());
+        openAuthDialogForUnlock(targetUnlock, {
+          preservePaywallSelections: isPaywallOpen,
+        });
+        return;
+      }
+
+      if (!response.ok && isFreshAuthRequiredResponse(payload)) {
+        openReAuthDialog({
+          preservePaywallSelections: isPaywallOpen,
+          targetUnlock,
+        });
         return;
       }
 
@@ -790,8 +916,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       }
     } catch (error) {
       if (isAuthRequiredApiError(error)) {
-        resetPaywallState();
-        router.push(buildFanLoginHref());
+        openAuthDialogForUnlock(targetUnlock, {
+          preservePaywallSelections: isPaywallOpen,
+        });
+        return;
+      }
+
+      if (isFreshAuthRequiredApiError(error)) {
+        openReAuthDialog({
+          preservePaywallSelections: isPaywallOpen,
+          targetUnlock,
+        });
         return;
       }
 
@@ -806,27 +941,20 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
    */
   const handleActivateUnlock = async () => {
     if (!hasViewerSession) {
-      router.push(buildFanLoginHref());
+      openAuthDialogForUnlock(activeUnlock);
       return;
     }
 
-    if (isResolvingUnlock || isSubmittingMainAccess) {
+    if (isSubmittingMainAccess) {
       return;
     }
 
-    const targetUnlock = await resolveUnlockForAction();
-
-    if (!targetUnlock) {
-      return;
-    }
-
+    const targetUnlock = activeUnlock;
     const nextAction = getUnlockEntryAction(targetUnlock);
-
-    const shouldOpenPaywall =
-      nextAction === "open_paywall" || (usesFeedPresentation && targetUnlock.unlockCta.state === "unlock_available");
+    const shouldOpenPaywall = shouldOpenPaywallForUnlock(targetUnlock);
 
     if (shouldOpenPaywall) {
-      resetPaywallState();
+      resetPaywallSelections();
       setIsPaywallOpen(true);
       return;
     }
@@ -885,7 +1013,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             className="mb-4 w-full"
             cta={activeUnlock.unlockCta}
-            disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+            disabled={!isHydrated || isSubmittingMainAccess}
             variant="feed"
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
@@ -970,7 +1098,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             className="w-full"
             cta={activeUnlock.unlockCta}
-            disabled={!isHydrated || isResolvingUnlock || isSubmittingMainAccess}
+            disabled={!isHydrated || isSubmittingMainAccess}
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
                   onClick: () => {

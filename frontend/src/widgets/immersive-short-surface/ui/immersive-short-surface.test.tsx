@@ -1,13 +1,22 @@
 import userEvent from "@testing-library/user-event";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import {
   CreatorFollowApiError,
   updateCreatorFollow,
 } from "@/entities/creator";
-import { ViewerSessionProvider } from "@/entities/viewer";
-import { useFanAuthDialog } from "@/features/fan-auth";
+import { CurrentViewerProvider, ViewerSessionProvider } from "@/entities/viewer";
 import {
+  useFanAuthDialog,
+  useFanAuthDialogControls,
+} from "@/features/fan-auth";
+import {
+  requestMainAccessEntry,
+  requestUnlockSurfaceByShortId,
+} from "@/features/unlock-entry";
+import { ApiError } from "@/shared/api";
+import {
+  buildDetailSurfaceFromApi,
   buildFeedSurfaceFromApiItem,
   getFeedSurfaceByTab,
   getShortSurfaceById,
@@ -31,7 +40,18 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
 
   return {
     ...actual,
+    useFanAuthDialogControls: vi.fn(),
     useFanAuthDialog: vi.fn(),
+  };
+});
+
+vi.mock("@/features/unlock-entry", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/features/unlock-entry")>();
+
+  return {
+    ...actual,
+    requestMainAccessEntry: vi.fn(actual.requestMainAccessEntry),
+    requestUnlockSurfaceByShortId: vi.fn(actual.requestUnlockSurfaceByShortId),
   };
 });
 
@@ -42,22 +62,73 @@ vi.mock("next/navigation", () => ({
 }));
 
 const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
+const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedRequestMainAccessEntry = vi.mocked(requestMainAccessEntry);
+const mockedRequestUnlockSurfaceByShortId = vi.mocked(requestUnlockSurfaceByShortId);
 const openFanAuthDialog = vi.fn();
 
 function renderWithViewerSession(
   ui: React.ReactElement,
-  { hasSession }: { hasSession: boolean },
+  {
+    currentViewer = null,
+    hasSession,
+  }: {
+    currentViewer?: {
+      activeMode: "creator" | "fan";
+      canAccessCreatorMode: boolean;
+      id: string;
+    } | null;
+    hasSession: boolean;
+  },
 ) {
   return render(
     <ViewerSessionProvider hasSession={hasSession}>
-      {ui}
+      <CurrentViewerProvider currentViewer={currentViewer}>
+        {ui}
+      </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
 }
 
 function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
   return buildFeedSurfaceFromApiItem({
+    creator: {
+      avatar: null,
+      bio: "night preview specialist",
+      displayName: "Mina Rei",
+      handle: "@minarei",
+      id: "creator_mina_rei",
+    },
+    short: {
+      caption: "quiet rooftop preview",
+      canonicalMainId: "main_mina_quiet_rooftop",
+      creatorId: "creator_mina_rei",
+      id: "short_mina_rooftop",
+      media: {
+        durationSeconds: 16,
+        id: "asset_short_mina_rooftop",
+        kind: "video",
+        posterUrl: "https://cdn.example.com/shorts/poster.jpg",
+        url: "https://cdn.example.com/shorts/playback.mp4",
+      },
+      previewDurationSeconds: 16,
+    },
+    unlockCta: {
+      mainDurationSeconds: 480,
+      priceJpy: 1800,
+      resumePositionSeconds: state === "continue_main" ? 120 : null,
+      state,
+    },
+    viewer: {
+      isFollowingCreator: false,
+      isPinned: true,
+    },
+  });
+}
+
+function createApiDetailSurface(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
+  return buildDetailSurfaceFromApi({
     creator: {
       avatar: null,
       bio: "night preview specialist",
@@ -108,8 +179,15 @@ describe("ImmersiveShortSurface", () => {
 
   beforeEach(() => {
     mockedUpdateCreatorFollow.mockReset();
+    mockedUseFanAuthDialogControls.mockReset();
+    mockedRequestMainAccessEntry.mockReset();
+    mockedRequestUnlockSurfaceByShortId.mockReset();
     mockedUseFanAuthDialog.mockReset();
     openFanAuthDialog.mockReset();
+    mockedUseFanAuthDialogControls.mockReturnValue({
+      closeFanAuthDialog: vi.fn(),
+      openFanAuthDialog,
+    });
     mockedUseFanAuthDialog.mockReturnValue({
       closeFanAuthDialog: vi.fn(),
       isFanAuthDialogOpen: false,
@@ -124,6 +202,7 @@ describe("ImmersiveShortSurface", () => {
 
   it("opens the mini paywall for setup-required feed content", async () => {
     const user = userEvent.setup();
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(feedSurface.unlock);
 
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
@@ -149,7 +228,7 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
   });
 
   it("updates the feed playback progress bar from video metadata and timeupdate", () => {
@@ -338,76 +417,8 @@ describe("ImmersiveShortSurface", () => {
     });
   });
 
-  it("resolves the unlock surface before opening paywall for API-backed feed content", async () => {
+  it("opens the paywall directly for API-backed feed content without refetching unlock state", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
-          data: {
-            access: {
-              mainId: "main_mina_quiet_rooftop",
-              reason: "unlock_required",
-              status: "locked",
-            },
-            creator: {
-              avatar: null,
-              bio: "night preview specialist",
-              displayName: "Mina Rei",
-              handle: "@minarei",
-              id: "creator_mina_rei",
-            },
-            main: {
-              durationSeconds: 480,
-              id: "main_mina_quiet_rooftop",
-              priceJpy: 1800,
-            },
-            mainAccessEntry: {
-              routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
-              token: "signed-rooftop-token",
-            },
-            setup: {
-              required: true,
-              requiresAgeConfirmation: true,
-              requiresTermsAcceptance: true,
-            },
-            short: {
-              caption: "quiet rooftop preview",
-              canonicalMainId: "main_mina_quiet_rooftop",
-              creatorId: "creator_mina_rei",
-              id: "short_mina_rooftop",
-              media: {
-                durationSeconds: 16,
-                id: "asset_short_mina_rooftop",
-                kind: "video",
-                posterUrl: "https://cdn.example.com/shorts/poster.jpg",
-                url: "https://cdn.example.com/shorts/playback.mp4",
-              },
-              previewDurationSeconds: 16,
-            },
-            unlockCta: {
-              mainDurationSeconds: 480,
-              priceJpy: 1800,
-              resumePositionSeconds: null,
-              state: "setup_required",
-            },
-          },
-          error: null,
-          meta: {
-            page: null,
-            requestId: "req_short_unlock_001",
-          },
-        }),
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-          status: 200,
-        },
-      ),
-    );
-
-    vi.stubGlobal("fetch", fetchMock);
-
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("setup_required")} />,
       { hasSession: true },
@@ -415,106 +426,20 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
-    expect(fetchMock.mock.calls[0]?.[0].toString()).toContain("/api/fan/shorts/short_mina_rooftop/unlock");
     expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+    expect(mockedRequestUnlockSurfaceByShortId).not.toHaveBeenCalled();
   });
 
-  it("resolves the unlock surface before opening the paywall and main for API-backed direct unlock feed content", async () => {
+  it("uses the current unlock surface to open the paywall and main for API-backed direct unlock feed content", async () => {
     const user = userEvent.setup();
-    const fetchMock = vi.fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              access: {
-                mainId: "main_mina_quiet_rooftop",
-                reason: "unlock_required",
-                status: "locked",
-              },
-              creator: {
-                avatar: null,
-                bio: "night preview specialist",
-                displayName: "Mina Rei",
-                handle: "@minarei",
-                id: "creator_mina_rei",
-              },
-              main: {
-                durationSeconds: 480,
-                id: "main_mina_quiet_rooftop",
-                priceJpy: 1800,
-              },
-              mainAccessEntry: {
-                routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
-                token: "signed-rooftop-token",
-              },
-              setup: {
-                required: false,
-                requiresAgeConfirmation: false,
-                requiresTermsAcceptance: false,
-              },
-              short: {
-                caption: "quiet rooftop preview",
-                canonicalMainId: "main_mina_quiet_rooftop",
-                creatorId: "creator_mina_rei",
-                id: "short_mina_rooftop",
-                media: {
-                  durationSeconds: 16,
-                  id: "asset_short_mina_rooftop",
-                  kind: "video",
-                  posterUrl: "https://cdn.example.com/shorts/poster.jpg",
-                  url: "https://cdn.example.com/shorts/playback.mp4",
-                },
-                previewDurationSeconds: 16,
-              },
-              unlockCta: {
-                mainDurationSeconds: 480,
-                priceJpy: 1800,
-                resumePositionSeconds: null,
-                state: "unlock_available",
-              },
-            },
-            error: null,
-            meta: {
-              page: null,
-              requestId: "req_short_unlock_001",
-            },
-          }),
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            status: 200,
-          },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            data: {
-              href: "/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant",
-            },
-            error: null,
-            meta: {
-              page: null,
-              requestId: "req_main_access_entry_001",
-            },
-          }),
-          {
-            headers: {
-              "Content-Type": "application/json",
-            },
-            status: 200,
-          },
-        ),
-      );
+    const surface = createApiFeedSurface("unlock_available");
 
-    vi.stubGlobal("fetch", fetchMock);
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant",
+    });
 
     renderWithViewerSession(
-      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("unlock_available")} />,
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
       { hasSession: true },
     );
 
@@ -526,9 +451,15 @@ describe("ImmersiveShortSurface", () => {
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant");
     });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0]?.[0].toString()).toContain("/api/fan/shorts/short_mina_rooftop/unlock");
-    expect(fetchMock.mock.calls[1]?.[0].toString()).toContain("/api/fan/mains/main_mina_quiet_rooftop/access-entry");
+    expect(mockedRequestUnlockSurfaceByShortId).not.toHaveBeenCalled();
+    expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
+      acceptedAge: false,
+      acceptedTerms: false,
+      entryToken: surface.unlock.mainAccessEntry.token,
+      fromShortId: "short_mina_rooftop",
+      mainId: "main_mina_quiet_rooftop",
+      routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+    });
   });
 
   it("updates the feed follow CTA after an authenticated follow succeeds", async () => {
@@ -654,7 +585,7 @@ describe("ImmersiveShortSurface", () => {
     );
   });
 
-  it("redirects unauthenticated viewers to the login entry before opening paywall", async () => {
+  it("opens the shared auth dialog before an unauthenticated viewer can open the paywall", async () => {
     const user = userEvent.setup();
 
     renderWithViewerSession(
@@ -664,8 +595,342 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(push).toHaveBeenCalledWith("/login");
-    expect(screen.queryByRole("dialog", { name: feedDialogTitle })).not.toBeInTheDocument();
+    expect(openFanAuthDialog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        onAfterAuthenticated: expect.any(Function),
+        postAuthNavigation: "none",
+      }),
+    );
+  });
+
+  it("resolves the unlock surface before reopening the paywall after auth", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+    const resolvedUnlock = {
+      ...surface.unlock,
+      mainAccessEntry: {
+        ...surface.unlock.mainAccessEntry,
+        token: "entry-token-after-auth",
+      },
+    };
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+        shortId: surface.short.id,
+      });
+      expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+    });
+  });
+
+  it("keeps the paywall closed when auth recovery resolves to continue-main", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+    const resolvedUnlock = createApiFeedSurface("continue_main").unlock;
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+        shortId: surface.short.id,
+      });
+      expect(screen.queryByRole("dialog", { name: feedDialogTitle })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Continue main/i })).toBeInTheDocument();
+    });
+  });
+
+  it("keeps the paywall closed when auth recovery resolves to owner-preview", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+    const resolvedUnlock = createApiFeedSurface("owner_preview").unlock;
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+        shortId: surface.short.id,
+      });
+      expect(screen.queryByRole("dialog", { name: feedDialogTitle })).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Owner preview/i })).toBeInTheDocument();
+    });
+  });
+
+  it("refreshes stale continue-main auth recovery into the current paywall state", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("continue_main");
+    const resolvedUnlock = createApiFeedSurface("setup_required").unlock;
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Continue main/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+        shortId: surface.short.id,
+      });
+      expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+    });
+  });
+
+  it("drops a stale resolved unlock immediately when the parent provides newer unlock props for the same short", async () => {
+    const user = userEvent.setup();
+    const initialSurface = createApiFeedSurface("unlock_available");
+    const resolvedUnlock = createApiFeedSurface("continue_main").unlock;
+    const nextSurface = createApiFeedSurface("owner_preview");
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    const view = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={initialSurface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /Continue main/i })).toBeInTheDocument();
+    });
+
+    view.rerender(
+      <ViewerSessionProvider hasSession={false}>
+        <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={nextSurface} />
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: /Owner preview/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Continue main/i })).not.toBeInTheDocument();
+  });
+
+  it("preserves paywall setup selections across auth-required recovery", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = {
+      ...surface.unlock,
+      mainAccessEntry: {
+        ...surface.unlock.mainAccessEntry,
+        token: "entry-token-after-auth",
+      },
+    };
+
+    mockedRequestMainAccessEntry.mockRejectedValueOnce(
+      new ApiError("auth required", {
+        code: "http",
+        details: JSON.stringify({
+          error: {
+            code: "auth_required",
+            message: "login required",
+          },
+        }),
+        status: 401,
+      }),
+    );
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む"));
+    await user.click(screen.getByRole("button", { name: "Unlock ¥1,800 | 8分" }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+      expect(screen.getByLabelText("18歳以上であり、年齢確認に同意する")).toBeChecked();
+      expect(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む")).toBeChecked();
+    });
+  });
+
+  it("restores the paywall after re-auth success when fresh-auth blocks unlock entry", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = {
+      ...surface.unlock,
+      mainAccessEntry: {
+        ...surface.unlock.mainAccessEntry,
+        token: "entry-token-after-auth",
+      },
+    };
+
+    mockedRequestMainAccessEntry.mockRejectedValueOnce(
+      new ApiError("fresh auth required", {
+        code: "http",
+        details: JSON.stringify({
+          error: {
+            code: "fresh_auth_required",
+            message: "recent auth required",
+          },
+        }),
+        status: 403,
+      }),
+    );
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む"));
+    await user.click(screen.getByRole("button", { name: "Unlock ¥1,800 | 8分" }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    expect(options).toEqual(
+      expect.objectContaining({
+        allowClose: false,
+        initialMode: "re-auth",
+        onAfterAuthenticated: expect.any(Function),
+        postAuthNavigation: "none",
+      }),
+    );
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+      expect(screen.getByLabelText("18歳以上であり、年齢確認に同意する")).toBeChecked();
+      expect(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む")).toBeChecked();
+    });
+  });
+
+  it("resolves the unlock surface before reopening detail paywall after auth", async () => {
+    const user = userEvent.setup();
+    const surface = {
+      ...createApiDetailSurface("setup_required"),
+      mainEntryEnabled: true,
+    };
+    const resolvedUnlock = {
+      ...surface.unlock,
+      mainAccessEntry: {
+        ...surface.unlock.mainAccessEntry,
+        token: "entry-token-after-auth",
+      },
+    };
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: "short_mina_rooftop" }}
+        mode="detail"
+        surface={surface}
+      />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.();
+    });
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+        shortId: surface.short.id,
+      });
+      expect(screen.getByRole("dialog", { name: detailDialogTitle })).toBeInTheDocument();
+    });
   });
 
   it("renders detail mode with back navigation and the same creator block", async () => {
@@ -810,7 +1075,7 @@ describe("ImmersiveShortSurface", () => {
     });
   });
 
-  it("redirects unauthenticated viewers to login when detail pin is tapped", async () => {
+  it("opens the shared auth dialog when detail pin is tapped without a session", async () => {
     if (!detailSurface) {
       throw new Error("fixture missing");
     }
@@ -824,10 +1089,12 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: "Pinned short" }));
 
-    expect(push).toHaveBeenCalledWith("/login");
+    expect(openFanAuthDialog).toHaveBeenCalledWith({
+      postAuthNavigation: "none",
+    });
   });
 
-  it("renders continue-main detail content as an action button", async () => {
+  it("reopens the shared auth dialog when continue-main receives auth_required", async () => {
     if (!continueMainSurface) {
       throw new Error("fixture missing");
     }
@@ -866,7 +1133,61 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Continue main/i }));
 
-    expect(push).toHaveBeenCalledWith("/login");
+    await waitFor(() => {
+      expect(openFanAuthDialog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          postAuthNavigation: "none",
+        }),
+      );
+    });
+  });
+
+  it("opens the shared re-auth dialog when continue-main receives fresh_auth_required", async () => {
+    if (!continueMainSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "fresh_auth_required",
+              message: "recent auth required",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 403,
+          },
+        ),
+      ),
+    );
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: "softlight" }}
+        mode="detail"
+        surface={continueMainSurface}
+      />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Continue main/i }));
+
+    await waitFor(() => {
+      expect(openFanAuthDialog).toHaveBeenCalledWith({
+        allowClose: false,
+        initialMode: "re-auth",
+        postAuthNavigation: "none",
+      });
+    });
   });
 
   it("renders direct-unlock detail content as an action button", () => {
@@ -934,6 +1255,7 @@ describe("ImmersiveShortSurface", () => {
         },
       },
     };
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(surface.unlock);
 
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
@@ -942,7 +1264,7 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(screen.getByRole("dialog", { name: "この short の続きを見る" })).toBeInTheDocument();
+    expect(await screen.findByRole("dialog", { name: "この short の続きを見る" })).toBeInTheDocument();
   });
 
   it("renders feed mode without short theme lookup for unknown short ids", () => {

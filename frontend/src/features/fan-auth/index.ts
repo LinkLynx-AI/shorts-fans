@@ -2,23 +2,37 @@ export {
   buildFanLoginHref,
   FanAuthApiError,
   fanLoginPath,
+  getFanAuthModeDescription,
+  getFanAuthModeTitle,
   getFanAuthErrorMessage,
   getFanLogoutErrorMessage,
-  getFanAuthModeHint,
-  getFanAuthModeSwitchLabel,
   getFanAuthSubmitLabel,
   isAuthRequiredApiError,
   isAuthRequiredResponse,
+  isFreshAuthRequiredApiError,
+  isFreshAuthRequiredResponse,
+  mapFanAuthNextStepToMode,
 } from "./model/fan-auth";
 export type {
   AuthRequiredResponse,
+  FanAuthAcceptedNextStep,
   FanAuthErrorCode,
   FanAuthMode,
+  FreshAuthRequiredResponse,
 } from "./model/fan-auth";
-export { authenticateFanWithEmail } from "./api/request-fan-auth";
+export {
+  confirmFanPasswordReset,
+  confirmFanSignUp,
+  reAuthenticateFan,
+  signInFan,
+  signUpFan,
+  startFanPasswordReset,
+} from "./api/request-fan-auth";
+export type { FanAuthAcceptedStep } from "./api/request-fan-auth";
 export { logoutFanSession } from "./api/logout-fan-session";
 export {
   FanAuthDialogProvider,
+  useFanAuthDialogControls,
   useFanAuthDialog,
 } from "./model/fan-auth-dialog-context";
 export { useFanAuthEntry } from "./model/use-fan-auth-entry";

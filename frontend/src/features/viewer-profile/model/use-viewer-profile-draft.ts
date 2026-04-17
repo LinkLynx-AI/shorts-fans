@@ -345,6 +345,13 @@ export function useViewerProfileDraft({
     });
   };
 
+  const resetDraft = () => {
+    setDisplayNameState(initialValues.displayName);
+    setHandleState(initialValues.handle);
+    setAvatarState({ kind: "empty" });
+    setAvatarInputKey((currentKey) => currentKey + 1);
+  };
+
   return {
     avatar: buildAvatarField(avatarState, avatarPreviewUrl, {
       mode,
@@ -356,6 +363,7 @@ export function useViewerProfileDraft({
     getAvatarSubmissionError,
     getProfileValidationError,
     handle,
+    resetDraft,
     resetCompletedAvatarUploadToken,
     selectAvatarFile,
     setDisplayName,

@@ -2,6 +2,16 @@ import { expect, test, type Page } from "@playwright/test";
 
 type ViewerSessionMode = "creator" | "fan";
 
+const existingFanEmail = "fan@example.com";
+const existingFanPassword = "VeryStrongPass123!";
+const pendingConfirmationFanEmail = "pendingfan@example.com";
+const pendingConfirmationFanPassword = "PendingPass123!";
+const pendingConfirmationNextPassword = "PendingPass456!";
+const passwordResetFanEmail = "resetfan@example.com";
+const passwordResetNextPassword = "RenewedPass123!";
+const passwordResetConfirmationCode = "654321";
+const signUpConfirmationCode = "123456";
+
 const viewerSessionCookieBase = {
   domain: "127.0.0.1",
   name: "shorts_fans_session",
@@ -57,11 +67,12 @@ test("fan shell routes render and unlock flow works", async ({ page }) => {
   await expect(page.getByText("Mina Rei")).toBeVisible();
 
   await page.getByRole("button", { name: /Unlock/i }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/$/);
   await expect(page.getByRole("heading", { name: "続けるにはログインが必要です" })).toBeVisible();
 
   await page.goto("/?tab=following");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/\?tab=following$/);
+  await expect(page.getByRole("button", { name: "ログインして続ける" })).toBeVisible();
 
   await page.goto("/fan");
   await expect(page).toHaveURL(/\/fan$/);
@@ -159,6 +170,7 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
+  await page.getByLabel("Password").fill(existingFanPassword);
   await page.getByRole("button", { name: "サインインを続ける" }).click();
 
   await expect(page).toHaveURL(/\/fan$/);
@@ -173,6 +185,135 @@ test("unauthenticated viewers can sign in from the shared auth modal opened by t
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
 });
 
+test("unlock auth recovery restores the same paywall context after modal sign-in without auto-submitting", async ({ page }) => {
+  await page.goto("/");
+
+  await page.getByRole("button", { name: /Unlock/i }).click();
+
+  const authDialog = page.getByRole("dialog", { name: "続けるにはログインが必要です" });
+  await expect(authDialog).toBeVisible();
+
+  await authDialog.getByRole("textbox", { name: "Email" }).fill(existingFanEmail);
+  await authDialog.getByLabel("Password").fill(existingFanPassword);
+  await authDialog.getByRole("button", { name: "サインインを続ける" }).click();
+
+  const paywall = page.getByRole("dialog", { name: "quiet rooftop preview の続きを見る" });
+
+  await expect(page).toHaveURL(/\/$/);
+  await expect(authDialog).toHaveCount(0);
+  await expect(paywall).toBeVisible();
+  await expect(paywall.getByRole("button", { name: "Unlock ¥1,800 | 8分" })).toBeDisabled();
+
+  await page.getByLabel("18歳以上であり、年齢確認に同意する").check();
+  await page.getByLabel(/利用規約とポリシーに同意/).check();
+  await paywall.getByRole("button", { name: "Unlock ¥1,800 | 8分" }).click();
+
+  await expect(page).toHaveURL(/\/mains\/main_mina_quiet_rooftop\?fromShortId=rooftop&grant=/);
+  await expect(page.getByText("Playing main")).toBeVisible();
+});
+
+test("following auth-required shell returns to the same tab after modal sign-in", async ({ page }) => {
+  await page.goto("/?tab=following");
+
+  await expect(page).toHaveURL(/\/\?tab=following$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("textbox", { name: "Email" }).fill(existingFanEmail);
+  await page.getByLabel("Password").fill(existingFanPassword);
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page).toHaveURL(/\/\?tab=following$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("link", { name: "Following" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("フォロー中を見るにはログインが必要です")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Unlock/i })).toBeVisible({ timeout: 15000 });
+});
+
+test("password reset carries the new password back into sign-in and restores the protected route", async ({ page }) => {
+  await page.goto("/fan");
+
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("button", { name: "パスワードを再設定" }).click();
+  await page.getByRole("textbox", { name: "Email" }).fill(passwordResetFanEmail);
+  await page.getByRole("button", { name: "確認コードを送る" }).click();
+  await page.getByRole("textbox", { name: "Confirmation code" }).fill(passwordResetConfirmationCode);
+  await page.getByLabel("New password").fill(passwordResetNextPassword);
+  await page.getByRole("button", { name: "パスワードを更新する" }).click();
+
+  await expect(page.getByRole("textbox", { name: "Email" })).toHaveValue(passwordResetFanEmail);
+  await page.getByLabel("Password").fill(passwordResetNextPassword);
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page).toHaveURL(/\/fan$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
+  await page.waitForLoadState("networkidle");
+  await expect(page.getByRole("heading", { name: "My archive" })).toBeVisible({ timeout: 15000 });
+});
+
+test("confirmation-required recovery can resend while the same sign-up draft is intact", async ({ page }) => {
+  await page.goto("/fan");
+
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("button", { name: "サインアップへ" }).click();
+  await page.getByRole("textbox", { name: "Email" }).fill(pendingConfirmationFanEmail);
+  await page.getByRole("textbox", { name: "Display name" }).fill("Pending Fan");
+  await page.getByRole("textbox", { name: "Handle" }).fill("@pendingfan");
+  await page.getByLabel("Password").fill(pendingConfirmationFanPassword);
+
+  const [initialSignUpResponse] = await Promise.all([
+    page.waitForResponse((candidate) =>
+      candidate.request().method() === "POST" &&
+      candidate.url().includes("/api/fan/auth/sign-up"),
+    ),
+    page.getByRole("button", { name: "確認コードを送る" }).click(),
+  ]);
+
+  expect(initialSignUpResponse.status()).toBe(200);
+  await expect(page.getByRole("textbox", { name: "Confirmation code" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "コードを再送" })).toBeVisible();
+
+  await page.getByRole("button", { name: "サインインへ" }).click();
+  await page.getByLabel("Password").fill(pendingConfirmationFanPassword);
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page.getByRole("textbox", { name: "Confirmation code" })).toBeVisible();
+
+  const [resendResponse] = await Promise.all([
+    page.waitForResponse((candidate) =>
+      candidate.request().method() === "POST" &&
+      candidate.url().includes("/api/fan/auth/sign-up"),
+    ),
+    page.getByRole("button", { name: "コードを再送" }).click(),
+  ]);
+
+  expect(resendResponse.status()).toBe(200);
+});
+
+test("confirmation-required recovery hides resend after the sign-up password changes", async ({ page }) => {
+  await page.goto("/fan");
+
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
+
+  await page.getByRole("button", { name: "サインアップへ" }).click();
+  await page.getByRole("textbox", { name: "Email" }).fill(pendingConfirmationFanEmail);
+  await page.getByRole("textbox", { name: "Display name" }).fill("Pending Fan");
+  await page.getByRole("textbox", { name: "Handle" }).fill("@pendingfan");
+  await page.getByLabel("Password").fill(pendingConfirmationFanPassword);
+  await page.getByRole("button", { name: "確認コードを送る" }).click();
+
+  await expect(page.getByRole("textbox", { name: "Confirmation code" })).toBeVisible();
+  await page.getByRole("button", { name: "サインインへ" }).click();
+  await page.getByLabel("Password").fill(pendingConfirmationNextPassword);
+  await page.getByRole("button", { name: "サインインを続ける" }).click();
+
+  await expect(page.getByRole("textbox", { name: "Display name" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "コードを再送" })).toHaveCount(0);
+});
+
 test("unauthenticated viewers can open the shared auth modal from creator profile follow without auto-following", async ({ page }) => {
   await page.goto("/creators/creator_aoi_n");
 
@@ -180,6 +321,7 @@ test("unauthenticated viewers can open the shared auth modal from creator profil
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
 
   await page.getByRole("textbox", { name: "Email" }).fill("fan@example.com");
+  await page.getByLabel("Password").fill(existingFanPassword);
   await page.getByRole("button", { name: "サインインを続ける" }).click();
 
   await expect(page).toHaveURL(/\/creators\/creator_aoi_n$/);
@@ -221,8 +363,13 @@ test("unauthenticated viewers can sign up from the shared auth modal and enter t
   await page.getByRole("link", { name: "マイ" }).click();
   await expect(page).toHaveURL(/\/fan$/);
   await page.getByRole("button", { name: "サインアップへ" }).click();
+  await page.getByRole("textbox", { name: "Display name" }).fill("New Fan");
+  await page.getByRole("textbox", { name: "Handle" }).fill("@newfan");
   await page.getByRole("textbox", { name: "Email" }).fill("newfan@example.com");
-  await page.getByRole("button", { name: "新規登録を続ける" }).click();
+  await page.getByLabel("Password").fill("FreshPass123!");
+  await page.getByRole("button", { name: "確認コードを送る" }).click();
+  await page.getByRole("textbox", { name: "Confirmation code" }).fill(signUpConfirmationCode);
+  await page.getByRole("button", { name: "登録を完了する" }).click();
 
   await expect(page).toHaveURL(/\/fan$/);
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toHaveCount(0);
@@ -282,7 +429,8 @@ test("stale session cookies are treated as unauthenticated on protected fan surf
   await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
   await page.goto("/shorts/softlight");
   await page.getByRole("button", { name: /Continue main/i }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/shorts\/softlight$/);
+  await expect(page.getByRole("dialog", { name: "続けるにはログインが必要です" })).toBeVisible();
 });
 
 test("main access route rejects direct setup bypass requests after authentication", async ({ request }) => {

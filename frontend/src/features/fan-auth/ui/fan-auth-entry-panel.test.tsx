@@ -1,140 +1,110 @@
 import userEvent from "@testing-library/user-event";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { useState } from "react";
 
 import {
-  FanAuthApiError,
   FanAuthEntryPanel,
-  useFanAuthEntry,
+  type FanAuthMode,
 } from "@/features/fan-auth";
 
-const authenticateFanWithEmailMock = vi.hoisted(() => vi.fn());
+const emptyAvatarField = {
+  canClear: false,
+  fileName: null,
+  inputAccept: "image/jpeg,image/png,image/webp",
+  isError: false,
+  kind: "empty" as const,
+  message: "未設定でも登録できます。",
+  previewUrl: null,
+};
 
-vi.mock("@/features/fan-auth/api/request-fan-auth", () => ({
-  authenticateFanWithEmail: authenticateFanWithEmailMock,
-}));
-
-function FanAuthEntryPanelHarness(props: {
-  onAuthenticated?: () => Promise<string | null> | string | null;
+function FanAuthEntryPanelHarness({
+  initialMode = "sign-in",
+  onResend = vi.fn(),
+}: {
+  initialMode?: FanAuthMode;
+  onResend?: () => void | Promise<void>;
 }) {
-  const {
-    avatar,
-    avatarInputKey,
-    clearAvatarSelection,
-    displayName,
-    email,
-    errorMessage,
-    handle,
-    isSubmitting,
-    mode,
-    selectAvatarFile,
-    setDisplayName,
-    setEmail,
-    setHandle,
-    submit,
-    switchMode,
-  } = useFanAuthEntry(props);
+  const [confirmationCode, setConfirmationCode] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [email, setEmail] = useState("");
+  const [mode, setMode] = useState<FanAuthMode>(initialMode);
+  const [newPassword, setNewPassword] = useState("");
+  const [password, setPassword] = useState("");
 
   return (
     <FanAuthEntryPanel
-      avatar={avatar}
-      avatarInputKey={avatarInputKey}
-      clearAvatarSelection={clearAvatarSelection}
+      avatar={emptyAvatarField}
+      avatarInputKey={0}
+      canResend
+      clearAvatarSelection={vi.fn()}
+      confirmationCode={confirmationCode}
+      deliveryDestinationHint="f***@example.com"
       displayName={displayName}
       email={email}
-      errorMessage={errorMessage}
-      handle={handle}
-      isSubmitting={isSubmitting}
+      errorMessage={null}
+      handle="@mina"
+      hasConfirmedSignUp={false}
+      infoMessage={null}
+      isSubmitting={false}
       mode={mode}
-      onAvatarSelect={selectAvatarFile}
+      newPassword={newPassword}
+      onAvatarSelect={vi.fn()}
+      onConfirmationCodeChange={setConfirmationCode}
       onDisplayNameChange={setDisplayName}
       onEmailChange={setEmail}
-      onHandleChange={setHandle}
-      onModeSwitch={switchMode}
-      onSubmit={submit}
+      onHandleChange={vi.fn()}
+      onModeChange={setMode}
+      onNewPasswordChange={setNewPassword}
+      onPasswordChange={setPassword}
+      onResend={onResend}
+      onSubmit={vi.fn()}
+      password={password}
     />
   );
 }
 
 describe("FanAuthEntryPanel", () => {
-  beforeEach(() => {
-    authenticateFanWithEmailMock.mockReset();
-  });
-
-  it("starts in sign-in mode and preserves email when switching to sign-up", async () => {
+  it("preserves email when switching from sign-in to sign-up", async () => {
     const user = userEvent.setup();
 
     render(<FanAuthEntryPanelHarness />);
 
-    const emailInput = screen.getByRole("textbox", { name: "Email" });
-    await user.type(emailInput, "fan@example.com");
-
-    expect(screen.getByRole("button", { name: "サインインを続ける" })).toBeInTheDocument();
-
+    await user.type(screen.getByRole("textbox", { name: "Email" }), "fan@example.com");
     await user.click(screen.getByRole("button", { name: "サインアップへ" }));
 
-    expect(screen.getByRole("button", { name: "新規登録を続ける" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "確認コードを送る" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Email" })).toHaveValue("fan@example.com");
     expect(screen.getByRole("textbox", { name: "Display name" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Handle" })).toBeInTheDocument();
   });
 
-  it("runs the shared auth flow and notifies the caller on success", async () => {
+  it("renders confirmation controls and allows resending sign-up codes", async () => {
     const user = userEvent.setup();
-    const onAuthenticated = vi.fn();
+    const onResend = vi.fn();
 
-    authenticateFanWithEmailMock.mockResolvedValue(undefined);
+    render(<FanAuthEntryPanelHarness initialMode="confirm-sign-up" onResend={onResend} />);
 
-    render(<FanAuthEntryPanelHarness onAuthenticated={onAuthenticated} />);
+    expect(screen.getByRole("textbox", { name: "Confirmation code" })).toBeInTheDocument();
+    expect(screen.getByText("確認コードを f***@example.com に送りました。メールを確認してください。")).toBeInTheDocument();
 
-    await user.type(screen.getByRole("textbox", { name: "Email" }), "fan@example.com");
-    await user.click(screen.getByRole("button", { name: "サインインを続ける" }));
+    await user.click(screen.getByRole("button", { name: "コードを再送" }));
 
-    await waitFor(() => {
-      expect(authenticateFanWithEmailMock).toHaveBeenCalledWith({
-        email: "fan@example.com",
-        mode: "sign-in",
-      });
-      expect(onAuthenticated).toHaveBeenCalledTimes(1);
-    });
+    expect(onResend).toHaveBeenCalledTimes(1);
   });
 
-  it("passes shared profile fields when signing up", async () => {
-    const user = userEvent.setup();
+  it("renders the new password field during password reset confirmation", () => {
+    render(<FanAuthEntryPanelHarness initialMode="confirm-password-reset" />);
 
-    authenticateFanWithEmailMock.mockResolvedValue(undefined);
-
-    render(<FanAuthEntryPanelHarness />);
-
-    await user.click(screen.getByRole("button", { name: "サインアップへ" }));
-    await user.type(screen.getByRole("textbox", { name: "Email" }), "fan@example.com");
-    await user.type(screen.getByRole("textbox", { name: "Display name" }), "Mina");
-    await user.type(screen.getByRole("textbox", { name: "Handle" }), "@mina");
-    await user.click(screen.getByRole("button", { name: "新規登録を続ける" }));
-
-    await waitFor(() => {
-      expect(authenticateFanWithEmailMock).toHaveBeenCalledWith({
-        displayName: "Mina",
-        email: "fan@example.com",
-        handle: "@mina",
-        mode: "sign-up",
-      });
-    });
+    expect(screen.getByRole("textbox", { name: "Confirmation code" })).toBeInTheDocument();
+    expect(screen.getByLabelText("New password")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "パスワードを更新する" })).toBeInTheDocument();
   });
 
-  it("renders mapped contract errors inside the panel", async () => {
-    const user = userEvent.setup();
+  it("hides the email field during re-auth and explains the action", () => {
+    render(<FanAuthEntryPanelHarness initialMode="re-auth" />);
 
-    authenticateFanWithEmailMock.mockRejectedValue(
-      new FanAuthApiError("email_not_found", "email was not found"),
-    );
-
-    render(<FanAuthEntryPanelHarness />);
-
-    await user.type(screen.getByRole("textbox", { name: "Email" }), "fan@example.com");
-    await user.click(screen.getByRole("button", { name: "サインインを続ける" }));
-
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "このメールアドレスのアカウントが見つかりません。サインアップに切り替えてください。",
-    );
+    expect(screen.queryByRole("textbox", { name: "Email" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    expect(screen.getByText("現在の fan session を維持したまま、必要な操作だけを続行します。")).toBeInTheDocument();
   });
 });

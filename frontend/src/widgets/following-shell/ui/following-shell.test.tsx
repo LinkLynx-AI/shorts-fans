@@ -7,7 +7,7 @@ import {
   updateCreatorFollow,
 } from "@/entities/creator";
 import { listFollowingItems } from "@/entities/fan-profile";
-import { useFanAuthDialog } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 import { ApiError } from "@/shared/api";
 import { FollowingShell } from "@/widgets/following-shell";
 
@@ -25,12 +25,12 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
 
   return {
     ...actual,
-    useFanAuthDialog: vi.fn(),
+    useFanAuthDialogControls: vi.fn(),
   };
 });
 
 const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
-const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const openFanAuthDialog = vi.fn();
 
 function getFirstFollowingButton(): HTMLElement {
@@ -46,11 +46,10 @@ function getFirstFollowingButton(): HTMLElement {
 describe("FollowingShell", () => {
   beforeEach(() => {
     mockedUpdateCreatorFollow.mockReset();
-    mockedUseFanAuthDialog.mockReset();
+    mockedUseFanAuthDialogControls.mockReset();
     openFanAuthDialog.mockReset();
-    mockedUseFanAuthDialog.mockReturnValue({
+    mockedUseFanAuthDialogControls.mockReturnValue({
       closeFanAuthDialog: vi.fn(),
-      isFanAuthDialogOpen: false,
       openFanAuthDialog,
     });
   });

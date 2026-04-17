@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useCurrentViewer } from "@/entities/viewer";
+
 import { ApiError } from "@/shared/api";
 
 import {
@@ -62,9 +64,24 @@ export function useCreatorFollowToggle({
   onUnauthenticated,
   updateFollow,
 }: UseCreatorFollowToggleOptions): UseCreatorFollowToggleResult {
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
-  const [isPending, setIsPending] = useState(false);
+  const currentViewer = useCurrentViewer();
+  const viewerIdentityKey = currentViewer?.id ?? null;
+  const viewerScopeKey = `${creatorId}::${viewerIdentityKey ?? "anonymous"}`;
+  const [followState, setFollowState] = useState<{
+    errorMessage: string | null;
+    isFollowing: boolean;
+    isPending: boolean;
+    viewerScopeKey: string;
+  }>(() => ({
+    errorMessage: null,
+    isFollowing: initialIsFollowing,
+    isPending: false,
+    viewerScopeKey,
+  }));
+  const isCurrentViewerScope = followState.viewerScopeKey === viewerScopeKey;
+  const errorMessage = isCurrentViewerScope ? followState.errorMessage : null;
+  const isFollowing = isCurrentViewerScope ? followState.isFollowing : initialIsFollowing;
+  const isPending = isCurrentViewerScope ? followState.isPending : false;
 
   const toggleFollow = async () => {
     if (isPending) {
@@ -72,15 +89,24 @@ export function useCreatorFollowToggle({
     }
 
     if (!hasViewerSession) {
-      setErrorMessage(null);
+      setFollowState({
+        errorMessage: null,
+        isFollowing,
+        isPending: false,
+        viewerScopeKey,
+      });
       onUnauthenticated();
       return;
     }
 
     const action = isFollowing ? "unfollow" : "follow";
 
-    setErrorMessage(null);
-    setIsPending(true);
+    setFollowState({
+      errorMessage: null,
+      isFollowing,
+      isPending: true,
+      viewerScopeKey,
+    });
 
     try {
       const result = await (updateFollow ?? updateCreatorFollow)({
@@ -88,17 +114,31 @@ export function useCreatorFollowToggle({
         creatorId,
       });
 
-      setIsFollowing(result.viewer.isFollowing);
+      setFollowState({
+        errorMessage: null,
+        isFollowing: result.viewer.isFollowing,
+        isPending: false,
+        viewerScopeKey,
+      });
       onSuccess?.(result);
     } catch (error) {
       if (error instanceof CreatorFollowApiError && error.code === "auth_required") {
+        setFollowState({
+          errorMessage: null,
+          isFollowing,
+          isPending: false,
+          viewerScopeKey,
+        });
         onAuthRequired();
         return;
       }
 
-      setErrorMessage(getCreatorFollowErrorMessage(error));
-    } finally {
-      setIsPending(false);
+      setFollowState({
+        errorMessage: getCreatorFollowErrorMessage(error),
+        isFollowing,
+        isPending: false,
+        viewerScopeKey,
+      });
     }
   };
 

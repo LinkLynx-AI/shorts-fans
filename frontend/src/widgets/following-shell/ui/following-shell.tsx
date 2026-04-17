@@ -4,7 +4,7 @@ import {
   FollowingCreatorList,
   type FollowingCreatorListProps,
 } from "@/features/following-creator-list";
-import { useFanAuthDialog } from "@/features/fan-auth";
+import { useFanAuthDialogControls } from "@/features/fan-auth";
 
 type FollowingShellProps = Omit<FollowingCreatorListProps, "onAuthRequired">;
 
@@ -16,7 +16,7 @@ export function FollowingShell({
   items,
   updateFollowingCreatorRelation,
 }: FollowingShellProps) {
-  const { openFanAuthDialog } = useFanAuthDialog();
+  const { openFanAuthDialog } = useFanAuthDialogControls();
 
   return (
     <FollowingCreatorList
