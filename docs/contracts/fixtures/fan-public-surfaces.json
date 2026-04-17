@@ -44,25 +44,46 @@
                 "mainDurationSeconds": 480,
                 "resumePositionSeconds": null
               }
-            }
-          ]
-        },
-        "meta": {
-          "requestId": "req_feed_recommended_public_001",
-          "page": {
-            "nextCursor": "feed:recommended:cursor:001",
-            "hasNext": true
-          }
-        },
-        "error": null
-      }
-    },
-    "recommended_unlocked": {
-      "status": 200,
-      "body": {
-        "data": {
-          "tab": "recommended",
-          "items": [
+            },
+            {
+              "short": {
+                "id": "short_sora_afterrain",
+                "canonicalMainId": "main_sora_after_rain",
+                "creatorId": "creator_sora_vale",
+                "caption": "after rain の balcony preview。",
+                "media": {
+                  "id": "asset_short_sora_afterrain",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/sora-after-rain.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
+                  "durationSeconds": 17
+                },
+                "previewDurationSeconds": 17
+              },
+              "creator": {
+                "id": "creator_sora_vale",
+                "displayName": "Sora Vale",
+                "handle": "@soravale",
+                "avatar": {
+                  "id": "asset_creator_sora_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/sora/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "after rain と balcony mood の short をまとめています。"
+              },
+              "viewer": {
+                "isFollowingCreator": false,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1600,
+                "mainDurationSeconds": 420,
+                "resumePositionSeconds": null
+              }
+            },
             {
               "short": {
                 "id": "short_aoi_softlight",
@@ -93,6 +114,141 @@
               },
               "viewer": {
                 "isFollowingCreator": false,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1700,
+                "mainDurationSeconds": 460,
+                "resumePositionSeconds": null
+              }
+            }
+          ]
+        },
+        "meta": {
+          "requestId": "req_feed_recommended_public_001",
+          "page": {
+            "nextCursor": "feed:recommended:cursor:001",
+            "hasNext": true
+          }
+        },
+        "error": null
+      }
+    },
+    "recommended_unlocked": {
+      "status": 200,
+      "body": {
+        "data": {
+          "tab": "recommended",
+          "items": [
+            {
+              "short": {
+                "id": "short_mina_rooftop",
+                "canonicalMainId": "main_mina_quiet_rooftop",
+                "creatorId": "creator_mina_rei",
+                "caption": "quiet rooftop preview。",
+                "media": {
+                  "id": "asset_short_mina_rooftop",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+                  "durationSeconds": 16
+                },
+                "previewDurationSeconds": 16
+              },
+              "creator": {
+                "id": "creator_mina_rei",
+                "displayName": "Mina Rei",
+                "handle": "@minarei",
+                "avatar": {
+                  "id": "asset_creator_mina_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/mina/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1800,
+                "mainDurationSeconds": 480,
+                "resumePositionSeconds": null
+              }
+            },
+            {
+              "short": {
+                "id": "short_sora_afterrain",
+                "canonicalMainId": "main_sora_after_rain",
+                "creatorId": "creator_sora_vale",
+                "caption": "after rain の balcony preview。",
+                "media": {
+                  "id": "asset_short_sora_afterrain",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/sora-after-rain.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/sora-after-rain-poster.jpg",
+                  "durationSeconds": 17
+                },
+                "previewDurationSeconds": 17
+              },
+              "creator": {
+                "id": "creator_sora_vale",
+                "displayName": "Sora Vale",
+                "handle": "@soravale",
+                "avatar": {
+                  "id": "asset_creator_sora_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/sora/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "after rain と balcony mood の short をまとめています。"
+              },
+              "viewer": {
+                "isFollowingCreator": false,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1600,
+                "mainDurationSeconds": 420,
+                "resumePositionSeconds": null
+              }
+            },
+            {
+              "short": {
+                "id": "short_aoi_softlight",
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "creatorId": "creator_aoi_n",
+                "caption": "soft light の preview。",
+                "media": {
+                  "id": "asset_short_aoi_softlight",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+                  "durationSeconds": 18
+                },
+                "previewDurationSeconds": 18
+              },
+              "creator": {
+                "id": "creator_aoi_n",
+                "displayName": "Aoi N",
+                "handle": "@aoina",
+                "avatar": {
+                  "id": "asset_creator_aoi_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "soft light と close framing の short を中心に更新中。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
                 "isPinned": true
               },
               "unlockCta": {
@@ -109,6 +265,180 @@
           "page": {
             "nextCursor": null,
             "hasNext": false
+          }
+        },
+        "error": null
+      }
+    },
+    "following_ranked": {
+      "status": 200,
+      "body": {
+        "data": {
+          "tab": "following",
+          "items": [
+            {
+              "short": {
+                "id": "short_mina_rooftop",
+                "canonicalMainId": "main_mina_quiet_rooftop",
+                "creatorId": "creator_mina_rei",
+                "caption": "quiet rooftop preview。",
+                "media": {
+                  "id": "asset_short_mina_rooftop",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/mina-rooftop.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/mina-rooftop-poster.jpg",
+                  "durationSeconds": 16
+                },
+                "previewDurationSeconds": 16
+              },
+              "creator": {
+                "id": "creator_mina_rei",
+                "displayName": "Mina Rei",
+                "handle": "@minarei",
+                "avatar": {
+                  "id": "asset_creator_mina_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/mina/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1800,
+                "mainDurationSeconds": 480,
+                "resumePositionSeconds": null
+              }
+            },
+            {
+              "short": {
+                "id": "short_aoi_softlight",
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "creatorId": "creator_aoi_n",
+                "caption": "soft light の preview。",
+                "media": {
+                  "id": "asset_short_aoi_softlight",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/aoi-softlight.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/aoi-softlight-poster.jpg",
+                  "durationSeconds": 18
+                },
+                "previewDurationSeconds": 18
+              },
+              "creator": {
+                "id": "creator_aoi_n",
+                "displayName": "Aoi N",
+                "handle": "@aoina",
+                "avatar": {
+                  "id": "asset_creator_aoi_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "soft light と close framing の short を中心に更新中。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
+                "isPinned": true
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1700,
+                "mainDurationSeconds": 460,
+                "resumePositionSeconds": null
+              }
+            },
+            {
+              "short": {
+                "id": "short_mina_hotel_mirror",
+                "canonicalMainId": "main_mina_hotel_mirror",
+                "creatorId": "creator_mina_rei",
+                "caption": "hotel mirror の preview。",
+                "media": {
+                  "id": "asset_short_mina_mirror",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/mina-mirror.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/mina-mirror-poster.jpg",
+                  "durationSeconds": 18
+                },
+                "previewDurationSeconds": 18
+              },
+              "creator": {
+                "id": "creator_mina_rei",
+                "displayName": "Mina Rei",
+                "handle": "@minarei",
+                "avatar": {
+                  "id": "asset_creator_mina_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/mina/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "quiet rooftop と hotel light の preview を軸に投稿。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "unlock_available",
+                "priceJpy": 1900,
+                "mainDurationSeconds": 510,
+                "resumePositionSeconds": null
+              }
+            },
+            {
+              "short": {
+                "id": "short_aoi_balcony_cut",
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "creatorId": "creator_aoi_n",
+                "caption": "blue tone の balcony preview。",
+                "media": {
+                  "id": "asset_short_aoi_balcony",
+                  "kind": "video",
+                  "url": "https://cdn.example.com/shorts/aoi-balcony.mp4",
+                  "posterUrl": "https://cdn.example.com/shorts/aoi-balcony-poster.jpg",
+                  "durationSeconds": 15
+                },
+                "previewDurationSeconds": 15
+              },
+              "creator": {
+                "id": "creator_aoi_n",
+                "displayName": "Aoi N",
+                "handle": "@aoina",
+                "avatar": {
+                  "id": "asset_creator_aoi_avatar",
+                  "kind": "image",
+                  "url": "https://cdn.example.com/creator/aoi/avatar.jpg",
+                  "posterUrl": null,
+                  "durationSeconds": null
+                },
+                "bio": "soft light と close framing の short を中心に更新中。"
+              },
+              "viewer": {
+                "isFollowingCreator": true,
+                "isPinned": false
+              },
+              "unlockCta": {
+                "state": "continue_main",
+                "priceJpy": null,
+                "mainDurationSeconds": null,
+                "resumePositionSeconds": 198
+              }
+            }
+          ]
+        },
+        "meta": {
+          "requestId": "req_feed_following_ranked_001",
+          "page": {
+            "nextCursor": "feed:following:cursor:001",
+            "hasNext": true
           }
         },
         "error": null
