@@ -1,11 +1,5 @@
 "use client";
 
-import {
-  CreatorRegistrationSectionHeading,
-  creatorRegistrationInlineSurfaceClassName,
-  creatorRegistrationSectionClassName,
-} from "./creator-registration-ui-primitives";
-
 const previewTiles = [
   {
     detail: "確認が終わると、投稿の準備と管理ができるようになります。",
@@ -29,21 +23,21 @@ const previewTiles = [
  */
 export function CreatorRegistrationStaticWorkspacePreview() {
   return (
-    <section className={`mt-6 ${creatorRegistrationSectionClassName}`}>
-      <CreatorRegistrationSectionHeading>
+    <section className="rounded-[28px] border border-gray-100 bg-white p-5 shadow-[0_2px_15px_rgba(0,0,0,0.03)]">
+      <p className="text-[12px] font-black tracking-[0.15em] text-[#a3adbc]">
         利用開始後の画面
-      </CreatorRegistrationSectionHeading>
-      <h2 className="mt-3 font-display text-[24px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">
+      </p>
+      <h2 className="mt-3 text-[22px] font-extrabold leading-tight text-foreground">
         利用開始後に使える画面
       </h2>
-      <p className="mt-2 text-sm leading-6 text-muted">
+      <p className="mt-1 text-[13px] font-medium leading-relaxed text-muted">
         ここでは、確認が終わったあとに使える画面の雰囲気だけを先に確認できます。
       </p>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 space-y-3">
         {previewTiles.map((tile) => (
           <div
-            className={creatorRegistrationInlineSurfaceClassName}
+            className="rounded-[22px] border border-gray-100 bg-[#f8f9fc] px-4 py-4"
             key={tile.label}
           >
             <p className="text-[12px] font-black tracking-[0.08em] text-[#a3adbc]">
@@ -52,7 +46,9 @@ export function CreatorRegistrationStaticWorkspacePreview() {
             <p className="mt-2 text-[16px] font-bold tracking-[-0.02em] text-foreground">
               {tile.value}
             </p>
-            <p className="mt-1 text-sm leading-6 text-muted">{tile.detail}</p>
+            <p className="mt-1 text-[13px] font-medium leading-relaxed text-muted">
+              {tile.detail}
+            </p>
           </div>
         ))}
       </div>

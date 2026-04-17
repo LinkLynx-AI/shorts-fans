@@ -62,7 +62,7 @@ describe("CreatorRegistrationSuccessPanel", () => {
     expect(screen.getByText("現在の状態")).toBeInTheDocument();
     expect(screen.getByText("確認中")).toBeInTheDocument();
     expect(screen.getByText("受付日時")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "プロフィール設定を開く" })).toHaveAttribute("href", "/fan/settings/profile");
+    expect(screen.getByRole("link", { name: "編集する" })).toHaveAttribute("href", "/fan/settings/profile");
     expect(screen.getByRole("link", { name: "ホームに戻る" })).toHaveAttribute("href", "/fan");
     expect(screen.queryByText("creator submitted")).not.toBeInTheDocument();
     expect(screen.queryByText("fan hub に戻る")).not.toBeInTheDocument();
