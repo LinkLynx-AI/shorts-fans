@@ -2,50 +2,179 @@
 
 ## 位置づけ
 
-- この文書は `SHO-121 fan profile から creator entry を始める` の transport 契約を固定します。
-- fan private hub から creator registration を開始し、success surface を挟んで `activeMode` を `creator` へ切り替える最小導線を対象にします。
-- creator registration は shared viewer profile を使って creator capability を付与する entry であり、`displayName / handle / avatar` の入力面ではありません。
+- この文書は `SHO-121 fan profile から creator entry を始める` を土台に、`SHO-171 creator registration / review の契約と状態境界を更新する` の transport 契約を固定します。
+- fan private hub から始める creator onboarding のうち、`status read`、`initial submit`、`eligible reject の resubmit`、`active mode switch` の境界だけを扱います。
+- creator registration は shared viewer profile を preview しながら creator capability 審査へ進む entry であり、`displayName / handle / avatar` の再入力面ではありません。
 
 ## Goals
 
-- authenticated fan が `fan profile` から creator registration を開始できるようにする。
-- creator registration 完了後に `canAccessCreatorMode = true` を bootstrap へ反映できるようにする。
-- success surface の CTA から `activeMode = creator` を明示的に切り替えられるようにする。
-- creator registration 時に shared viewer profile を読み、fan / creator で同じ `displayName / handle / avatar` を使う。
+- authenticated fan が current viewer 自身の creator registration status を読めるようにする。
+- creator registration を `draft / submitted / approved / rejected / suspended` 前提へ置き換え、`approved` まで creator mode を開かないようにする。
+- approval 前 surface を `read-only onboarding surface + shared viewer profile basics preview + private bio draft` に限定する。
+- rejection metadata と self-serve resubmit eligibility を、transport と fixture の両方で辿れるようにする。
 
 ## Non-goals
 
-- creator dashboard / creator home 自体の read 契約
+- creator onboarding intake payload、required docs、証跡 upload の concrete schema
 - shared viewer profile の作成 / 編集
-- creator registration 時の `displayName / handle / avatar / bio` 入力 UI
-- review / pending / reject / resubmit workflow
+- admin review UI と review decision mutation
+- creator dashboard / creator home 自体の read 契約
 
 ## Canonical Sources
 
+- `docs/contracts/fan-auth-api-contract.md`
 - `docs/contracts/viewer-bootstrap-api-contract.md`
 - `docs/contracts/viewer-profile-api-contract.md`
 - `docs/contracts/creator-workspace-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/contracts/mvp-core-domain-contract.md`
-- `docs/contracts/mvp-media-workflow-contract.md`
 - `docs/ssot/product/account/identity-and-mode-model.md`
 - `docs/ssot/product/account/account-permissions.md`
 - `docs/ssot/product/creator/creator-onboarding-surface.md`
+- `docs/ssot/product/creator/creator-workflow.md`
+- `docs/ssot/product/moderation/moderation-and-review.md`
 
 ## Endpoint Summary
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `POST` | `/api/viewer/creator-registration` | required | fan profile から始める self-serve creator registration |
+| `GET` | `/api/viewer/creator-registration` | required | current viewer の creator registration status read |
+| `POST` | `/api/viewer/creator-registration` | required | no-case または `draft` から creator registration を submit |
+| `POST` | `/api/viewer/creator-registration/resubmit` | required | eligible な `rejected` case を self-serve resubmit |
 | `PUT` | `/api/viewer/active-mode` | required | `fan` / `creator` の active mode switch |
 
 ## Shared Rules
 
 - creator registration は current viewer 自身だけを対象にします。
+- auth は `docs/contracts/fan-auth-api-contract.md` の app session cookie を前提にし、Cognito token や provider state を request / response に含めません。
 - `displayName / handle / avatar` は `docs/contracts/viewer-profile-api-contract.md` の shared viewer profile から読みます。
-- current primary flow では sign-up flow または fan settings で shared viewer profile を準備してから creator registration に進みます。
-- creator registration 完了時点では `activeMode` を自動切替しません。
+- approval 前 state では public creator profile を公開せず、creator workspace / upload / submission package 作成 UI を解放しません。
+- creator 固有の `bio` は onboarding draft として private に保持してよいですが、write transport 自体はこの leaf では固定しません。
+- registration submit / resubmit 完了時点では `activeMode` を自動切替しません。
+- registration submit / resubmit は creator capability を即時 `approved` にせず、後続の `GET /api/viewer/bootstrap` でも `canAccessCreatorMode = false` を維持します。
+- `reasonCode` は opaque string として扱い、この leaf では enum を固定しません。
 - legacy な creator-registration avatar upload route が残っていても、この文書の canonical flow には含めません。
+
+## `GET /api/viewer/creator-registration`
+
+### Success
+
+- status は `200 OK`
+- `data.registration` は current viewer の onboarding case が未開始なら `null`、開始済みなら `CreatorRegistrationStatus` を返します。
+- `meta.page = null`、`error = null` を維持します。
+
+```json
+{
+  "data": {
+    "registration": {
+      "state": "submitted",
+      "sharedProfile": {
+        "avatar": {
+          "id": "asset_viewer_profile_avatar_760f5b5cb41c4cc48817d7f90d7ef6d6",
+          "kind": "image",
+          "url": "https://cdn.example.com/avatars/mina.jpg",
+          "posterUrl": null,
+          "durationSeconds": null
+        },
+        "displayName": "Mina Rei",
+        "handle": "@minarei"
+      },
+      "creatorDraft": {
+        "bio": "quiet rooftop の continuation を中心に投稿します。"
+      },
+      "review": {
+        "submittedAt": "2026-04-16T09:30:00Z",
+        "approvedAt": null,
+        "rejectedAt": null,
+        "suspendedAt": null
+      },
+      "rejection": null,
+      "surface": {
+        "kind": "read_only_onboarding",
+        "workspacePreview": "static_mock"
+      },
+      "actions": {
+        "canSubmit": false,
+        "canResubmit": false,
+        "canEnterCreatorMode": false
+      }
+    }
+  },
+  "meta": {
+    "requestId": "req_viewer_creator_registration_status_001",
+    "page": null
+  },
+  "error": null
+}
+```
+
+### `CreatorRegistrationStatus`
+
+| field | type | notes |
+| --- | --- | --- |
+| `state` | `"draft" \| "submitted" \| "approved" \| "rejected" \| "suspended"` | creator capability review state |
+| `sharedProfile` | `ViewerProfilePreview` | current shared viewer profile の read-only preview |
+| `creatorDraft.bio` | `string` | private creator bio draft。未入力なら空文字 |
+| `review` | `CreatorRegistrationReviewTimeline` | review timestamps の summary |
+| `rejection` | `CreatorRegistrationRejection \| null` | `state = rejected` のときだけ object |
+| `surface` | `CreatorRegistrationSurface` | approval 前 guardrail の解釈を固定する |
+| `actions` | `CreatorRegistrationActions` | current state から取りうる次 action |
+
+### `ViewerProfilePreview`
+
+- shape は `docs/contracts/viewer-profile-api-contract.md` の `GET /api/viewer/profile` における `profile` と同じです。
+- `displayName / handle / avatar` は preview 専用であり、この endpoint から更新しません。
+- shared viewer profile を直したい場合は `docs/contracts/viewer-profile-api-contract.md` を使います。
+
+### `CreatorRegistrationReviewTimeline`
+
+| field | type | notes |
+| --- | --- | --- |
+| `submittedAt` | `string \| null` | ISO-8601。未 submit は `null` |
+| `approvedAt` | `string \| null` | ISO-8601 |
+| `rejectedAt` | `string \| null` | ISO-8601 |
+| `suspendedAt` | `string \| null` | ISO-8601 |
+
+### `CreatorRegistrationRejection`
+
+| field | type | notes |
+| --- | --- | --- |
+| `reasonCode` | `string` | opaque string。文言化は frontend / copy 側の責務 |
+| `isResubmitEligible` | `boolean` | fixable reject に限り `true` |
+| `isSupportReviewRequired` | `boolean` | support / manual review を通すまで self-serve resubmit 不可 |
+| `selfServeResubmitCount` | `number` | accepted 済み self-serve resubmit 回数 |
+| `selfServeResubmitRemaining` | `number` | `0..2`。同じ onboarding case で残る self-serve 回数 |
+
+### `CreatorRegistrationSurface`
+
+| field | type | notes |
+| --- | --- | --- |
+| `kind` | `"read_only_onboarding" \| "creator_workspace"` | 現在 user に見せてよい surface |
+| `workspacePreview` | `"static_mock" \| null` | approval 前は `static_mock`、approved 後は `null` |
+
+### `CreatorRegistrationActions`
+
+| field | type | notes |
+| --- | --- | --- |
+| `canSubmit` | `boolean` | `draft` のときだけ `true` |
+| `canResubmit` | `boolean` | eligible な `rejected` のときだけ `true` |
+| `canEnterCreatorMode` | `boolean` | approved creator capability を持つときだけ `true` |
+
+### Status Rules
+
+- onboarding case 未開始の viewer は `data.registration = null` を返します。
+- `draft / submitted / rejected / suspended` はすべて `surface.kind = read_only_onboarding`、`surface.workspacePreview = "static_mock"` を返します。
+- `approved` は `surface.kind = creator_workspace`、`surface.workspacePreview = null`、`actions.canEnterCreatorMode = true` を返します。
+- `rejection` object は `state = rejected` のときだけ返し、それ以外は `null` です。
+- `selfServeResubmitRemaining` は `2 - selfServeResubmitCount` を返し、負値にはしません。
+- `isResubmitEligible = true` でも `isSupportReviewRequired = true` の場合は `actions.canResubmit = false` です。
+
+### Error Contract
+
+| status | code | notes |
+| --- | --- | --- |
+| `401` | `auth_required` | session 不在 |
+| `500` | `internal_error` | unexpected failure |
 
 ## `POST /api/viewer/creator-registration`
 
@@ -58,18 +187,16 @@
 ### Success
 
 - status は `204 No Content`
-- 登録成功時点では `activeMode` を切り替えません。
-- 後続の `GET /api/viewer/bootstrap` では `canAccessCreatorMode = true`、`activeMode = fan` を返します。
+- canonical current state は `GET /api/viewer/creator-registration` と `GET /api/viewer/bootstrap` の再読で確認します。
 
-### Registration Rules
+### Submit Rules
 
-- request user を viewer 自身の creator として登録します。
-- creator capability は即時 `approved` で upsert します。
-- creator profile は registration transaction 内で upsert し、shared viewer profile の `displayName / handle / avatar` を mirror します。
-- creator 固有の `bio` は registration 時点では空文字で初期化し、後続の `/api/creator/workspace/profile` で更新します。
-- creator profile は暫定運用として successful registration 時に即時 public 化します。
-- shared viewer profile が sign-up flow で既に作成済み、または fan settings で準備済みである前提で動作し、registration request 自体は profile field を受け取りません。
-- `handle` の uniqueness は shared viewer profile 準備時点で解決済みとし、creator registration 側で再裁定しません。
+- target は current viewer 自身の onboarding case だけです。
+- onboarding case が未開始なら、server は shared viewer profile preview と empty bio draft を基点に最小 case を作成し、そのまま `submitted` へ遷移してよいものとします。
+- onboarding case が `draft` の場合は、現在保存済みの draft を `submitted` へ遷移します。
+- submit 成功は creator capability 付与や public creator profile 公開を意味しません。
+- submit 後も `GET /api/viewer/bootstrap` では `canAccessCreatorMode = false`、`activeMode = fan` を返します。
+- concrete な intake completeness、required docs、evidence validation は後続 intake contract の責務とし、この leaf では state transition 境界だけを固定します。
 
 ### Error Contract
 
@@ -79,6 +206,37 @@
 | `400` | `invalid_display_name` | shared viewer profile の display name が不正 |
 | `400` | `invalid_handle` | shared viewer profile の handle が不正 |
 | `401` | `auth_required` | session 不在 |
+| `409` | `registration_state_conflict` | no-case / `draft` 以外から initial submit を要求 |
+| `500` | `internal_error` | unexpected failure |
+
+## `POST /api/viewer/creator-registration/resubmit`
+
+### Request
+
+```json
+{}
+```
+
+### Success
+
+- status は `204 No Content`
+- canonical current state は `GET /api/viewer/creator-registration` と `GET /api/viewer/bootstrap` の再読で確認します。
+
+### Resubmit Rules
+
+- `state = rejected`、`rejection.isResubmitEligible = true`、`rejection.isSupportReviewRequired = false`、`rejection.selfServeResubmitCount < 2` の場合だけ self-serve resubmit を許可します。
+- 受理された resubmit は `rejected -> submitted` へ遷移し、`selfServeResubmitCount` を 1 加算します。
+- `fixable reject` には一律 cooldown を置きません。
+- `blocked reject` と `suspended` は self-serve resubmit を開かず、support review 前提にします。
+- resubmit 成功後も creator capability は未付与のままで、creator mode は開きません。
+
+### Error Contract
+
+| status | code | notes |
+| --- | --- | --- |
+| `400` | `invalid_request` | malformed JSON / extra payload |
+| `401` | `auth_required` | session 不在 |
+| `409` | `resubmit_not_allowed` | `rejected` 以外、support review required、または self-serve 上限到達 |
 | `500` | `internal_error` | unexpected failure |
 
 ## `PUT /api/viewer/active-mode`
@@ -103,9 +261,9 @@
 ### Mode Switch Rules
 
 - `fan -> creator` は approved creator capability がある viewer だけ許可します。
+- `draft / submitted / rejected / suspended` の creator registration status は creator mode 解放条件になりません。
 - `creator -> fan` は authenticated viewer なら許可します。
 - mode switch 完了後の canonical current viewer state は `GET /api/viewer/bootstrap` で確認します。
-- frontend は registration 完了後に success surface を挟み、そこから明示 CTA で `creator` へ切り替える前提です。
 
 ### Error Contract
 
@@ -119,10 +277,11 @@
 
 ## Boundary Guardrails
 
-- registration endpoint は profile preview や dashboard data を返しません。
-- registration endpoint は `displayName / handle / avatar / bio` を request body で受けません。
-- creator registration と mode switch は transport 上で分離し、登録直後に自動遷移しません。
-- review state や checklist はこの leaf では transport に含めません。
+- creator registration status は bootstrap に重ねて返しません。app shell の global self state は引き続き `GET /api/viewer/bootstrap`、status detail はこの contract を正とします。
+- registration submit / resubmit endpoint は `displayName / handle / avatar / bio` を request body で受けません。
+- approval 前 surface は `read-only onboarding surface + shared viewer profile preview + private bio draft + static mock workspace preview` に限定します。
+- registration / resubmit 成功時に dashboard data、upload target、public creator profile header を返しません。
+- public creator profile の公開可否は creator capability approval と別に管理し、registration submit / resubmit transaction 内で即時 public 化しません。
 
 ## Fixture Reference
 

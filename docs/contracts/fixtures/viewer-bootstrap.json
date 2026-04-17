@@ -13,6 +13,76 @@
     },
     "error": null
   },
+  "draftRegistrationViewer": {
+    "data": {
+      "currentViewer": {
+        "id": "user_draft_creator_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_draft_creator_001",
+      "page": null
+    },
+    "error": null
+  },
+  "submittedRegistrationViewer": {
+    "data": {
+      "currentViewer": {
+        "id": "user_submitted_creator_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_submitted_creator_001",
+      "page": null
+    },
+    "error": null
+  },
+  "submittedRegistrationViewerNormalizedFromCreatorSession": {
+    "data": {
+      "currentViewer": {
+        "id": "user_submitted_creator_legacy_session_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_submitted_creator_normalized_001",
+      "page": null
+    },
+    "error": null
+  },
+  "rejectedRegistrationViewer": {
+    "data": {
+      "currentViewer": {
+        "id": "user_rejected_creator_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_rejected_creator_001",
+      "page": null
+    },
+    "error": null
+  },
+  "suspendedRegistrationViewer": {
+    "data": {
+      "currentViewer": {
+        "id": "user_suspended_creator_001",
+        "activeMode": "fan",
+        "canAccessCreatorMode": false
+      }
+    },
+    "meta": {
+      "requestId": "req_viewer_bootstrap_suspended_creator_001",
+      "page": null
+    },
+    "error": null
+  },
   "authenticatedCreator": {
     "data": {
       "currentViewer": {
