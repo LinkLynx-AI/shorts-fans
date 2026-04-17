@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { getCreatorInitials } from "@/entities/creator";
+import type { ViewerProfileAvatarField } from "@/features/viewer-profile";
 import { cn } from "@/shared/lib";
 import {
   Avatar,
@@ -27,18 +28,8 @@ import {
   type FanAuthMode,
 } from "../model/fan-auth";
 
-type FanAuthEntryAvatar = {
-  canClear: boolean;
-  fileName: string | null;
-  inputAccept: string;
-  isError: boolean;
-  kind: "completed" | "empty" | "failed" | "invalid" | "selected" | "uploading";
-  message: string;
-  previewUrl: string | null;
-};
-
 type FanAuthEntryPanelProps = {
-  avatar: FanAuthEntryAvatar;
+  avatar: ViewerProfileAvatarField;
   avatarInputKey: number;
   canResend: boolean;
   clearAvatarSelection: () => void;
@@ -291,7 +282,7 @@ function buildPrimaryActionLabel(
   return getFanAuthSubmitLabel(mode, isSubmitting);
 }
 
-function buildAvatarSurfaceClasses(kind: FanAuthEntryAvatar["kind"]) {
+function buildAvatarSurfaceClasses(kind: ViewerProfileAvatarField["kind"]) {
   switch (kind) {
     case "failed":
     case "invalid":
@@ -308,7 +299,7 @@ function buildAvatarSurfaceClasses(kind: FanAuthEntryAvatar["kind"]) {
   }
 }
 
-function buildAvatarPreviewClasses(kind: FanAuthEntryAvatar["kind"]) {
+function buildAvatarPreviewClasses(kind: ViewerProfileAvatarField["kind"]) {
   switch (kind) {
     case "failed":
     case "invalid":
@@ -329,7 +320,7 @@ function buildAvatarActionLabel(fileName: string | null) {
   return fileName ? "画像を変更" : "画像を選択";
 }
 
-function renderAvatarStateIcon(kind: FanAuthEntryAvatar["kind"]) {
+function renderAvatarStateIcon(kind: ViewerProfileAvatarField["kind"]) {
   switch (kind) {
     case "failed":
     case "invalid":
@@ -384,7 +375,7 @@ function FanAuthAvatarField({
   isSubmitting,
   onAvatarSelect,
 }: {
-  avatar: FanAuthEntryAvatar;
+  avatar: ViewerProfileAvatarField;
   avatarInputKey: number;
   clearAvatarSelection: () => void;
   displayName: string;
@@ -653,8 +644,12 @@ export function FanAuthEntryPanel({
               disabled={isSubmitting}
               helpText={
                 <>
-                  使える文字は英数字・<code className="rounded bg-[#edf2f7] px-1.5 py-0.5 text-[11px] text-muted-strong">.</code>・
-                  <code className="rounded bg-[#edf2f7] px-1.5 py-0.5 text-[11px] text-muted-strong">_</code> です。
+                  先頭の
+                  <code className="rounded bg-[#edf2f7] px-1.5 py-0.5 text-[11px] text-muted-strong">@</code>
+                  は省略可、使える文字は英数字・
+                  <code className="rounded bg-[#edf2f7] px-1.5 py-0.5 text-[11px] text-muted-strong">.</code>・
+                  <code className="rounded bg-[#edf2f7] px-1.5 py-0.5 text-[11px] text-muted-strong">_</code>
+                  です。
                 </>
               }
               id="fan-auth-handle"

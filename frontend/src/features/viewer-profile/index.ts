@@ -15,4 +15,7 @@ export {
   getViewerProfileSaveErrorMessage,
   type ViewerProfileInitialValues,
 } from "./model/viewer-profile";
-export { useViewerProfileDraft } from "./model/use-viewer-profile-draft";
+export {
+  useViewerProfileDraft,
+  type ViewerProfileAvatarField,
+} from "./model/use-viewer-profile-draft";
