@@ -156,7 +156,7 @@ func (s *ReviewService) loadReviewCaseSnapshot(
 		return registrationSnapshot{}, fmt.Errorf("creator registration review service が初期化されていません")
 	}
 
-	snapshot, err := s.repository.loadSnapshot(ctx, s.repository.queries, userID, includeEvidences)
+	snapshot, err := s.repository.loadSnapshot(ctx, s.repository.queries, userID, includeEvidences, false)
 	if err != nil {
 		if errors.Is(err, ErrSharedProfileNotFound) {
 			return registrationSnapshot{}, ErrReviewCaseNotFound

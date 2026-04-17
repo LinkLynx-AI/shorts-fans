@@ -19,6 +19,7 @@ type repositoryQueriesStub struct {
 	createCreatorCapability            func(context.Context, sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	createCreatorProfile               func(context.Context, sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	getCreatorCapabilityByUserID       func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	getCreatorCapabilityByUserIDLocked func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	getCreatorProfileByUserID          func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	getCreatorRegistrationIntakeByUser func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	getUserProfileByUserID             func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error)
@@ -49,6 +50,16 @@ func (s repositoryQueriesStub) GetCreatorCapabilityByUserID(ctx context.Context,
 		panic("unexpected GetCreatorCapabilityByUserID call")
 	}
 	return s.getCreatorCapabilityByUserID(ctx, userID)
+}
+
+func (s repositoryQueriesStub) GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+	if s.getCreatorCapabilityByUserIDLocked != nil {
+		return s.getCreatorCapabilityByUserIDLocked(ctx, userID)
+	}
+	if s.getCreatorCapabilityByUserID != nil {
+		return s.getCreatorCapabilityByUserID(ctx, userID)
+	}
+	panic("unexpected GetCreatorCapabilityByUserIDForUpdate call")
 }
 
 func (s repositoryQueriesStub) GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error) {
@@ -780,7 +791,7 @@ func TestLoadSnapshotAndUpsertDraftProfileErrors(t *testing.T) {
 			return sqlc.AppUserProfile{}, pgx.ErrNoRows
 		},
 	})
-	if _, err := repo.loadSnapshot(context.Background(), repo.queries, userID, false); !errors.Is(err, ErrSharedProfileNotFound) {
+	if _, err := repo.loadSnapshot(context.Background(), repo.queries, userID, false, false); !errors.Is(err, ErrSharedProfileNotFound) {
 		t.Fatalf("loadSnapshot() error got %v want %v", err, ErrSharedProfileNotFound)
 	}
 

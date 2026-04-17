@@ -52,6 +52,7 @@ type queries interface {
 	CreateCreatorCapability(ctx context.Context, arg sqlc.CreateCreatorCapabilityParams) (sqlc.AppCreatorCapability, error)
 	CreateCreatorProfile(ctx context.Context, arg sqlc.CreateCreatorProfileParams) (sqlc.AppCreatorProfile, error)
 	GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	GetCreatorProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorProfile, error)
 	GetCreatorRegistrationIntakeByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error)
 	GetUserProfileByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppUserProfile, error)
@@ -221,7 +222,7 @@ func (r *Repository) GetRegistration(ctx context.Context, userID uuid.UUID) (*Re
 		return nil, fmt.Errorf("creator registration repository が初期化されていません")
 	}
 
-	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, false)
+	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -243,7 +244,7 @@ func (r *Repository) GetIntake(ctx context.Context, userID uuid.UUID) (Intake, e
 		return Intake{}, fmt.Errorf("creator registration repository が初期化されていません")
 	}
 
-	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, true)
+	snapshot, err := r.loadSnapshot(ctx, r.queries, userID, true, false)
 	if err != nil {
 		return Intake{}, err
 	}
@@ -259,7 +260,7 @@ func (r *Repository) PrepareEvidenceUpload(ctx context.Context, userID uuid.UUID
 
 	return postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, userID, false)
+		snapshot, err := r.loadSnapshot(ctx, q, userID, false, true)
 		if err != nil {
 			return err
 		}
@@ -280,7 +281,7 @@ func (r *Repository) SaveEvidence(ctx context.Context, input SaveEvidenceInput) 
 	var result SaveEvidenceResult
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, loadErr := r.loadSnapshot(ctx, q, input.UserID, true)
+		snapshot, loadErr := r.loadSnapshot(ctx, q, input.UserID, true, true)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -334,7 +335,7 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 	var intake Intake
 	err = postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, loadErr := r.loadSnapshot(ctx, q, normalized.userID, true)
+		snapshot, loadErr := r.loadSnapshot(ctx, q, normalized.userID, true, true)
 		if loadErr != nil {
 			return loadErr
 		}
@@ -359,7 +360,7 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 			return fmt.Errorf("creator registration intake 保存 user=%s: %w", normalized.userID, err)
 		}
 
-		updatedSnapshot, err := r.loadSnapshot(ctx, q, normalized.userID, true)
+		updatedSnapshot, err := r.loadSnapshot(ctx, q, normalized.userID, true, false)
 		if err != nil {
 			return err
 		}
@@ -382,7 +383,7 @@ func (r *Repository) Submit(ctx context.Context, userID uuid.UUID) (Registration
 	var registration Registration
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, userID, true)
+		snapshot, err := r.loadSnapshot(ctx, q, userID, true, true)
 		if err != nil {
 			return err
 		}
@@ -558,7 +559,13 @@ func ensureDraftEditable(capability *sqlc.AppCreatorCapability) error {
 	return nil
 }
 
-func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UUID, includeEvidences bool) (registrationSnapshot, error) {
+func (r *Repository) loadSnapshot(
+	ctx context.Context,
+	q queries,
+	userID uuid.UUID,
+	includeEvidences bool,
+	lockCapability bool,
+) (registrationSnapshot, error) {
 	userProfile, err := q.GetUserProfileByUserID(ctx, postgres.UUIDToPG(userID))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -569,7 +576,7 @@ func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UU
 
 	snapshot := registrationSnapshot{userProfile: userProfile}
 
-	capability, err := q.GetCreatorCapabilityByUserID(ctx, postgres.UUIDToPG(userID))
+	capability, err := loadCapability(ctx, q, userID, lockCapability)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
 			return registrationSnapshot{}, fmt.Errorf("creator registration capability 取得 user=%s: %w", userID, err)
@@ -605,6 +612,15 @@ func (r *Repository) loadSnapshot(ctx context.Context, q queries, userID uuid.UU
 	}
 
 	return snapshot, nil
+}
+
+func loadCapability(ctx context.Context, q queries, userID uuid.UUID, lockCapability bool) (sqlc.AppCreatorCapability, error) {
+	userPGID := postgres.UUIDToPG(userID)
+	if lockCapability {
+		return q.GetCreatorCapabilityByUserIDForUpdate(ctx, userPGID)
+	}
+
+	return q.GetCreatorCapabilityByUserID(ctx, userPGID)
 }
 
 func isSnapshotComplete(snapshot registrationSnapshot) bool {

@@ -121,6 +121,36 @@ func (q *Queries) GetCreatorCapabilityByUserID(ctx context.Context, userID pgtyp
 	return i, err
 }
 
+const getCreatorCapabilityByUserIDForUpdate = `-- name: GetCreatorCapabilityByUserIDForUpdate :one
+SELECT user_id, state, rejection_reason_code, is_resubmit_eligible, is_support_review_required, self_serve_resubmit_count, kyc_provider_case_ref, payout_provider_account_ref, submitted_at, approved_at, rejected_at, suspended_at, created_at, updated_at
+FROM app.creator_capabilities
+WHERE user_id = $1
+LIMIT 1
+FOR UPDATE
+`
+
+func (q *Queries) GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (AppCreatorCapability, error) {
+	row := q.db.QueryRow(ctx, getCreatorCapabilityByUserIDForUpdate, userID)
+	var i AppCreatorCapability
+	err := row.Scan(
+		&i.UserID,
+		&i.State,
+		&i.RejectionReasonCode,
+		&i.IsResubmitEligible,
+		&i.IsSupportReviewRequired,
+		&i.SelfServeResubmitCount,
+		&i.KycProviderCaseRef,
+		&i.PayoutProviderAccountRef,
+		&i.SubmittedAt,
+		&i.ApprovedAt,
+		&i.RejectedAt,
+		&i.SuspendedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateCreatorCapabilityState = `-- name: UpdateCreatorCapabilityState :one
 UPDATE app.creator_capabilities
 SET
