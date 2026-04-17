@@ -1,5 +1,9 @@
 aws_region = "ap-northeast-1"
 
+# Verify this SES sender first, then switch cognito_use_ses_developer_email to true.
+cognito_email_from_address       = "no-reply@example.com"
+cognito_use_ses_developer_email  = false
+
 allowed_app_origins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
