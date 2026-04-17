@@ -44,7 +44,8 @@
 ### Main Playback
 
 - main は locked/private delivery を前提にし、current session で検証済みの access entry がある場合だけ `url` と `posterUrl` を返します。
-- actual billing は別 leaf に分離し、この phase では `access-entry` による unlock access 記録と temporary grant 発行を扱います。
+- actual billing と durable purchase 記録の contract は `fan-unlock-main-api-contract.md` が担当し、この文書では purchase 済みまたは owner access 済みの main だけを playback へ出す前提を固定します。
+- `access-entry` は durable purchase や owner access を検証した後に temporary grant を発行するだけで、purchase record 自体は作りません。
 - main playback grant は library 永続化や purchase ledger と同義にしません。
 
 ### Owner Preview

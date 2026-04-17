@@ -36,9 +36,10 @@
             "durationSeconds": 480,
             "priceJpy": 1800
           },
-          "mainAccessEntry": {
-            "routePath": "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
-            "token": "signed_entry_token_rooftop"
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_mina_quiet_rooftop/purchase",
+            "accessEntryPath": "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+            "token": "signed_entry_context_token_rooftop"
           },
           "access": {
             "mainId": "main_mina_quiet_rooftop",
@@ -51,10 +52,22 @@
             "mainDurationSeconds": 480,
             "resumePositionSeconds": null
           },
-          "setup": {
-            "required": true,
-            "requiresAgeConfirmation": true,
-            "requiresTermsAcceptance": true
+          "purchase": {
+            "state": "setup_required",
+            "supportedCardBrands": [
+              "visa",
+              "mastercard",
+              "jcb",
+              "american_express"
+            ],
+            "savedPaymentMethods": [],
+            "setup": {
+              "required": true,
+              "requiresCardSetup": true,
+              "requiresAgeConfirmation": true,
+              "requiresTermsAcceptance": true
+            },
+            "pendingReason": null
           }
         },
         "meta": {
@@ -100,9 +113,10 @@
             "durationSeconds": 540,
             "priceJpy": 2100
           },
-          "mainAccessEntry": {
-            "routePath": "/api/fan/mains/main_sora_after_rain/access-entry",
-            "token": "signed_entry_token_afterrain"
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_sora_after_rain/purchase",
+            "accessEntryPath": "/api/fan/mains/main_sora_after_rain/access-entry",
+            "token": "signed_entry_context_token_afterrain"
           },
           "access": {
             "mainId": "main_sora_after_rain",
@@ -115,10 +129,28 @@
             "mainDurationSeconds": 540,
             "resumePositionSeconds": null
           },
-          "setup": {
-            "required": false,
-            "requiresAgeConfirmation": false,
-            "requiresTermsAcceptance": false
+          "purchase": {
+            "state": "purchase_ready",
+            "supportedCardBrands": [
+              "visa",
+              "mastercard",
+              "jcb",
+              "american_express"
+            ],
+            "savedPaymentMethods": [
+              {
+                "paymentMethodId": "pm_saved_visa_001",
+                "brand": "visa",
+                "last4": "4242"
+              }
+            ],
+            "setup": {
+              "required": false,
+              "requiresCardSetup": false,
+              "requiresAgeConfirmation": false,
+              "requiresTermsAcceptance": false
+            },
+            "pendingReason": null
           }
         },
         "meta": {
@@ -128,7 +160,90 @@
         "error": null
       }
     },
-    "unlocked": {
+    "purchase_pending": {
+      "status": 200,
+      "body": {
+        "data": {
+          "short": {
+            "id": "short_emi_midnight",
+            "canonicalMainId": "main_emi_midnight_room",
+            "creatorId": "creator_emi_lane",
+            "caption": "midnight room preview。",
+            "media": {
+              "id": "asset_short_emi_midnight",
+              "kind": "video",
+              "url": "https://cdn.example.com/shorts/emi-midnight.mp4",
+              "posterUrl": "https://cdn.example.com/shorts/emi-midnight-poster.jpg",
+              "durationSeconds": 19
+            },
+            "previewDurationSeconds": 19
+          },
+          "creator": {
+            "id": "creator_emi_lane",
+            "displayName": "Emi Lane",
+            "handle": "@emilane",
+            "avatar": {
+              "id": "asset_creator_emi_avatar",
+              "kind": "image",
+              "url": "https://cdn.example.com/creator/emi/avatar.jpg",
+              "posterUrl": null,
+              "durationSeconds": null
+            },
+            "bio": "midnight room と close whisper の preview を更新。"
+          },
+          "main": {
+            "id": "main_emi_midnight_room",
+            "durationSeconds": 660,
+            "priceJpy": 2300
+          },
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_emi_midnight_room/purchase",
+            "accessEntryPath": "/api/fan/mains/main_emi_midnight_room/access-entry",
+            "token": "signed_entry_context_token_midnight"
+          },
+          "access": {
+            "mainId": "main_emi_midnight_room",
+            "status": "locked",
+            "reason": "unlock_required"
+          },
+          "unlockCta": {
+            "state": "unlock_available",
+            "priceJpy": 2300,
+            "mainDurationSeconds": 660,
+            "resumePositionSeconds": null
+          },
+          "purchase": {
+            "state": "purchase_pending",
+            "supportedCardBrands": [
+              "visa",
+              "mastercard",
+              "jcb",
+              "american_express"
+            ],
+            "savedPaymentMethods": [
+              {
+                "paymentMethodId": "pm_saved_mastercard_002",
+                "brand": "mastercard",
+                "last4": "4444"
+              }
+            ],
+            "setup": {
+              "required": false,
+              "requiresCardSetup": false,
+              "requiresAgeConfirmation": false,
+              "requiresTermsAcceptance": false
+            },
+            "pendingReason": "provider_processing"
+          }
+        },
+        "meta": {
+          "requestId": "req_unlock_purchase_pending_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "already_purchased": {
       "status": 200,
       "body": {
         "data": {
@@ -164,14 +279,15 @@
             "durationSeconds": 720,
             "priceJpy": 2200
           },
-          "mainAccessEntry": {
-            "routePath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
-            "token": "signed_entry_token_softlight"
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_aoi_blue_balcony/purchase",
+            "accessEntryPath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_context_token_softlight"
           },
           "access": {
             "mainId": "main_aoi_blue_balcony",
             "status": "unlocked",
-            "reason": "session_unlocked"
+            "reason": "purchased"
           },
           "unlockCta": {
             "state": "continue_main",
@@ -179,14 +295,32 @@
             "mainDurationSeconds": null,
             "resumePositionSeconds": 198
           },
-          "setup": {
-            "required": false,
-            "requiresAgeConfirmation": false,
-            "requiresTermsAcceptance": false
+          "purchase": {
+            "state": "already_purchased",
+            "supportedCardBrands": [
+              "visa",
+              "mastercard",
+              "jcb",
+              "american_express"
+            ],
+            "savedPaymentMethods": [
+              {
+                "paymentMethodId": "pm_saved_jcb_003",
+                "brand": "jcb",
+                "last4": "1111"
+              }
+            ],
+            "setup": {
+              "required": false,
+              "requiresCardSetup": false,
+              "requiresAgeConfirmation": false,
+              "requiresTermsAcceptance": false
+            },
+            "pendingReason": null
           }
         },
         "meta": {
-          "requestId": "req_unlock_unlocked_001",
+          "requestId": "req_unlock_already_purchased_001",
           "page": null
         },
         "error": null
@@ -228,9 +362,10 @@
             "durationSeconds": 720,
             "priceJpy": 2200
           },
-          "mainAccessEntry": {
-            "routePath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
-            "token": "signed_entry_token_balcony"
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_aoi_blue_balcony/purchase",
+            "accessEntryPath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_context_token_balcony"
           },
           "access": {
             "mainId": "main_aoi_blue_balcony",
@@ -243,10 +378,22 @@
             "mainDurationSeconds": null,
             "resumePositionSeconds": null
           },
-          "setup": {
-            "required": false,
-            "requiresAgeConfirmation": false,
-            "requiresTermsAcceptance": false
+          "purchase": {
+            "state": "owner_preview",
+            "supportedCardBrands": [
+              "visa",
+              "mastercard",
+              "jcb",
+              "american_express"
+            ],
+            "savedPaymentMethods": [],
+            "setup": {
+              "required": false,
+              "requiresCardSetup": false,
+              "requiresAgeConfirmation": false,
+              "requiresTermsAcceptance": false
+            },
+            "pendingReason": null
           }
         },
         "meta": {
@@ -256,17 +403,17 @@
         "error": null
       }
     },
-    "locked": {
+    "main_not_unlockable": {
       "status": 403,
       "body": {
         "data": null,
         "meta": {
-          "requestId": "req_unlock_locked_001",
+          "requestId": "req_unlock_main_not_unlockable_001",
           "page": null
         },
         "error": {
           "code": "main_locked",
-          "message": "main is not available for playback"
+          "message": "main is not unlockable"
         }
       }
     },
@@ -285,15 +432,258 @@
       }
     }
   },
-  "POST /api/fan/mains/{mainId}/access-entry": {
-    "access_entry_issued": {
+  "POST /api/fan/mains/{mainId}/purchase": {
+    "purchase_succeeded": {
       "status": 200,
       "body": {
         "data": {
-          "href": "/mains/main_mina_quiet_rooftop?fromShortId=rooftop&grant=signed_grant_token_rooftop"
+          "access": {
+            "mainId": "main_sora_after_rain",
+            "status": "unlocked",
+            "reason": "purchased"
+          },
+          "purchase": {
+            "status": "succeeded",
+            "failureReason": null,
+            "canRetry": false
+          },
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_sora_after_rain/purchase",
+            "accessEntryPath": "/api/fan/mains/main_sora_after_rain/access-entry",
+            "token": "signed_entry_context_token_afterrain"
+          }
         },
         "meta": {
-          "requestId": "req_main_access_entry_issued_001",
+          "requestId": "req_main_purchase_succeeded_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "purchase_pending": {
+      "status": 202,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_emi_midnight_room",
+            "status": "locked",
+            "reason": "unlock_required"
+          },
+          "purchase": {
+            "status": "pending",
+            "failureReason": null,
+            "canRetry": false
+          },
+          "entryContext": null
+        },
+        "meta": {
+          "requestId": "req_main_purchase_pending_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "purchase_failed_card_brand_unsupported": {
+      "status": 200,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_sora_after_rain",
+            "status": "locked",
+            "reason": "unlock_required"
+          },
+          "purchase": {
+            "status": "failed",
+            "failureReason": "card_brand_unsupported",
+            "canRetry": true
+          },
+          "entryContext": null
+        },
+        "meta": {
+          "requestId": "req_main_purchase_failed_brand_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "purchase_failed_declined": {
+      "status": 200,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_sora_after_rain",
+            "status": "locked",
+            "reason": "unlock_required"
+          },
+          "purchase": {
+            "status": "failed",
+            "failureReason": "purchase_declined",
+            "canRetry": true
+          },
+          "entryContext": null
+        },
+        "meta": {
+          "requestId": "req_main_purchase_failed_declined_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "purchase_failed_authentication": {
+      "status": 200,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_sora_after_rain",
+            "status": "locked",
+            "reason": "unlock_required"
+          },
+          "purchase": {
+            "status": "failed",
+            "failureReason": "authentication_failed",
+            "canRetry": true
+          },
+          "entryContext": null
+        },
+        "meta": {
+          "requestId": "req_main_purchase_failed_auth_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "already_purchased": {
+      "status": 200,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "unlocked",
+            "reason": "purchased"
+          },
+          "purchase": {
+            "status": "already_purchased",
+            "failureReason": null,
+            "canRetry": false
+          },
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_aoi_blue_balcony/purchase",
+            "accessEntryPath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_context_token_softlight"
+          }
+        },
+        "meta": {
+          "requestId": "req_main_purchase_already_purchased_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "owner_preview": {
+      "status": 200,
+      "body": {
+        "data": {
+          "access": {
+            "mainId": "main_aoi_blue_balcony",
+            "status": "owner",
+            "reason": "owner_preview"
+          },
+          "purchase": {
+            "status": "owner_preview",
+            "failureReason": null,
+            "canRetry": false
+          },
+          "entryContext": {
+            "purchasePath": "/api/fan/mains/main_aoi_blue_balcony/purchase",
+            "accessEntryPath": "/api/fan/mains/main_aoi_blue_balcony/access-entry",
+            "token": "signed_entry_context_token_balcony"
+          }
+        },
+        "meta": {
+          "requestId": "req_main_purchase_owner_preview_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_purchase_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "main purchase requires authentication"
+        }
+      }
+    },
+    "main_not_unlockable": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_purchase_not_unlockable_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main is not unlockable"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_purchase_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "main or short was not found"
+        }
+      }
+    }
+  },
+  "POST /api/fan/mains/{mainId}/access-entry": {
+    "entry_issued_after_purchase": {
+      "status": 200,
+      "body": {
+        "data": {
+          "href": "/mains/main_sora_after_rain?fromShortId=afterrain&grant=signed_grant_token_afterrain"
+        },
+        "meta": {
+          "requestId": "req_main_access_entry_after_purchase_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "entry_issued_already_purchased": {
+      "status": 200,
+      "body": {
+        "data": {
+          "href": "/mains/main_aoi_blue_balcony?fromShortId=softlight&grant=signed_grant_token_softlight"
+        },
+        "meta": {
+          "requestId": "req_main_access_entry_already_purchased_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "entry_issued_owner": {
+      "status": 200,
+      "body": {
+        "data": {
+          "href": "/mains/main_aoi_blue_balcony?fromShortId=balcony&grant=signed_grant_token_balcony"
+        },
+        "meta": {
+          "requestId": "req_main_access_entry_owner_001",
           "page": null
         },
         "error": null
@@ -309,21 +699,21 @@
         },
         "error": {
           "code": "auth_required",
-          "message": "main playback requires authentication"
+          "message": "main access entry requires authentication"
         }
       }
     },
-    "locked": {
+    "purchase_required": {
       "status": 403,
       "body": {
         "data": null,
         "meta": {
-          "requestId": "req_main_access_entry_locked_001",
+          "requestId": "req_main_access_entry_purchase_required_001",
           "page": null
         },
         "error": {
           "code": "main_locked",
-          "message": "main access entry could not be issued"
+          "message": "main access entry requires durable purchase or owner access"
         }
       }
     },
@@ -343,7 +733,7 @@
     }
   },
   "GET /api/fan/mains/{mainId}/playback": {
-    "playback_unlocked": {
+    "playback_purchased": {
       "status": 200,
       "body": {
         "data": {
@@ -374,7 +764,7 @@
           "access": {
             "mainId": "main_aoi_blue_balcony",
             "status": "unlocked",
-            "reason": "session_unlocked"
+            "reason": "purchased"
           },
           "resumePositionSeconds": 198,
           "entryShort": {
@@ -393,7 +783,7 @@
           }
         },
         "meta": {
-          "requestId": "req_playback_unlocked_001",
+          "requestId": "req_playback_purchased_001",
           "page": null
         },
         "error": null
@@ -455,17 +845,17 @@
         "error": null
       }
     },
-    "locked": {
+    "purchase_required": {
       "status": 403,
       "body": {
         "data": null,
         "meta": {
-          "requestId": "req_playback_locked_001",
+          "requestId": "req_playback_purchase_required_001",
           "page": null
         },
         "error": {
           "code": "main_locked",
-          "message": "main is not available for playback"
+          "message": "main playback requires durable purchase or owner access"
         }
       }
     },
