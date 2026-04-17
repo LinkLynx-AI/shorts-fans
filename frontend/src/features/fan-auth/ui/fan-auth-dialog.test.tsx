@@ -32,14 +32,21 @@ describe("FanAuthDialog", () => {
     );
 
     const dialog = screen.getByRole("dialog");
-    const scrollShell = dialog.querySelector("div.max-h-full");
+    const scrollShell = dialog.querySelector("div.max-h-\\[90svh\\]");
 
-    expect(dialog).toHaveClass("inset-y-4", "items-start");
+    expect(dialog).toHaveClass(
+      "inset-x-0",
+      "bottom-0",
+      "left-1/2",
+      "max-w-[408px]",
+      "-translate-x-1/2",
+    );
     expect(scrollShell).not.toBeNull();
     expect(scrollShell).toHaveClass(
-      "max-h-full",
+      "max-h-[90svh]",
       "overflow-y-auto",
       "overscroll-contain",
+      "rounded-t-[32px]",
     );
   });
 
