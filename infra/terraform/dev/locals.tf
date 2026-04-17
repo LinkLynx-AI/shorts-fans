@@ -7,6 +7,7 @@ locals {
   raw_bucket_name                     = "${local.resource_prefix}-raw-${local.bucket_suffix}"
   creator_avatar_upload_bucket_name   = "${local.resource_prefix}-avatar-upload-${local.bucket_suffix}"
   creator_avatar_delivery_bucket_name = "${local.resource_prefix}-avatar-delivery-${local.bucket_suffix}"
+  creator_review_evidence_bucket_name = "${local.resource_prefix}-review-evidence-${local.bucket_suffix}"
   short_public_bucket_name            = "${local.resource_prefix}-short-public-${local.bucket_suffix}"
   main_private_bucket_name            = "${local.resource_prefix}-main-private-${local.bucket_suffix}"
   cognito_user_pool_name              = "${local.resource_prefix}-fan-auth"

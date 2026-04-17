@@ -30,6 +30,11 @@
 - private creator avatar delivery bucket
   - creator avatar の stable delivery object を置く private origin bucket
   - bucket 自体は private のままにする
+- private creator review evidence bucket
+  - creator registration evidence upload の受け口と finalized review evidence の保管先
+  - bucket 自体は private のままにする
+  - browser からの presigned `PUT` 向け CORS を持つ
+  - temporary upload prefix だけ `1` 日で expire
 - creator avatar CloudFront distribution
   - creator workspace や registration preview が参照する avatar URL base
   - origin access control で avatar delivery bucket だけを読む
@@ -53,6 +58,9 @@
 - creator avatar app access policy
   - avatar upload / delivery bucket を扱う最小権限をまとめる
   - attach は手動で行う
+- creator review evidence app access policy
+  - creator review evidence bucket を扱う最小権限をまとめる
+  - attach は手動で行う
 
 ## 入力変数
 
@@ -62,7 +70,7 @@
 - `allowed_app_origins`
   - 任意
   - default は `http://localhost:3000` と `http://127.0.0.1:3000`
-  - raw upload bucket の direct `PUT`、creator avatar upload bucket の direct `PUT`、`main` の private S3 delivery bucket CORS に使います
+  - raw upload bucket の direct `PUT`、creator avatar upload bucket の direct `PUT`、creator review evidence bucket の direct `PUT`、`main` の private S3 delivery bucket CORS に使います
 
 ## 使い方
 
@@ -110,6 +118,9 @@ terraform destroy -var-file=terraform.tfvars
 - `creator_avatar_cloudfront_distribution_arn`
 - `creator_avatar_cloudfront_domain_name`
 - `creator_avatar_app_access_policy_arn`
+- `creator_review_evidence_bucket_name`
+- `creator_review_evidence_bucket_arn`
+- `creator_review_evidence_app_access_policy_arn`
 - `short_public_bucket_name`
 - `short_public_base_url`
   - public short の CloudFront base URL として使います
@@ -146,14 +157,20 @@ creator avatar 後続 task から読む env 名は次に揃えます。
 | `creator_avatar_upload_bucket_name` | `CREATOR_AVATAR_UPLOAD_BUCKET_NAME` |
 | `creator_avatar_delivery_bucket_name` | `CREATOR_AVATAR_DELIVERY_BUCKET_NAME` |
 | `creator_avatar_base_url` | `CREATOR_AVATAR_BASE_URL` |
+| `creator_review_evidence_bucket_name` | `CREATOR_REVIEW_EVIDENCE_BUCKET_NAME` |
 
-`SHO-149` 以降の `cmd/api` は上記 avatar env を必須にし、creator registration avatar upload endpoint の S3 / delivery 設定として使用します。`cmd/worker` は引き続き avatar env を要求しません。
+`SHO-149` 以降の `cmd/api` は上記 avatar env と review evidence env を必須にし、creator registration avatar upload endpoint と creator registration evidence upload endpoint の S3 設定として使用します。`cmd/worker` は引き続き avatar / review evidence env を要求しません。
 
 ## Guardrail
 
 - creator avatar upload bucket は private のままにし、presigned `PUT` 以外の public upload surface を作りません。
+- creator review evidence bucket は private のままにし、presigned `PUT` 以外の public upload surface を作りません。
 - creator avatar delivery は `CloudFront + private S3 origin` に固定します。
 - creator avatar upload object は lifecycle で `1` 日後に自動削除し、abandoned upload の残留を抑えます。
+- creator review evidence の object key policy は次を前提にします。
+  - upload prefix: `creator-registration-evidence/<viewer-user-id>/<kind>/<evidence-upload-token>/<sanitized-file-name>`
+  - finalized prefix: `creator-registration-evidence-final/<viewer-user-id>/<kind>/<evidence-upload-token>/<sanitized-file-name>`
+  - lifecycle expire は upload prefix のみに適用し、finalized evidence object は自動削除しません。
 - creator avatar の object key policy は次を前提にします。
   - upload bucket: `creator-avatar-upload/<viewer-user-id>/<avatar-upload-token>/<sanitized-file-name>`
   - delivery bucket: `creator-avatar/<viewer-user-id>/<avatar-asset-id>/<sanitized-file-name>`
@@ -170,9 +187,9 @@ creator avatar 後続 task から読む env 名は次に揃えます。
 
 ## 手動依存と未対応事項
 
-- dev app access policy と creator avatar app access policy の principal attach は手動です。
+- dev app access policy と creator avatar / creator review evidence app access policy の principal attach は手動です。
   - どの IAM user / role に attach するかは `SHO-22` の access 運用に従います。
-  - 同じ local principal が動画 media と avatar の両方を扱う場合は、両 policy を attach します。
+  - 同じ local principal が動画 media、avatar、review evidence のすべてを扱う場合は、各 policy を attach します。
 - remote state backend は未対応です。
   - この root module は local state 前提です。
 - MediaConvert custom queue、job template、preset、notification 設定は未対応です。

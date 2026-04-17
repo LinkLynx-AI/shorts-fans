@@ -73,6 +73,16 @@ output "creator_avatar_cloudfront_domain_name" {
   value       = aws_cloudfront_distribution.creator_avatar.domain_name
 }
 
+output "creator_review_evidence_bucket_name" {
+  description = "Private bucket name for creator registration evidence uploads and finalized review evidence."
+  value       = aws_s3_bucket.creator_review_evidence.bucket
+}
+
+output "creator_review_evidence_bucket_arn" {
+  description = "Private bucket ARN for creator registration evidence uploads and finalized review evidence."
+  value       = aws_s3_bucket.creator_review_evidence.arn
+}
+
 output "short_public_bucket_name" {
   description = "Private S3 origin bucket name for short delivery."
   value       = aws_s3_bucket.short_public.bucket
@@ -146,4 +156,9 @@ output "media_app_access_policy_arn" {
 output "creator_avatar_app_access_policy_arn" {
   description = "Managed policy ARN to attach manually to the app principal for creator avatar upload/delivery."
   value       = aws_iam_policy.creator_avatar_app_access.arn
+}
+
+output "creator_review_evidence_app_access_policy_arn" {
+  description = "Managed policy ARN to attach manually to the app principal for creator registration evidence uploads."
+  value       = aws_iam_policy.creator_review_evidence_app_access.arn
 }
