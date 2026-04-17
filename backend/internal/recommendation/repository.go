@@ -30,8 +30,14 @@ var (
 	ErrCreatorUserIDRequired = errors.New("recommendation event の creator user id が必要です")
 	// ErrCanonicalMainIDRequired は recommendation event に canonical main id が必要なことを表します。
 	ErrCanonicalMainIDRequired = errors.New("recommendation event の canonical main id が必要です")
+	// ErrCanonicalMainIDForbidden は recommendation event に canonical main id を含められないことを表します。
+	ErrCanonicalMainIDForbidden = errors.New("recommendation event の canonical main id はこの event kind では指定できません")
 	// ErrShortIDRequired は recommendation event に short id が必要なことを表します。
 	ErrShortIDRequired = errors.New("recommendation event の short id が必要です")
+	// ErrShortIDForbidden は recommendation event に short id を含められないことを表します。
+	ErrShortIDForbidden = errors.New("recommendation event の short id はこの event kind では指定できません")
+	// ErrShortIDInvalid は recommendation event の short id が不正なことを表します。
+	ErrShortIDInvalid = errors.New("recommendation event の short id が不正です")
 )
 
 const postgresTimestampPrecision = time.Microsecond
@@ -572,12 +578,21 @@ func validateRecordEventInput(input RecordEventInput) error {
 		if input.CreatorUserID == nil || *input.CreatorUserID == uuid.Nil {
 			return ErrCreatorUserIDRequired
 		}
+		if input.CanonicalMainID != nil {
+			return ErrCanonicalMainIDForbidden
+		}
+		if input.ShortID != nil {
+			return ErrShortIDForbidden
+		}
 	case EventKindMainClick, EventKindUnlockConversion:
 		if input.CreatorUserID == nil || *input.CreatorUserID == uuid.Nil {
 			return ErrCreatorUserIDRequired
 		}
 		if input.CanonicalMainID == nil || *input.CanonicalMainID == uuid.Nil {
 			return ErrCanonicalMainIDRequired
+		}
+		if input.ShortID != nil && *input.ShortID == uuid.Nil {
+			return ErrShortIDInvalid
 		}
 	default:
 		return ErrEventKindInvalid

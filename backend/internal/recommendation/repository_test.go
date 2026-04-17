@@ -580,6 +580,28 @@ func TestRecordEventValidation(t *testing.T) {
 			want: ErrCreatorUserIDRequired,
 		},
 		{
+			name: "profile click forbids canonical main",
+			input: RecordEventInput{
+				ViewerUserID:    validViewerID,
+				EventKind:       EventKindProfileClick,
+				CreatorUserID:   uuidPtr(validCreatorID),
+				CanonicalMainID: uuidPtr(validMainID),
+				IdempotencyKey:  "k",
+			},
+			want: ErrCanonicalMainIDForbidden,
+		},
+		{
+			name: "profile click forbids short",
+			input: RecordEventInput{
+				ViewerUserID:   validViewerID,
+				EventKind:      EventKindProfileClick,
+				CreatorUserID:  uuidPtr(validCreatorID),
+				ShortID:        uuidPtr(validShortID),
+				IdempotencyKey: "k",
+			},
+			want: ErrShortIDForbidden,
+		},
+		{
 			name: "missing short for impression",
 			input: RecordEventInput{
 				ViewerUserID:    validViewerID,
@@ -589,6 +611,18 @@ func TestRecordEventValidation(t *testing.T) {
 				IdempotencyKey:  "k",
 			},
 			want: ErrShortIDRequired,
+		},
+		{
+			name: "main click rejects nil short pointer",
+			input: RecordEventInput{
+				ViewerUserID:    validViewerID,
+				EventKind:       EventKindMainClick,
+				CreatorUserID:   uuidPtr(validCreatorID),
+				CanonicalMainID: uuidPtr(validMainID),
+				ShortID:         uuidPtr(uuid.Nil),
+				IdempotencyKey:  "k",
+			},
+			want: ErrShortIDInvalid,
 		},
 		{
 			name: "invalid kind",
