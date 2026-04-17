@@ -342,7 +342,35 @@ func TestRepositoryApplyReviewDecisionValidatesInput(t *testing.T) {
 	if _, err := repo.ApplyReviewDecision(context.Background(), ReviewDecisionInput{
 		Decision: StateSuspended,
 		UserID:   userID,
-	}); !errors.Is(err, ErrReviewDecisionConflict) {
-		t.Fatalf("ApplyReviewDecision() invalid transition got %v want %v", err, ErrReviewDecisionConflict)
+	}); !errors.Is(err, ErrRegistrationStateConflict) {
+		t.Fatalf("ApplyReviewDecision() invalid transition got %v want %v", err, ErrRegistrationStateConflict)
+	}
+}
+
+func TestRepositoryApplyReviewDecisionRequiresExistingCapability(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("19191919-1919-1919-1919-191919191919")
+	repo := &Repository{
+		txBeginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) { return &repositoryTxStub{}, nil },
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{}, pgx.ErrNoRows
+				},
+			}
+		},
+	}
+
+	if _, err := repo.ApplyReviewDecision(context.Background(), ReviewDecisionInput{
+		Decision: StateApproved,
+		UserID:   userID,
+	}); !errors.Is(err, ErrRegistrationIncomplete) {
+		t.Fatalf("ApplyReviewDecision() missing capability got %v want %v", err, ErrRegistrationIncomplete)
 	}
 }

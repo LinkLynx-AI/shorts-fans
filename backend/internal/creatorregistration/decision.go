@@ -17,8 +17,6 @@ import (
 var (
 	// ErrInvalidReviewDecision は未知の review decision が指定されたことを表します。
 	ErrInvalidReviewDecision = errors.New("creator registration review decision が不正です")
-	// ErrReviewDecisionConflict は現在 state では許可されない遷移が指定されたことを表します。
-	ErrReviewDecisionConflict = errors.New("creator registration review decision state conflict")
 	// ErrReviewDecisionReasonRequired は rejected decision に reason code が不足していることを表します。
 	ErrReviewDecisionReasonRequired = errors.New("creator registration rejection reason code が必要です")
 	// ErrReviewDecisionMetadataConflict は rejected metadata の組み合わせが矛盾していることを表します。
@@ -137,18 +135,18 @@ func buildReviewDecisionUpdateParams(
 
 func validateReviewDecisionInput(capability *sqlc.AppCreatorCapability, input ReviewDecisionInput) error {
 	if capability == nil {
-		return ErrReviewDecisionConflict
+		return ErrRegistrationIncomplete
 	}
 
 	switch strings.TrimSpace(input.Decision) {
 	case StateApproved:
 		if capability.State != StateSubmitted {
-			return ErrReviewDecisionConflict
+			return ErrRegistrationStateConflict
 		}
 		return nil
 	case StateRejected:
 		if capability.State != StateSubmitted {
-			return ErrReviewDecisionConflict
+			return ErrRegistrationStateConflict
 		}
 		if trimmedOptionalString(input.ReasonCode) == nil {
 			return ErrReviewDecisionReasonRequired
@@ -159,7 +157,7 @@ func validateReviewDecisionInput(capability *sqlc.AppCreatorCapability, input Re
 		return nil
 	case StateSuspended:
 		if capability.State != StateApproved {
-			return ErrReviewDecisionConflict
+			return ErrRegistrationStateConflict
 		}
 		return nil
 	default:
