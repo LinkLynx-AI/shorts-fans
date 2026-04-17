@@ -25,6 +25,22 @@ export const creatorRegistrationTextareaClassName =
 export const creatorRegistrationButtonClassName =
   "h-14 w-full text-[16px] font-bold";
 
+export const creatorRegistrationFocusRingClassName =
+  "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-ring/60";
+
+export function buildCreatorRegistrationAvatarFallback(displayName: string) {
+  const trimmed = displayName.trim();
+  if (trimmed === "") {
+    return "ME";
+  }
+
+  return trimmed
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.at(0)?.toUpperCase() ?? "")
+    .join("");
+}
+
 export function CreatorRegistrationMessage({
   className,
   kind,
@@ -36,7 +52,7 @@ export function CreatorRegistrationMessage({
 }) {
   return (
     <p
-      aria-live="polite"
+      aria-live={kind === "error" ? "assertive" : "polite"}
       className={cn(
         kind === "error"
           ? "rounded-[22px] border border-[#f5c8d1] bg-[#fff6f8] px-4 py-3 text-[13px] leading-6 text-[#b2394f]"

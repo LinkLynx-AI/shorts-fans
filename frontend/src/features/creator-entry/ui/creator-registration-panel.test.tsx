@@ -102,13 +102,6 @@ describe("CreatorRegistrationPanel", () => {
           mimeType: "image/png",
           uploadedAt: "2026-04-17T10:30:00.000Z",
         },
-        {
-          fileName: "bank-proof.pdf",
-          fileSizeBytes: 2048,
-          kind: "payout_proof",
-          mimeType: "application/pdf",
-          uploadedAt: "2026-04-17T10:32:00.000Z",
-        },
       ],
       isReadOnly: false,
       legalName: "",
@@ -439,8 +432,9 @@ describe("CreatorRegistrationPanel", () => {
     expect(screen.getByRole("button", { name: "再申請する" })).toBeInTheDocument();
     expect(screen.getByText("必要な書類または入力内容に不足があります。内容を見直して再度申請してください。")).toBeInTheDocument();
     expect(screen.getByText("残り申請回数：1回", { exact: false })).toBeInTheDocument();
-    expect(screen.getByText("要修正")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "新しい書類をアップロード" })).toBeInTheDocument();
+    expect(screen.queryByText("要修正")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "新しい書類をアップロード" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "書類を差し替える" })).toHaveLength(2);
   });
 
   it("recovers eligible rejected detail when the server-side status fetch was unavailable", async () => {

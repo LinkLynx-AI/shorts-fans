@@ -14,21 +14,10 @@ import {
   getCreatorRegistrationErrorMessage,
 } from "../model/creator-entry";
 import {
+  buildCreatorRegistrationAvatarFallback,
   CreatorRegistrationMessage,
+  creatorRegistrationFocusRingClassName,
 } from "./creator-registration-ui-primitives";
-
-function buildAvatarFallback(displayName: string) {
-  const trimmed = displayName.trim();
-  if (trimmed === "") {
-    return "ME";
-  }
-
-  return trimmed
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.at(0)?.toUpperCase() ?? "")
-    .join("");
-}
 
 function formatSubmittedAt(submittedAt: string | null) {
   if (!submittedAt) {
@@ -196,7 +185,7 @@ export function CreatorRegistrationSuccessPanel() {
                     <AvatarImage alt={`${profilePreview.displayName} の画像`} src={profilePreview.avatar.url} />
                   ) : null}
                   <AvatarFallback className="bg-[#f3f5f8] text-[17px] font-semibold text-[#486270]">
-                    {buildAvatarFallback(profilePreview.displayName)}
+                    {buildCreatorRegistrationAvatarFallback(profilePreview.displayName)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
@@ -219,7 +208,7 @@ export function CreatorRegistrationSuccessPanel() {
 
       <div className="absolute bottom-0 left-0 z-30 w-full border-t border-gray-100 bg-white/95 px-4 pb-8 pt-4 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] backdrop-blur-md">
         <Link
-          className="block w-full rounded-full bg-[#4DA8DA] py-4 text-center text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98]"
+          className={`block w-full rounded-full bg-[#4DA8DA] py-4 text-center text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98] ${creatorRegistrationFocusRingClassName}`}
           href="/fan"
         >
           ホームに戻る

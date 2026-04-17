@@ -15,7 +15,9 @@ import {
 import { useCreatorRegistration } from "../model/use-creator-registration";
 import { CreatorRegistrationStaticWorkspacePreview } from "./creator-registration-static-workspace-preview";
 import {
+  buildCreatorRegistrationAvatarFallback,
   CreatorRegistrationMessage,
+  creatorRegistrationFocusRingClassName,
 } from "./creator-registration-ui-primitives";
 
 const evidenceFieldLabels = {
@@ -74,19 +76,6 @@ type ResubmitIssueSummary = {
   needsAttentionKind: CreatorRegistrationEvidenceKind | null;
   title: string;
 };
-
-function buildAvatarFallback(displayName: string) {
-  const trimmed = displayName.trim();
-  if (trimmed === "") {
-    return "ME";
-  }
-
-  return trimmed
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part.at(0)?.toUpperCase() ?? "")
-    .join("");
-}
 
 function formatEvidenceDate(uploadedAt: string) {
   const date = new Date(uploadedAt);
@@ -365,7 +354,7 @@ function resolveResubmitIssueSummary(
     return {
       description:
         "書類が不鮮明で読み取れません。新しい書類に差し替えて再度申請してください。",
-      needsAttentionKind: missingKinds[0] ?? "payout_proof",
+      needsAttentionKind: missingKinds[0] ?? null,
       title: "申請が差し戻されました",
     };
   }
@@ -374,7 +363,7 @@ function resolveResubmitIssueSummary(
     return {
       description:
         "必要な書類または入力内容に不足があります。内容を見直して再度申請してください。",
-      needsAttentionKind: missingKinds[0] ?? "payout_proof",
+      needsAttentionKind: missingKinds[0] ?? null,
       title: "申請が差し戻されました",
     };
   }
@@ -550,7 +539,7 @@ export function CreatorRegistrationPanel({
                       <AvatarImage alt={`${profilePreview.displayName} の画像`} src={profilePreview.avatar.url} />
                     ) : null}
                     <AvatarFallback className="bg-[#f3f5f8] text-[17px] font-semibold text-[#486270]">
-                      {buildAvatarFallback(profilePreview.displayName)}
+                      {buildCreatorRegistrationAvatarFallback(profilePreview.displayName)}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -846,7 +835,7 @@ export function CreatorRegistrationPanel({
           <CreatorRegistrationMessage className="mb-3" kind="error" message={errorMessage} />
         ) : null}
         <button
-          className="w-full rounded-full border border-gray-200 bg-white py-4 text-[16px] font-bold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+          className={`w-full rounded-full border border-gray-200 bg-white py-4 text-[16px] font-bold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 ${creatorRegistrationFocusRingClassName}`}
           disabled={isBusy || isReadOnly}
           onClick={() => {
             void saveDraft();
@@ -856,7 +845,7 @@ export function CreatorRegistrationPanel({
           {isSaving ? "保存中..." : "修正内容を保存する"}
         </button>
         <button
-          className="mt-3 w-full rounded-full bg-[#4DA8DA] py-4 text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+          className={`mt-3 w-full rounded-full bg-[#4DA8DA] py-4 text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${creatorRegistrationFocusRingClassName}`}
           disabled={submitDisabled}
           form="creator-registration-resubmit-form"
           type="submit"
@@ -864,7 +853,7 @@ export function CreatorRegistrationPanel({
             {isSubmitting ? "送信中..." : "再申請する"}
           </button>
           <Link
-            className="mt-2 block w-full rounded-full py-3 text-center text-[14px] font-bold text-gray-500 transition-colors hover:text-gray-800"
+            className={`mt-2 block w-full rounded-full py-3 text-center text-[14px] font-bold text-gray-500 transition-colors hover:text-gray-800 ${creatorRegistrationFocusRingClassName}`}
             href="/fan"
           >
             閉じる
@@ -1012,13 +1001,13 @@ export function CreatorRegistrationPanel({
 
               <div className="mt-4 flex items-center gap-4">
                 <Avatar className="size-16 border border-gray-100 shadow-sm">
-                  {profilePreview.avatar ? (
-                    <AvatarImage alt={`${profilePreview.displayName} の画像`} src={profilePreview.avatar.url} />
-                  ) : null}
-                  <AvatarFallback className="bg-[#f3f5f8] text-[17px] font-semibold text-[#486270]">
-                    {buildAvatarFallback(profilePreview.displayName)}
-                  </AvatarFallback>
-                </Avatar>
+                    {profilePreview.avatar ? (
+                      <AvatarImage alt={`${profilePreview.displayName} の画像`} src={profilePreview.avatar.url} />
+                    ) : null}
+                    <AvatarFallback className="bg-[#f3f5f8] text-[17px] font-semibold text-[#486270]">
+                      {buildCreatorRegistrationAvatarFallback(profilePreview.displayName)}
+                    </AvatarFallback>
+                  </Avatar>
                 <div>
                   <p className="text-[16px] font-extrabold text-foreground">
                     {profilePreview.displayName}
@@ -1314,7 +1303,7 @@ export function CreatorRegistrationPanel({
         {showFormActions ? (
           <>
             <button
-              className="w-full rounded-full border border-gray-200 bg-white py-4 text-[16px] font-bold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className={`w-full rounded-full border border-gray-200 bg-white py-4 text-[16px] font-bold text-gray-900 shadow-sm transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 ${creatorRegistrationFocusRingClassName}`}
               disabled={isBusy || isReadOnly}
               onClick={() => {
                 void saveDraft();
@@ -1325,7 +1314,7 @@ export function CreatorRegistrationPanel({
             </button>
 
             <button
-              className="mt-3 w-full rounded-full bg-[#4DA8DA] py-4 text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+              className={`mt-3 w-full rounded-full bg-[#4DA8DA] py-4 text-[16px] font-bold text-white shadow-lg shadow-[#4DA8DA]/20 transition-transform active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${creatorRegistrationFocusRingClassName}`}
               disabled={submitDisabled}
               form="creator-registration-form"
               type="submit"
@@ -1336,7 +1325,7 @@ export function CreatorRegistrationPanel({
         ) : null}
 
         <Link
-          className="mt-2 block w-full rounded-full py-3 text-center text-[14px] font-bold text-gray-500 transition-colors hover:text-gray-800"
+          className={`mt-2 block w-full rounded-full py-3 text-center text-[14px] font-bold text-gray-500 transition-colors hover:text-gray-800 ${creatorRegistrationFocusRingClassName}`}
           href="/fan"
         >
           閉じる
