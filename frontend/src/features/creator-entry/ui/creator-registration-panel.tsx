@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 
 import { Avatar, AvatarFallback, AvatarImage, Button, SurfacePanel } from "@/shared/ui";
 
@@ -44,6 +45,7 @@ function formatEvidenceDate(uploadedAt: string) {
  * fan profile から始める creator registration intake panel を表示する。
  */
 export function CreatorRegistrationPanel() {
+  const evidenceInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const {
     acceptsConsentResponsibility,
     birthDate,
@@ -230,6 +232,7 @@ export function CreatorRegistrationPanel() {
             {creatorRegistrationEvidenceKinds.map((kind) => {
               const field = evidences[kind];
               const config = evidenceFieldLabels[kind];
+              const evidenceUploadDisabled = isBusy || isReadOnly || field.isUploading;
 
               return (
                 <section
@@ -270,20 +273,28 @@ export function CreatorRegistrationPanel() {
                   ) : null}
 
                   <div className="mt-4">
-                    <label
-                      className="inline-flex w-full cursor-pointer items-center justify-center rounded-full border border-white/84 bg-white px-4 py-3 text-sm font-semibold text-accent-strong transition hover:bg-[#f7fbfd] disabled:cursor-default disabled:opacity-60"
-                      htmlFor={`creator-registration-evidence-${kind}`}
+                    <Button
+                      className="w-full"
+                      disabled={evidenceUploadDisabled}
+                      onClick={() => {
+                        evidenceInputRefs.current[kind]?.click();
+                      }}
+                      type="button"
+                      variant="secondary"
                     >
                       {field.isUploading ? "アップロード中..." : field.evidence ? "証跡を差し替える" : "証跡を選択する"}
-                    </label>
+                    </Button>
                     <input
                       accept="image/jpeg,image/png,image/webp,application/pdf"
                       className="sr-only"
-                      disabled={isBusy || isReadOnly || field.isUploading}
+                      disabled={evidenceUploadDisabled}
                       id={`creator-registration-evidence-${kind}`}
                       key={field.inputKey}
                       onChange={(event) => {
                         void uploadEvidence(kind, event.target.files?.[0] ?? null);
+                      }}
+                      ref={(node) => {
+                        evidenceInputRefs.current[kind] = node;
                       }}
                       type="file"
                     />

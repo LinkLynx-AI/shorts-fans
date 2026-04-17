@@ -163,8 +163,8 @@ describe("CreatorRegistrationPanel", () => {
     await user.type(screen.getByRole("textbox", { name: "Payout recipient name" }), "Mina Rei");
     await user.click(screen.getByRole("checkbox", { name: /prohibited category/i }));
     await user.click(screen.getByRole("checkbox", { name: /consent/i }));
-    await user.click(screen.getByRole("button", { name: "審査申請を送信する" }));
-
+    expect(screen.getByRole("button", { name: "審査申請を送信する" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "下書きを保存する" }));
     await waitFor(() => {
       expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledWith(
         {
@@ -177,6 +177,11 @@ describe("CreatorRegistrationPanel", () => {
           payoutRecipientType: "self",
         },
       );
+    });
+    await user.click(screen.getByRole("button", { name: "審査申請を送信する" }));
+
+    await waitFor(() => {
+      expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledTimes(2);
       expect(apiMocks.registerCreator).toHaveBeenCalledWith();
       expect(mockedRouter.push).toHaveBeenCalledWith("/fan/creator/success");
     });
@@ -189,5 +194,34 @@ describe("CreatorRegistrationPanel", () => {
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "下書きを保存する" })).toBeDisabled();
+  });
+
+  it("disables evidence upload buttons when the intake is read only", async () => {
+    apiMocks.fetchCreatorRegistrationIntake.mockResolvedValue({
+      acceptsConsentResponsibility: true,
+      birthDate: "1999-04-02",
+      canSubmit: false,
+      creatorBio: "quiet rooftop",
+      declaresNoProhibitedCategory: true,
+      evidences: [],
+      isReadOnly: true,
+      legalName: "Mina Rei",
+      payoutRecipientName: "Mina Rei",
+      payoutRecipientType: "self",
+      registrationState: "submitted",
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
+    });
+
+    render(<CreatorRegistrationPanel />);
+
+    await screen.findByRole("heading", { name: "Creator審査申請を始める" });
+
+    for (const button of screen.getAllByRole("button", { name: "証跡を選択する" })) {
+      expect(button).toBeDisabled();
+    }
   });
 });

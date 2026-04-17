@@ -28,6 +28,7 @@ type EvidenceFieldState = {
 
 type CreatorRegistrationDraft = {
   acceptsConsentResponsibility: boolean;
+  canSubmit: boolean;
   creatorBio: string;
   declaresNoProhibitedCategory: boolean;
   evidences: Record<CreatorRegistrationEvidenceKind, EvidenceFieldState>;
@@ -102,6 +103,7 @@ function buildDraftFromIntake(intake: CreatorRegistrationIntake): CreatorRegistr
   return {
     acceptsConsentResponsibility: intake.acceptsConsentResponsibility,
     birthDate: intake.birthDate ?? "",
+    canSubmit: intake.canSubmit,
     creatorBio: intake.creatorBio,
     declaresNoProhibitedCategory: intake.declaresNoProhibitedCategory,
     evidences: buildEvidenceRecord(intake.evidences),
@@ -119,15 +121,7 @@ function computeSubmitDisabled(draft: CreatorRegistrationDraft | null, isBusy: b
     return true;
   }
 
-  if (
-    draft.creatorBio.trim() === "" ||
-    draft.legalName.trim() === "" ||
-    draft.birthDate.trim() === "" ||
-    draft.payoutRecipientType.trim() === "" ||
-    draft.payoutRecipientName.trim() === "" ||
-    !draft.declaresNoProhibitedCategory ||
-    !draft.acceptsConsentResponsibility
-  ) {
+  if (!draft.canSubmit) {
     return true;
   }
 
@@ -340,6 +334,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
       updateDraft((current) => ({
         ...current,
         acceptsConsentResponsibility: value,
+        canSubmit: false,
       }));
       setSuccessMessage(null);
     },
@@ -347,12 +342,14 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
       updateDraft((current) => ({
         ...current,
         birthDate: value,
+        canSubmit: false,
       }));
       setSuccessMessage(null);
     },
     setCreatorBio: (value) => {
       updateDraft((current) => ({
         ...current,
+        canSubmit: false,
         creatorBio: value,
       }));
       setSuccessMessage(null);
@@ -360,6 +357,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     setDeclaresNoProhibitedCategory: (value) => {
       updateDraft((current) => ({
         ...current,
+        canSubmit: false,
         declaresNoProhibitedCategory: value,
       }));
       setSuccessMessage(null);
@@ -367,6 +365,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     setLegalName: (value) => {
       updateDraft((current) => ({
         ...current,
+        canSubmit: false,
         legalName: value,
       }));
       setSuccessMessage(null);
@@ -374,6 +373,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     setPayoutRecipientName: (value) => {
       updateDraft((current) => ({
         ...current,
+        canSubmit: false,
         payoutRecipientName: value,
       }));
       setSuccessMessage(null);
@@ -381,6 +381,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     setPayoutRecipientType: (value) => {
       updateDraft((current) => ({
         ...current,
+        canSubmit: false,
         payoutRecipientType: value,
       }));
       setSuccessMessage(null);

@@ -491,10 +491,6 @@ func handleViewerCreatorRegistrationEvidenceUploadComplete(
 			writeViewerCreatorEntryError(c, http.StatusConflict, "evidence_upload_expired", "evidence upload has expired", viewerCreatorRegistrationEvidenceCompleteRequestScope)
 			return
 		default:
-			if errors.Is(err, creatorregistration.ErrSharedProfileNotFound) {
-				writeInternalServerError(c, viewerCreatorRegistrationEvidenceCompleteRequestScope)
-				return
-			}
 			if writeViewerCreatorRegistrationError(c, err, viewerCreatorRegistrationEvidenceCompleteRequestScope) {
 				return
 			}

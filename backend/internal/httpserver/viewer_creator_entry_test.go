@@ -521,6 +521,48 @@ func TestViewerCreatorRegistrationEvidenceUploadCompleteReturnsEvidence(t *testi
 	}
 }
 
+func TestViewerCreatorRegistrationEvidenceUploadCompleteMapsMissingProfileToNotFound(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+
+	router := NewHandler(HandlerConfig{
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:         viewerID,
+						ActiveMode: auth.ActiveModeFan,
+					},
+				}, nil
+			},
+		},
+		CreatorRegistrationEvidence: viewerCreatorRegistrationEvidenceUploadHandlerStub{
+			completeUpload: func(context.Context, creatorregistration.CompleteEvidenceUploadInput) (creatorregistration.CompleteEvidenceUploadResult, error) {
+				return creatorregistration.CompleteEvidenceUploadResult{}, creatorregistration.ErrSharedProfileNotFound
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/viewer/creator-registration/evidence-uploads/complete",
+		bytes.NewBufferString(`{"evidenceUploadToken":"vcevd_123"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /api/viewer/creator-registration/evidence-uploads/complete status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
+		t.Fatalf("POST /api/viewer/creator-registration/evidence-uploads/complete body got %q want not_found", rec.Body.String())
+	}
+}
+
 func TestViewerActiveModeSwitchSuccess(t *testing.T) {
 	t.Parallel()
 
