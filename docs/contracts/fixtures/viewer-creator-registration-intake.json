@@ -1,0 +1,144 @@
+{
+  "GET /api/viewer/creator-registration/intake": {
+    "draft_complete": {
+      "status": 200,
+      "body": {
+        "data": {
+          "intake": {
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_minarei",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorBio": "quiet rooftop の continuation を中心に投稿します。",
+            "legalName": "Mina Rei",
+            "birthDate": "1999-04-02",
+            "payoutRecipientType": "self",
+            "payoutRecipientName": "Mina Rei",
+            "declaresNoProhibitedCategory": true,
+            "acceptsConsentResponsibility": true,
+            "registrationState": "draft",
+            "isReadOnly": false,
+            "canSubmit": true,
+            "evidences": [
+              {
+                "kind": "government_id",
+                "fileName": "government-id.png",
+                "mimeType": "image/png",
+                "fileSizeBytes": 183442,
+                "uploadedAt": "2026-04-17T01:15:00Z"
+              },
+              {
+                "kind": "payout_proof",
+                "fileName": "bank-proof.pdf",
+                "mimeType": "application/pdf",
+                "fileSizeBytes": 84512,
+                "uploadedAt": "2026-04-17T01:17:00Z"
+              }
+            ]
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_intake_get_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "PUT /api/viewer/creator-registration/intake": {
+    "save_draft": {
+      "status": 200,
+      "body": {
+        "data": {
+          "intake": {
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_minarei",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorBio": "quiet rooftop の continuation を中心に投稿します。",
+            "legalName": "Mina Rei",
+            "birthDate": "1999-04-02",
+            "payoutRecipientType": "self",
+            "payoutRecipientName": "Mina Rei",
+            "declaresNoProhibitedCategory": true,
+            "acceptsConsentResponsibility": true,
+            "registrationState": "draft",
+            "isReadOnly": false,
+            "canSubmit": false,
+            "evidences": []
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_intake_put_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "POST /api/viewer/creator-registration/evidence-uploads": {
+    "government_id": {
+      "status": 200,
+      "body": {
+        "data": {
+          "evidenceKind": "government_id",
+          "evidenceUploadToken": "vcevd_b9f28e5ce0c24f0db969e0b9d4c81d4e",
+          "expiresAt": "2026-04-17T01:30:00Z",
+          "uploadTarget": {
+            "fileName": "government-id.png",
+            "mimeType": "image/png",
+            "upload": {
+              "method": "PUT",
+              "url": "https://bucket.s3.ap-northeast-1.amazonaws.com/example",
+              "headers": {
+                "Content-Type": "image/png"
+              }
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_evidence_upload_create_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "POST /api/viewer/creator-registration/evidence-uploads/complete": {
+    "government_id": {
+      "status": 200,
+      "body": {
+        "data": {
+          "evidenceKind": "government_id",
+          "evidenceUploadToken": "vcevd_b9f28e5ce0c24f0db969e0b9d4c81d4e",
+          "evidence": {
+            "kind": "government_id",
+            "fileName": "government-id.png",
+            "mimeType": "image/png",
+            "fileSizeBytes": 183442,
+            "uploadedAt": "2026-04-17T01:15:00Z"
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_evidence_upload_complete_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  }
+}

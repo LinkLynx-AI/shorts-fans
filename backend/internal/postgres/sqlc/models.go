@@ -82,6 +82,31 @@ type AppCreatorProfile struct {
 	Handle      string
 }
 
+type AppCreatorRegistrationEvidence struct {
+	UserID        pgtype.UUID
+	Kind          string
+	FileName      string
+	MimeType      string
+	FileSizeBytes int64
+	StorageBucket string
+	StorageKey    string
+	UploadedAt    pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
+type AppCreatorRegistrationIntake struct {
+	UserID                       pgtype.UUID
+	LegalName                    string
+	BirthDate                    pgtype.Date
+	PayoutRecipientType          pgtype.Text
+	PayoutRecipientName          string
+	DeclaresNoProhibitedCategory bool
+	AcceptsConsentResponsibility bool
+	CreatedAt                    pgtype.Timestamptz
+	UpdatedAt                    pgtype.Timestamptz
+}
+
 type AppMain struct {
 	ID                  pgtype.UUID
 	CreatorUserID       pgtype.UUID

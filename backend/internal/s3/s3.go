@@ -210,6 +210,33 @@ func (c *Client) PresignGetObject(ctx context.Context, bucket string, key string
 
 // PresignPutObject は direct upload 用の signed PUT request を生成します。
 func (c *Client) PresignPutObject(ctx context.Context, bucket string, key string, contentType string, expires time.Duration) (PresignedUpload, error) {
+	return c.presignPutObject(ctx, bucket, key, contentType, nil, expires)
+}
+
+// PresignPutObjectWithLength は direct upload 用 signed PUT request に content length も拘束します。
+func (c *Client) PresignPutObjectWithLength(
+	ctx context.Context,
+	bucket string,
+	key string,
+	contentType string,
+	contentLength int64,
+	expires time.Duration,
+) (PresignedUpload, error) {
+	if contentLength <= 0 {
+		return PresignedUpload{}, fmt.Errorf("content length must be greater than zero")
+	}
+
+	return c.presignPutObject(ctx, bucket, key, contentType, &contentLength, expires)
+}
+
+func (c *Client) presignPutObject(
+	ctx context.Context,
+	bucket string,
+	key string,
+	contentType string,
+	contentLength *int64,
+	expires time.Duration,
+) (PresignedUpload, error) {
 	if c == nil {
 		return PresignedUpload{}, fmt.Errorf("s3 client is nil")
 	}
@@ -223,11 +250,16 @@ func (c *Client) PresignPutObject(ctx context.Context, bucket string, key string
 		return PresignedUpload{}, fmt.Errorf("expires must be greater than zero")
 	}
 
-	request, err := c.presigner.PresignPutObject(ctx, &awss3.PutObjectInput{
+	input := &awss3.PutObjectInput{
 		Bucket:      aws.String(bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
-	}, func(options *awss3.PresignOptions) {
+	}
+	if contentLength != nil {
+		input.ContentLength = contentLength
+	}
+
+	request, err := c.presigner.PresignPutObject(ctx, input, func(options *awss3.PresignOptions) {
 		options.Expires = expires
 	})
 	if err != nil {

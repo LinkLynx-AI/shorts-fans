@@ -13,6 +13,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatoravatar"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorregistration"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creatorupload"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanmain"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
@@ -98,9 +99,18 @@ type CreatorFollowWriter interface {
 	UnfollowPublicCreator(ctx context.Context, viewerUserID uuid.UUID, creatorID string) (creator.FollowMutationResult, error)
 }
 
-// ViewerCreatorRegistrationWriter は creator registration mutation を表します。
-type ViewerCreatorRegistrationWriter interface {
-	RegisterApprovedCreator(ctx context.Context, input creator.SelfServeRegistrationInput) (creator.SelfServeRegistrationResult, error)
+// ViewerCreatorRegistrationService は creator registration status/intake/submit を表します。
+type ViewerCreatorRegistrationService interface {
+	GetIntake(ctx context.Context, userID uuid.UUID) (creatorregistration.Intake, error)
+	GetRegistration(ctx context.Context, userID uuid.UUID) (*creatorregistration.Registration, error)
+	SaveIntake(ctx context.Context, input creatorregistration.SaveIntakeInput) (creatorregistration.Intake, error)
+	Submit(ctx context.Context, userID uuid.UUID) (creatorregistration.Registration, error)
+}
+
+// ViewerCreatorRegistrationEvidenceUploadHandler は creator registration evidence upload を表します。
+type ViewerCreatorRegistrationEvidenceUploadHandler interface {
+	CompleteUpload(ctx context.Context, input creatorregistration.CompleteEvidenceUploadInput) (creatorregistration.CompleteEvidenceUploadResult, error)
+	CreateUpload(ctx context.Context, input creatorregistration.CreateEvidenceUploadInput) (creatorregistration.CreateEvidenceUploadResult, error)
 }
 
 // ViewerProfileReader は shared viewer profile read を表します。
@@ -173,7 +183,8 @@ type HandlerConfig struct {
 	FanShortPin                  FanShortPinWriter
 	CreatorFollow                CreatorFollowWriter
 	CreatorAvatarUpload          ViewerCreatorAvatarUploadHandler
-	CreatorRegistration          ViewerCreatorRegistrationWriter
+	CreatorRegistration          ViewerCreatorRegistrationService
+	CreatorRegistrationEvidence  ViewerCreatorRegistrationEvidenceUploadHandler
 	FanProfileLibrary            FanProfileLibraryReader
 	FanProfileFollowing          FanProfileFollowingReader
 	FanProfilePinnedShorts       FanProfilePinnedShortsReader
@@ -277,8 +288,8 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerViewerCreatorEntryRoutes(
 		router,
 		config.CreatorRegistration,
+		config.CreatorRegistrationEvidence,
 		config.CreatorAvatarUpload,
-		config.ViewerProfile,
 		config.ViewerActiveMode,
 		config.ViewerBootstrap,
 	)

@@ -17,6 +17,7 @@ source:
         - 000011_require_main_price_metadata.up.sql
         - 000012_add_user_profiles.up.sql
         - 000013_add_cognito_session_foundation.up.sql
+        - 000014_add_creator_registration_intake.up.sql
 schemas:
     - name: app
       tables:
@@ -445,6 +446,116 @@ schemas:
                 - handle
               predicate: (published_at IS NOT NULL)
               definition: CREATE INDEX creator_profiles_public_published_handle_idx ON app.creator_profiles USING btree (published_at DESC, handle) WHERE (published_at IS NOT NULL)
+        - name: creator_registration_evidences
+          columns:
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: kind
+              type: text
+              nullable: false
+            - name: file_name
+              type: text
+              nullable: false
+            - name: mime_type
+              type: text
+              nullable: false
+            - name: file_size_bytes
+              type: bigint
+              nullable: false
+            - name: storage_bucket
+              type: text
+              nullable: false
+            - name: storage_key
+              type: text
+              nullable: false
+            - name: uploaded_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - user_id
+            - kind
+          foreign_keys:
+            - name: creator_registration_evidences_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+          check_constraints:
+            - name: creator_registration_evidences_file_size_bytes_check
+              expression: CHECK (file_size_bytes > 0 AND file_size_bytes <= 10485760)
+            - name: creator_registration_evidences_kind_check
+              expression: CHECK (kind = ANY (ARRAY['government_id'::text, 'payout_proof'::text]))
+            - name: creator_registration_evidences_mime_type_check
+              expression: CHECK (mime_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text, 'application/pdf'::text]))
+          indexes:
+            - name: idx_creator_registration_evidences_user_id
+              columns:
+                - user_id
+              definition: CREATE INDEX idx_creator_registration_evidences_user_id ON app.creator_registration_evidences USING btree (user_id)
+        - name: creator_registration_intakes
+          columns:
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: legal_name
+              type: text
+              nullable: false
+              default: '''''::text'
+            - name: birth_date
+              type: date
+              nullable: true
+            - name: payout_recipient_type
+              type: text
+              nullable: true
+            - name: payout_recipient_name
+              type: text
+              nullable: false
+              default: '''''::text'
+            - name: declares_no_prohibited_category
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_consent_responsibility
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - user_id
+          foreign_keys:
+            - name: creator_registration_intakes_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+              on_delete: CASCADE
+          check_constraints:
+            - name: creator_registration_intakes_payout_recipient_type_check
+              expression: CHECK (payout_recipient_type IS NULL OR (payout_recipient_type = ANY (ARRAY['self'::text, 'business'::text])))
         - name: main_playback_progress
           columns:
             - name: user_id

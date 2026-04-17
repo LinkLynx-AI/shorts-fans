@@ -34,6 +34,7 @@ func TestValidateAPI(t *testing.T) {
 		CreatorAvatarUploadBucketName:   "avatar-upload-bucket",
 		CreatorAvatarDeliveryBucketName: "avatar-delivery-bucket",
 		CreatorAvatarBaseURL:            "https://example.com/avatar",
+		CreatorReviewEvidenceBucketName: "creator-review-evidence-bucket",
 	}
 
 	if err := cfg.ValidateAPI(); err != nil {
