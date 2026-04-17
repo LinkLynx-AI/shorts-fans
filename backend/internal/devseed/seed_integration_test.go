@@ -2,7 +2,6 @@ package devseed
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/url"
@@ -13,7 +12,6 @@ import (
 	"testing"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
-	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/golang-migrate/migrate/v4"
 	pgmigrate "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -22,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const integrationPostgresDSNEnv = "POSTGRES_DSN"
@@ -30,14 +28,8 @@ const integrationPostgresDSNEnv = "POSTGRES_DSN"
 func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	t.Parallel()
 
-	ctx, dsn, cleanup := newSeedTestDatabase(t)
+	ctx, pool, cleanup := newSeedTestDatabase(t)
 	defer cleanup()
-
-	pool, err := postgres.NewPool(ctx, dsn)
-	if err != nil {
-		t.Fatalf("postgres.NewPool() error = %v, want nil", err)
-	}
-	defer pool.Close()
 
 	summary, err := Run(ctx, pool)
 	if err != nil {
@@ -191,7 +183,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 }
 
-func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
+func newSeedTestDatabase(t *testing.T) (context.Context, *pgxpool.Pool, func()) {
 	t.Helper()
 
 	dsn := strings.TrimSpace(os.Getenv(integrationPostgresDSNEnv))
@@ -218,8 +210,7 @@ func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
 
 	tempConfig := baseConfig.Copy()
 	tempConfig.Database = tempDatabaseName
-	tempDSN := tempConfig.ConnString()
-	migrator := newTestMigrator(t, tempDSN)
+	migrator := newTestMigrator(t, tempConfig)
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
@@ -227,13 +218,38 @@ func newSeedTestDatabase(t *testing.T) (context.Context, string, func()) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
 
+	poolConfig, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pgxpool.ParseConfig() error = %v, want nil", err)
+	}
+	poolConfig.ConnConfig.Database = tempDatabaseName
+
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pgxpool.NewWithConfig() error = %v, want nil", err)
+	}
+	if err := pool.Ping(ctx); err != nil {
+		pool.Close()
+		closeMigrator(t, migrator)
+		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
+		adminConn.Close(ctx)
+		t.Fatalf("pool.Ping() error = %v, want nil", err)
+	}
+
 	cleanup := func() {
+		pool.Close()
 		closeMigrator(t, migrator)
 		dropTempDatabase(t, ctx, adminConn, tempDatabaseName)
 		adminConn.Close(ctx)
 	}
 
-	return ctx, tempDSN, cleanup
+	return ctx, pool, cleanup
 }
 
 func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx.Conn, error) {
@@ -252,13 +268,10 @@ func connectAdminDatabase(ctx context.Context, baseConfig *pgx.ConnConfig) (*pgx
 	return nil, fmt.Errorf("connect admin database: %w", lastErr)
 }
 
-func newTestMigrator(t *testing.T, dsn string) *migrate.Migrate {
+func newTestMigrator(t *testing.T, config *pgx.ConnConfig) *migrate.Migrate {
 	t.Helper()
 
-	db, err := sql.Open("pgx", dsn)
-	if err != nil {
-		t.Fatalf("sql.Open() error = %v, want nil", err)
-	}
+	db := stdlib.OpenDB(*config)
 
 	driver, err := pgmigrate.WithInstance(db, &pgmigrate.Config{})
 	if err != nil {
