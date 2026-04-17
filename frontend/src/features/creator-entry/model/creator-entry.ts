@@ -41,67 +41,67 @@ export function getCreatorRegistrationErrorMessage(error: unknown): string {
     return "ログイン状態を確認してから再度お試しください。";
   }
   if (code === "not_found") {
-    return "プロフィールが見つかりませんでした。profile settings を確認してください。";
+    return "プロフィールが見つかりませんでした。プロフィール設定をご確認ください。";
   }
   if (code === "invalid_display_name") {
     return "表示名を入力してください。";
   }
   if (code === "invalid_handle") {
-    return "handleは英数字・`.`・`_`のみ使えます。`@`は先頭に付けても構いません。";
+    return "ユーザー名は英数字と「.」「_」が使えます。先頭の @ は付けたままでも構いません。";
   }
   if (code === "handle_already_taken") {
-    return "そのhandleは既に使われています。別のhandleを入力してください。";
+    return "そのユーザー名はすでに使われています。別のものを入力してください。";
   }
   if (code === "invalid_legal_name") {
     return "本人確認に使う氏名を入力してください。";
   }
   if (code === "invalid_birth_date") {
-    return "生年月日は `YYYY-MM-DD` 形式で入力してください。";
+    return "生年月日は 1999-04-02 の形で入力してください。";
   }
   if (code === "invalid_payout_recipient_type") {
-    return "受取人種別を選択してください。";
+    return "受取名義の種類を選択してください。";
   }
   if (code === "invalid_payout_recipient_name") {
     return "売上受取名義を入力してください。";
   }
   if (code === "registration_incomplete") {
-    return "必須項目と証跡をそろえてから申請してください。";
+    return "必須項目と必要な書類をそろえてから申請してください。";
   }
   if (code === "registration_state_conflict") {
     return "現在の申請状態ではこの操作を実行できません。";
   }
   if (code === "invalid_avatar_mime_type") {
-    return "avatar は JPEG / PNG / WebP のみ選択できます。";
+    return "画像は JPEG / PNG / WebP のみ選択できます。";
   }
   if (code === "invalid_avatar_file_size") {
-    return "avatar file を読み取れませんでした。別の画像を選択してください。";
+    return "画像を読み取れませんでした。別の画像を選択してください。";
   }
   if (code === "avatar_file_too_large") {
-    return "avatar は 5MB 以下の画像を選択してください。";
+    return "画像は 5MB 以下のものを選択してください。";
   }
   if (code === "avatar_upload_not_found" || code === "avatar_upload_incomplete") {
-    return "avatar のアップロードを確認できませんでした。もう一度お試しください。";
+    return "画像のアップロードを確認できませんでした。もう一度お試しください。";
   }
   if (code === "avatar_upload_expired" || code === "invalid_avatar_upload_token") {
-    return "avatar upload の有効期限が切れました。もう一度申し込んでください。";
+    return "画像アップロードの有効期限が切れました。もう一度やり直してください。";
   }
   if (code === "invalid_evidence_kind") {
-    return "この証跡タイプは現在アップロードできません。";
+    return "この種類の書類は現在提出できません。";
   }
   if (code === "invalid_evidence_mime_type") {
-    return "証跡は JPEG / PNG / WebP / PDF のみ選択できます。";
+    return "書類は画像またはPDFを選択してください。";
   }
   if (code === "invalid_evidence_file_size") {
-    return "証跡ファイルを読み取れませんでした。別のファイルを選択してください。";
+    return "書類を読み取れませんでした。別のファイルを選択してください。";
   }
   if (code === "evidence_file_too_large") {
-    return "証跡ファイルは 10MB 以下で選択してください。";
+    return "書類は 10MB 以下のものを選択してください。";
   }
   if (code === "evidence_upload_not_found" || code === "evidence_upload_incomplete") {
-    return "証跡アップロードを確認できませんでした。もう一度お試しください。";
+    return "書類のアップロードを確認できませんでした。もう一度お試しください。";
   }
   if (code === "evidence_upload_expired") {
-    return "証跡アップロードの有効期限が切れました。もう一度ファイルを選択してください。";
+    return "書類アップロードの有効期限が切れました。もう一度ファイルを選択してください。";
   }
 
   if (error instanceof ApiError && error.code === "network") {

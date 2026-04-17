@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef } from "react";
 
-import { Avatar, AvatarFallback, AvatarImage, Button, SurfacePanel } from "@/shared/ui";
+import { Avatar, AvatarFallback, AvatarImage, Button } from "@/shared/ui";
 
 import {
   creatorRegistrationEvidenceKinds,
@@ -11,23 +11,34 @@ import {
 } from "../api/contracts";
 import { useCreatorRegistration } from "../model/use-creator-registration";
 import { CreatorRegistrationStaticWorkspacePreview } from "./creator-registration-static-workspace-preview";
+import {
+  CreatorRegistrationMessage,
+  CreatorRegistrationSectionHeading,
+  creatorRegistrationButtonClassName,
+  creatorRegistrationFieldLabelClassName,
+  creatorRegistrationInlineSurfaceClassName,
+  creatorRegistrationInputClassName,
+  creatorRegistrationSectionClassName,
+  creatorRegistrationShellClassName,
+  creatorRegistrationTextareaClassName,
+} from "./creator-registration-ui-primitives";
 
 const evidenceFieldLabels = {
   government_id: {
-    description: "本人確認書類。JPEG / PNG / WebP / PDF、10MB まで。",
-    label: "Government ID",
+    description: "顔写真付きの確認書類です。画像またはPDFで提出できます。10MBまでです。",
+    label: "本人確認書類",
   },
   payout_proof: {
-    description: "売上受取名義が確認できる書類。JPEG / PNG / WebP / PDF、10MB まで。",
-    label: "Payout Proof",
+    description: "売上を受け取る名義が分かる書類です。画像またはPDFで提出できます。10MBまでです。",
+    label: "受取名義の確認書類",
   },
 } as const;
 
 const onboardingChecklist = [
-  "年齢要件と本人確認書類をそろえる",
-  "売上受取主体が確認できる payout proof を出す",
-  "禁止カテゴリ非該当と consent responsibility を確認する",
-  "approval 前は creator dashboard / upload は開かない",
+  "本人確認に必要な書類をそろえる",
+  "売上の受取名義が分かる書類を用意する",
+  "禁止された内容を扱わないことを確認する",
+  "確認が終わるまでは投稿や管理画面は使えません",
 ] as const;
 
 type RegistrationSurfaceKind =
@@ -42,7 +53,6 @@ type RegistrationSurfaceKind =
 
 type RegistrationPanelCopy = {
   description: string;
-  eyebrow: string;
   saveLabel: string;
   submitLabel: string;
   title: string;
@@ -77,6 +87,17 @@ function formatEvidenceDate(uploadedAt: string) {
   }
 
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatEvidenceFileKind(mimeType: string) {
+  if (mimeType === "application/pdf") {
+    return "PDF";
+  }
+  if (mimeType.startsWith("image/")) {
+    return "画像";
+  }
+
+  return "ファイル";
 }
 
 function formatStatusTimestamp(timestamp: string | null) {
@@ -128,74 +149,66 @@ function resolvePanelCopy(surfaceKind: RegistrationSurfaceKind): RegistrationPan
     case "rejected_resubmit":
       return {
         description:
-          "却下理由を確認し、必要な項目だけ修正して同じ onboarding flow から再申請できます。creator mode や upload workspace は引き続き開きません。",
-        eyebrow: "creator rejected",
+          "差し戻し理由を確認し、必要な項目だけ直してからもう一度申請できます。",
         saveLabel: "修正内容を保存する",
-        submitLabel: "再申請を送信する",
+        submitLabel: "再申請する",
         title: "修正して再申請する",
       };
     case "rejected_support":
       return {
         description:
-          "現在の却下内容は self-serve では解消できません。この surface は read-only のまま next action を確認するために使います。",
-        eyebrow: "creator rejected",
+          "現在の内容はこの画面からは再申請できません。必要な案内が出るまでお待ちください。",
         saveLabel: "下書きを保存する",
-        submitLabel: "再申請を送信する",
+        submitLabel: "再申請する",
         title: "サポート確認が必要です",
       };
     case "rejected_closed":
       return {
         description:
-          "この onboarding case では self-serve resubmit を開けません。却下理由と残回数を確認するための read-only surface として扱います。",
-        eyebrow: "creator rejected",
+          "この申請はこの画面からは出し直せません。表示されている理由をご確認ください。",
         saveLabel: "下書きを保存する",
-        submitLabel: "再申請を送信する",
+        submitLabel: "再申請する",
         title: "再申請は利用できません",
       };
     case "rejected_unknown":
       return {
         description:
-          "rejected status の詳細をいま確認できません。support review required か上限到達かをこの surface だけでは判定できないため、時間を置いて再読み込みしてください。",
-        eyebrow: "creator rejected",
+          "申請状況を確認できませんでした。時間を置いてからもう一度開いてください。",
         saveLabel: "下書きを保存する",
-        submitLabel: "再申請を送信する",
+        submitLabel: "再申請する",
         title: "審査状態を再確認してください",
       };
     case "suspended":
       return {
         description:
-          "Creator 利用は現在停止中です。review 状態が更新されるまで、creator mode や upload workspace は引き続き開きません。",
-        eyebrow: "creator suspended",
+          "利用停止中のため、状態が更新されるまで内容確認のみ行えます。",
         saveLabel: "下書きを保存する",
-        submitLabel: "審査申請を送信する",
-        title: "Creator利用は停止中です",
+        submitLabel: "申請を送る",
+        title: "クリエイター利用は停止中です",
       };
     case "draft":
       return {
         description:
-          "shared profile の表示名、handle、avatar は fan / creator 共通です。この面では preview のみ行い、必要な証跡と creator 固有の bio を追加します。",
-        eyebrow: "creator onboarding",
+          "プロフィールを確認し、必要な情報と書類をそろえて申請します。",
         saveLabel: "下書きを保存する",
-        submitLabel: "審査申請を送信する",
-        title: "Creator審査申請を始める",
+        submitLabel: "申請を送る",
+        title: "クリエイター登録を始める",
       };
     case "submitted":
       return {
-        description: "審査状況の確認が完了するまでお待ちください。",
-        eyebrow: "creator submitted",
+        description: "確認が終わるまでしばらくお待ちください。",
         saveLabel: "下書きを保存する",
-        submitLabel: "審査申請を送信する",
-        title: "審査申請を受け付けました",
+        submitLabel: "申請を送る",
+        title: "申請を受け付けました",
       };
     case "not_started":
     default:
       return {
         description:
-          "shared profile の表示名、handle、avatar は fan / creator 共通です。この面では preview のみ行い、必要な証跡と creator 固有の bio を追加します。",
-        eyebrow: "creator onboarding",
+          "プロフィールを確認し、必要な情報と書類をそろえて申請します。",
         saveLabel: "下書きを保存する",
-        submitLabel: "審査申請を送信する",
-        title: "Creator審査申請を始める",
+        submitLabel: "申請を送る",
+        title: "クリエイター登録を始める",
       };
   }
 }
@@ -204,37 +217,37 @@ function resolveReasonChecklist(reasonCode: string | null): readonly string[] {
   switch (reasonCode) {
     case "documents_incomplete":
       return [
-        "不足している証跡をアップロードし直す",
-        "legal name / birth date / payout recipient の空欄を埋める",
-        "保存後に同じ flow から再申請する",
+        "不足している書類をアップロードし直す",
+        "氏名、生年月日、受取名義の空欄を埋める",
+        "保存後にこの画面から再申請する",
       ];
     case "documents_blurry":
       return [
         "判別できる解像度で本人確認書類を再提出する",
         "見切れや反射がないファイルへ差し替える",
-        "更新後に再申請する",
+        "更新後にもう一度申請する",
       ];
     case "payout_info_incomplete":
       return [
-        "payout recipient type と受取名義を見直す",
-        "payout proof を最新ファイルへ差し替える",
+        "受取名義の種類と受取名を見直す",
+        "受取名義の確認書類を最新のものに差し替える",
         "修正後に再申請する",
       ];
     case "profile_mismatch":
       return [
-        "shared profile の表示名と提出情報の不一致を直す",
-        "必要なら profile settings で表示名や handle を更新する",
+        "プロフィールの表示名と提出情報の不一致を直す",
+        "必要ならプロフィール設定で表示名やユーザー名を更新する",
         "反映後に再申請する",
       ];
     case "impersonation_suspected":
       return [
-        "現在は self-serve での再申請はできません",
-        "review 側の確認が終わるまで read-only のままです",
+        "現在はこの画面から再申請できません",
+        "運営側の確認が終わるまでお待ちください",
       ];
     default:
       return [
-        "status explanation を確認する",
-        "必要な項目が分かる場合だけ修正し、案内に従って再申請する",
+        "表示されている案内を確認する",
+        "必要な項目が分かる場合だけ修正し、もう一度申請する",
       ];
   }
 }
@@ -250,10 +263,10 @@ function resolveStatusCard(
 
     return {
       body:
-        "rejected detail の再取得には失敗しましたが、self-serve resubmit 自体は開いています。差し戻しになった項目を中心に見直し、同じ onboarding surface から再申請してください。",
+        "詳しい差し戻し理由は読み込めませんでしたが、再申請はできます。気になる項目を見直してからもう一度送ってください。",
       checklist: [
         "差し戻しになった入力と証跡を見直す",
-        "保存後に同じ flow から再申請する",
+        "保存後にこの画面から再申請する",
       ],
       ctaLabel: "修正して再申請する",
       eyebrow: "再申請できます",
@@ -274,14 +287,14 @@ function resolveStatusCard(
     const meta = [
       rejectedAt ? `却下日時: ${rejectedAt}` : null,
       showRemaining
-        ? `セルフ再申請の残回数: ${remaining}`
+        ? `再申請できる残り回数: ${remaining}`
         : null,
     ].filter((value): value is string => value !== null);
 
     if (registration.actions.canResubmit) {
       return {
         body:
-          "fixable reject として判定されています。必要な項目だけ修正し、同じ onboarding surface から self-serve で再申請できます。",
+          "差し戻しになった項目だけ直せば、もう一度申請できます。",
         checklist: resolveReasonChecklist(reasonCode),
         ctaLabel: "修正して再申請する",
         eyebrow: "再申請できます",
@@ -293,13 +306,13 @@ function resolveStatusCard(
     return {
       body:
         registration.rejection?.isSupportReviewRequired
-          ? "support review required の状態です。いまは self-serve では再申請できず、この surface は確認用の read-only です。"
-          : "self-serve resubmit の残回数がなく、この onboarding case では再申請できません。next action の案内がある場合だけ従ってください。",
+          ? "いまはこの画面から再申請できません。運営からの確認をお待ちください。"
+          : "この申請はこの画面からは出し直せません。必要な案内がある場合のみ従ってください。",
       checklist: resolveReasonChecklist(reasonCode),
       ctaLabel: null,
       eyebrow: registration.rejection?.isSupportReviewRequired ? "運営確認が必要です" : "再申請は利用できません",
       meta: registration.rejection?.isSupportReviewRequired
-        ? [...meta, "次の対応: 運営確認が必要です"]
+        ? [...meta, "次の案内: 運営確認が必要です"]
         : meta,
       title: registration.rejection?.isSupportReviewRequired ? "運営確認が必要です" : "再申請は利用できません",
     };
@@ -310,13 +323,13 @@ function resolveStatusCard(
 
     return {
       body:
-        "creator capability は停止中です。approval 前 surface だけを read-only で表示し、creator mode / upload / submission package は引き続き閉じたままにします。",
+        "利用停止中のため、いまは内容確認のみ行えます。",
       checklist: [
-        "creator mode は再開まで利用できません",
-        "この surface では内容確認のみ行えます",
+        "投稿や管理画面は再開まで使えません",
+        "この画面では内容確認のみ行えます",
       ],
       ctaLabel: null,
-      eyebrow: "Suspended",
+      eyebrow: "利用停止中",
       meta: suspendedAt ? [`停止日時: ${suspendedAt}`] : [],
       title: "停止中のため再申請できません",
     };
@@ -379,44 +392,41 @@ export function CreatorRegistrationPanel({
   };
 
   return (
-    <main className="mx-auto flex min-h-full w-full max-w-[440px] flex-col px-4 pb-28 pt-5">
-      <SurfacePanel className="w-full px-5 py-6 text-foreground">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">
-          {panelCopy.eyebrow}
-        </p>
-        <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
-          {panelCopy.title}
-        </h1>
-        <p className="mt-3 text-sm leading-6 text-muted">{panelCopy.description}</p>
+    <main className="mx-auto flex min-h-svh w-full max-w-[408px] px-4 py-10">
+      <div className={creatorRegistrationShellClassName}>
+        <div className="mt-2">
+          <h1 className="font-display text-[32px] font-semibold leading-[1.12] tracking-[-0.05em] text-foreground">
+            {panelCopy.title}
+          </h1>
+          <p className="mt-3 max-w-[34ch] text-sm leading-6 text-muted">{panelCopy.description}</p>
+        </div>
 
         {isLoading ? (
-          <div className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-5 text-sm leading-6 text-muted">
-            申請フォームを読み込んでいます...
-          </div>
+          <CreatorRegistrationMessage className="mt-6" kind="info" message="入力内容を読み込んでいます。" />
         ) : null}
 
         {statusCard ? (
-          <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
+          <section className={`mt-6 ${creatorRegistrationSectionClassName}`}>
+            <CreatorRegistrationSectionHeading>
               {statusCard.eyebrow}
-            </p>
-            <h2 className="mt-2 text-[20px] font-semibold tracking-[-0.02em] text-foreground">
+            </CreatorRegistrationSectionHeading>
+            <h2 className="mt-3 font-display text-[24px] font-semibold leading-[1.12] tracking-[-0.04em] text-foreground">
               {statusCard.title}
             </h2>
             <p className="mt-2 text-sm leading-6 text-muted">{statusCard.body}</p>
 
             {statusCard.meta.length > 0 ? (
-              <div className="mt-4 rounded-[18px] border border-white/90 bg-white/92 px-4 py-4 text-sm leading-6 text-muted">
+              <div className={`mt-4 ${creatorRegistrationInlineSurfaceClassName} text-sm leading-6 text-muted`}>
                 {statusCard.meta.map((item) => (
                   <p key={item}>{item}</p>
                 ))}
               </div>
             ) : null}
 
-            <div className="mt-4 grid gap-2">
+            <div className="mt-4 grid gap-3">
               {statusCard.checklist.map((item) => (
                 <div
-                  className="rounded-[18px] border border-white/85 bg-white/90 px-4 py-3 text-sm leading-6 text-foreground"
+                  className={`${creatorRegistrationInlineSurfaceClassName} text-sm leading-6 text-foreground`}
                   key={item}
                 >
                   {item}
@@ -426,7 +436,7 @@ export function CreatorRegistrationPanel({
 
             {statusCard.ctaLabel ? (
               <div className="mt-4">
-                <Button className="w-full" disabled={isBusy || isReadOnly} onClick={scrollToForm} type="button">
+                <Button className={creatorRegistrationButtonClassName} disabled={isBusy || isReadOnly} onClick={scrollToForm} type="button">
                   {statusCard.ctaLabel}
                 </Button>
               </div>
@@ -434,14 +444,14 @@ export function CreatorRegistrationPanel({
           </section>
         ) : null}
 
-        <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-            Onboarding checklist
-          </p>
-          <div className="mt-4 grid gap-2">
+        <section className={`mt-6 ${creatorRegistrationSectionClassName}`}>
+          <CreatorRegistrationSectionHeading>
+            準備しておくこと
+          </CreatorRegistrationSectionHeading>
+          <div className="mt-4 grid gap-3">
             {onboardingChecklist.map((item) => (
               <div
-                className="rounded-[18px] border border-white/90 bg-white/92 px-4 py-3 text-sm leading-6 text-foreground"
+                className={`${creatorRegistrationInlineSurfaceClassName} text-sm leading-6 text-foreground`}
                 key={item}
               >
                 {item}
@@ -453,30 +463,30 @@ export function CreatorRegistrationPanel({
         <CreatorRegistrationStaticWorkspacePreview />
 
         {sharedProfile ? (
-          <section className="mt-6 rounded-[24px] border border-[#d7e7ef] bg-[#f7fbfd] px-4 py-4 text-foreground">
+          <section className={`mt-6 ${creatorRegistrationSectionClassName}`}>
             <div className="flex items-center gap-4">
-              <Avatar className="size-[72px] border border-[#d3e2ea] bg-white text-[18px] font-semibold text-[#2f6176] shadow-none">
-                {sharedProfile.avatar ? <AvatarImage alt={`${sharedProfile.displayName} avatar`} src={sharedProfile.avatar.url} /> : null}
+              <Avatar className="size-[72px] border border-[#dfe8ef] bg-white text-[18px] font-semibold text-[#2f6176] shadow-none">
+                {sharedProfile.avatar ? <AvatarImage alt={`${sharedProfile.displayName} の画像`} src={sharedProfile.avatar.url} /> : null}
                 <AvatarFallback className="bg-transparent text-inherit">
                   {buildAvatarFallback(sharedProfile.displayName)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                  Shared profile
-                </p>
-                <p className="mt-1 text-[17px] font-semibold tracking-[-0.02em] text-foreground">
+                <CreatorRegistrationSectionHeading>
+                  現在のプロフィール
+                </CreatorRegistrationSectionHeading>
+                <p className="mt-2 text-[17px] font-bold tracking-[-0.02em] text-foreground">
                   {sharedProfile.displayName}
                 </p>
                 <p className="mt-1 text-sm text-muted">{sharedProfile.handle}</p>
               </div>
             </div>
-            <div className="mt-4 rounded-[18px] border border-white/80 bg-white/90 px-4 py-3 text-sm leading-6 text-muted">
-              表示名、handle、avatar を直したい場合は profile settings で更新してください。
+            <div className={`mt-4 ${creatorRegistrationInlineSurfaceClassName} text-sm leading-6 text-muted`}>
+              表示名、ユーザー名、画像はプロフィール設定で変更できます。
             </div>
             <div className="mt-4">
-              <Button asChild className="w-full" disabled={isBusy} variant="secondary">
-                <Link href="/fan/settings/profile">Profile settings を開く</Link>
+              <Button asChild className={creatorRegistrationButtonClassName} disabled={isBusy} variant="secondary">
+                <Link href="/fan/settings/profile">プロフィール設定を開く</Link>
               </Button>
             </div>
           </section>
@@ -490,28 +500,28 @@ export function CreatorRegistrationPanel({
           }}
           ref={formRef}
         >
-          <section className="grid gap-4">
+          <section className={`grid gap-4 ${creatorRegistrationSectionClassName}`}>
             <label className="grid gap-1.5" htmlFor="creator-registration-bio">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                Bio
+              <span className={creatorRegistrationFieldLabelClassName}>
+                紹介文
               </span>
               <textarea
-                className="min-h-[132px] w-full resize-none rounded-[22px] border border-[#d7e7ef] bg-white px-4 py-3 text-sm leading-6 text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60 disabled:cursor-default disabled:opacity-70"
+                className={creatorRegistrationTextareaClassName}
                 disabled={isBusy || isReadOnly}
                 id="creator-registration-bio"
                 onChange={(event) => setCreatorBio(event.target.value)}
-                placeholder="投稿したい世界観や自分の紹介を記入してください。"
+                placeholder="投稿したい雰囲気や、見てもらいたい内容を入力してください。"
                 value={creatorBio}
               />
             </label>
 
             <label className="grid gap-1.5" htmlFor="creator-registration-legal-name">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                Legal name
+              <span className={creatorRegistrationFieldLabelClassName}>
+                氏名
               </span>
               <input
                 autoComplete="name"
-                className="min-h-12 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60 disabled:cursor-default disabled:opacity-70"
+                className={creatorRegistrationInputClassName}
                 disabled={isBusy || isReadOnly}
                 id="creator-registration-legal-name"
                 onChange={(event) => setLegalName(event.target.value)}
@@ -522,11 +532,11 @@ export function CreatorRegistrationPanel({
             </label>
 
             <label className="grid gap-1.5" htmlFor="creator-registration-birth-date">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                Birth date
+              <span className={creatorRegistrationFieldLabelClassName}>
+                生年月日
               </span>
               <input
-                className="min-h-12 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60 disabled:cursor-default disabled:opacity-70"
+                className={creatorRegistrationInputClassName}
                 disabled={isBusy || isReadOnly}
                 id="creator-registration-birth-date"
                 onChange={(event) => setBirthDate(event.target.value)}
@@ -536,8 +546,8 @@ export function CreatorRegistrationPanel({
             </label>
 
             <fieldset className="grid gap-2">
-              <legend className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                Payout recipient
+              <legend className={creatorRegistrationFieldLabelClassName}>
+                受取名義の種類
               </legend>
               <div className="grid gap-2 sm:grid-cols-2">
                 {[
@@ -545,7 +555,7 @@ export function CreatorRegistrationPanel({
                   { label: "事業名義", value: "business" },
                 ].map((option) => (
                   <label
-                    className="flex items-start gap-3 rounded-[20px] border border-[#d7e7ef] bg-[#f8fbfd] px-4 py-4 text-sm leading-6 text-foreground"
+                    className={`${creatorRegistrationInlineSurfaceClassName} flex items-start gap-3 text-sm leading-6 text-foreground`}
                     htmlFor={`creator-registration-payout-${option.value}`}
                     key={option.value}
                   >
@@ -565,11 +575,11 @@ export function CreatorRegistrationPanel({
             </fieldset>
 
             <label className="grid gap-1.5" htmlFor="creator-registration-payout-name">
-              <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                Payout recipient name
+              <span className={creatorRegistrationFieldLabelClassName}>
+                受取名
               </span>
               <input
-                className="min-h-12 rounded-[18px] border border-[#bae7ff]/90 bg-white/88 px-4 text-sm text-foreground outline-none transition placeholder:text-muted focus:border-accent focus:ring-4 focus:ring-ring/60 disabled:cursor-default disabled:opacity-70"
+                className={creatorRegistrationInputClassName}
                 disabled={isBusy || isReadOnly}
                 id="creator-registration-payout-name"
                 onChange={(event) => setPayoutRecipientName(event.target.value)}
@@ -580,10 +590,10 @@ export function CreatorRegistrationPanel({
             </label>
           </section>
 
-          <section className="grid gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-strong">
-              Evidence
-            </p>
+          <section className={`grid gap-3 ${creatorRegistrationSectionClassName}`}>
+            <CreatorRegistrationSectionHeading>
+              提出書類
+            </CreatorRegistrationSectionHeading>
             {creatorRegistrationEvidenceKinds.map((kind) => {
               const field = evidences[kind];
               const config = evidenceFieldLabels[kind];
@@ -591,25 +601,25 @@ export function CreatorRegistrationPanel({
 
               return (
                 <section
-                  className="rounded-[22px] border border-[#d7e7ef] bg-[#f8fbfd] px-4 py-4 text-foreground"
+                  className={`${creatorRegistrationInlineSurfaceClassName} text-foreground`}
                   key={kind}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-[15px] font-semibold tracking-[-0.02em] text-foreground">{config.label}</p>
+                      <p className="text-[15px] font-bold tracking-[-0.02em] text-foreground">{config.label}</p>
                       <p className="mt-1 text-sm leading-6 text-muted">{config.description}</p>
                     </div>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-accent-strong">
-                      required
+                    <span className="text-[11px] font-black tracking-[0.08em] text-[#a3adbc]">
+                      必須
                     </span>
                   </div>
 
-                  <div className="mt-4 rounded-[18px] border border-white/90 bg-white/92 px-4 py-4 text-sm leading-6 text-muted">
+                  <div className={`mt-4 ${creatorRegistrationSectionClassName} text-sm leading-6 text-muted`}>
                     {field.evidence ? (
                       <>
-                        <p className="font-semibold text-foreground">{field.evidence.fileName}</p>
+                        <p className="font-bold text-foreground">{field.evidence.fileName}</p>
                         <p className="mt-1">
-                          {field.evidence.mimeType} / {Math.ceil(field.evidence.fileSizeBytes / 1024)}KB / {formatEvidenceDate(field.evidence.uploadedAt)}
+                          {formatEvidenceFileKind(field.evidence.mimeType)} / {Math.ceil(field.evidence.fileSizeBytes / 1024)}KB / {formatEvidenceDate(field.evidence.uploadedAt)}
                         </p>
                       </>
                     ) : (
@@ -618,18 +628,12 @@ export function CreatorRegistrationPanel({
                   </div>
 
                   {field.errorMessage ? (
-                    <p
-                      aria-live="polite"
-                      className="mt-3 rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
-                      role="alert"
-                    >
-                      {field.errorMessage}
-                    </p>
+                    <CreatorRegistrationMessage className="mt-3" kind="error" message={field.errorMessage} />
                   ) : null}
 
                   <div className="mt-4">
                     <Button
-                      className="w-full"
+                      className={creatorRegistrationButtonClassName}
                       disabled={evidenceUploadDisabled}
                       onClick={() => {
                         evidenceInputRefs.current[kind]?.click();
@@ -637,7 +641,7 @@ export function CreatorRegistrationPanel({
                       type="button"
                       variant="secondary"
                     >
-                      {field.isUploading ? "アップロード中..." : field.evidence ? "証跡を差し替える" : "証跡を選択する"}
+                      {field.isUploading ? "アップロード中..." : field.evidence ? "書類を差し替える" : "書類を選択する"}
                     </Button>
                     <input
                       accept="image/jpeg,image/png,image/webp,application/pdf"
@@ -659,8 +663,8 @@ export function CreatorRegistrationPanel({
             })}
           </section>
 
-          <section className="grid gap-3">
-            <label className="flex items-start gap-3 rounded-[20px] border border-[#d7e7ef] bg-[#f8fbfd] px-4 py-4">
+          <section className={`grid gap-3 ${creatorRegistrationSectionClassName}`}>
+            <label className={`${creatorRegistrationInlineSurfaceClassName} flex items-start gap-3`}>
               <input
                 checked={declaresNoProhibitedCategory}
                 className="mt-1 size-5 rounded-[6px] border border-[#cfd7e3] accent-accent-strong"
@@ -669,11 +673,11 @@ export function CreatorRegistrationPanel({
                 type="checkbox"
               />
               <span className="text-sm leading-6 text-foreground">
-                prohibited category に該当する content を扱わないことを確認しました。
+                禁止されている内容を扱わないことを確認しました。
               </span>
             </label>
 
-            <label className="flex items-start gap-3 rounded-[20px] border border-[#d7e7ef] bg-[#f8fbfd] px-4 py-4">
+            <label className={`${creatorRegistrationInlineSurfaceClassName} flex items-start gap-3`}>
               <input
                 checked={acceptsConsentResponsibility}
                 className="mt-1 size-5 rounded-[6px] border border-[#cfd7e3] accent-accent-strong"
@@ -682,31 +686,23 @@ export function CreatorRegistrationPanel({
                 type="checkbox"
               />
               <span className="text-sm leading-6 text-foreground">
-                出演者 consent と権利関係の責任を自分で負うことを確認しました。
+                出演者の同意と権利確認の責任を自分で負うことを確認しました。
               </span>
             </label>
           </section>
 
           {successMessage ? (
-            <p className="rounded-[18px] border border-[rgba(26,152,80,0.22)] bg-[rgba(245,255,249,0.95)] px-4 py-3 text-sm leading-6 text-[#197040]">
-              {successMessage}
-            </p>
+            <CreatorRegistrationMessage kind="success" message={successMessage} />
           ) : null}
 
           {errorMessage ? (
-            <p
-              aria-live="polite"
-              className="rounded-[18px] border border-[#ffb3b8] bg-[#fff4f5] px-4 py-3 text-sm leading-6 text-[#b2394f]"
-              role="alert"
-            >
-              {errorMessage}
-            </p>
+            <CreatorRegistrationMessage kind="error" message={errorMessage} />
           ) : null}
 
           {showFormActions ? (
             <div className="grid gap-3">
               <Button
-                className="w-full"
+                className={creatorRegistrationButtonClassName}
                 disabled={isBusy || isReadOnly}
                 onClick={() => {
                   void saveDraft();
@@ -717,19 +713,19 @@ export function CreatorRegistrationPanel({
                 {isSaving ? "保存中..." : panelCopy.saveLabel}
               </Button>
 
-              <Button className="w-full" disabled={submitDisabled} type="submit">
+              <Button className={creatorRegistrationButtonClassName} disabled={submitDisabled} type="submit">
                 {isSubmitting ? "送信中..." : panelCopy.submitLabel}
               </Button>
             </div>
           ) : null}
         </form>
 
-        <div className="mt-4">
-          <Button asChild className="w-full" disabled={isBusy} variant="secondary">
-            <Link href="/fan">あとで fan に戻る</Link>
+        <div className="mt-6">
+          <Button asChild className={creatorRegistrationButtonClassName} disabled={isBusy} variant="secondary">
+            <Link href="/fan">あとでホームに戻る</Link>
           </Button>
         </div>
-      </SurfacePanel>
+      </div>
     </main>
   );
 }

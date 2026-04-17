@@ -59,12 +59,11 @@ describe("CreatorRegistrationSuccessPanel", () => {
     render(<CreatorRegistrationSuccessPanel />);
 
     expect(await screen.findByRole("heading", { name: "申請を受け付けました" })).toBeInTheDocument();
-    expect(screen.getByText("受付完了")).toBeInTheDocument();
     expect(screen.getByText("現在の状態")).toBeInTheDocument();
-    expect(screen.getByText("確認待ち")).toBeInTheDocument();
+    expect(screen.getByText("確認中")).toBeInTheDocument();
     expect(screen.getByText("受付日時")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "プロフィール設定" })).toHaveAttribute("href", "/fan/settings/profile");
-    expect(screen.getByRole("link", { name: "ホームへ戻る" })).toHaveAttribute("href", "/fan");
+    expect(screen.getByRole("link", { name: "プロフィール設定を開く" })).toHaveAttribute("href", "/fan/settings/profile");
+    expect(screen.getByRole("link", { name: "ホームに戻る" })).toHaveAttribute("href", "/fan");
     expect(screen.queryByText("creator submitted")).not.toBeInTheDocument();
     expect(screen.queryByText("fan hub に戻る")).not.toBeInTheDocument();
   });
@@ -130,7 +129,7 @@ describe("CreatorRegistrationSuccessPanel", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("プロフィール設定をご確認ください。");
     expect(screen.queryByText("profile settings")).not.toBeInTheDocument();
-    expect(screen.queryByText("確認待ち")).not.toBeInTheDocument();
+    expect(screen.queryByText("確認中")).not.toBeInTheDocument();
     expect(screen.queryByText("現在の状態")).not.toBeInTheDocument();
   });
 });
