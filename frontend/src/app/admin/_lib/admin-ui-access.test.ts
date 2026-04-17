@@ -5,10 +5,15 @@ describe("admin ui access", () => {
     vi.unstubAllEnvs();
   });
 
-  it("returns true only when the dedicated admin env flag is enabled", () => {
+  it("returns true only when the dedicated admin env flag is enabled in development", () => {
+    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("ADMIN_UI_ENABLED", "1");
     expect(isAdminUiEnabled()).toBe(true);
 
+    vi.stubEnv("NODE_ENV", "production");
+    expect(isAdminUiEnabled()).toBe(false);
+
+    vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("ADMIN_UI_ENABLED", "0");
     expect(isAdminUiEnabled()).toBe(false);
 

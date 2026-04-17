@@ -16,11 +16,10 @@ import {
   getCreatorReviewCase,
   getCreatorReviewReasonOption,
   getCreatorReviewStateLabel,
+  isCreatorReviewUserId,
   normalizeCreatorReviewState,
 } from "@/entities/creator-review";
 import { CreatorReviewDecisionForm } from "@/features/creator-review-decision";
-
-const creatorReviewUserIDPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function getStateBadgeClass(state: string) {
   switch (state) {
@@ -50,7 +49,7 @@ export default async function AdminCreatorReviewCasePage({
   assertAdminUiEnabled();
   const [{ userId }, { state }] = await Promise.all([params, searchParams]);
   const activeState = normalizeCreatorReviewState(state);
-  if (!creatorReviewUserIDPattern.test(userId)) {
+  if (!isCreatorReviewUserId(userId)) {
     notFound();
   }
 

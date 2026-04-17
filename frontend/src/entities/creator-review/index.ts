@@ -1,6 +1,7 @@
 export { applyCreatorReviewDecision } from "./api/apply-creator-review-decision";
 export { getCreatorReviewCase } from "./api/get-creator-review-case";
 export { getCreatorReviewQueue } from "./api/get-creator-review-queue";
+export { isCreatorReviewUserId } from "./api/contracts";
 export type {
   CreatorReviewCase,
   CreatorReviewDecision,

@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const creatorReviewHandlePattern = /^@[a-z0-9._]+$/;
 const creatorReviewUserIDPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const creatorReviewUserIdSchema = z.string().regex(creatorReviewUserIDPattern);
 
 export const creatorReviewStates = [
   "submitted",
@@ -76,7 +77,7 @@ export const creatorReviewQueueItemSchema = z.object({
   review: creatorReviewTimelineSchema,
   sharedProfile: creatorReviewSharedProfileSchema,
   state: z.enum(creatorReviewStates),
-  userId: z.string().regex(creatorReviewUserIDPattern),
+  userId: creatorReviewUserIdSchema,
 });
 
 export const creatorReviewCaseSchema = z.object({
@@ -87,8 +88,12 @@ export const creatorReviewCaseSchema = z.object({
   review: creatorReviewTimelineSchema,
   sharedProfile: creatorReviewSharedProfileSchema,
   state: z.enum(creatorReviewStates),
-  userId: z.string().regex(creatorReviewUserIDPattern),
+  userId: creatorReviewUserIdSchema,
 });
+
+export function isCreatorReviewUserId(value: string): boolean {
+  return creatorReviewUserIdSchema.safeParse(value).success;
+}
 
 export const creatorReviewQueueResponseSchema = z.object({
   data: z.object({
