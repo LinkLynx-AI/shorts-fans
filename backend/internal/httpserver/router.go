@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -91,6 +92,12 @@ type FanUnlockMainService interface {
 	GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error)
 	GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (fanmain.UnlockSurface, error)
 	IssueAccessEntry(ctx context.Context, sessionBinding string, input fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+	PurchaseMain(ctx context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
+}
+
+// PaymentWebhookHandler は provider webhook を受けて purchase state を更新します。
+type PaymentWebhookHandler interface {
+	HandleWebhook(ctx context.Context, remoteIP string, query url.Values, contentType string, body []byte) error
 }
 
 // CreatorFollowWriter は creator follow mutation を表します。
@@ -185,6 +192,7 @@ type HandlerConfig struct {
 	CreatorAvatarUpload          ViewerCreatorAvatarUploadHandler
 	CreatorRegistration          ViewerCreatorRegistrationService
 	CreatorRegistrationEvidence  ViewerCreatorRegistrationEvidenceUploadHandler
+	CCBillWebhook                PaymentWebhookHandler
 	FanProfileLibrary            FanProfileLibraryReader
 	FanProfileFollowing          FanProfileFollowingReader
 	FanProfilePinnedShorts       FanProfilePinnedShortsReader
@@ -283,6 +291,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
 	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerFanUnlockMainRoutes(router, config.FanUnlockMain, config.ShortDisplayAssets, config.MainDisplayAssets, config.ViewerBootstrap)
+	registerPaymentWebhookRoutes(router, config.CCBillWebhook)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(

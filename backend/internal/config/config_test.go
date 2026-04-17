@@ -15,6 +15,12 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.APIAddr != ":8080" {
 		t.Fatalf("LoadFromEnv() default api addr got %q want %q", cfg.APIAddr, ":8080")
 	}
+	if cfg.CCBillBaseURL != "https://api.ccbill.com" {
+		t.Fatalf("LoadFromEnv() default ccbill base url got %q want %q", cfg.CCBillBaseURL, "https://api.ccbill.com")
+	}
+	if cfg.CCBillCurrencyCode != 392 {
+		t.Fatalf("LoadFromEnv() default ccbill currency code got %d want %d", cfg.CCBillCurrencyCode, 392)
+	}
 }
 
 func TestValidateAPI(t *testing.T) {
@@ -25,6 +31,12 @@ func TestValidateAPI(t *testing.T) {
 		RedisAddr:                       "localhost:6379",
 		AWSRegion:                       "ap-northeast-1",
 		CognitoUserPoolClientID:         "exampleclientid",
+		CCBillBackendClientID:           "backend-client-id",
+		CCBillBackendClientSecret:       "backend-client-secret",
+		CCBillClientAccountNumber:       900100,
+		CCBillClientSubAccountNumber:    1,
+		CCBillCurrencyCode:              392,
+		CCBillInitialPeriodDays:         30,
 		MediaJobsQueueURL:               "https://example.com/queue",
 		MediaRawBucketName:              "raw-bucket",
 		MediaShortPublicBucketName:      "short-bucket",
@@ -55,9 +67,14 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		PostgresDSN:             "postgres://example",
-		RedisAddr:               "localhost:6379",
-		CognitoUserPoolClientID: "exampleclientid",
+		PostgresDSN:                  "postgres://example",
+		RedisAddr:                    "localhost:6379",
+		CCBillBackendClientID:        "backend-client-id",
+		CCBillBackendClientSecret:    "backend-client-secret",
+		CCBillClientAccountNumber:    900100,
+		CCBillClientSubAccountNumber: 1,
+		CCBillInitialPeriodDays:      30,
+		CognitoUserPoolClientID:      "exampleclientid",
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
@@ -69,20 +86,45 @@ func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
-		PostgresDSN:                "postgres://example",
-		RedisAddr:                  "localhost:6379",
-		AWSRegion:                  "ap-northeast-1",
-		CognitoUserPoolClientID:    "exampleclientid",
-		MediaJobsQueueURL:          "https://example.com/queue",
-		MediaRawBucketName:         "raw-bucket",
-		MediaShortPublicBucketName: "short-bucket",
-		MediaShortPublicBaseURL:    "https://example.com/shorts",
-		MediaMainPrivateBucketName: "main-bucket",
-		MediaConvertServiceRoleARN: "arn:aws:iam::123456789012:role/media-role",
+		PostgresDSN:                  "postgres://example",
+		RedisAddr:                    "localhost:6379",
+		AWSRegion:                    "ap-northeast-1",
+		CognitoUserPoolClientID:      "exampleclientid",
+		CCBillBackendClientID:        "backend-client-id",
+		CCBillBackendClientSecret:    "backend-client-secret",
+		CCBillClientAccountNumber:    900100,
+		CCBillClientSubAccountNumber: 1,
+		CCBillInitialPeriodDays:      30,
+		MediaJobsQueueURL:            "https://example.com/queue",
+		MediaRawBucketName:           "raw-bucket",
+		MediaShortPublicBucketName:   "short-bucket",
+		MediaShortPublicBaseURL:      "https://example.com/shorts",
+		MediaMainPrivateBucketName:   "main-bucket",
+		MediaConvertServiceRoleARN:   "arn:aws:iam::123456789012:role/media-role",
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
 		t.Fatal("ValidateAPI() error = nil, want error")
+	}
+}
+
+func TestValidatePayment(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		CCBillBackendClientID:        "backend-client-id",
+		CCBillBackendClientSecret:    "backend-client-secret",
+		CCBillClientAccountNumber:    900100,
+		CCBillClientSubAccountNumber: 1,
+		CCBillInitialPeriodDays:      30,
+	}
+
+	if err := cfg.ValidatePayment(); err != nil {
+		t.Fatalf("ValidatePayment() unexpected error: %v", err)
+	}
+
+	if err := (Config{}).ValidatePayment(); err == nil {
+		t.Fatal("ValidatePayment() error = nil, want error")
 	}
 }
 

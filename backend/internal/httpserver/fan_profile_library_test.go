@@ -141,8 +141,8 @@ func TestFanProfileLibraryRoute(t *testing.T) {
 	if response.Data.Items[0].Main.ID != "main_22222222222222222222222222222222" {
 		t.Fatalf("response.Data.Items[0].Main.ID got %q want %q", response.Data.Items[0].Main.ID, "main_22222222222222222222222222222222")
 	}
-	if response.Data.Items[0].Access.Status != "unlocked" || response.Data.Items[0].Access.Reason != "session_unlocked" {
-		t.Fatalf("response.Data.Items[0].Access got %#v want unlocked/session_unlocked", response.Data.Items[0].Access)
+	if response.Data.Items[0].Access.Status != "unlocked" || response.Data.Items[0].Access.Reason != "purchased" {
+		t.Fatalf("response.Data.Items[0].Access got %#v want unlocked/purchased", response.Data.Items[0].Access)
 	}
 	if response.Data.Items[0].EntryShort.ID != "short_33333333333333333333333333333333" {
 		t.Fatalf("response.Data.Items[0].EntryShort.ID got %q want %q", response.Data.Items[0].EntryShort.ID, "short_33333333333333333333333333333333")

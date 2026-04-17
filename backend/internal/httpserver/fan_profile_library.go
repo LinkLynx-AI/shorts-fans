@@ -111,7 +111,7 @@ func buildFanProfileLibraryItem(
 	return fanProfileLibraryItem{
 		Access: mainAccessStatePayload{
 			MainID: mainPublicID(item.MainID),
-			Reason: "session_unlocked",
+			Reason: "purchased",
 			Status: "unlocked",
 		},
 		Creator:    creator,

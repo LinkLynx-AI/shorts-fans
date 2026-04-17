@@ -3,12 +3,15 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
 const (
 	defaultAPIAddr             = ":8080"
 	defaultAppEnv              = "development"
+	defaultCCBillBaseURL       = "https://api.ccbill.com"
+	defaultCCBillCurrencyCode  = 392
 	legacySQSQueueURLEnv       = "SQS_QUEUE_URL"
 	cognitoUserPoolIDEnv       = "COGNITO_USER_POOL_ID"
 	cognitoUserPoolClientIDEnv = "COGNITO_USER_POOL_CLIENT_ID"
@@ -22,6 +25,14 @@ const (
 	avatarDeliveryBucketEnv    = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
 	avatarBaseURLEnv           = "CREATOR_AVATAR_BASE_URL"
 	reviewEvidenceBucketEnv    = "CREATOR_REVIEW_EVIDENCE_BUCKET_NAME"
+	ccbillBaseURLEnv           = "CCBILL_BASE_URL"
+	ccbillBackendClientIDEnv   = "CCBILL_BACKEND_CLIENT_ID"
+	ccbillBackendSecretEnv     = "CCBILL_BACKEND_CLIENT_SECRET"
+	ccbillAccountNumberEnv     = "CCBILL_CLIENT_ACCOUNT_NUMBER"
+	ccbillSubAccountNumberEnv  = "CCBILL_CLIENT_SUB_ACCOUNT_NUMBER"
+	ccbillCurrencyCodeEnv      = "CCBILL_CURRENCY_CODE"
+	ccbillInitialPeriodDaysEnv = "CCBILL_INITIAL_PERIOD_DAYS"
+	ccbillWebhookCIDRsEnv      = "CCBILL_WEBHOOK_ALLOWED_CIDRS"
 )
 
 // Config は backend コマンドの実行時設定を保持します。
@@ -33,6 +44,14 @@ type Config struct {
 	AWSRegion                       string
 	CognitoUserPoolID               string
 	CognitoUserPoolClientID         string
+	CCBillBaseURL                   string
+	CCBillBackendClientID           string
+	CCBillBackendClientSecret       string
+	CCBillClientAccountNumber       int32
+	CCBillClientSubAccountNumber    int32
+	CCBillCurrencyCode              int32
+	CCBillInitialPeriodDays         int32
+	CCBillWebhookAllowedCIDRs       []string
 	MediaJobsQueueURL               string
 	MediaRawBucketName              string
 	MediaShortPublicBucketName      string
@@ -60,6 +79,14 @@ func LoadFromEnv(lookup func(string) string) Config {
 		AWSRegion:                       trimmedLookup(lookup, "AWS_REGION"),
 		CognitoUserPoolID:               trimmedLookup(lookup, cognitoUserPoolIDEnv),
 		CognitoUserPoolClientID:         trimmedLookup(lookup, cognitoUserPoolClientIDEnv),
+		CCBillBaseURL:                   trimmedLookup(lookup, ccbillBaseURLEnv),
+		CCBillBackendClientID:           trimmedLookup(lookup, ccbillBackendClientIDEnv),
+		CCBillBackendClientSecret:       trimmedLookup(lookup, ccbillBackendSecretEnv),
+		CCBillClientAccountNumber:       int32Lookup(lookup, ccbillAccountNumberEnv),
+		CCBillClientSubAccountNumber:    int32Lookup(lookup, ccbillSubAccountNumberEnv),
+		CCBillCurrencyCode:              int32Lookup(lookup, ccbillCurrencyCodeEnv),
+		CCBillInitialPeriodDays:         int32Lookup(lookup, ccbillInitialPeriodDaysEnv),
+		CCBillWebhookAllowedCIDRs:       csvLookup(lookup, ccbillWebhookCIDRsEnv),
 		MediaJobsQueueURL:               firstNonEmpty(trimmedLookup(lookup, mediaJobsQueueURLEnv), trimmedLookup(lookup, legacySQSQueueURLEnv)),
 		MediaRawBucketName:              trimmedLookup(lookup, mediaRawBucketNameEnv),
 		MediaShortPublicBucketName:      trimmedLookup(lookup, mediaShortBucketNameEnv),
@@ -78,6 +105,12 @@ func LoadFromEnv(lookup func(string) string) Config {
 	if cfg.APIAddr == "" {
 		cfg.APIAddr = defaultAPIAddr
 	}
+	if cfg.CCBillBaseURL == "" {
+		cfg.CCBillBaseURL = defaultCCBillBaseURL
+	}
+	if cfg.CCBillCurrencyCode == 0 {
+		cfg.CCBillCurrencyCode = defaultCCBillCurrencyCode
+	}
 
 	return cfg
 }
@@ -95,6 +128,9 @@ func (c Config) ValidateAPI() error {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 	if err := c.ValidateFanAuth(); err != nil {
+		return err
+	}
+	if err := c.ValidatePayment(); err != nil {
 		return err
 	}
 
@@ -120,6 +156,32 @@ func (c Config) ValidateAPI() error {
 	}
 	if len(missingAvatar) > 0 {
 		return fmt.Errorf("missing required environment variables: %s", strings.Join(missingAvatar, ", "))
+	}
+
+	return nil
+}
+
+// ValidatePayment は payment runtime が必要とする CCBill 設定を検証します。
+func (c Config) ValidatePayment() error {
+	required := []struct {
+		name    string
+		present bool
+	}{
+		{name: ccbillBackendClientIDEnv, present: c.CCBillBackendClientID != ""},
+		{name: ccbillBackendSecretEnv, present: c.CCBillBackendClientSecret != ""},
+		{name: ccbillAccountNumberEnv, present: c.CCBillClientAccountNumber > 0},
+		{name: ccbillSubAccountNumberEnv, present: c.CCBillClientSubAccountNumber > 0},
+		{name: ccbillInitialPeriodDaysEnv, present: c.CCBillInitialPeriodDays > 0},
+	}
+
+	var missing []string
+	for _, field := range required {
+		if !field.present {
+			missing = append(missing, field.name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
 	}
 
 	return nil
@@ -219,4 +281,41 @@ func firstNonEmpty(values ...string) string {
 	}
 
 	return ""
+}
+
+func int32Lookup(lookup func(string) string, key string) int32 {
+	value := trimmedLookup(lookup, key)
+	if value == "" {
+		return 0
+	}
+
+	parsed, err := strconv.ParseInt(value, 10, 32)
+	if err != nil {
+		return 0
+	}
+
+	return int32(parsed)
+}
+
+func csvLookup(lookup func(string) string, key string) []string {
+	value := trimmedLookup(lookup, key)
+	if value == "" {
+		return nil
+	}
+
+	parts := strings.Split(value, ",")
+	items := make([]string, 0, len(parts))
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		items = append(items, trimmed)
+	}
+
+	if len(items) == 0 {
+		return nil
+	}
+
+	return items
 }

@@ -21,6 +21,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/payment"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
@@ -96,7 +97,23 @@ func main() {
 	feedRepository := feed.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
 	unlockRepository := unlock.NewRepository(pool)
-	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository)
+	paymentRepository := payment.NewRepository(pool)
+	ccbillClient, err := payment.NewCCBillClient(payment.CCBillConfig{
+		BaseURL:             cfg.CCBillBaseURL,
+		BackendClientID:     cfg.CCBillBackendClientID,
+		BackendClientSecret: cfg.CCBillBackendClientSecret,
+		ClientAccountNumber: cfg.CCBillClientAccountNumber,
+		ClientSubAccount:    cfg.CCBillClientSubAccountNumber,
+		CurrencyCode:        cfg.CCBillCurrencyCode,
+		InitialPeriodDays:   cfg.CCBillInitialPeriodDays,
+		WebhookAllowedCIDRs: cfg.CCBillWebhookAllowedCIDRs,
+	}, nil)
+	if err != nil {
+		logger.Error("failed to initialize ccbill client", "error", err)
+		os.Exit(1)
+	}
+	ccbillWebhookHandler := payment.NewCCBillWebhookHandler(paymentRepository, unlockRepository, ccbillClient)
+	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository, paymentRepository, ccbillClient)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	signUpDraftStore := auth.NewRedisSignUpDraftStore(redisClient)
@@ -193,6 +210,7 @@ func main() {
 			CreatorAvatarUpload:          creatorAvatarService,
 			CreatorRegistration:          creatorRegistrationRepository,
 			CreatorRegistrationEvidence:  creatorRegistrationEvidenceService,
+			CCBillWebhook:                ccbillWebhookHandler,
 			FanProfileLibrary:            fanProfileRepository,
 			FanProfileOverview:           fanProfileRepository,
 			FanProfileFollowing:          fanProfileRepository,
