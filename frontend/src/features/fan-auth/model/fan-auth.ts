@@ -82,7 +82,7 @@ const fanAuthModeTitles: Record<FanAuthMode, string> = {
   "password-reset-request": "パスワードを再設定します",
   "re-auth": "認証を確認してください",
   "sign-in": "続けるにはログインが必要です",
-  "sign-up": "fan アカウントを作成します",
+  "sign-up": "アカウントを作成します",
 };
 
 const fanAuthModeDescriptions: Record<FanAuthMode, string> = {

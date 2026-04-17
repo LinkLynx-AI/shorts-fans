@@ -105,7 +105,11 @@ function FanAuthDialogBody({
       dismissAction={
         allowClose ? (
           <Dialog.Close asChild>
-            <Button className="w-full" disabled={isSubmitting || submitLockActive} variant="secondary">
+            <Button
+              className="h-14 w-full text-[16px] font-bold"
+              disabled={isSubmitting || submitLockActive}
+              variant="secondary"
+            >
               閉じる
             </Button>
           </Dialog.Close>
@@ -162,9 +166,9 @@ export function FanAuthDialog({
       open={open}
     >
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-[#061521]/36 backdrop-blur-[2px]" />
+        <Dialog.Overlay className="fixed inset-y-0 left-1/2 z-40 w-full max-w-[408px] -translate-x-1/2 bg-[#061521]/52 backdrop-blur-[2px]" />
         <Dialog.Content
-          className="fixed inset-x-4 inset-y-4 z-50 mx-auto flex w-full max-w-[376px] items-start outline-none sm:items-center"
+          className="fixed inset-x-0 bottom-0 left-1/2 z-50 flex w-full max-w-[408px] -translate-x-1/2 justify-center outline-none"
           onEscapeKeyDown={(event) => {
             if (!canClose) {
               event.preventDefault();
@@ -180,16 +184,19 @@ export function FanAuthDialog({
           <Dialog.Description className="sr-only">
             email と password を中心に fan auth を完了する shared modal
           </Dialog.Description>
-          <div className="max-h-full w-full overflow-y-auto overscroll-contain">
-            <FanAuthDialogBody
-              allowClose={allowClose}
-              initialMode={initialMode}
-              key={sessionKey}
-              onAuthenticated={onAuthenticated}
-              onFallbackToSignIn={onFallbackToSignIn}
-              onSubmittingChange={setIsDismissLocked}
-              submitLockActive={isDismissLocked}
-            />
+          <div className="w-full">
+            <div className="max-h-[90svh] w-full overflow-y-auto overscroll-contain rounded-t-[32px] bg-white px-5 pb-10 pt-4 shadow-[0_-18px_42px_rgba(15,23,42,0.18)]">
+              <div className="mx-auto mb-5 h-1.5 w-12 rounded-full bg-[#dde5ef]" />
+              <FanAuthDialogBody
+                allowClose={allowClose}
+                initialMode={initialMode}
+                key={sessionKey}
+                onAuthenticated={onAuthenticated}
+                onFallbackToSignIn={onFallbackToSignIn}
+                onSubmittingChange={setIsDismissLocked}
+                submitLockActive={isDismissLocked}
+              />
+            </div>
           </div>
         </Dialog.Content>
       </Dialog.Portal>
