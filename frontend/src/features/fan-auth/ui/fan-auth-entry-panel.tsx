@@ -1,5 +1,6 @@
 "use client";
 
+import * as Dialog from "@radix-ui/react-dialog";
 import type {
   ComponentProps,
   ReactNode,
@@ -243,9 +244,11 @@ export function FanAuthEntryPanel({
   return (
     <SurfacePanel className="w-full px-5 py-6 text-foreground">
       <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-accent">fan access</p>
-      <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
-        {title}
-      </h1>
+      <Dialog.Title asChild>
+        <h1 className="mt-3 font-display text-[30px] font-semibold leading-[1.08] tracking-[-0.04em]">
+          {title}
+        </h1>
+      </Dialog.Title>
       <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
 
       <form

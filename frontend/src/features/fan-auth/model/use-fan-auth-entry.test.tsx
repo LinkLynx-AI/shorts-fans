@@ -535,6 +535,37 @@ describe("useFanAuthEntry", () => {
     );
   });
 
+  it("clears password-reset info when switching into sign-up", async () => {
+    const user = userEvent.setup();
+
+    startFanPasswordResetMock.mockResolvedValue({
+      deliveryDestinationHint: "f***@example.com",
+      nextStep: "confirm_password_reset",
+    });
+    confirmFanPasswordResetMock.mockResolvedValue(undefined);
+
+    render(<FanAuthEntryConsumer />);
+
+    await user.click(screen.getByRole("button", { name: "mode-password-reset" }));
+    await user.click(screen.getByRole("button", { name: "set-email" }));
+    await user.click(screen.getByRole("button", { name: "submit" }));
+    await user.click(screen.getByRole("button", { name: "set-code" }));
+    await user.click(screen.getByRole("button", { name: "set-new-password" }));
+    await user.click(screen.getByRole("button", { name: "submit" }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId("mode")).toHaveTextContent("sign-in");
+      expect(screen.getByTestId("info-message")).toHaveTextContent(
+        "パスワードを更新しました。サインインを続けてください。",
+      );
+    });
+
+    await user.click(screen.getByRole("button", { name: "mode-sign-up" }));
+
+    expect(screen.getByTestId("mode")).toHaveTextContent("sign-up");
+    expect(screen.getByTestId("info-message")).toHaveTextContent("");
+  });
+
   it("falls back to sign-in when re-auth loses the current session", async () => {
     const user = userEvent.setup();
 

@@ -151,6 +151,7 @@ export function useFanAuthEntry({
   const setMode = (nextMode: FanAuthMode) => {
     setModeState(nextMode);
     setErrorMessage(null);
+    setInfoMessage(null);
 
     const shouldRequirePasswordReentry =
       nextMode === "sign-up" &&
@@ -172,10 +173,6 @@ export function useFanAuthEntry({
         nextMode === "confirm-sign-up" ? currentCode : "",
       );
       setNewPasswordState("");
-    }
-
-    if (nextMode !== "sign-up") {
-      setInfoMessage(null);
     }
   };
 
