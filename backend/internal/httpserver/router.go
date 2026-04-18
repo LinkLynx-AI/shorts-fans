@@ -71,6 +71,16 @@ type FanFeedReader interface {
 	ListRecommended(ctx context.Context, viewerUserID *uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
 }
 
+// RecommendationSignalExposureStore は recommendation signal 用の recent surfaced target を表します。
+type RecommendationSignalExposureStore interface {
+	HasCreatorExposure(ctx context.Context, viewerID uuid.UUID, creatorUserID uuid.UUID) (bool, error)
+	HasShortExposure(ctx context.Context, viewerID uuid.UUID, shortID uuid.UUID) (bool, error)
+	RememberCreatorExposure(ctx context.Context, viewerID uuid.UUID, creatorUserID uuid.UUID) error
+	RememberCreatorExposures(ctx context.Context, viewerID uuid.UUID, creatorUserIDs []uuid.UUID) error
+	RememberShortExposure(ctx context.Context, viewerID uuid.UUID, shortID uuid.UUID) error
+	RememberShortExposures(ctx context.Context, viewerID uuid.UUID, shortIDs []uuid.UUID) error
+}
+
 // FanShortPinWriter は public short pin mutation を表します。
 type FanShortPinWriter interface {
 	PinPublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.PinMutationResult, error)
@@ -194,6 +204,8 @@ type HandlerConfig struct {
 	CreatorProfile               CreatorProfileReader
 	CreatorProfileShorts         CreatorProfileShortsReader
 	FanFeed                      FanFeedReader
+	RecommendationSignalExposure RecommendationSignalExposureStore
+	RecommendationSignals        RecommendationSignalWriter
 	FanUnlockMain                FanUnlockMainService
 	FanShortPin                  FanShortPinWriter
 	CreatorFollow                CreatorFollowWriter
@@ -297,8 +309,22 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
-	registerFanFeedRoutes(router, config.FanFeed, config.ShortDisplayAssets, config.ViewerBootstrap)
-	registerFanUnlockMainRoutes(router, config.FanUnlockMain, config.ShortDisplayAssets, config.MainDisplayAssets, config.ViewerBootstrap)
+	registerFanFeedRoutes(
+		router,
+		config.FanFeed,
+		config.ShortDisplayAssets,
+		config.RecommendationSignalExposure,
+		config.ViewerBootstrap,
+	)
+	registerRecommendationSignalRoutes(router, config.RecommendationSignals, config.RecommendationSignalExposure, config.ViewerBootstrap)
+	registerFanUnlockMainRoutes(
+		router,
+		config.FanUnlockMain,
+		config.ShortDisplayAssets,
+		config.MainDisplayAssets,
+		config.RecommendationSignalExposure,
+		config.ViewerBootstrap,
+	)
 	registerPaymentWebhookRoutes(router, config.CCBillWebhook)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)

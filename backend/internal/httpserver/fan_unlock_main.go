@@ -136,6 +136,7 @@ func registerFanUnlockMainRoutes(
 	service FanUnlockMainService,
 	shortDisplayAssets ShortDisplayAssetResolver,
 	mainDisplayAssets MainDisplayAssetResolver,
+	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	if router == nil || service == nil || shortDisplayAssets == nil || mainDisplayAssets == nil || viewerBootstrap == nil {
@@ -163,7 +164,7 @@ func registerFanUnlockMainRoutes(
 	mainPlaybackGroup := router.Group("/")
 	mainPlaybackGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainPlaybackRequestScope, fanMainAuthRequiredMessage))
 	mainPlaybackGroup.GET("/api/fan/mains/:mainId/playback", func(c *gin.Context) {
-		handleFanMainPlayback(c, service, shortDisplayAssets, mainDisplayAssets)
+		handleFanMainPlayback(c, service, shortDisplayAssets, mainDisplayAssets, recommendationSignalExposure)
 	})
 }
 
@@ -379,6 +380,7 @@ func handleFanMainPlayback(
 	service FanUnlockMainService,
 	shortDisplayAssets ShortDisplayAssetResolver,
 	mainDisplayAssets MainDisplayAssetResolver,
+	recommendationSignalExposure RecommendationSignalExposureStore,
 ) {
 	viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(c)
 	if !ok {
@@ -443,6 +445,9 @@ func handleFanMainPlayback(
 	if err != nil {
 		writeInternalServerError(c, fanMainPlaybackRequestScope)
 		return
+	}
+	if playback.Access.Status != "owner" && recommendationSignalExposure != nil {
+		_ = recommendationSignalExposure.RememberCreatorExposure(c.Request.Context(), viewer.ID, playback.Creator.ID)
 	}
 
 	c.JSON(http.StatusOK, responseEnvelope[mainPlaybackResponseData]{

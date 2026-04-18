@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronRight, Pause, Play, Volume2 } from "lucide-react";
 
 import { getShortThemeStyle } from "@/entities/short";
+import { useCurrentViewer } from "@/entities/viewer";
+import {
+  createRecommendationSignalIdempotencyKey,
+  createRecommendationSignalNonce,
+  fireRecommendationSignal,
+  isRecommendationPublicCreatorId,
+} from "@/features/recommendation-signal";
 import {
   BottomSheetMenu,
   BottomSheetMenuAction,
@@ -46,6 +53,7 @@ export function MainPlaybackSurface({
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const resumeAppliedRef = useRef<string | null>(null);
+  const currentViewer = useCurrentViewer();
   const playbackHeading = surface.entryShort?.caption.trim() || "Main playback";
   const resumePositionSeconds = surface.resumePositionSeconds;
   const resumeKey =
@@ -75,6 +83,22 @@ export function MainPlaybackSurface({
   const isMuted = audioState.mediaStateKey === mediaStateKey ? audioState.isMuted : false;
   const progressPercent = durationSeconds > 0 ? Math.min(100, (currentTimeSeconds / durationSeconds) * 100) : 0;
   const playbackButtonLabel = isMuted && isPlaying ? "Enable audio" : isPlaying ? "Pause playback" : "Play playback";
+
+  const handleCreatorProfileClick = () => {
+    if (surface.access.status === "owner" || currentViewer === null || !isRecommendationPublicCreatorId(surface.creator.id)) {
+      return;
+    }
+
+    fireRecommendationSignal({
+      creatorId: surface.creator.id,
+      eventKind: "profile_click",
+      idempotencyKey: createRecommendationSignalIdempotencyKey(
+        "profile_click",
+        surface.creator.id,
+        createRecommendationSignalNonce(),
+      ),
+    });
+  };
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -377,7 +401,7 @@ export function MainPlaybackSurface({
             <BottomSheetMenuGroup>
               <BottomSheetMenuClose asChild>
                 <BottomSheetMenuAction asChild>
-                  <Link aria-label="クリエイターのプロフィールへ" href={creatorProfileHref}>
+                  <Link aria-label="クリエイターのプロフィールへ" href={creatorProfileHref} onClick={handleCreatorProfileClick}>
                     <span>クリエイターのプロフィールへ</span>
                     <ChevronRight
                       aria-hidden="true"
