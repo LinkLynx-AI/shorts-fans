@@ -41,6 +41,53 @@ func (s stubUnlockRecorder) EnsureMainUnlock(ctx context.Context, input unlock.R
 	return s.ensureMainUnlock(ctx, input)
 }
 
+type stubUnlockConversionRecorder struct {
+	recordUnlockConversion func(context.Context, uuid.UUID, feed.Detail, string) error
+}
+
+func (s stubUnlockConversionRecorder) RecordUnlockConversion(
+	ctx context.Context,
+	viewerID uuid.UUID,
+	detail feed.Detail,
+	idempotencyKey string,
+) error {
+	if s.recordUnlockConversion == nil {
+		return nil
+	}
+
+	return s.recordUnlockConversion(ctx, viewerID, detail, idempotencyKey)
+}
+
+type stubUnlockConversionRetryStore struct {
+	clearPendingUnlockConversion func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
+	hasPendingUnlockConversion   func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (bool, error)
+	markPendingUnlockConversion  func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error
+}
+
+func (s stubUnlockConversionRetryStore) ClearPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) error {
+	if s.clearPendingUnlockConversion == nil {
+		return nil
+	}
+
+	return s.clearPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
+func (s stubUnlockConversionRetryStore) HasPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) (bool, error) {
+	if s.hasPendingUnlockConversion == nil {
+		return false, nil
+	}
+
+	return s.hasPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
+func (s stubUnlockConversionRetryStore) MarkPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) error {
+	if s.markPendingUnlockConversion == nil {
+		return nil
+	}
+
+	return s.markPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
 func TestServiceUnlockEntryPlaybackFlow(t *testing.T) {
 	t.Parallel()
 
@@ -422,6 +469,560 @@ func TestServiceIssueAccessEntryFailsWhenPersistenceFails(t *testing.T) {
 	})
 	if !errors.Is(err, recordErr) {
 		t.Fatalf("IssueAccessEntry() error got %v want wrapped %v", err, recordErr)
+	}
+}
+
+func TestServiceIssueAccessEntryRecordsUnlockConversionSignal(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	conversionCallCount := 0
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(_ context.Context, gotViewerID uuid.UUID, gotDetail feed.Detail, gotIdempotencyKey string) error {
+			conversionCallCount++
+			if gotViewerID != viewerID {
+				t.Fatalf("RecordUnlockConversion() viewerID got %s want %s", gotViewerID, viewerID)
+			}
+			if gotDetail.Item.Short.ID != shortID {
+				t.Fatalf("RecordUnlockConversion() shortID got %s want %s", gotDetail.Item.Short.ID, shortID)
+			}
+			wantIdempotencyKey := "unlock-conversion:" + viewerID.String() + ":" + mainID.String() + ":" + shortID.String()
+			if gotIdempotencyKey != wantIdempotencyKey {
+				t.Fatalf("RecordUnlockConversion() idempotencyKey got %q want %q", gotIdempotencyKey, wantIdempotencyKey)
+			}
+
+			return nil
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	issued, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindUnlocked {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindUnlocked)
+	}
+	if conversionCallCount != 1 {
+		t.Fatalf("IssueAccessEntry() conversion call count got %d want %d", conversionCallCount, 1)
+	}
+}
+
+func TestServiceIssueAccessEntrySkipsUnlockConversionSignalForExistingUnlockWithoutPendingRetry(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+
+	conversionCallCount := 0
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							IsUnlocked: true,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(_ context.Context, gotViewerID uuid.UUID, gotDetail feed.Detail, gotIdempotencyKey string) error {
+			conversionCallCount++
+			if gotViewerID != viewerID {
+				t.Fatalf("RecordUnlockConversion() viewerID got %s want %s", gotViewerID, viewerID)
+			}
+			if gotDetail.Item.Short.ID != shortID {
+				t.Fatalf("RecordUnlockConversion() shortID got %s want %s", gotDetail.Item.Short.ID, shortID)
+			}
+			wantIdempotencyKey := "unlock-conversion:" + viewerID.String() + ":" + mainID.String() + ":" + shortID.String()
+			if gotIdempotencyKey != wantIdempotencyKey {
+				t.Fatalf("RecordUnlockConversion() idempotencyKey got %q want %q", gotIdempotencyKey, wantIdempotencyKey)
+			}
+
+			return nil
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if conversionCallCount != 0 {
+		t.Fatalf("IssueAccessEntry() conversion call count got %d want %d", conversionCallCount, 0)
+	}
+}
+
+func TestServiceIssueAccessEntryIgnoresUnlockConversionSignalFailure(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(context.Context, uuid.UUID, feed.Detail, string) error {
+			return errors.New("temporary recommendation failure")
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	issued, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindUnlocked {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindUnlocked)
+	}
+}
+
+func TestServiceIssueAccessEntryRetriesUnlockConversionAfterTransientFailure(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	detailCallCount := 0
+	conversionCallCount := 0
+	var idempotencyKeys []string
+	pendingRetry := false
+	markCallCount := 0
+	clearCallCount := 0
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				detailCallCount++
+				isUnlocked := detailCallCount >= 3
+
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							IsUnlocked:          isUnlocked,
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(_ context.Context, _ uuid.UUID, _ feed.Detail, gotIdempotencyKey string) error {
+			conversionCallCount++
+			idempotencyKeys = append(idempotencyKeys, gotIdempotencyKey)
+			if conversionCallCount == 1 {
+				return errors.New("temporary recommendation failure")
+			}
+
+			return nil
+		},
+	}).WithUnlockConversionRetryStore(stubUnlockConversionRetryStore{
+		hasPendingUnlockConversion: func(_ context.Context, gotViewerID uuid.UUID, gotMainID uuid.UUID, gotShortID uuid.UUID) (bool, error) {
+			if gotViewerID != viewerID || gotMainID != mainID || gotShortID != shortID {
+				t.Fatalf(
+					"HasPendingUnlockConversion() input got viewer=%s main=%s short=%s want viewer=%s main=%s short=%s",
+					gotViewerID,
+					gotMainID,
+					gotShortID,
+					viewerID,
+					mainID,
+					shortID,
+				)
+			}
+			return pendingRetry, nil
+		},
+		markPendingUnlockConversion: func(_ context.Context, gotViewerID uuid.UUID, gotMainID uuid.UUID, gotShortID uuid.UUID) error {
+			if gotViewerID != viewerID || gotMainID != mainID || gotShortID != shortID {
+				t.Fatalf(
+					"MarkPendingUnlockConversion() input got viewer=%s main=%s short=%s want viewer=%s main=%s short=%s",
+					gotViewerID,
+					gotMainID,
+					gotShortID,
+					viewerID,
+					mainID,
+					shortID,
+				)
+			}
+			markCallCount++
+			pendingRetry = true
+			return nil
+		},
+		clearPendingUnlockConversion: func(_ context.Context, gotViewerID uuid.UUID, gotMainID uuid.UUID, gotShortID uuid.UUID) error {
+			if gotViewerID != viewerID || gotMainID != mainID || gotShortID != shortID {
+				t.Fatalf(
+					"ClearPendingUnlockConversion() input got viewer=%s main=%s short=%s want viewer=%s main=%s short=%s",
+					gotViewerID,
+					gotMainID,
+					gotShortID,
+					viewerID,
+					mainID,
+					shortID,
+				)
+			}
+			clearCallCount++
+			pendingRetry = false
+			return nil
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	firstUnlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() first error = %v, want nil", err)
+	}
+
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  firstUnlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err != nil {
+		t.Fatalf("IssueAccessEntry() first error = %v, want nil", err)
+	}
+
+	secondUnlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() second error = %v, want nil", err)
+	}
+
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  secondUnlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err != nil {
+		t.Fatalf("IssueAccessEntry() second error = %v, want nil", err)
+	}
+
+	if conversionCallCount != 2 {
+		t.Fatalf("IssueAccessEntry() conversion call count got %d want %d", conversionCallCount, 2)
+	}
+	if markCallCount != 1 {
+		t.Fatalf("MarkPendingUnlockConversion() call count got %d want %d", markCallCount, 1)
+	}
+	if clearCallCount != 1 {
+		t.Fatalf("ClearPendingUnlockConversion() call count got %d want %d", clearCallCount, 1)
+	}
+	if pendingRetry {
+		t.Fatal("pendingRetry got true want false after successful retry")
+	}
+	wantIdempotencyKey := "unlock-conversion:" + viewerID.String() + ":" + mainID.String() + ":" + shortID.String()
+	if len(idempotencyKeys) != 2 || idempotencyKeys[0] != wantIdempotencyKey || idempotencyKeys[1] != wantIdempotencyKey {
+		t.Fatalf("IssueAccessEntry() idempotency keys got %#v want both %q", idempotencyKeys, wantIdempotencyKey)
+	}
+}
+
+func TestServiceIssueAccessEntryDoesNotRetryUnlockConversionForSiblingShort(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortAID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	shortBID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	mainID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	now := time.Unix(1_710_000_000, 0).UTC()
+	shortACallCount := 0
+	conversionCallCount := 0
+	var pendingRetryShortID uuid.UUID
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(_ context.Context, gotShortID uuid.UUID, _ *uuid.UUID) (feed.Detail, error) {
+				isUnlocked := true
+				switch gotShortID {
+				case shortAID:
+					shortACallCount++
+					isUnlocked = shortACallCount >= 3
+				case shortBID:
+					isUnlocked = true
+				default:
+					t.Fatalf("GetDetail() shortID got %s want one of %s or %s", gotShortID, shortAID, shortBID)
+				}
+
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     gotShortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							IsUnlocked:          isUnlocked,
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(_ context.Context, _ uuid.UUID, gotDetail feed.Detail, _ string) error {
+			conversionCallCount++
+			if conversionCallCount == 1 {
+				if gotDetail.Item.Short.ID != shortAID {
+					t.Fatalf("RecordUnlockConversion() first shortID got %s want %s", gotDetail.Item.Short.ID, shortAID)
+				}
+				return errors.New("temporary recommendation failure")
+			}
+
+			t.Fatalf("RecordUnlockConversion() should not retry for sibling short, got short=%s", gotDetail.Item.Short.ID)
+			return nil
+		},
+	}).WithUnlockConversionRetryStore(stubUnlockConversionRetryStore{
+		hasPendingUnlockConversion: func(_ context.Context, _ uuid.UUID, _ uuid.UUID, gotShortID uuid.UUID) (bool, error) {
+			return pendingRetryShortID == gotShortID, nil
+		},
+		markPendingUnlockConversion: func(_ context.Context, _ uuid.UUID, _ uuid.UUID, gotShortID uuid.UUID) error {
+			pendingRetryShortID = gotShortID
+			return nil
+		},
+		clearPendingUnlockConversion: func(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) error {
+			pendingRetryShortID = uuid.Nil
+			return nil
+		},
+	})
+	service.now = func() time.Time { return now }
+
+	firstUnlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortAID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() first error = %v, want nil", err)
+	}
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  firstUnlockSurface.MainAccessToken,
+		FromShortID: shortAID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err != nil {
+		t.Fatalf("IssueAccessEntry() first error = %v, want nil", err)
+	}
+	if pendingRetryShortID != shortAID {
+		t.Fatalf("pendingRetryShortID got %s want %s", pendingRetryShortID, shortAID)
+	}
+
+	secondUnlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortBID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() second error = %v, want nil", err)
+	}
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  secondUnlockSurface.MainAccessToken,
+		FromShortID: shortBID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err != nil {
+		t.Fatalf("IssueAccessEntry() second error = %v, want nil", err)
+	}
+	if conversionCallCount != 1 {
+		t.Fatalf("IssueAccessEntry() conversion call count got %d want %d", conversionCallCount, 1)
+	}
+	if pendingRetryShortID != shortAID {
+		t.Fatalf("pendingRetryShortID got %s want %s after sibling retry", pendingRetryShortID, shortAID)
+	}
+}
+
+func TestServiceIssueAccessEntryDoesNotRecordUnlockConversionWhenGrantIssuanceFails(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	now := time.Unix(1_710_000_000, 0).UTC()
+
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return feed.Detail{
+					Item: feed.Item{
+						Creator: feed.CreatorSummary{
+							DisplayName: "Mina Rei",
+							Handle:      "minarei",
+							ID:          viewerID,
+						},
+						Short: feed.ShortSummary{
+							CanonicalMainID:        mainID,
+							CreatorUserID:          viewerID,
+							ID:                     shortID,
+							PreviewDurationSeconds: 16,
+						},
+						Unlock: feed.UnlockPreview{
+							MainDurationSeconds: 480,
+							PriceJPY:            1800,
+						},
+					},
+				}, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return shorts.Main{CreatedAt: now, ID: mainID, PriceMinor: 1800}, nil
+			},
+		},
+		stubUnlockRecorder{},
+	).WithRecommendationRecorder(stubUnlockConversionRecorder{
+		recordUnlockConversion: func(context.Context, uuid.UUID, feed.Detail, string) error {
+			t.Fatal("RecordUnlockConversion() should not be called")
+			return nil
+		},
+	})
+	service.now = func() time.Time { return now }
+	service.grantTTL = 0
+
+	unlockSurface, err := service.GetUnlockSurface(context.Background(), viewerID, "session-hash", shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+
+	if _, err := service.IssueAccessEntry(context.Background(), "session-hash", AccessEntryInput{
+		EntryToken:  unlockSurface.MainAccessToken,
+		FromShortID: shortID,
+		MainID:      mainID,
+		ViewerID:    viewerID,
+	}); err == nil {
+		t.Fatal("IssueAccessEntry() error = nil, want grant issuance error")
 	}
 }
 

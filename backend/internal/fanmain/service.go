@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
@@ -46,14 +47,26 @@ type unlockRecorder interface {
 	EnsureMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
+type unlockConversionRecorder interface {
+	RecordUnlockConversion(ctx context.Context, viewerID uuid.UUID, detail feed.Detail, idempotencyKey string) error
+}
+
+type unlockConversionRetryStore interface {
+	ClearPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) error
+	HasPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) (bool, error)
+	MarkPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) error
+}
+
 // Service は fan unlock / main playback 導線を扱います。
 type Service struct {
-	feedReader     feedReader
-	mainReader     mainReader
-	unlockRecorder unlockRecorder
-	now            func() time.Time
-	tokenTTL       time.Duration
-	grantTTL       time.Duration
+	feedReader               feedReader
+	mainReader               mainReader
+	unlockRecorder           unlockRecorder
+	unlockConversionRecorder unlockConversionRecorder
+	unlockConversionRetry    unlockConversionRetryStore
+	now                      func() time.Time
+	tokenTTL                 time.Duration
+	grantTTL                 time.Duration
 }
 
 // CreatorSummary は unlock / playback surface で使う creator 表示情報です。
@@ -163,6 +176,28 @@ func NewService(feedReader feedReader, mainReader mainReader, unlockRecorder unl
 	}
 }
 
+// WithRecommendationRecorder は unlock conversion signal recorder を注入します。
+func (s *Service) WithRecommendationRecorder(recorder unlockConversionRecorder) *Service {
+	if s == nil {
+		return nil
+	}
+
+	s.unlockConversionRecorder = recorder
+
+	return s
+}
+
+// WithUnlockConversionRetryStore は unlock conversion retry state store を注入します。
+func (s *Service) WithUnlockConversionRetryStore(store unlockConversionRetryStore) *Service {
+	if s == nil {
+		return nil
+	}
+
+	s.unlockConversionRetry = store
+
+	return s
+}
+
 // GetUnlockSurface は short 起点の unlock surface を返します。
 func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (UnlockSurface, error) {
 	detail, main, err := s.loadLinkedSurface(ctx, viewerID, shortID)
@@ -234,6 +269,8 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 	if err := s.ensureMainUnlockIfNeeded(ctx, grantKind, input.ViewerID, input.MainID); err != nil {
 		return AccessEntryResult{}, err
 	}
+	unlockRequired := grantKind == MainPlaybackGrantKindUnlocked && !detail.Item.Unlock.IsUnlocked
+	s.markPendingUnlockConversionIfNeeded(ctx, unlockRequired, input.ViewerID, input.MainID, detail.Item.Short.ID)
 
 	grantToken, err := issueSignedToken(sessionBinding, s.now().UTC(), s.grantTTL, signedTokenPayload{
 		GrantKind:   grantKind,
@@ -246,10 +283,50 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 		return AccessEntryResult{}, err
 	}
 
+	s.recordUnlockConversionIfNeeded(ctx, unlockRequired, detail, input.ViewerID, input.MainID)
+
 	return AccessEntryResult{
 		GrantKind:  grantKind,
 		GrantToken: grantToken,
 	}, nil
+}
+
+func (s *Service) recordUnlockConversionIfNeeded(
+	ctx context.Context,
+	unlockRequired bool,
+	detail feed.Detail,
+	viewerID uuid.UUID,
+	mainID uuid.UUID,
+) {
+	if s == nil || s.unlockConversionRecorder == nil {
+		return
+	}
+	shouldRecord := unlockRequired
+	if !shouldRecord {
+		pending, err := s.hasPendingUnlockConversion(ctx, viewerID, mainID, detail.Item.Short.ID)
+		if err != nil || !pending {
+			return
+		}
+
+		shouldRecord = true
+	}
+	if !shouldRecord {
+		return
+	}
+
+	idempotencyKey := fmt.Sprintf(
+		"unlock-conversion:%s:%s:%s",
+		strings.TrimSpace(viewerID.String()),
+		strings.TrimSpace(mainID.String()),
+		strings.TrimSpace(detail.Item.Short.ID.String()),
+	)
+
+	// Recommendation signal failure must not block the access-entry UX.
+	if err := s.unlockConversionRecorder.RecordUnlockConversion(ctx, viewerID, detail, idempotencyKey); err != nil {
+		return
+	}
+
+	s.clearPendingUnlockConversion(ctx, viewerID, mainID, detail.Item.Short.ID)
 }
 
 func (s *Service) ensureMainUnlockIfNeeded(
@@ -432,4 +509,28 @@ func resolveGrantKind(source feed.UnlockPreview) MainPlaybackGrantKind {
 	default:
 		return MainPlaybackGrantKindUnlocked
 	}
+}
+
+func (s *Service) markPendingUnlockConversionIfNeeded(ctx context.Context, unlockRequired bool, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) {
+	if !unlockRequired || s == nil || s.unlockConversionRetry == nil {
+		return
+	}
+
+	_ = s.unlockConversionRetry.MarkPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
+func (s *Service) hasPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) (bool, error) {
+	if s == nil || s.unlockConversionRetry == nil {
+		return false, nil
+	}
+
+	return s.unlockConversionRetry.HasPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
+func (s *Service) clearPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) {
+	if s == nil || s.unlockConversionRetry == nil {
+		return
+	}
+
+	_ = s.unlockConversionRetry.ClearPendingUnlockConversion(ctx, viewerID, mainID, shortID)
 }

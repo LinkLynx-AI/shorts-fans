@@ -22,6 +22,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/recommendation"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
@@ -94,9 +95,15 @@ func main() {
 	creatorRegistrationRepository := creatorregistration.NewRepository(pool)
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
+	recommendationRepository := recommendation.NewRepository(pool)
+	recommendationSignalExposureStore := recommendation.NewRedisSignalExposureStore(redisClient)
+	unlockConversionRetryStore := recommendation.NewRedisUnlockConversionRetryStore(redisClient)
 	shortsRepository := shorts.NewRepository(pool)
 	unlockRepository := unlock.NewRepository(pool)
-	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository)
+	recommendationSignalService := recommendation.NewSignalService(feedRepository, creatorRepository, recommendationRepository)
+	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository).
+		WithRecommendationRecorder(recommendationSignalService).
+		WithUnlockConversionRetryStore(unlockConversionRetryStore)
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	signUpDraftStore := auth.NewRedisSignUpDraftStore(redisClient)
@@ -187,6 +194,8 @@ func main() {
 			CreatorProfile:               creatorRepository,
 			CreatorProfileShorts:         creatorRepository,
 			FanFeed:                      feedRepository,
+			RecommendationSignalExposure: recommendationSignalExposureStore,
+			RecommendationSignals:        recommendationSignalService,
 			FanUnlockMain:                fanUnlockMainService,
 			FanShortPin:                  shortsRepository,
 			CreatorFollow:                creatorRepository,
