@@ -133,6 +133,34 @@ type AppMainPlaybackProgress struct {
 	UpdatedAt      pgtype.Timestamptz
 }
 
+type AppMainPurchaseAttempt struct {
+	ID                       pgtype.UUID
+	UserID                   pgtype.UUID
+	MainID                   pgtype.UUID
+	FromShortID              pgtype.UUID
+	Provider                 string
+	PaymentMethodMode        string
+	UserPaymentMethodID      pgtype.UUID
+	ProviderPaymentTokenRef  string
+	IdempotencyKey           string
+	Status                   string
+	FailureReason            pgtype.Text
+	PendingReason            pgtype.Text
+	ProviderPurchaseRef      pgtype.Text
+	ProviderTransactionRef   pgtype.Text
+	ProviderSessionRef       pgtype.Text
+	ProviderPaymentUniqueRef pgtype.Text
+	ProviderDeclineCode      pgtype.Int4
+	ProviderDeclineText      pgtype.Text
+	RequestedPriceJpy        int64
+	RequestedCurrencyCode    int32
+	AcceptedAge              bool
+	AcceptedTerms            bool
+	ProviderProcessedAt      pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+	UpdatedAt                pgtype.Timestamptz
+}
+
 type AppMainUnlock struct {
 	UserID                     pgtype.UUID
 	MainID                     pgtype.UUID
@@ -336,6 +364,19 @@ type AppUser struct {
 	ID        pgtype.UUID
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+}
+
+type AppUserPaymentMethod struct {
+	ID                        pgtype.UUID
+	UserID                    pgtype.UUID
+	Provider                  string
+	ProviderPaymentTokenRef   string
+	ProviderPaymentAccountRef string
+	Brand                     string
+	Last4                     string
+	CreatedAt                 pgtype.Timestamptz
+	UpdatedAt                 pgtype.Timestamptz
+	LastUsedAt                pgtype.Timestamptz
 }
 
 type AppUserProfile struct {

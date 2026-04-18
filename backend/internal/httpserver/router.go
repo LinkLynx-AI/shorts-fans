@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -101,6 +102,12 @@ type FanUnlockMainService interface {
 	GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error)
 	GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (fanmain.UnlockSurface, error)
 	IssueAccessEntry(ctx context.Context, sessionBinding string, input fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+	PurchaseMain(ctx context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
+}
+
+// PaymentWebhookHandler は provider webhook を受けて purchase state を更新します。
+type PaymentWebhookHandler interface {
+	HandleWebhook(ctx context.Context, remoteIP string, query url.Values, contentType string, body []byte) error
 }
 
 // CreatorFollowWriter は creator follow mutation を表します。
@@ -157,6 +164,13 @@ type CreatorWorkspaceShortCaptionWriter interface {
 	UpdateWorkspaceShortCaption(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID, caption string) (creator.WorkspaceShortCaptionMutationResult, error)
 }
 
+// AdminCreatorReviewService は localhost 向け creator review admin transport を表します。
+type AdminCreatorReviewService interface {
+	ApplyDecision(ctx context.Context, input creatorregistration.ReviewDecisionInput) (creatorregistration.ReviewCase, error)
+	GetCase(ctx context.Context, userID uuid.UUID) (creatorregistration.ReviewCase, error)
+	ListCases(ctx context.Context, state string) ([]creatorregistration.ReviewQueueItem, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -180,6 +194,7 @@ type FanProfileLibraryReader interface {
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv                       string
+	AdminCreatorReview           AdminCreatorReviewService
 	CreatorSearch                CreatorSearchReader
 	CreatorWorkspace             CreatorWorkspaceReader
 	CreatorWorkspaceMainPrice    CreatorWorkspaceMainPriceWriter
@@ -197,6 +212,7 @@ type HandlerConfig struct {
 	CreatorAvatarUpload          ViewerCreatorAvatarUploadHandler
 	CreatorRegistration          ViewerCreatorRegistrationService
 	CreatorRegistrationEvidence  ViewerCreatorRegistrationEvidenceUploadHandler
+	CCBillWebhook                PaymentWebhookHandler
 	FanProfileLibrary            FanProfileLibraryReader
 	FanProfileFollowing          FanProfileFollowingReader
 	FanProfilePinnedShorts       FanProfilePinnedShortsReader
@@ -309,6 +325,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.RecommendationSignalExposure,
 		config.ViewerBootstrap,
 	)
+	registerPaymentWebhookRoutes(router, config.CCBillWebhook)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(
@@ -319,6 +336,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.ViewerActiveMode,
 		config.ViewerBootstrap,
 	)
+	registerAdminCreatorReviewRoutes(router, config.AppEnv, config.AdminCreatorReview)
 
 	return router
 }

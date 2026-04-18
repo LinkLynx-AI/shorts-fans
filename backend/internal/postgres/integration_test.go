@@ -23,7 +23,10 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
-const integrationPostgresDSNEnv = "POSTGRES_DSN"
+const (
+	integrationPostgresDSNEnv = "POSTGRES_DSN"
+	latestMigrationVersion    = 16
+)
 
 func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
@@ -137,7 +140,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 15)
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
 
 	queries := sqlc.New(conn)
 	now := time.Now().UTC()
@@ -435,7 +438,7 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() second run error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 15)
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
 	assertRelationExists(t, ctx, conn, "app.auth_identities", true)
 	assertRelationExists(t, ctx, conn, "app.auth_sessions", true)
 	assertRelationExists(t, ctx, conn, "app.auth_login_challenges", true)
@@ -481,7 +484,7 @@ func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 15)
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
 
 	queries := sqlc.New(conn)
 	now := time.Unix(1710000000, 0).UTC()
@@ -586,8 +589,8 @@ func TestRecommendationFoundationMigrationRoundTrip(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	if err := migrator.Migrate(15); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(15) error = %v, want nil", err)
 	}
 	assertMigrationVersion(t, migrator, 15)
 	assertRelationExists(t, ctx, conn, "app.recommendation_events", true)
@@ -1139,7 +1142,7 @@ func TestCreatorProfileHandleQueriesLatestRevision(t *testing.T) {
 	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		t.Fatalf("migrator.Up() to latest error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 15)
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
 
 	profileA, err := queries.GetCreatorProfileByUserID(ctx, creatorA.ID)
 	if err != nil {
@@ -1483,6 +1486,234 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 	}
 	if len(unlockedMainIDs) != 1 || unlockedMainIDs[0] != unlockableMain.ID {
 		t.Fatalf("ListUnlockedMainIDsByUserID() after purchase got %#v want [%v]", unlockedMainIDs, unlockableMain.ID)
+	}
+}
+
+func TestPaymentQueriesLatestRevision(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710000000, 0).UTC()
+
+	buyer, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(buyer) error = %v, want nil", err)
+	}
+	creator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creator) error = %v, want nil", err)
+	}
+
+	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creator.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	}); err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+
+	mainAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "payment-main")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(main) error = %v, want nil", err)
+	}
+	shortAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "payment-short")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(short) error = %v, want nil", err)
+	}
+
+	main, err := queries.CreateMain(ctx, sqlc.CreateMainParams{
+		CreatorUserID:       creator.ID,
+		MediaAssetID:        mainAsset.ID,
+		State:               "approved_for_unlock",
+		PriceMinor:          1800,
+		CurrencyCode:        "JPY",
+		OwnershipConfirmed:  true,
+		ConsentConfirmed:    true,
+		ApprovedForUnlockAt: pgTime(now.Add(time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateMain() error = %v, want nil", err)
+	}
+	short, err := queries.CreateShort(ctx, sqlc.CreateShortParams{
+		CreatorUserID:        creator.ID,
+		CanonicalMainID:      main.ID,
+		MediaAssetID:         shortAsset.ID,
+		State:                "approved_for_publish",
+		ApprovedForPublishAt: pgTime(now.Add(2 * time.Hour)),
+		PublishedAt:          pgTime(now.Add(3 * time.Hour)),
+	})
+	if err != nil {
+		t.Fatalf("CreateShort() error = %v, want nil", err)
+	}
+
+	method, err := queries.UpsertUserPaymentMethod(ctx, sqlc.UpsertUserPaymentMethodParams{
+		UserID:                    buyer.ID,
+		Provider:                  "ccbill",
+		ProviderPaymentTokenRef:   "token-initial",
+		ProviderPaymentAccountRef: "account-1",
+		Brand:                     "visa",
+		Last4:                     "4242",
+		LastUsedAt:                pgTime(now),
+	})
+	if err != nil {
+		t.Fatalf("UpsertUserPaymentMethod(initial) error = %v, want nil", err)
+	}
+	if method.Provider != "ccbill" || method.Brand != "visa" || method.Last4 != "4242" {
+		t.Fatalf("UpsertUserPaymentMethod(initial) got %#v", method)
+	}
+
+	updatedMethod, err := queries.UpsertUserPaymentMethod(ctx, sqlc.UpsertUserPaymentMethodParams{
+		UserID:                    buyer.ID,
+		Provider:                  "ccbill",
+		ProviderPaymentTokenRef:   "token-updated",
+		ProviderPaymentAccountRef: "account-1",
+		Brand:                     "mastercard",
+		Last4:                     "4444",
+		LastUsedAt:                pgTime(now.Add(time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("UpsertUserPaymentMethod(update) error = %v, want nil", err)
+	}
+	if updatedMethod.ID != method.ID {
+		t.Fatalf("UpsertUserPaymentMethod(update) id got %v want %v", updatedMethod.ID, method.ID)
+	}
+	if updatedMethod.ProviderPaymentTokenRef != "token-updated" || updatedMethod.Brand != "mastercard" || updatedMethod.Last4 != "4444" {
+		t.Fatalf("UpsertUserPaymentMethod(update) got %#v", updatedMethod)
+	}
+
+	listedMethods, err := queries.ListUserPaymentMethodsByUserID(ctx, buyer.ID)
+	if err != nil {
+		t.Fatalf("ListUserPaymentMethodsByUserID() error = %v, want nil", err)
+	}
+	if len(listedMethods) != 1 || listedMethods[0].ID != method.ID {
+		t.Fatalf("ListUserPaymentMethodsByUserID() got %#v want single method %v", listedMethods, method.ID)
+	}
+
+	touchedMethod, err := queries.TouchUserPaymentMethodLastUsedAt(ctx, sqlc.TouchUserPaymentMethodLastUsedAtParams{
+		LastUsedAt: pgTime(now.Add(2 * time.Minute)),
+		ID:         method.ID,
+		UserID:     buyer.ID,
+	})
+	if err != nil {
+		t.Fatalf("TouchUserPaymentMethodLastUsedAt() error = %v, want nil", err)
+	}
+	if !touchedMethod.LastUsedAt.Time.Equal(now.Add(2 * time.Minute)) {
+		t.Fatalf("TouchUserPaymentMethodLastUsedAt() last_used_at got %s want %s", touchedMethod.LastUsedAt.Time, now.Add(2*time.Minute))
+	}
+
+	attempt, err := queries.CreateMainPurchaseAttempt(ctx, sqlc.CreateMainPurchaseAttemptParams{
+		UserID:                  buyer.ID,
+		MainID:                  main.ID,
+		FromShortID:             short.ID,
+		Provider:                "ccbill",
+		PaymentMethodMode:       "saved_card",
+		UserPaymentMethodID:     method.ID,
+		ProviderPaymentTokenRef: "token-updated",
+		IdempotencyKey:          "purchase-attempt-1",
+		Status:                  "processing",
+		RequestedPriceJpy:       1800,
+		RequestedCurrencyCode:   392,
+		AcceptedAge:             true,
+		AcceptedTerms:           true,
+	})
+	if err != nil {
+		t.Fatalf("CreateMainPurchaseAttempt() error = %v, want nil", err)
+	}
+	if attempt.UserPaymentMethodID != method.ID || attempt.Status != "processing" {
+		t.Fatalf("CreateMainPurchaseAttempt() got %#v", attempt)
+	}
+
+	inflight, err := queries.GetLatestInflightMainPurchaseAttemptByUserIDAndMainIDForUpdate(ctx, sqlc.GetLatestInflightMainPurchaseAttemptByUserIDAndMainIDForUpdateParams{
+		UserID: buyer.ID,
+		MainID: main.ID,
+	})
+	if err != nil {
+		t.Fatalf("GetLatestInflightMainPurchaseAttemptByUserIDAndMainIDForUpdate() error = %v, want nil", err)
+	}
+	if inflight.ID != attempt.ID {
+		t.Fatalf("GetLatestInflightMainPurchaseAttemptByUserIDAndMainIDForUpdate() id got %v want %v", inflight.ID, attempt.ID)
+	}
+
+	_, err = queries.CreateMainPurchaseAttempt(ctx, sqlc.CreateMainPurchaseAttemptParams{
+		UserID:                  buyer.ID,
+		MainID:                  main.ID,
+		FromShortID:             short.ID,
+		Provider:                "ccbill",
+		PaymentMethodMode:       "saved_card",
+		UserPaymentMethodID:     method.ID,
+		ProviderPaymentTokenRef: "token-updated",
+		IdempotencyKey:          "purchase-attempt-2",
+		Status:                  "processing",
+		RequestedPriceJpy:       1800,
+		RequestedCurrencyCode:   392,
+		AcceptedAge:             true,
+		AcceptedTerms:           true,
+	})
+	assertPgConstraintError(t, err, "23505", "idx_main_purchase_attempts_user_main_inflight")
+
+	processedAt := now.Add(4 * time.Minute)
+	attempt, err = queries.UpdateMainPurchaseAttemptOutcome(ctx, sqlc.UpdateMainPurchaseAttemptOutcomeParams{
+		Status:                   "succeeded",
+		FailureReason:            pgtype.Text{},
+		PendingReason:            pgtype.Text{},
+		ProviderPurchaseRef:      pgText("purchase-ref-1"),
+		ProviderTransactionRef:   pgText("txn-1"),
+		ProviderSessionRef:       pgText("session-1"),
+		ProviderPaymentUniqueRef: pgText("payment-unique-1"),
+		ProviderDeclineCode:      pgtype.Int4{},
+		ProviderDeclineText:      pgtype.Text{},
+		ProviderProcessedAt:      pgTime(processedAt),
+		ID:                       attempt.ID,
+	})
+	if err != nil {
+		t.Fatalf("UpdateMainPurchaseAttemptOutcome() error = %v, want nil", err)
+	}
+	if attempt.Status != "succeeded" || attempt.ProviderPurchaseRef.String != "purchase-ref-1" {
+		t.Fatalf("UpdateMainPurchaseAttemptOutcome() got %#v", attempt)
+	}
+	if !attempt.ProviderProcessedAt.Time.Equal(processedAt) {
+		t.Fatalf("UpdateMainPurchaseAttemptOutcome() provider_processed_at got %s want %s", attempt.ProviderProcessedAt.Time, processedAt)
+	}
+
+	gotAttempt, err := queries.GetMainPurchaseAttemptByID(ctx, attempt.ID)
+	if err != nil {
+		t.Fatalf("GetMainPurchaseAttemptByID() error = %v, want nil", err)
+	}
+	if gotAttempt.ID != attempt.ID {
+		t.Fatalf("GetMainPurchaseAttemptByID() id got %v want %v", gotAttempt.ID, attempt.ID)
+	}
+
+	gotAttempt, err = queries.GetMainPurchaseAttemptByIDForUpdate(ctx, attempt.ID)
+	if err != nil {
+		t.Fatalf("GetMainPurchaseAttemptByIDForUpdate() error = %v, want nil", err)
+	}
+	if gotAttempt.ID != attempt.ID {
+		t.Fatalf("GetMainPurchaseAttemptByIDForUpdate() id got %v want %v", gotAttempt.ID, attempt.ID)
+	}
+
+	gotAttempt, err = queries.GetMainPurchaseAttemptByIdempotencyKeyForUpdate(ctx, "purchase-attempt-1")
+	if err != nil {
+		t.Fatalf("GetMainPurchaseAttemptByIdempotencyKeyForUpdate() error = %v, want nil", err)
+	}
+	if gotAttempt.ID != attempt.ID {
+		t.Fatalf("GetMainPurchaseAttemptByIdempotencyKeyForUpdate() id got %v want %v", gotAttempt.ID, attempt.ID)
+	}
+
+	gotAttempt, err = queries.GetMainPurchaseAttemptByProviderPurchaseRefForUpdate(ctx, pgText("purchase-ref-1"))
+	if err != nil {
+		t.Fatalf("GetMainPurchaseAttemptByProviderPurchaseRefForUpdate() error = %v, want nil", err)
+	}
+	if gotAttempt.ID != attempt.ID {
+		t.Fatalf("GetMainPurchaseAttemptByProviderPurchaseRefForUpdate() id got %v want %v", gotAttempt.ID, attempt.ID)
 	}
 }
 

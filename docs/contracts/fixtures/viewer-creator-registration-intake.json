@@ -50,6 +50,108 @@
         },
         "error": null
       }
+    },
+    "rejected_eligible_complete": {
+      "status": 200,
+      "body": {
+        "data": {
+          "intake": {
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_minarei",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorBio": "不足していた書類を補って再申請します。",
+            "legalName": "Mina Rei",
+            "birthDate": "1999-04-02",
+            "payoutRecipientType": "self",
+            "payoutRecipientName": "Mina Rei",
+            "declaresNoProhibitedCategory": true,
+            "acceptsConsentResponsibility": true,
+            "registrationState": "rejected",
+            "isReadOnly": false,
+            "canSubmit": true,
+            "evidences": [
+              {
+                "kind": "government_id",
+                "fileName": "government-id-retake.png",
+                "mimeType": "image/png",
+                "fileSizeBytes": 193442,
+                "uploadedAt": "2026-04-17T05:15:00Z"
+              },
+              {
+                "kind": "payout_proof",
+                "fileName": "bank-proof.pdf",
+                "mimeType": "application/pdf",
+                "fileSizeBytes": 84512,
+                "uploadedAt": "2026-04-17T05:17:00Z"
+              }
+            ]
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_intake_get_rejected_eligible_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "rejected_support_only": {
+      "status": 200,
+      "body": {
+        "data": {
+          "intake": {
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_minarei",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorBio": "quiet rooftop の continuation を中心に投稿します。",
+            "legalName": "Mina Rei",
+            "birthDate": "1999-04-02",
+            "payoutRecipientType": "self",
+            "payoutRecipientName": "Mina Rei",
+            "declaresNoProhibitedCategory": true,
+            "acceptsConsentResponsibility": true,
+            "registrationState": "rejected",
+            "isReadOnly": true,
+            "canSubmit": false,
+            "evidences": [
+              {
+                "kind": "government_id",
+                "fileName": "government-id.png",
+                "mimeType": "image/png",
+                "fileSizeBytes": 183442,
+                "uploadedAt": "2026-04-17T01:15:00Z"
+              },
+              {
+                "kind": "payout_proof",
+                "fileName": "bank-proof.pdf",
+                "mimeType": "application/pdf",
+                "fileSizeBytes": 84512,
+                "uploadedAt": "2026-04-17T01:17:00Z"
+              }
+            ]
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_intake_get_rejected_support_001",
+          "page": null
+        },
+        "error": null
+      }
     }
   },
   "PUT /api/viewer/creator-registration/intake": {
@@ -84,6 +186,42 @@
         },
         "meta": {
           "requestId": "req_viewer_creator_registration_intake_put_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "save_rejected_eligible": {
+      "status": 200,
+      "body": {
+        "data": {
+          "intake": {
+            "sharedProfile": {
+              "avatar": {
+                "id": "asset_viewer_profile_avatar_minarei",
+                "kind": "image",
+                "url": "https://cdn.example.com/avatars/mina.jpg",
+                "posterUrl": null,
+                "durationSeconds": null
+              },
+              "displayName": "Mina Rei",
+              "handle": "@minarei"
+            },
+            "creatorBio": "不足していた書類を補って再申請します。",
+            "legalName": "Mina Rei",
+            "birthDate": "1999-04-02",
+            "payoutRecipientType": "self",
+            "payoutRecipientName": "Mina Rei",
+            "declaresNoProhibitedCategory": true,
+            "acceptsConsentResponsibility": true,
+            "registrationState": "rejected",
+            "isReadOnly": false,
+            "canSubmit": false,
+            "evidences": []
+          }
+        },
+        "meta": {
+          "requestId": "req_viewer_creator_registration_intake_put_rejected_eligible_001",
           "page": null
         },
         "error": null

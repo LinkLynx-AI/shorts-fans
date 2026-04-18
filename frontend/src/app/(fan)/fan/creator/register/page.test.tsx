@@ -154,6 +154,55 @@ describe("CreatorRegisterPage", () => {
     expect(redirect).toHaveBeenCalledWith("/fan/creator/success");
   });
 
+  it("redirects approved viewers away from the register page on the server", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const { fetchCreatorRegistration, getCreatorEntryErrorCode } = await import("@/features/creator-entry");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      hasSession: true,
+    });
+    cookies.mockResolvedValue({
+      get: vi.fn().mockReturnValue({ value: "raw-session-token" }),
+    });
+    vi.mocked(getCreatorEntryErrorCode).mockReturnValue(null);
+    vi.mocked(fetchCreatorRegistration).mockResolvedValue({
+      actions: {
+        canEnterCreatorMode: true,
+        canResubmit: false,
+        canSubmit: false,
+      },
+      creatorDraft: {
+        bio: "",
+      },
+      rejection: null,
+      review: {
+        approvedAt: "2026-04-17T10:30:00.000Z",
+        rejectedAt: null,
+        submittedAt: "2026-04-16T10:30:00.000Z",
+        suspendedAt: null,
+      },
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
+      state: "approved",
+      surface: {
+        kind: "creator_workspace",
+        workspacePreview: null,
+      },
+    });
+
+    await CreatorRegisterPage();
+
+    expect(redirect).toHaveBeenCalledWith("/fan");
+  });
+
   it("redirects missing shared profiles to profile settings", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const { fetchCreatorRegistration, getCreatorEntryErrorCode } = await import("@/features/creator-entry");
@@ -175,5 +224,41 @@ describe("CreatorRegisterPage", () => {
     await CreatorRegisterPage();
 
     expect(redirect).toHaveBeenCalledWith("/fan/settings/profile");
+  });
+
+  it("renders the registration form even when status fetch fails for a non-not_found reason", async () => {
+    const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
+    const { fetchCreatorRegistration, getCreatorEntryErrorCode } = await import("@/features/creator-entry");
+
+    vi.mocked(getFanAuthGateState).mockResolvedValue({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_123",
+      },
+      hasSession: true,
+    });
+    cookies.mockResolvedValue({
+      get: vi.fn().mockReturnValue({ value: "raw-session-token" }),
+    });
+    vi.mocked(fetchCreatorRegistration).mockRejectedValue(new Error("boom"));
+    vi.mocked(getCreatorEntryErrorCode).mockReturnValue(null);
+
+    render(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider
+          currentViewer={{
+            activeMode: "fan",
+            canAccessCreatorMode: false,
+            id: "viewer_123",
+          }}
+        >
+          {await CreatorRegisterPage()}
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByText("creator registration panel")).toBeInTheDocument();
+    expect(redirect).not.toHaveBeenCalledWith("/fan/settings/profile");
   });
 });

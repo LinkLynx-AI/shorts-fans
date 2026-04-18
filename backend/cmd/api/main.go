@@ -21,6 +21,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/httpserver"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/payment"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/recommendation"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
@@ -93,6 +94,15 @@ func main() {
 
 	creatorRepository := creator.NewRepository(pool, delivery)
 	creatorRegistrationRepository := creatorregistration.NewRepository(pool)
+	adminCreatorReviewService, err := creatorregistration.NewReviewService(
+		creatorregistration.ReviewServiceConfig{},
+		s3Client,
+		creatorRegistrationRepository,
+	)
+	if err != nil {
+		logger.Error("failed to initialize creator registration review service", "error", err)
+		os.Exit(1)
+	}
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	recommendationRepository := recommendation.NewRepository(pool)
@@ -100,8 +110,30 @@ func main() {
 	unlockConversionRetryStore := recommendation.NewRedisUnlockConversionRetryStore(redisClient)
 	shortsRepository := shorts.NewRepository(pool)
 	unlockRepository := unlock.NewRepository(pool)
+	paymentRepository := payment.NewRepository(pool)
+	ccbillClient, err := payment.NewCCBillClient(payment.CCBillConfig{
+		BaseURL:             cfg.CCBillBaseURL,
+		BackendClientID:     cfg.CCBillBackendClientID,
+		BackendClientSecret: cfg.CCBillBackendClientSecret,
+		ClientAccountNumber: cfg.CCBillClientAccountNumber,
+		ClientSubAccount:    cfg.CCBillClientSubAccountNumber,
+		CurrencyCode:        cfg.CCBillCurrencyCode,
+		InitialPeriodDays:   cfg.CCBillInitialPeriodDays,
+		WebhookAllowedCIDRs: cfg.CCBillWebhookAllowedCIDRs,
+	}, nil)
+	if err != nil {
+		logger.Error("failed to initialize ccbill client", "error", err)
+		os.Exit(1)
+	}
+	ccbillWebhookHandler := payment.NewCCBillWebhookHandler(paymentRepository, unlockRepository, ccbillClient)
 	recommendationSignalService := recommendation.NewSignalService(feedRepository, creatorRepository, recommendationRepository)
-	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository).
+	fanUnlockMainService := fanmain.NewService(
+		feedRepository,
+		shortsRepository,
+		unlockRepository,
+		paymentRepository,
+		ccbillClient,
+	).
 		WithRecommendationRecorder(recommendationSignalService).
 		WithUnlockConversionRetryStore(unlockConversionRetryStore)
 	fanProfileRepository := fanprofile.NewRepository(pool)
@@ -185,6 +217,7 @@ func main() {
 		logger,
 		httpserver.HandlerConfig{
 			AppEnv:                       cfg.AppEnv,
+			AdminCreatorReview:           adminCreatorReviewService,
 			CreatorSearch:                creatorRepository,
 			CreatorWorkspace:             creatorRepository,
 			CreatorWorkspaceMainPrice:    creatorRepository,
@@ -202,6 +235,7 @@ func main() {
 			CreatorAvatarUpload:          creatorAvatarService,
 			CreatorRegistration:          creatorRegistrationRepository,
 			CreatorRegistrationEvidence:  creatorRegistrationEvidenceService,
+			CCBillWebhook:                ccbillWebhookHandler,
 			FanProfileLibrary:            fanProfileRepository,
 			FanProfileOverview:           fanProfileRepository,
 			FanProfileFollowing:          fanProfileRepository,

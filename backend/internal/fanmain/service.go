@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/payment"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
 	"github.com/google/uuid"
@@ -44,7 +45,7 @@ type mainReader interface {
 }
 
 type unlockRecorder interface {
-	EnsureMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
+	RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
 type unlockConversionRecorder interface {
@@ -57,16 +58,20 @@ type unlockConversionRetryStore interface {
 	MarkPendingUnlockConversion(ctx context.Context, viewerID uuid.UUID, mainID uuid.UUID, shortID uuid.UUID) error
 }
 
-// Service は fan unlock / main playback 導線を扱います。
+// Service は fan unlock / main playback / purchase 導線を扱います。
 type Service struct {
-	feedReader               feedReader
-	mainReader               mainReader
-	unlockRecorder           unlockRecorder
+	feedReader        feedReader
+	mainReader        mainReader
+	unlockRecorder    unlockRecorder
+	paymentRepository paymentRepository
+	purchaseGateway   purchaseGateway
+
 	unlockConversionRecorder unlockConversionRecorder
 	unlockConversionRetry    unlockConversionRetryStore
-	now                      func() time.Time
-	tokenTTL                 time.Duration
-	grantTTL                 time.Duration
+
+	now      func() time.Time
+	tokenTTL time.Duration
+	grantTTL time.Duration
 }
 
 // CreatorSummary は unlock / playback surface で使う creator 表示情報です。
@@ -91,8 +96,8 @@ type MainPlaybackGrantKind string
 const (
 	// MainPlaybackGrantKindOwner は owner preview 向け grant です。
 	MainPlaybackGrantKindOwner MainPlaybackGrantKind = "owner"
-	// MainPlaybackGrantKindUnlocked は unlocked playback 向け grant です。
-	MainPlaybackGrantKindUnlocked MainPlaybackGrantKind = "unlocked"
+	// MainPlaybackGrantKindPurchased は purchased playback 向け grant です。
+	MainPlaybackGrantKindPurchased MainPlaybackGrantKind = "purchased"
 )
 
 // MainSummary は unlock / playback surface で使う main 表示情報です。
@@ -121,32 +126,23 @@ type UnlockCtaState struct {
 	State                 string
 }
 
-// UnlockSetupState は unlock setup 状態です。
-type UnlockSetupState struct {
-	Required                bool
-	RequiresAgeConfirmation bool
-	RequiresTermsAcceptance bool
-}
-
 // UnlockSurface は short ごとの unlock surface です。
 type UnlockSurface struct {
 	Access          MainAccessState
 	Creator         CreatorSummary
 	Main            MainSummary
 	MainAccessToken string
-	Setup           UnlockSetupState
+	Purchase        UnlockPurchaseState
 	Short           ShortSummary
 	UnlockCta       UnlockCtaState
 }
 
 // AccessEntryInput は main access entry 発行時の入力です。
 type AccessEntryInput struct {
-	AcceptedAge   bool
-	AcceptedTerms bool
-	EntryToken    string
-	FromShortID   uuid.UUID
-	MainID        uuid.UUID
-	ViewerID      uuid.UUID
+	EntryToken  string
+	FromShortID uuid.UUID
+	MainID      uuid.UUID
+	ViewerID    uuid.UUID
 }
 
 // AccessEntryResult は発行済み playback grant を表します。
@@ -165,14 +161,22 @@ type PlaybackSurface struct {
 }
 
 // NewService は fan unlock / main playback service を構築します。
-func NewService(feedReader feedReader, mainReader mainReader, unlockRecorder unlockRecorder) *Service {
+func NewService(
+	feedReader feedReader,
+	mainReader mainReader,
+	unlockRecorder unlockRecorder,
+	paymentRepository paymentRepository,
+	purchaseGateway purchaseGateway,
+) *Service {
 	return &Service{
-		feedReader:     feedReader,
-		mainReader:     mainReader,
-		unlockRecorder: unlockRecorder,
-		now:            time.Now,
-		tokenTTL:       defaultTokenTTL,
-		grantTTL:       defaultGrantTTL,
+		feedReader:        feedReader,
+		mainReader:        mainReader,
+		unlockRecorder:    unlockRecorder,
+		paymentRepository: paymentRepository,
+		purchaseGateway:   purchaseGateway,
+		now:               time.Now,
+		tokenTTL:          defaultTokenTTL,
+		grantTTL:          defaultGrantTTL,
 	}
 }
 
@@ -202,10 +206,29 @@ func (s *Service) WithUnlockConversionRetryStore(store unlockConversionRetryStor
 func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (UnlockSurface, error) {
 	detail, main, err := s.loadLinkedSurface(ctx, viewerID, shortID)
 	if err != nil {
-		if errors.Is(err, feed.ErrPublicShortNotFound) || errors.Is(err, shorts.ErrUnlockableMainNotFound) {
+		switch {
+		case errors.Is(err, feed.ErrPublicShortNotFound):
 			return UnlockSurface{}, ErrShortUnlockNotFound
+		case errors.Is(err, shorts.ErrUnlockableMainNotFound):
+			return UnlockSurface{}, ErrMainLocked
+		default:
+			return UnlockSurface{}, err
 		}
+	}
 
+	savedMethods, err := s.listSavedPaymentMethods(ctx, viewerID)
+	if err != nil {
+		return UnlockSurface{}, err
+	}
+
+	var inflightAttempt *payment.MainPurchaseAttempt
+	attempt, err := s.getInflightAttempt(ctx, viewerID, main.ID)
+	switch {
+	case err == nil:
+		inflightAttempt = &attempt
+	case errors.Is(err, payment.ErrMainPurchaseAttemptNotFound):
+		inflightAttempt = nil
+	default:
 		return UnlockSurface{}, err
 	}
 
@@ -219,18 +242,16 @@ func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sess
 		return UnlockSurface{}, err
 	}
 
+	purchaseState := buildUnlockPurchaseState(detail.Item.Unlock, savedMethods, inflightAttempt)
+
 	return UnlockSurface{
 		Access:          buildMainAccessState(detail.Item.Unlock, main.ID),
 		Creator:         buildCreatorSummary(detail.Item.Creator),
 		Main:            buildMainSummary(main, detail.Item.Unlock.MainDurationSeconds),
 		MainAccessToken: entryToken,
-		Setup: UnlockSetupState{
-			Required:                false,
-			RequiresAgeConfirmation: false,
-			RequiresTermsAcceptance: false,
-		},
-		Short:     buildShortSummary(detail.Item.Short),
-		UnlockCta: buildUnlockCtaState(detail.Item.Unlock),
+		Purchase:        purchaseState,
+		Short:           buildShortSummary(detail.Item.Short),
+		UnlockCta:       buildUnlockCtaState(detail.Item.Unlock, purchaseState),
 	}, nil
 }
 
@@ -238,11 +259,14 @@ func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sess
 func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, input AccessEntryInput) (AccessEntryResult, error) {
 	detail, main, err := s.loadLinkedSurface(ctx, input.ViewerID, input.FromShortID)
 	if err != nil {
-		if errors.Is(err, feed.ErrPublicShortNotFound) || errors.Is(err, shorts.ErrUnlockableMainNotFound) {
+		switch {
+		case errors.Is(err, feed.ErrPublicShortNotFound):
 			return AccessEntryResult{}, ErrAccessEntryNotFound
+		case errors.Is(err, shorts.ErrUnlockableMainNotFound):
+			return AccessEntryResult{}, ErrMainLocked
+		default:
+			return AccessEntryResult{}, err
 		}
-
-		return AccessEntryResult{}, err
 	}
 
 	if detail.Item.Short.CanonicalMainID != input.MainID || main.ID != input.MainID {
@@ -261,17 +285,16 @@ func (s *Service) IssueAccessEntry(ctx context.Context, sessionBinding string, i
 		return AccessEntryResult{}, ErrMainLocked
 	}
 
-	grantKind := resolveGrantKind(detail.Item.Unlock)
+	grantKind, err := s.resolveAccessEntryGrantKind(ctx, detail.Item.Unlock, input.ViewerID, input.MainID)
+	if err != nil {
+		return AccessEntryResult{}, err
+	}
 	if grantKind == "" {
 		return AccessEntryResult{}, ErrMainLocked
 	}
 
-	if err := s.ensureMainUnlockIfNeeded(ctx, grantKind, input.ViewerID, input.MainID); err != nil {
-		return AccessEntryResult{}, err
-	}
-	unlockRequired := grantKind == MainPlaybackGrantKindUnlocked && !detail.Item.Unlock.IsUnlocked
+	unlockRequired := grantKind == MainPlaybackGrantKindPurchased && !detail.Item.Unlock.IsUnlocked
 	s.markPendingUnlockConversionIfNeeded(ctx, unlockRequired, input.ViewerID, input.MainID, detail.Item.Short.ID)
-
 	grantToken, err := issueSignedToken(sessionBinding, s.now().UTC(), s.grantTTL, signedTokenPayload{
 		GrantKind:   grantKind,
 		Kind:        playbackTokenKind,
@@ -329,40 +352,38 @@ func (s *Service) recordUnlockConversionIfNeeded(
 	s.clearPendingUnlockConversion(ctx, viewerID, mainID, detail.Item.Short.ID)
 }
 
-func (s *Service) ensureMainUnlockIfNeeded(
+func (s *Service) resolveAccessEntryGrantKind(
 	ctx context.Context,
-	grantKind MainPlaybackGrantKind,
+	preview feed.UnlockPreview,
 	viewerID uuid.UUID,
 	mainID uuid.UUID,
-) error {
-	if grantKind != MainPlaybackGrantKindUnlocked {
-		return nil
+) (MainPlaybackGrantKind, error) {
+	grantKind := resolveGrantKind(preview)
+	if grantKind != "" {
+		return grantKind, nil
 	}
 
-	if s == nil || s.unlockRecorder == nil {
-		return fmt.Errorf("fan main unlock recorder が初期化されていません")
+	if _, err := s.getLatestSucceededAttempt(ctx, viewerID, mainID); err == nil {
+		return MainPlaybackGrantKindPurchased, nil
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return "", err
 	}
 
-	_, err := s.unlockRecorder.EnsureMainUnlock(ctx, unlock.RecordMainUnlockInput{
-		UserID: viewerID,
-		MainID: mainID,
-	})
-	if err == nil {
-		return nil
-	}
-
-	return fmt.Errorf("main unlock 記録 viewer=%s main=%s: %w", viewerID, mainID, err)
+	return "", nil
 }
 
 // GetPlaybackSurface は temporary grant を検証して main playback surface を返します。
 func (s *Service) GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (PlaybackSurface, error) {
 	detail, main, err := s.loadLinkedSurface(ctx, viewerID, fromShortID)
 	if err != nil {
-		if errors.Is(err, feed.ErrPublicShortNotFound) || errors.Is(err, shorts.ErrUnlockableMainNotFound) {
+		switch {
+		case errors.Is(err, feed.ErrPublicShortNotFound):
 			return PlaybackSurface{}, ErrPlaybackNotFound
+		case errors.Is(err, shorts.ErrUnlockableMainNotFound):
+			return PlaybackSurface{}, ErrMainLocked
+		default:
+			return PlaybackSurface{}, err
 		}
-
-		return PlaybackSurface{}, err
 	}
 
 	if detail.Item.Short.CanonicalMainID != mainID || main.ID != mainID {
@@ -377,7 +398,8 @@ func (s *Service) GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, se
 	if grant.Kind != playbackTokenKind ||
 		grant.MainID != mainID ||
 		grant.FromShortID != fromShortID ||
-		grant.ViewerID != viewerID {
+		grant.ViewerID != viewerID ||
+		grant.GrantKind == "" {
 		return PlaybackSurface{}, ErrMainLocked
 	}
 
@@ -421,40 +443,44 @@ func buildCreatorSummary(source feed.CreatorSummary) CreatorSummary {
 func buildGrantedAccessState(mainID uuid.UUID, grantKind MainPlaybackGrantKind) MainAccessState {
 	switch grantKind {
 	case MainPlaybackGrantKindOwner:
-		return MainAccessState{
-			MainID: mainID,
-			Reason: "owner_preview",
-			Status: mainAccessOwner,
-		}
+		return buildOwnerAccessState(mainID)
 	default:
-		return MainAccessState{
-			MainID: mainID,
-			Reason: "session_unlocked",
-			Status: mainAccessUnlocked,
-		}
+		return buildPurchasedAccessState(mainID)
 	}
 }
 
 func buildMainAccessState(source feed.UnlockPreview, mainID uuid.UUID) MainAccessState {
 	switch {
 	case source.IsOwner:
-		return MainAccessState{
-			MainID: mainID,
-			Reason: "owner_preview",
-			Status: mainAccessOwner,
-		}
+		return buildOwnerAccessState(mainID)
 	case source.IsUnlocked:
-		return MainAccessState{
-			MainID: mainID,
-			Reason: "session_unlocked",
-			Status: mainAccessUnlocked,
-		}
+		return buildPurchasedAccessState(mainID)
 	default:
-		return MainAccessState{
-			MainID: mainID,
-			Reason: "unlock_required",
-			Status: mainAccessLocked,
-		}
+		return buildLockedAccessState(mainID)
+	}
+}
+
+func buildPurchasedAccessState(mainID uuid.UUID) MainAccessState {
+	return MainAccessState{
+		MainID: mainID,
+		Reason: "purchased",
+		Status: mainAccessUnlocked,
+	}
+}
+
+func buildOwnerAccessState(mainID uuid.UUID) MainAccessState {
+	return MainAccessState{
+		MainID: mainID,
+		Reason: "owner_preview",
+		Status: mainAccessOwner,
+	}
+}
+
+func buildLockedAccessState(mainID uuid.UUID) MainAccessState {
+	return MainAccessState{
+		MainID: mainID,
+		Reason: "unlock_required",
+		Status: mainAccessLocked,
 	}
 }
 
@@ -478,23 +504,28 @@ func buildShortSummary(source feed.ShortSummary) ShortSummary {
 	}
 }
 
-func buildUnlockCtaState(source feed.UnlockPreview) UnlockCtaState {
-	switch {
-	case source.IsOwner:
+func buildUnlockCtaState(source feed.UnlockPreview, purchase UnlockPurchaseState) UnlockCtaState {
+	switch purchase.State {
+	case "owner_preview":
+		return UnlockCtaState{State: "owner_preview"}
+	case "already_purchased":
+		return UnlockCtaState{State: "continue_main"}
+	case "setup_required":
 		return UnlockCtaState{
-			State: "owner_preview",
+			MainDurationSeconds: int64Ptr(source.MainDurationSeconds),
+			PriceJPY:            int64Ptr(source.PriceJPY),
+			State:               "setup_required",
 		}
-	case source.IsUnlocked:
+	case "purchase_pending", "purchase_ready":
 		return UnlockCtaState{
-			State: "continue_main",
+			MainDurationSeconds: int64Ptr(source.MainDurationSeconds),
+			PriceJPY:            int64Ptr(source.PriceJPY),
+			State:               "unlock_available",
 		}
 	default:
-		mainDurationSeconds := source.MainDurationSeconds
-		priceJPY := source.PriceJPY
-
 		return UnlockCtaState{
-			MainDurationSeconds: &mainDurationSeconds,
-			PriceJPY:            &priceJPY,
+			MainDurationSeconds: int64Ptr(source.MainDurationSeconds),
+			PriceJPY:            int64Ptr(source.PriceJPY),
 			State:               "unlock_available",
 		}
 	}
@@ -505,9 +536,9 @@ func resolveGrantKind(source feed.UnlockPreview) MainPlaybackGrantKind {
 	case source.IsOwner:
 		return MainPlaybackGrantKindOwner
 	case source.IsUnlocked:
-		return MainPlaybackGrantKindUnlocked
+		return MainPlaybackGrantKindPurchased
 	default:
-		return MainPlaybackGrantKindUnlocked
+		return ""
 	}
 }
 
@@ -533,4 +564,12 @@ func (s *Service) clearPendingUnlockConversion(ctx context.Context, viewerID uui
 	}
 
 	_ = s.unlockConversionRetry.ClearPendingUnlockConversion(ctx, viewerID, mainID, shortID)
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

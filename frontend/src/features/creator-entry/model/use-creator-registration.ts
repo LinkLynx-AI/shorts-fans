@@ -6,6 +6,7 @@ import { startTransition, useEffect, useState } from "react";
 import {
   completeCreatorRegistrationEvidenceUpload,
   createCreatorRegistrationEvidenceUpload,
+  fetchCreatorRegistration,
   fetchCreatorRegistrationIntake,
   registerCreator,
   saveCreatorRegistrationIntake,
@@ -16,8 +17,12 @@ import {
   type CreatorRegistrationEvidence,
   type CreatorRegistrationEvidenceKind,
   type CreatorRegistrationIntake,
+  type CreatorRegistrationStatus,
 } from "../api/contracts";
-import { getCreatorRegistrationErrorMessage } from "./creator-entry";
+import {
+  getCreatorEntryErrorCode,
+  getCreatorRegistrationErrorMessage,
+} from "./creator-entry";
 
 type EvidenceFieldState = {
   errorMessage: string | null;
@@ -56,6 +61,7 @@ type UseCreatorRegistrationResult = {
   legalName: string;
   payoutRecipientName: string;
   payoutRecipientType: string;
+  registration: CreatorRegistrationStatus | null;
   registrationState: string | null;
   saveDraft: () => Promise<void>;
   setAcceptsConsentResponsibility: (value: boolean) => void;
@@ -72,6 +78,15 @@ type UseCreatorRegistrationResult = {
   uploadEvidence: (kind: CreatorRegistrationEvidenceKind, file: File | null) => Promise<void>;
   birthDate: string;
 };
+
+type LoadedRegistrationState =
+  | {
+      redirectTo: string;
+    }
+  | {
+      draft: CreatorRegistrationDraft;
+      registration: CreatorRegistrationStatus | null;
+    };
 
 function buildEvidenceFieldState(
   evidence: CreatorRegistrationEvidence | null = null,
@@ -116,6 +131,53 @@ function buildDraftFromIntake(intake: CreatorRegistrationIntake): CreatorRegistr
   };
 }
 
+function reconcileRegistration(
+  initialRegistration: CreatorRegistrationStatus | null,
+  intake: CreatorRegistrationIntake,
+): CreatorRegistrationStatus | null {
+  if (initialRegistration === null || initialRegistration.state !== intake.registrationState) {
+    return null;
+  }
+
+  if (
+    initialRegistration.state === "rejected" &&
+    initialRegistration.actions.canResubmit !== !intake.isReadOnly
+  ) {
+    return null;
+  }
+
+  return initialRegistration;
+}
+
+function shouldRefreshRejectedRegistration(
+  reconciledRegistration: CreatorRegistrationStatus | null,
+  intake: CreatorRegistrationIntake,
+): boolean {
+  if (intake.registrationState !== "rejected") {
+    return false;
+  }
+
+  return intake.isReadOnly || reconciledRegistration === null;
+}
+
+async function resolveRegistrationForIntake(
+  initialRegistration: CreatorRegistrationStatus | null,
+  intake: CreatorRegistrationIntake,
+): Promise<CreatorRegistrationStatus | null> {
+  const reconciledRegistration = reconcileRegistration(initialRegistration, intake);
+
+  if (!shouldRefreshRejectedRegistration(reconciledRegistration, intake)) {
+    return reconciledRegistration;
+  }
+
+  try {
+    const refreshedRegistration = await fetchCreatorRegistration();
+    return reconcileRegistration(refreshedRegistration ?? null, intake);
+  } catch {
+    return null;
+  }
+}
+
 function computeSubmitDisabled(draft: CreatorRegistrationDraft | null, isBusy: boolean): boolean {
   if (isBusy || draft === null || draft.isReadOnly) {
     return true;
@@ -131,7 +193,9 @@ function computeSubmitDisabled(draft: CreatorRegistrationDraft | null, isBusy: b
   });
 }
 
-export function useCreatorRegistration(): UseCreatorRegistrationResult {
+export function useCreatorRegistration(
+  initialRegistration: CreatorRegistrationStatus | null,
+): UseCreatorRegistrationResult {
   const router = useRouter();
   const [draft, setDraft] = useState<CreatorRegistrationDraft | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -139,7 +203,64 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [registration, setRegistration] = useState<CreatorRegistrationStatus | null>(initialRegistration);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const loadDraftState = async (
+    registrationSeed: CreatorRegistrationStatus | null,
+  ): Promise<LoadedRegistrationState> => {
+    const intake = await fetchCreatorRegistrationIntake();
+
+    if (registrationSeed?.state === "submitted" || intake.registrationState === "submitted") {
+      return { redirectTo: "/fan/creator/success" };
+    }
+
+    if (registrationSeed?.actions.canEnterCreatorMode || intake.registrationState === "approved") {
+      return { redirectTo: "/fan" };
+    }
+
+    const resolvedRegistration = await resolveRegistrationForIntake(registrationSeed, intake);
+
+    if (resolvedRegistration?.actions.canEnterCreatorMode) {
+      return { redirectTo: "/fan" };
+    }
+
+    return {
+      draft: buildDraftFromIntake(intake),
+      registration: resolvedRegistration,
+    };
+  };
+
+  const applyLoadedState = (loadedState: LoadedRegistrationState) => {
+    if ("redirectTo" in loadedState) {
+      startTransition(() => {
+        router.replace(loadedState.redirectTo);
+      });
+      return;
+    }
+
+    setDraft(loadedState.draft);
+    setRegistration(loadedState.registration);
+  };
+
+  const refreshStateAfterConflict = async (error: unknown) => {
+    if (getCreatorEntryErrorCode(error) !== "registration_state_conflict") {
+      return false;
+    }
+
+    setIsLoading(true);
+    try {
+      const loadedState = await loadDraftState(registration);
+      applyLoadedState(loadedState);
+    } catch {
+      return false;
+    } finally {
+      setHasLoaded(true);
+      setIsLoading(false);
+    }
+
+    return true;
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -149,19 +270,20 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
       setErrorMessage(null);
 
       try {
-        const intake = await fetchCreatorRegistrationIntake();
+        const loadedState = await loadDraftState(initialRegistration);
         if (cancelled) {
           return;
         }
 
-        if (intake.registrationState === "submitted") {
+        if ("redirectTo" in loadedState) {
           startTransition(() => {
-            router.replace("/fan/creator/success");
+            router.replace(loadedState.redirectTo);
           });
           return;
         }
 
-        setDraft(buildDraftFromIntake(intake));
+        setDraft(loadedState.draft);
+        setRegistration(loadedState.registration);
       } catch (error) {
         if (!cancelled) {
           setErrorMessage(getCreatorRegistrationErrorMessage(error));
@@ -179,7 +301,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [initialRegistration, router]);
 
   const isBusy = isLoading || isSaving || isSubmitting;
   const submitDisabled = computeSubmitDisabled(draft, isBusy);
@@ -226,6 +348,10 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
       await persistDraft();
       setSuccessMessage("下書きを保存しました。");
     } catch (error) {
+      if (await refreshStateAfterConflict(error)) {
+        setErrorMessage(getCreatorRegistrationErrorMessage(error));
+        return;
+      }
       setErrorMessage(getCreatorRegistrationErrorMessage(error));
     } finally {
       setIsSaving(false);
@@ -249,6 +375,10 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
         router.push("/fan/creator/success");
       });
     } catch (error) {
+      if (await refreshStateAfterConflict(error)) {
+        setErrorMessage(getCreatorRegistrationErrorMessage(error));
+        return;
+      }
       setErrorMessage(getCreatorRegistrationErrorMessage(error));
     } finally {
       setIsSubmitting(false);
@@ -295,6 +425,10 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
         },
       }));
     } catch (error) {
+      if (await refreshStateAfterConflict(error)) {
+        setErrorMessage(getCreatorRegistrationErrorMessage(error));
+        return;
+      }
       updateDraft((current) => ({
         ...current,
         evidences: {
@@ -328,6 +462,7 @@ export function useCreatorRegistration(): UseCreatorRegistrationResult {
     legalName: draft?.legalName ?? "",
     payoutRecipientName: draft?.payoutRecipientName ?? "",
     payoutRecipientType: draft?.payoutRecipientType ?? "",
+    registration,
     registrationState: draft?.registrationState ?? null,
     saveDraft,
     setAcceptsConsentResponsibility: (value) => {

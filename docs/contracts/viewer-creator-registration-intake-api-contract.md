@@ -14,7 +14,7 @@
 
 ## Non-goals
 
-- reviewer decision / approval / rejection / resubmit UX
+- reviewer decision UI
 - shared viewer profile の更新
 - evidence の public URL 発行
 - KYC provider / payout provider への外部送信
@@ -41,7 +41,8 @@
 - `displayName / handle / avatar` は shared viewer profile preview として返すだけで、この surface から更新しません。
 - shared viewer profile を修正したい場合は `docs/contracts/viewer-profile-api-contract.md` の `/api/viewer/profile` を使います。
 - `bio` は creator 固有 draft としてこの surface で編集できます。
-- intake / evidence の編集は `draft` だけに許可します。`submitted / approved / rejected / suspended` は `409 registration_state_conflict` を返します。
+- intake / evidence の編集は `draft` と eligible な `rejected` だけに許可します。
+- `submitted / approved / suspended`、および `rejected` でも `isReadOnly=true` / `isSupportReviewRequired=true` な case は `409 registration_state_conflict` を返します。
 - evidence object は private bucket に保存し、この contract では download URL や public asset URL を返しません。
 - required evidence kind は `government_id` と `payout_proof` の 2 種類です。
 - allowed mime type は `image/jpeg`、`image/png`、`image/webp`、`application/pdf` です。
@@ -118,8 +119,8 @@
 | `declaresNoProhibitedCategory` | `boolean` | prohibited category 非該当確認 |
 | `acceptsConsentResponsibility` | `boolean` | consent / ownership responsibility 確認 |
 | `registrationState` | `string \| null` | onboarding case 未開始なら `null` |
-| `isReadOnly` | `boolean` | `draft` 以外は `true` |
-| `canSubmit` | `boolean` | required fields + required evidence が揃っていて `draft` 編集可のときだけ `true` |
+| `isReadOnly` | `boolean` | `draft` と eligible `rejected` は `false`、それ以外は `true` |
+| `canSubmit` | `boolean` | required fields + required evidence が揃っていて editable なときだけ `true` |
 | `evidences` | `CreatorRegistrationEvidence[]` | current draft に紐づく uploaded evidence summary |
 
 ## `PUT /api/viewer/creator-registration/intake`
@@ -143,6 +144,7 @@
 - status は `200 OK`
 - response body は `GET` と同じ `intake` shape を返します。
 - 初回 save で onboarding case が未開始なら server は `draft` case を作成してよいものとします。
+- eligible な `rejected` の場合は resubmit 用の修正保存として同じ endpoint を使います。
 
 ### Error Contract
 
@@ -174,6 +176,7 @@
 ### Success
 
 - onboarding case 未開始なら、server は upload target 発行前に `draft` case を初期化してよいものとします。
+- eligible な `rejected` では resubmit 用の証跡差し替えとして同じ endpoint を使います。
 
 ```json
 {
