@@ -26,7 +26,6 @@ type UseShortRecommendationSignalsOptions = {
 type ShortSignalSessionState = {
   activationNonce: string | null;
   completionSent: boolean;
-  impressionSent: boolean;
   lastProgress: number;
   lastSeekAt: number;
   loopCount: number;
@@ -41,7 +40,6 @@ function createShortSignalSessionState(): ShortSignalSessionState {
   return {
     activationNonce: null,
     completionSent: false,
-    impressionSent: false,
     lastProgress: 0,
     lastSeekAt: 0,
     loopCount: 0,
@@ -96,7 +94,6 @@ export function useShortRecommendationSignals({
     }
 
     sessionState.activationNonce = createRecommendationSignalNonce();
-    sessionState.impressionSent = true;
 
     fireRecommendationSignal({
       eventKind: "impression",

@@ -129,9 +129,14 @@ func recordRecommendationSignal(
 		recommendation.EventKindViewCompletion,
 		recommendation.EventKindRewatchLoop,
 		recommendation.EventKindMainClick:
-		shortID, err := shorts.ParsePublicShortID(request.ShortID)
-		if err != nil {
+		shortIDText := strings.TrimSpace(request.ShortID)
+		if shortIDText == "" {
 			return recommendation.RecordEventResult{}, recommendation.ErrShortIDRequired
+		}
+
+		shortID, err := shorts.ParsePublicShortID(shortIDText)
+		if err != nil {
+			return recommendation.RecordEventResult{}, recommendation.ErrShortIDInvalid
 		}
 		hasExposure, err := recommendationSignalExposure.HasShortExposure(ctx, viewerID, shortID)
 		if err != nil {

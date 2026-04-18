@@ -287,6 +287,56 @@ func TestRecommendationSignalRouteRejectsInvalidRequest(t *testing.T) {
 	}
 }
 
+func TestRecommendationSignalRouteRejectsMalformedShortID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		RecommendationSignalExposure: stubRecommendationSignalExposureStore{
+			hasCreatorExposure: func(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
+				t.Fatal("HasCreatorExposure() should not be called")
+				return false, nil
+			},
+			hasShortExposure: func(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
+				t.Fatal("HasShortExposure() should not be called")
+				return false, nil
+			},
+		},
+		RecommendationSignals: stubRecommendationSignalWriter{
+			recordProfileClick: func(context.Context, uuid.UUID, uuid.UUID, string) (recommendation.RecordEventResult, error) {
+				t.Fatal("RecordProfileClick() should not be called")
+				return recommendation.RecordEventResult{}, nil
+			},
+			recordShortSignal: func(context.Context, uuid.UUID, uuid.UUID, recommendation.EventKind, string) (recommendation.RecordEventResult, error) {
+				t.Fatal("RecordShortSignal() should not be called")
+				return recommendation.RecordEventResult{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{CurrentViewer: &auth.CurrentViewer{ID: uuid.New()}}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/recommendation/events",
+		strings.NewReader(`{"eventKind":"impression","idempotencyKey":"impression:session-1","shortId":"not-a-short-id"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/fan/recommendation/events status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("response body got %q want invalid_request", rec.Body.String())
+	}
+}
+
 func TestRecommendationSignalRouteMapsNotFoundAndConflict(t *testing.T) {
 	t.Parallel()
 
