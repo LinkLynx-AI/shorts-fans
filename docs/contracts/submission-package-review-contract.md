@@ -97,6 +97,16 @@
   - short A `approved for publish`
   - short B `revision requested`
 
+### State notation
+
+- この文書の state table と説明文では display 名として `pending review`、`revision requested`、`approved for publish`、`approved for unlock` を使います。
+- `main.state = ...` や `short.state = ...` のように persisted field / enum token を明示するときは snake_case を canonical にします。
+- 対応は次のとおりです。
+  - `pending review` -> `pending_review`
+  - `revision requested` -> `revision_requested`
+  - `approved for publish` -> `approved_for_publish`
+  - `approved for unlock` -> `approved_for_unlock`
+
 ### `main`
 
 | state | meaning | review cycle rule |
@@ -174,7 +184,7 @@
 - 将来 auto review を追加しても、少なくとも次を残せる必要があります。
   - manual review fallback
   - manual final decision path
-  - manual override
+  - manual override path (`decision source = manual_override`)
 - auto review は queue prioritization、assist signal、または automated decision に使えても、manual path を置き換える前提にしません。
 
 ### Decision provenance
