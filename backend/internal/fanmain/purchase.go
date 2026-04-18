@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,9 @@ var supportedCardBrands = []string{
 
 // ErrInvalidPurchaseRequest は purchase request が contract を満たさないことを表します。
 var ErrInvalidPurchaseRequest = errors.New("purchase request が不正です")
+
+// ErrInvalidCardSetupRequest は card setup request が contract を満たさないことを表します。
+var ErrInvalidCardSetupRequest = errors.New("card setup request が不正です")
 
 // ErrPurchaseNotFound は purchase 対象の short/main が見つからないことを表します。
 var ErrPurchaseNotFound = errors.New("main or short が見つかりません")
@@ -47,6 +51,41 @@ type transactionalPaymentRepository interface {
 
 type purchaseGateway interface {
 	Charge(ctx context.Context, input payment.ChargeInput) (payment.ChargeResult, error)
+}
+
+// CardSetupSessionInput は new card widget 初期化入力です。
+type CardSetupSessionInput struct {
+	EntryToken  string
+	FromShortID uuid.UUID
+	MainID      uuid.UUID
+	ViewerID    uuid.UUID
+}
+
+// CardSetupSessionResult は new card widget 初期化情報です。
+type CardSetupSessionResult struct {
+	APIBaseURL    string
+	APIKey        string
+	ClientAccount string
+	Currency      string
+	InitialPeriod string
+	InitialPrice  string
+	SessionToken  string
+	SubAccount    string
+}
+
+// CardSetupTokenInput は provider payment token を opaque token へ交換する入力です。
+type CardSetupTokenInput struct {
+	CardSetupSessionToken string
+	EntryToken            string
+	FromShortID           uuid.UUID
+	MainID                uuid.UUID
+	PaymentTokenRef       string
+	ViewerID              uuid.UUID
+}
+
+// CardSetupTokenResult は purchase input に渡す opaque token です。
+type CardSetupTokenResult struct {
+	CardSetupToken string
 }
 
 // SavedPaymentMethodSummary は unlock surface に返す saved card summary です。
@@ -106,6 +145,163 @@ type PurchaseResult struct {
 	Purchase   PurchaseOutcome
 }
 
+// CreateCardSetupSession は new card widget 初期化に必要な frontend token を返します。
+func (s *Service) CreateCardSetupSession(
+	ctx context.Context,
+	sessionBinding string,
+	input CardSetupSessionInput,
+) (CardSetupSessionResult, error) {
+	detail, main, err := s.loadLinkedSurface(ctx, input.ViewerID, input.FromShortID)
+	if err != nil {
+		switch {
+		case errors.Is(err, feed.ErrPublicShortNotFound):
+			return CardSetupSessionResult{}, ErrPurchaseNotFound
+		case errors.Is(err, shorts.ErrUnlockableMainNotFound):
+			return CardSetupSessionResult{}, ErrPurchaseNotFound
+		default:
+			return CardSetupSessionResult{}, err
+		}
+	}
+
+	if detail.Item.Short.CanonicalMainID != input.MainID || main.ID != input.MainID {
+		return CardSetupSessionResult{}, ErrPurchaseNotFound
+	}
+
+	entryToken, err := readSignedToken(sessionBinding, s.now().UTC(), input.EntryToken)
+	if err != nil {
+		return CardSetupSessionResult{}, ErrMainLocked
+	}
+	if entryToken.Kind != entryTokenKind ||
+		entryToken.MainID != input.MainID ||
+		entryToken.FromShortID != input.FromShortID ||
+		entryToken.ViewerID != input.ViewerID {
+		return CardSetupSessionResult{}, ErrMainLocked
+	}
+	if detail.Item.Unlock.IsOwner || detail.Item.Unlock.IsUnlocked {
+		return CardSetupSessionResult{}, ErrMainLocked
+	}
+	if _, err := s.getInflightAttempt(ctx, input.ViewerID, input.MainID); err == nil {
+		return CardSetupSessionResult{}, ErrMainLocked
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return CardSetupSessionResult{}, err
+	}
+	if _, err := s.getLatestSucceededAttempt(ctx, input.ViewerID, input.MainID); err == nil {
+		return CardSetupSessionResult{}, ErrMainLocked
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return CardSetupSessionResult{}, err
+	}
+	if strings.TrimSpace(main.CurrencyCode) != "JPY" {
+		return CardSetupSessionResult{}, fmt.Errorf("unsupported widget currency %q", main.CurrencyCode)
+	}
+	if s == nil || s.paymentWidgetSessionSource == nil {
+		return CardSetupSessionResult{}, fmt.Errorf("fan main payment widget session source が初期化されていません")
+	}
+
+	session, err := s.paymentWidgetSessionSource.CreatePaymentWidgetSession(ctx)
+	if err != nil {
+		return CardSetupSessionResult{}, err
+	}
+
+	sessionToken, err := issueSignedCardSetupSessionToken(
+		sessionBinding,
+		s.now().UTC(),
+		s.tokenTTL,
+		input.ViewerID,
+		input.MainID,
+		input.FromShortID,
+	)
+	if err != nil {
+		return CardSetupSessionResult{}, err
+	}
+
+	return CardSetupSessionResult{
+		APIBaseURL:    session.APIBaseURL,
+		APIKey:        session.APIKey,
+		ClientAccount: strconv.FormatInt(int64(session.ClientAccountNumber), 10),
+		Currency:      main.CurrencyCode,
+		InitialPeriod: strconv.FormatInt(int64(session.InitialPeriodDays), 10),
+		InitialPrice:  formatWidgetInitialPrice(main.PriceMinor, main.CurrencyCode),
+		SessionToken:  sessionToken,
+		SubAccount:    strconv.FormatInt(int64(session.ClientSubAccountNumber), 10),
+	}, nil
+}
+
+// IssueCardSetupToken は provider payment token を purchase input 用の opaque token に交換します。
+func (s *Service) IssueCardSetupToken(
+	ctx context.Context,
+	sessionBinding string,
+	input CardSetupTokenInput,
+) (CardSetupTokenResult, error) {
+	detail, main, err := s.loadLinkedSurface(ctx, input.ViewerID, input.FromShortID)
+	if err != nil {
+		switch {
+		case errors.Is(err, feed.ErrPublicShortNotFound):
+			return CardSetupTokenResult{}, ErrPurchaseNotFound
+		case errors.Is(err, shorts.ErrUnlockableMainNotFound):
+			return CardSetupTokenResult{}, ErrPurchaseNotFound
+		default:
+			return CardSetupTokenResult{}, err
+		}
+	}
+
+	if detail.Item.Short.CanonicalMainID != input.MainID || main.ID != input.MainID {
+		return CardSetupTokenResult{}, ErrPurchaseNotFound
+	}
+
+	entryToken, err := readSignedToken(sessionBinding, s.now().UTC(), input.EntryToken)
+	if err != nil {
+		return CardSetupTokenResult{}, ErrMainLocked
+	}
+	if entryToken.Kind != entryTokenKind ||
+		entryToken.MainID != input.MainID ||
+		entryToken.FromShortID != input.FromShortID ||
+		entryToken.ViewerID != input.ViewerID {
+		return CardSetupTokenResult{}, ErrMainLocked
+	}
+	if detail.Item.Unlock.IsOwner || detail.Item.Unlock.IsUnlocked {
+		return CardSetupTokenResult{}, ErrMainLocked
+	}
+	if _, err := s.getInflightAttempt(ctx, input.ViewerID, input.MainID); err == nil {
+		return CardSetupTokenResult{}, ErrMainLocked
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return CardSetupTokenResult{}, err
+	}
+	if _, err := s.getLatestSucceededAttempt(ctx, input.ViewerID, input.MainID); err == nil {
+		return CardSetupTokenResult{}, ErrMainLocked
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return CardSetupTokenResult{}, err
+	}
+	if strings.TrimSpace(input.PaymentTokenRef) == "" {
+		return CardSetupTokenResult{}, ErrInvalidCardSetupRequest
+	}
+	if err := resolveSignedCardSetupSessionToken(
+		sessionBinding,
+		s.now().UTC(),
+		input.ViewerID,
+		input.MainID,
+		input.FromShortID,
+		input.CardSetupSessionToken,
+	); err != nil {
+		return CardSetupTokenResult{}, ErrMainLocked
+	}
+
+	cardSetupToken, err := issueSignedCardSetupToken(
+		sessionBinding,
+		s.now().UTC(),
+		s.tokenTTL,
+		input.ViewerID,
+		input.MainID,
+		input.FromShortID,
+		payment.ProviderCCBill,
+		input.PaymentTokenRef,
+	)
+	if err != nil {
+		return CardSetupTokenResult{}, err
+	}
+
+	return CardSetupTokenResult{CardSetupToken: cardSetupToken}, nil
+}
+
 // PurchaseMain は provider purchase を実行し、success 時だけ durable unlock を記録します。
 func (s *Service) PurchaseMain(ctx context.Context, sessionBinding string, input PurchaseInput) (PurchaseResult, error) {
 	detail, main, err := s.loadLinkedSurface(ctx, input.ViewerID, input.FromShortID)
@@ -142,9 +338,17 @@ func (s *Service) PurchaseMain(ctx context.Context, sessionBinding string, input
 
 	switch {
 	case detail.Item.Unlock.IsOwner:
-		return buildOwnerPurchaseResult(main.ID, input.EntryToken), nil
+		freshEntryToken, err := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if err != nil {
+			return PurchaseResult{}, err
+		}
+		return buildOwnerPurchaseResult(main.ID, freshEntryToken), nil
 	case detail.Item.Unlock.IsUnlocked:
-		return buildAlreadyPurchasedResult(main.ID, input.EntryToken), nil
+		freshEntryToken, err := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if err != nil {
+			return PurchaseResult{}, err
+		}
+		return buildAlreadyPurchasedResult(main.ID, freshEntryToken), nil
 	}
 
 	if txRepo, ok := s.paymentRepository.(transactionalPaymentRepository); ok {
@@ -187,7 +391,11 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 		return PurchaseResult{}, err
 	}
 	if completedAttempt, err := s.getLatestSucceededAttempt(ctx, input.ViewerID, input.MainID); err == nil {
-		return buildPurchaseResultFromAttempt(main.ID, completedAttempt, input.EntryToken), nil
+		freshEntryToken, tokenErr := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if tokenErr != nil {
+			return PurchaseResult{}, tokenErr
+		}
+		return buildPurchaseResultFromAttempt(main.ID, completedAttempt, freshEntryToken), nil
 	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
 		return PurchaseResult{}, err
 	}
@@ -199,13 +407,6 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 	requestedCurrencyCode, err := currencyNumericCode(main.CurrencyCode)
 	if err != nil {
 		return PurchaseResult{}, err
-	}
-
-	idempotencyKey := buildPurchaseIdempotencyKey(input)
-	if existingAttempt, err := s.paymentRepository.GetMainPurchaseAttemptByIdempotencyKeyForUpdate(ctx, idempotencyKey); err == nil {
-		return buildPurchaseResultFromAttempt(main.ID, existingAttempt, input.EntryToken), nil
-	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
-		return PurchaseResult{}, fmt.Errorf("purchase attempt idempotency 取得 viewer=%s main=%s: %w", input.ViewerID, input.MainID, err)
 	}
 
 	paymentMode := strings.TrimSpace(input.PaymentMethod.Mode)
@@ -228,12 +429,30 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 		userPaymentMethodID = &method.ID
 		providerPaymentTokenRef = method.ProviderPaymentTokenRef
 	case payment.PaymentMethodModeNewCard:
-		providerPaymentTokenRef, err = resolveCardSetupPaymentTokenRef(sessionBinding, s.now().UTC(), input.ViewerID, input.PaymentMethod.CardSetupToken)
+		providerPaymentTokenRef, err = resolveCardSetupPaymentTokenRef(
+			sessionBinding,
+			s.now().UTC(),
+			input.ViewerID,
+			input.MainID,
+			input.FromShortID,
+			input.PaymentMethod.CardSetupToken,
+		)
 		if err != nil {
 			return PurchaseResult{}, ErrInvalidPurchaseRequest
 		}
 	default:
 		return PurchaseResult{}, ErrInvalidPurchaseRequest
+	}
+
+	idempotencyKey := buildPurchaseIdempotencyKey(input, providerPaymentTokenRef)
+	if existingAttempt, err := s.paymentRepository.GetMainPurchaseAttemptByIdempotencyKeyForUpdate(ctx, idempotencyKey); err == nil {
+		freshEntryToken, tokenErr := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if tokenErr != nil {
+			return PurchaseResult{}, tokenErr
+		}
+		return buildPurchaseResultFromAttempt(main.ID, existingAttempt, freshEntryToken), nil
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return PurchaseResult{}, fmt.Errorf("purchase attempt idempotency 取得 viewer=%s main=%s: %w", input.ViewerID, input.MainID, err)
 	}
 
 	attempt, err := s.paymentRepository.CreateMainPurchaseAttempt(ctx, payment.CreateMainPurchaseAttemptInput{
@@ -258,7 +477,11 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 				return PurchaseResult{}, resolveErr
 			}
 
-			return buildPurchaseResultFromAttempt(main.ID, existingAttempt, input.EntryToken), nil
+			freshEntryToken, tokenErr := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+			if tokenErr != nil {
+				return PurchaseResult{}, tokenErr
+			}
+			return buildPurchaseResultFromAttempt(main.ID, existingAttempt, freshEntryToken), nil
 		}
 
 		return PurchaseResult{}, err
@@ -311,9 +534,14 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 			}
 		}
 
+		freshEntryToken, err := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if err != nil {
+			return PurchaseResult{}, err
+		}
+
 		return PurchaseResult{
 			Access:     buildPurchasedAccessState(input.MainID),
-			EntryToken: stringPtr(input.EntryToken),
+			EntryToken: stringPtr(freshEntryToken),
 			Purchase: PurchaseOutcome{
 				CanRetry: false,
 				Status:   "succeeded",
@@ -475,7 +703,7 @@ func validatePurchaseInput(input PurchaseInput, savedMethods []payment.SavedPaym
 	return nil
 }
 
-func buildPurchaseIdempotencyKey(input PurchaseInput) string {
+func buildPurchaseIdempotencyKey(input PurchaseInput, providerPaymentTokenRef string) string {
 	builder := strings.Builder{}
 	builder.WriteString(input.ViewerID.String())
 	builder.WriteString(":")
@@ -489,7 +717,7 @@ func buildPurchaseIdempotencyKey(input PurchaseInput) string {
 	builder.WriteString(":")
 	builder.WriteString(strings.TrimSpace(input.PaymentMethod.PaymentMethodID))
 	builder.WriteString(":")
-	builder.WriteString(strings.TrimSpace(input.PaymentMethod.CardSetupToken))
+	builder.WriteString(strings.TrimSpace(providerPaymentTokenRef))
 
 	sum := sha256.Sum256([]byte(builder.String()))
 	return hex.EncodeToString(sum[:])
@@ -598,4 +826,12 @@ func buildOwnerPurchaseResult(mainID uuid.UUID, entryToken string) PurchaseResul
 			Status:   "owner_preview",
 		},
 	}
+}
+
+func formatWidgetInitialPrice(priceMinor int64, currencyCode string) string {
+	if strings.EqualFold(currencyCode, "JPY") {
+		return fmt.Sprintf("%d.00", priceMinor)
+	}
+
+	return fmt.Sprintf("%d", priceMinor)
 }

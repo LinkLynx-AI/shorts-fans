@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
@@ -17,11 +18,13 @@ import (
 )
 
 const (
-	fanShortUnlockRequestScope     = "fan_short_unlock"
-	fanMainPurchaseRequestScope    = "fan_main_purchase"
-	fanMainAccessEntryRequestScope = "fan_main_access_entry"
-	fanMainPlaybackRequestScope    = "fan_main_playback"
-	fanMainAuthRequiredMessage     = "authentication required"
+	fanShortUnlockRequestScope          = "fan_short_unlock"
+	fanMainCardSetupSessionRequestScope = "fan_main_card_setup_session"
+	fanMainCardSetupTokenRequestScope   = "fan_main_card_setup_token"
+	fanMainPurchaseRequestScope         = "fan_main_purchase"
+	fanMainAccessEntryRequestScope      = "fan_main_access_entry"
+	fanMainPlaybackRequestScope         = "fan_main_playback"
+	fanMainAuthRequiredMessage          = "authentication required"
 )
 
 type unlockSurfaceResponseData struct {
@@ -83,6 +86,33 @@ type mainAccessEntryRequestPayload struct {
 
 type mainAccessEntryResponseData struct {
 	Href string `json:"href"`
+}
+
+type cardSetupSessionRequestPayload struct {
+	EntryToken  string `json:"entryToken"`
+	FromShortID string `json:"fromShortId"`
+}
+
+type cardSetupSessionResponseData struct {
+	APIBaseURL    string `json:"apiBaseUrl"`
+	APIKey        string `json:"apiKey"`
+	ClientAccount string `json:"clientAccount"`
+	Currency      string `json:"currency"`
+	InitialPeriod string `json:"initialPeriod"`
+	InitialPrice  string `json:"initialPrice"`
+	SessionToken  string `json:"sessionToken"`
+	SubAccount    string `json:"subAccount"`
+}
+
+type cardSetupTokenRequestPayload struct {
+	EntryToken     string `json:"entryToken"`
+	FromShortID    string `json:"fromShortId"`
+	PaymentTokenID string `json:"paymentTokenId"`
+	SessionToken   string `json:"sessionToken"`
+}
+
+type cardSetupTokenResponseData struct {
+	CardSetupToken string `json:"cardSetupToken"`
 }
 
 type mainPurchasePaymentMethodPayload struct {
@@ -152,6 +182,18 @@ func registerFanUnlockMainRoutes(
 	mainPurchaseGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainPurchaseRequestScope, fanMainAuthRequiredMessage))
 	mainPurchaseGroup.POST("/api/fan/mains/:mainId/purchase", func(c *gin.Context) {
 		handleFanMainPurchase(c, service)
+	})
+
+	mainCardSetupSessionGroup := router.Group("/")
+	mainCardSetupSessionGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainCardSetupSessionRequestScope, fanMainAuthRequiredMessage))
+	mainCardSetupSessionGroup.POST("/api/fan/mains/:mainId/card-setup-session", func(c *gin.Context) {
+		handleFanMainCardSetupSession(c, service)
+	})
+
+	mainCardSetupTokenGroup := router.Group("/")
+	mainCardSetupTokenGroup.Use(buildProtectedFanAuthGuard(viewerBootstrap, fanMainCardSetupTokenRequestScope, fanMainAuthRequiredMessage))
+	mainCardSetupTokenGroup.POST("/api/fan/mains/:mainId/card-setup-token", func(c *gin.Context) {
+		handleFanMainCardSetupToken(c, service)
 	})
 
 	mainAccessEntryGroup := router.Group("/")
@@ -237,6 +279,140 @@ func handleFanShortUnlock(
 	})
 }
 
+func handleFanMainCardSetupSession(c *gin.Context, service FanUnlockMainService) {
+	viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(c)
+	if !ok {
+		writeInternalServerError(c, fanMainCardSetupSessionRequestScope)
+		return
+	}
+
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeNotFoundError(c, fanMainCardSetupSessionRequestScope, "main or short was not found")
+		return
+	}
+
+	var request cardSetupSessionRequestPayload
+	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+		writeInvalidFanMainRequest(c, fanMainCardSetupSessionRequestScope, "main card setup session request was invalid")
+		return
+	}
+	if !isStructurallyValidSignedToken(request.EntryToken) || strings.TrimSpace(request.FromShortID) == "" {
+		writeInvalidFanMainRequest(c, fanMainCardSetupSessionRequestScope, "main card setup session request was invalid")
+		return
+	}
+
+	fromShortID, err := shorts.ParsePublicShortID(request.FromShortID)
+	if err != nil {
+		writeInvalidFanMainRequest(c, fanMainCardSetupSessionRequestScope, "main card setup session request was invalid")
+		return
+	}
+
+	result, err := service.CreateCardSetupSession(c.Request.Context(), sessionBinding, fanmain.CardSetupSessionInput{
+		EntryToken:  request.EntryToken,
+		FromShortID: fromShortID,
+		MainID:      mainID,
+		ViewerID:    viewer.ID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, fanmain.ErrInvalidCardSetupRequest):
+			writeInvalidFanMainRequest(c, fanMainCardSetupSessionRequestScope, "main card setup session request was invalid")
+		case errors.Is(err, fanmain.ErrPurchaseNotFound):
+			writeNotFoundError(c, fanMainCardSetupSessionRequestScope, "main or short was not found")
+		case errors.Is(err, fanmain.ErrMainLocked):
+			writeFanMainLockedError(c, fanMainCardSetupSessionRequestScope, "main card setup session could not be issued")
+		default:
+			writeInternalServerError(c, fanMainCardSetupSessionRequestScope)
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[cardSetupSessionResponseData]{
+		Data: &cardSetupSessionResponseData{
+			APIBaseURL:    result.APIBaseURL,
+			APIKey:        result.APIKey,
+			ClientAccount: result.ClientAccount,
+			Currency:      result.Currency,
+			InitialPeriod: result.InitialPeriod,
+			InitialPrice:  result.InitialPrice,
+			SessionToken:  result.SessionToken,
+			SubAccount:    result.SubAccount,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(fanMainCardSetupSessionRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
+func handleFanMainCardSetupToken(c *gin.Context, service FanUnlockMainService) {
+	viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(c)
+	if !ok {
+		writeInternalServerError(c, fanMainCardSetupTokenRequestScope)
+		return
+	}
+
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeNotFoundError(c, fanMainCardSetupTokenRequestScope, "main or short was not found")
+		return
+	}
+
+	var request cardSetupTokenRequestPayload
+	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+		writeInvalidFanMainRequest(c, fanMainCardSetupTokenRequestScope, "main card setup token request was invalid")
+		return
+	}
+	if !isStructurallyValidSignedToken(request.EntryToken) ||
+		strings.TrimSpace(request.FromShortID) == "" ||
+		strings.TrimSpace(request.PaymentTokenID) == "" ||
+		!isStructurallyValidSignedToken(request.SessionToken) {
+		writeInvalidFanMainRequest(c, fanMainCardSetupTokenRequestScope, "main card setup token request was invalid")
+		return
+	}
+
+	fromShortID, err := shorts.ParsePublicShortID(request.FromShortID)
+	if err != nil {
+		writeInvalidFanMainRequest(c, fanMainCardSetupTokenRequestScope, "main card setup token request was invalid")
+		return
+	}
+
+	result, err := service.IssueCardSetupToken(c.Request.Context(), sessionBinding, fanmain.CardSetupTokenInput{
+		CardSetupSessionToken: request.SessionToken,
+		EntryToken:      request.EntryToken,
+		FromShortID:     fromShortID,
+		MainID:          mainID,
+		PaymentTokenRef: request.PaymentTokenID,
+		ViewerID:        viewer.ID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, fanmain.ErrInvalidCardSetupRequest):
+			writeInvalidFanMainRequest(c, fanMainCardSetupTokenRequestScope, "main card setup token request was invalid")
+		case errors.Is(err, fanmain.ErrPurchaseNotFound):
+			writeNotFoundError(c, fanMainCardSetupTokenRequestScope, "main or short was not found")
+		case errors.Is(err, fanmain.ErrMainLocked):
+			writeFanMainLockedError(c, fanMainCardSetupTokenRequestScope, "main card setup token could not be issued")
+		default:
+			writeInternalServerError(c, fanMainCardSetupTokenRequestScope)
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[cardSetupTokenResponseData]{
+		Data: &cardSetupTokenResponseData{
+			CardSetupToken: result.CardSetupToken,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(fanMainCardSetupTokenRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
 func handleFanMainPurchase(c *gin.Context, service FanUnlockMainService) {
 	viewer, sessionBinding, ok := resolveAuthenticatedViewerRequest(c)
 	if !ok {
@@ -255,10 +431,14 @@ func handleFanMainPurchase(c *gin.Context, service FanUnlockMainService) {
 		writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
 		return
 	}
+	if !isStructurallyValidSignedToken(request.EntryToken) || strings.TrimSpace(request.FromShortID) == "" {
+		writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
+		return
+	}
 
 	fromShortID, err := shorts.ParsePublicShortID(request.FromShortID)
 	if err != nil {
-		writeNotFoundError(c, fanMainPurchaseRequestScope, "main or short was not found")
+		writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
 		return
 	}
 
@@ -337,10 +517,14 @@ func handleFanMainAccessEntry(c *gin.Context, service FanUnlockMainService) {
 		writeInvalidFanMainRequest(c, fanMainAccessEntryRequestScope, "main access entry request was invalid")
 		return
 	}
+	if !isStructurallyValidSignedToken(request.EntryToken) || strings.TrimSpace(request.FromShortID) == "" {
+		writeInvalidFanMainRequest(c, fanMainAccessEntryRequestScope, "main access entry request was invalid")
+		return
+	}
 
 	fromShortID, err := shorts.ParsePublicShortID(request.FromShortID)
 	if err != nil {
-		writeNotFoundError(c, fanMainAccessEntryRequestScope, "main or short was not found")
+		writeInvalidFanMainRequest(c, fanMainAccessEntryRequestScope, "main access entry request was invalid")
 		return
 	}
 
@@ -602,4 +786,9 @@ func writeInvalidFanMainRequest(c *gin.Context, requestScope string, message str
 			Message: message,
 		},
 	})
+}
+
+func isStructurallyValidSignedToken(token string) bool {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	return len(parts) == 2 && parts[0] != "" && parts[1] != ""
 }

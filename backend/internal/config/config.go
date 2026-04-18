@@ -28,6 +28,8 @@ const (
 	ccbillBaseURLEnv           = "CCBILL_BASE_URL"
 	ccbillBackendClientIDEnv   = "CCBILL_BACKEND_CLIENT_ID"
 	ccbillBackendSecretEnv     = "CCBILL_BACKEND_CLIENT_SECRET"
+	ccbillFrontendClientIDEnv  = "CCBILL_FRONTEND_CLIENT_ID"
+	ccbillFrontendSecretEnv    = "CCBILL_FRONTEND_CLIENT_SECRET"
 	ccbillAccountNumberEnv     = "CCBILL_CLIENT_ACCOUNT_NUMBER"
 	ccbillSubAccountNumberEnv  = "CCBILL_CLIENT_SUB_ACCOUNT_NUMBER"
 	ccbillCurrencyCodeEnv      = "CCBILL_CURRENCY_CODE"
@@ -47,6 +49,8 @@ type Config struct {
 	CCBillBaseURL                   string
 	CCBillBackendClientID           string
 	CCBillBackendClientSecret       string
+	CCBillFrontendClientID          string
+	CCBillFrontendClientSecret      string
 	CCBillClientAccountNumber       int32
 	CCBillClientSubAccountNumber    int32
 	CCBillCurrencyCode              int32
@@ -82,6 +86,8 @@ func LoadFromEnv(lookup func(string) string) Config {
 		CCBillBaseURL:                   trimmedLookup(lookup, ccbillBaseURLEnv),
 		CCBillBackendClientID:           trimmedLookup(lookup, ccbillBackendClientIDEnv),
 		CCBillBackendClientSecret:       trimmedLookup(lookup, ccbillBackendSecretEnv),
+		CCBillFrontendClientID:          trimmedLookup(lookup, ccbillFrontendClientIDEnv),
+		CCBillFrontendClientSecret:      trimmedLookup(lookup, ccbillFrontendSecretEnv),
 		CCBillClientAccountNumber:       int32Lookup(lookup, ccbillAccountNumberEnv),
 		CCBillClientSubAccountNumber:    int32Lookup(lookup, ccbillSubAccountNumberEnv),
 		CCBillCurrencyCode:              int32Lookup(lookup, ccbillCurrencyCodeEnv),
@@ -169,6 +175,8 @@ func (c Config) ValidatePayment() error {
 	}{
 		{name: ccbillBackendClientIDEnv, present: c.CCBillBackendClientID != ""},
 		{name: ccbillBackendSecretEnv, present: c.CCBillBackendClientSecret != ""},
+		{name: ccbillFrontendClientIDEnv, present: c.CCBillFrontendClientID != ""},
+		{name: ccbillFrontendSecretEnv, present: c.CCBillFrontendClientSecret != ""},
 		{name: ccbillAccountNumberEnv, present: c.CCBillClientAccountNumber > 0},
 		{name: ccbillSubAccountNumberEnv, present: c.CCBillClientSubAccountNumber > 0},
 		{name: ccbillInitialPeriodDaysEnv, present: c.CCBillInitialPeriodDays > 0},

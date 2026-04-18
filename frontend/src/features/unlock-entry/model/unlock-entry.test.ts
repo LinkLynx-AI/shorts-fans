@@ -4,6 +4,7 @@ import {
   getMainPlaybackHref,
   getMockMainAccessRoutePath,
   getUnlockEntryAction,
+  normalizeUnlockSurface,
   parseMockMainPlaybackGrantContext,
   type UnlockSurfaceModel,
 } from "@/features/unlock-entry";
@@ -11,11 +12,11 @@ import {
 function createUnlockSurfaceModel(
   state: UnlockSurfaceModel["unlockCta"]["state"],
 ): UnlockSurfaceModel {
-  return {
+  return normalizeUnlockSurface({
     access: {
       mainId: "main_rooftop",
-      reason: "unlock_required",
-      status: "locked",
+      reason: state === "continue_main" ? "purchased" : state === "owner_preview" ? "owner_preview" : "unlock_required",
+      status: state === "continue_main" ? "unlocked" : state === "owner_preview" ? "owner" : "locked",
     },
     creator: {
       avatar: {
@@ -30,8 +31,9 @@ function createUnlockSurfaceModel(
       handle: "@minarei",
       id: "mina",
     },
-    mainAccessEntry: {
-      routePath: "/api/fan/mains/main_rooftop/access-entry",
+    entryContext: {
+      accessEntryPath: "/api/fan/mains/main_rooftop/access-entry",
+      purchasePath: "/api/fan/mains/main_rooftop/purchase",
       token: "entry_token",
     },
     main: {
@@ -39,10 +41,24 @@ function createUnlockSurfaceModel(
       id: "main_rooftop",
       priceJpy: 1800,
     },
-    setup: {
-      required: state === "setup_required",
-      requiresAgeConfirmation: state === "setup_required",
-      requiresTermsAcceptance: state === "setup_required",
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: state === "setup_required",
+        requiresAgeConfirmation: state === "setup_required",
+        requiresCardSetup: state === "setup_required",
+        requiresTermsAcceptance: state === "setup_required",
+      },
+      state:
+        state === "continue_main"
+          ? "already_purchased"
+          : state === "owner_preview"
+            ? "owner_preview"
+            : state === "setup_required"
+              ? "setup_required"
+              : "purchase_ready",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     short: {
       canonicalMainId: "main_rooftop",
@@ -64,7 +80,7 @@ function createUnlockSurfaceModel(
       resumePositionSeconds: state === "continue_main" ? 198 : null,
       state,
     },
-  };
+  });
 }
 
 describe("unlock-entry model", () => {
@@ -110,5 +126,20 @@ describe("unlock-entry model", () => {
         "main-playback-grant::main_mina_quiet_rooftop::rooftop::invalid",
       ),
     ).toBeNull();
+  });
+
+  it("keeps compatibility aliases in sync with the canonical entry and setup fields", () => {
+    const unlock = createUnlockSurfaceModel("setup_required");
+
+    expect(unlock.entryContext).toEqual({
+      accessEntryPath: "/api/fan/mains/main_rooftop/access-entry",
+      purchasePath: "/api/fan/mains/main_rooftop/purchase",
+      token: "entry_token",
+    });
+    expect(unlock.mainAccessEntry).toEqual({
+      routePath: "/api/fan/mains/main_rooftop/access-entry",
+      token: "entry_token",
+    });
+    expect(unlock.setup).toEqual(unlock.purchase.setup);
   });
 });

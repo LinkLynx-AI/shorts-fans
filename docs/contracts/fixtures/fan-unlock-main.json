@@ -432,6 +432,127 @@
       }
     }
   },
+  "POST /api/fan/mains/{mainId}/card-setup-session": {
+    "card_setup_session_issued": {
+      "status": 200,
+      "body": {
+        "data": {
+          "apiBaseUrl": "https://api.ccbill.com",
+          "apiKey": "frontend_widget_token_001",
+          "clientAccount": "900100",
+          "currency": "JPY",
+          "initialPeriod": "30",
+          "initialPrice": "1800.00",
+          "sessionToken": "opaque_card_setup_session_token_001",
+          "subAccount": "1"
+        },
+        "meta": {
+          "requestId": "req_main_card_setup_session_issued_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_session_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "authentication required"
+        }
+      }
+    },
+    "card_setup_session_main_not_unlockable": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_session_not_unlockable_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main card setup session could not be issued"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_session_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "main or short was not found"
+        }
+      }
+    }
+  },
+  "POST /api/fan/mains/{mainId}/card-setup-token": {
+    "card_setup_token_issued": {
+      "status": 200,
+      "body": {
+        "data": {
+          "cardSetupToken": "opaque_card_setup_token_001"
+        },
+        "meta": {
+          "requestId": "req_main_card_setup_token_issued_001",
+          "page": null
+        },
+        "error": null
+      }
+    },
+    "auth_required": {
+      "status": 401,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_token_auth_required_001",
+          "page": null
+        },
+        "error": {
+          "code": "auth_required",
+          "message": "authentication required"
+        }
+      }
+    },
+    "card_setup_token_main_not_unlockable": {
+      "status": 403,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_token_not_unlockable_001",
+          "page": null
+        },
+        "error": {
+          "code": "main_locked",
+          "message": "main card setup token could not be issued"
+        }
+      }
+    },
+    "not_found": {
+      "status": 404,
+      "body": {
+        "data": null,
+        "meta": {
+          "requestId": "req_main_card_setup_token_not_found_001",
+          "page": null
+        },
+        "error": {
+          "code": "not_found",
+          "message": "main or short was not found"
+        }
+      }
+    }
+  },
   "POST /api/fan/mains/{mainId}/purchase": {
     "purchase_succeeded": {
       "status": 200,

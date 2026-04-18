@@ -18,10 +18,19 @@ import (
 )
 
 type stubFanUnlockMainService struct {
-	getPlaybackSurface func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, string) (fanmain.PlaybackSurface, error)
-	getUnlockSurface   func(context.Context, uuid.UUID, string, uuid.UUID) (fanmain.UnlockSurface, error)
-	issueAccessEntry   func(context.Context, string, fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
-	purchaseMain       func(context.Context, string, fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
+	createCardSetupSession func(context.Context, string, fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error)
+	getPlaybackSurface     func(context.Context, uuid.UUID, string, uuid.UUID, uuid.UUID, string) (fanmain.PlaybackSurface, error)
+	getUnlockSurface       func(context.Context, uuid.UUID, string, uuid.UUID) (fanmain.UnlockSurface, error)
+	issueAccessEntry       func(context.Context, string, fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+	issueCardSetupToken    func(context.Context, string, fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error)
+	purchaseMain           func(context.Context, string, fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
+}
+
+const validSignedEntryToken = "signed-entry-token.payload"
+const validCardSetupSessionToken = "card-setup-session-token.payload"
+
+func (s stubFanUnlockMainService) CreateCardSetupSession(ctx context.Context, sessionBinding string, input fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error) {
+	return s.createCardSetupSession(ctx, sessionBinding, input)
 }
 
 func (s stubFanUnlockMainService) GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error) {
@@ -36,6 +45,10 @@ func (s stubFanUnlockMainService) IssueAccessEntry(ctx context.Context, sessionB
 	return s.issueAccessEntry(ctx, sessionBinding, input)
 }
 
+func (s stubFanUnlockMainService) IssueCardSetupToken(ctx context.Context, sessionBinding string, input fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+	return s.issueCardSetupToken(ctx, sessionBinding, input)
+}
+
 func (s stubFanUnlockMainService) PurchaseMain(ctx context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error) {
 	return s.purchaseMain(ctx, sessionBinding, input)
 }
@@ -46,6 +59,17 @@ type stubMainDisplayAssetResolver struct {
 
 func (s stubMainDisplayAssetResolver) ResolveMainDisplayAsset(ctx context.Context, source media.MainDisplaySource, boundary media.AccessBoundary, ttl time.Duration) (media.VideoDisplayAsset, error) {
 	return s.resolve(ctx, source, boundary, ttl)
+}
+
+func assertEnvelopeErrorCode(t *testing.T, rec *httptest.ResponseRecorder, wantStatus int, wantCode string) {
+	t.Helper()
+
+	if rec.Code != wantStatus {
+		t.Fatalf("response status got %d want %d", rec.Code, wantStatus)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"`+wantCode+`"`) {
+		t.Fatalf("response body got %q want code %q", rec.Body.String(), wantCode)
+	}
 }
 
 func TestFanShortUnlockRoute(t *testing.T) {
@@ -181,7 +205,7 @@ func TestFanMainPurchaseRouteReturnsAcceptedForPending(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/fan/mains/main_33333333333333333333333333333333/purchase",
-		strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+		strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.RemoteAddr = "192.0.2.1:1234"
@@ -206,6 +230,280 @@ func TestFanMainPurchaseRouteReturnsAcceptedForPending(t *testing.T) {
 	}
 }
 
+func TestFanMainCardSetupSessionRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+		createCardSetupSession: func(_ context.Context, sessionBinding string, input fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error) {
+			if sessionBinding == "" || input.ViewerID != viewerID || input.MainID != mainID || input.FromShortID != shortID {
+				t.Fatalf("CreateCardSetupSession() input got %+v session=%q", input, sessionBinding)
+			}
+			if input.EntryToken != validSignedEntryToken {
+				t.Fatalf("CreateCardSetupSession() entry token got %q want %q", input.EntryToken, validSignedEntryToken)
+			}
+
+			return fanmain.CardSetupSessionResult{
+				APIBaseURL:    "https://api.ccbill.com",
+				APIKey:        "frontend-token",
+				ClientAccount: "900100",
+				Currency:      "JPY",
+				InitialPeriod: "30",
+				InitialPrice:  "1800.00",
+				SessionToken:  validCardSetupSessionToken,
+				SubAccount:    "1",
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+		strings.NewReader(`{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /api/fan/mains/:mainId/card-setup-session status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[cardSetupSessionResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil || response.Data.APIKey != "frontend-token" {
+		t.Fatalf("response.Data got %#v want widget session", response.Data)
+	}
+	if response.Data.SessionToken != validCardSetupSessionToken {
+		t.Fatalf("response.Data.SessionToken got %q want %q", response.Data.SessionToken, validCardSetupSessionToken)
+	}
+}
+
+func TestFanMainCardSetupTokenRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+		issueCardSetupToken: func(_ context.Context, sessionBinding string, input fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+			if sessionBinding == "" || input.ViewerID != viewerID || input.MainID != mainID || input.FromShortID != shortID {
+				t.Fatalf("IssueCardSetupToken() input got %+v session=%q", input, sessionBinding)
+			}
+			if input.CardSetupSessionToken != validCardSetupSessionToken {
+				t.Fatalf("IssueCardSetupToken() session token got %q want %q", input.CardSetupSessionToken, validCardSetupSessionToken)
+			}
+			if input.PaymentTokenRef != "payment-token-1" {
+				t.Fatalf("IssueCardSetupToken() payment token got %q want %q", input.PaymentTokenRef, "payment-token-1")
+			}
+
+			return fanmain.CardSetupTokenResult{CardSetupToken: "opaque-card-setup-token"}, nil
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+		strings.NewReader(`{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"payment-token-1","sessionToken":"card-setup-session-token.payload"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("POST /api/fan/mains/:mainId/card-setup-token status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[cardSetupTokenResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil || response.Data.CardSetupToken != "opaque-card-setup-token" {
+		t.Fatalf("response.Data got %#v want card setup token", response.Data)
+	}
+}
+
+func TestFanMainCardSetupSessionRouteErrors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		path        string
+		body        string
+		service     stubFanUnlockMainService
+		wantCode    string
+		wantStatus  int
+	}{
+		{
+			name:       "invalid request body",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+			body:       `{`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid short id",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+			body:       `{"entryToken":"signed-entry-token.payload","fromShortId":"invalid-short"}`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing entry token",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+			body:       `{"entryToken":"","fromShortId":"short_22222222222222222222222222222222"}`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "main locked",
+			path: "/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+			body: `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`,
+			service: stubFanUnlockMainService{
+				createCardSetupSession: func(context.Context, string, fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error) {
+					return fanmain.CardSetupSessionResult{}, fanmain.ErrMainLocked
+				},
+			},
+			wantCode:   "main_locked",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "not found",
+			path: "/api/fan/mains/main_33333333333333333333333333333333/card-setup-session",
+			body: `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`,
+			service: stubFanUnlockMainService{
+				createCardSetupSession: func(context.Context, string, fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error) {
+					return fanmain.CardSetupSessionResult{}, fanmain.ErrPurchaseNotFound
+				},
+			},
+			wantCode:   "not_found",
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newFanUnlockMainRouter(t, tc.service)
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			assertEnvelopeErrorCode(t, rec, tc.wantStatus, tc.wantCode)
+		})
+	}
+}
+
+func TestFanMainCardSetupTokenRouteErrors(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name        string
+		path        string
+		body        string
+		service     stubFanUnlockMainService
+		wantCode    string
+		wantStatus  int
+	}{
+		{
+			name:       "invalid request body",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body:       `{`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "invalid short id",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body:       `{"entryToken":"signed-entry-token.payload","fromShortId":"invalid-short","paymentTokenId":"payment-token-1","sessionToken":"card-setup-session-token.payload"}`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing payment token",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body:       `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"   ","sessionToken":"card-setup-session-token.payload"}`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name:       "missing session token",
+			path:       "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body:       `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"payment-token-1","sessionToken":""}`,
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "invalid payment token request",
+			path: "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body: `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"payment-token-1","sessionToken":"card-setup-session-token.payload"}`,
+			service: stubFanUnlockMainService{
+				issueCardSetupToken: func(context.Context, string, fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+					return fanmain.CardSetupTokenResult{}, fanmain.ErrInvalidCardSetupRequest
+				},
+			},
+			wantCode:   "invalid_request",
+			wantStatus: http.StatusBadRequest,
+		},
+		{
+			name: "main locked",
+			path: "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body: `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"payment-token-1","sessionToken":"card-setup-session-token.payload"}`,
+			service: stubFanUnlockMainService{
+				issueCardSetupToken: func(context.Context, string, fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+					return fanmain.CardSetupTokenResult{}, fanmain.ErrMainLocked
+				},
+			},
+			wantCode:   "main_locked",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name: "not found",
+			path: "/api/fan/mains/main_33333333333333333333333333333333/card-setup-token",
+			body: `{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentTokenId":"payment-token-1","sessionToken":"card-setup-session-token.payload"}`,
+			service: stubFanUnlockMainService{
+				issueCardSetupToken: func(context.Context, string, fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+					return fanmain.CardSetupTokenResult{}, fanmain.ErrPurchaseNotFound
+				},
+			},
+			wantCode:   "not_found",
+			wantStatus: http.StatusNotFound,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := newFanUnlockMainRouter(t, tc.service)
+			req := httptest.NewRequest(http.MethodPost, tc.path, strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			assertEnvelopeErrorCode(t, rec, tc.wantStatus, tc.wantCode)
+		})
+	}
+}
+
 func TestFanMainPurchaseRouteReturnsEntryContextForSuccess(t *testing.T) {
 	t.Parallel()
 
@@ -219,7 +517,7 @@ func TestFanMainPurchaseRouteReturnsEntryContextForSuccess(t *testing.T) {
 				t.Fatalf("PurchaseMain() input got %+v session=%q", input, sessionBinding)
 			}
 
-			entryToken := "signed-entry-token"
+			entryToken := validSignedEntryToken
 			return fanmain.PurchaseResult{
 				Access: fanmain.MainAccessState{
 					MainID: mainID,
@@ -238,7 +536,7 @@ func TestFanMainPurchaseRouteReturnsEntryContextForSuccess(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/fan/mains/main_33333333333333333333333333333333/purchase",
-		strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+		strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -274,8 +572,8 @@ func TestFanMainAccessEntryRoute(t *testing.T) {
 			if sessionBinding == "" || input.ViewerID != viewerID || input.MainID != mainID || input.FromShortID != shortID {
 				t.Fatalf("IssueAccessEntry() input got %+v session=%q", input, sessionBinding)
 			}
-			if input.EntryToken != "signed-entry-token" {
-				t.Fatalf("IssueAccessEntry() entry token got %q want %q", input.EntryToken, "signed-entry-token")
+			if input.EntryToken != validSignedEntryToken {
+				t.Fatalf("IssueAccessEntry() entry token got %q want %q", input.EntryToken, validSignedEntryToken)
 			}
 
 			return fanmain.AccessEntryResult{
@@ -288,7 +586,7 @@ func TestFanMainAccessEntryRoute(t *testing.T) {
 	req := httptest.NewRequest(
 		http.MethodPost,
 		"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
-		strings.NewReader(`{"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222"}`),
+		strings.NewReader(`{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -412,7 +710,7 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		req := httptest.NewRequest(
 			http.MethodPost,
 			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
-			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
 		)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -423,6 +721,25 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		if rec.Code != http.StatusBadRequest {
 			t.Fatalf("POST /purchase status got %d want %d", rec.Code, http.StatusBadRequest)
 		}
+	})
+
+	t.Run("purchase invalid entry context payload", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"invalid-short","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertEnvelopeErrorCode(t, rec, http.StatusBadRequest, "invalid_request")
 	})
 
 	t.Run("access entry locked", func(t *testing.T) {
@@ -437,7 +754,7 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		req := httptest.NewRequest(
 			http.MethodPost,
 			"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
-			strings.NewReader(`{"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222"}`),
+			strings.NewReader(`{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`),
 		)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -448,6 +765,25 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		if rec.Code != http.StatusForbidden {
 			t.Fatalf("POST /access-entry status got %d want %d", rec.Code, http.StatusForbidden)
 		}
+	})
+
+	t.Run("access entry invalid entry context payload", func(t *testing.T) {
+		t.Parallel()
+
+		router := newFanUnlockMainRouter(t, stubFanUnlockMainService{})
+
+		req := httptest.NewRequest(
+			http.MethodPost,
+			"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
+			strings.NewReader(`{"entryToken":"invalid","fromShortId":"short_22222222222222222222222222222222"}`),
+		)
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertEnvelopeErrorCode(t, rec, http.StatusBadRequest, "invalid_request")
 	})
 
 	t.Run("playback missing grant", func(t *testing.T) {
@@ -506,7 +842,7 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		req := httptest.NewRequest(
 			http.MethodPost,
 			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
-			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
 		)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -531,7 +867,7 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		req := httptest.NewRequest(
 			http.MethodPost,
 			"/api/fan/mains/main_33333333333333333333333333333333/purchase",
-			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
+			strings.NewReader(`{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}`),
 		)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -556,7 +892,7 @@ func TestFanUnlockMainErrorRoutes(t *testing.T) {
 		req := httptest.NewRequest(
 			http.MethodPost,
 			"/api/fan/mains/main_33333333333333333333333333333333/access-entry",
-			strings.NewReader(`{"entryToken":"signed-entry-token","fromShortId":"short_22222222222222222222222222222222"}`),
+			strings.NewReader(`{"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222"}`),
 		)
 		req.Header.Set("Content-Type", "application/json")
 		req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -771,10 +1107,22 @@ func newFanUnlockMainRouter(t *testing.T, service stubFanUnlockMainService) *gin
 			return fanmain.PurchaseResult{}, nil
 		}
 	}
+	if service.createCardSetupSession == nil {
+		service.createCardSetupSession = func(context.Context, string, fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error) {
+			t.Fatal("CreateCardSetupSession() was called unexpectedly")
+			return fanmain.CardSetupSessionResult{}, nil
+		}
+	}
 	if service.issueAccessEntry == nil {
 		service.issueAccessEntry = func(context.Context, string, fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error) {
 			t.Fatal("IssueAccessEntry() was called unexpectedly")
 			return fanmain.AccessEntryResult{}, nil
+		}
+	}
+	if service.issueCardSetupToken == nil {
+		service.issueCardSetupToken = func(context.Context, string, fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error) {
+			t.Fatal("IssueCardSetupToken() was called unexpectedly")
+			return fanmain.CardSetupTokenResult{}, nil
 		}
 	}
 	if service.getPlaybackSurface == nil {

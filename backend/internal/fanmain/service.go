@@ -47,16 +47,21 @@ type unlockRecorder interface {
 	RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
+type paymentWidgetSessionProvider interface {
+	CreatePaymentWidgetSession(ctx context.Context) (payment.PaymentWidgetSession, error)
+}
+
 // Service は fan unlock / main playback / purchase 導線を扱います。
 type Service struct {
-	feedReader        feedReader
-	mainReader        mainReader
-	unlockRecorder    unlockRecorder
-	paymentRepository paymentRepository
-	purchaseGateway   purchaseGateway
-	now               func() time.Time
-	tokenTTL          time.Duration
-	grantTTL          time.Duration
+	feedReader                 feedReader
+	mainReader                 mainReader
+	unlockRecorder             unlockRecorder
+	paymentRepository          paymentRepository
+	purchaseGateway            purchaseGateway
+	paymentWidgetSessionSource paymentWidgetSessionProvider
+	now                        func() time.Time
+	tokenTTL                   time.Duration
+	grantTTL                   time.Duration
 }
 
 // CreatorSummary は unlock / playback surface で使う creator 表示情報です。
@@ -153,16 +158,31 @@ func NewService(
 	paymentRepository paymentRepository,
 	purchaseGateway purchaseGateway,
 ) *Service {
-	return &Service{
-		feedReader:        feedReader,
-		mainReader:        mainReader,
-		unlockRecorder:    unlockRecorder,
-		paymentRepository: paymentRepository,
-		purchaseGateway:   purchaseGateway,
-		now:               time.Now,
-		tokenTTL:          defaultTokenTTL,
-		grantTTL:          defaultGrantTTL,
+	var paymentWidgetSessionSource paymentWidgetSessionProvider
+	if provider, ok := purchaseGateway.(paymentWidgetSessionProvider); ok {
+		paymentWidgetSessionSource = provider
 	}
+
+	return &Service{
+		feedReader:                 feedReader,
+		mainReader:                 mainReader,
+		unlockRecorder:             unlockRecorder,
+		paymentRepository:          paymentRepository,
+		purchaseGateway:            purchaseGateway,
+		paymentWidgetSessionSource: paymentWidgetSessionSource,
+		now:                        time.Now,
+		tokenTTL:                   defaultTokenTTL,
+		grantTTL:                   defaultGrantTTL,
+	}
+}
+
+func (s *Service) issueEntryToken(sessionBinding string, viewerID uuid.UUID, mainID uuid.UUID, fromShortID uuid.UUID) (string, error) {
+	return issueSignedToken(sessionBinding, s.now().UTC(), s.tokenTTL, signedTokenPayload{
+		Kind:        entryTokenKind,
+		MainID:      mainID,
+		FromShortID: fromShortID,
+		ViewerID:    viewerID,
+	})
 }
 
 // GetUnlockSurface は short 起点の unlock surface を返します。
@@ -195,12 +215,7 @@ func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sess
 		return UnlockSurface{}, err
 	}
 
-	entryToken, err := issueSignedToken(sessionBinding, s.now().UTC(), s.tokenTTL, signedTokenPayload{
-		Kind:        entryTokenKind,
-		MainID:      main.ID,
-		FromShortID: detail.Item.Short.ID,
-		ViewerID:    viewerID,
-	})
+	entryToken, err := s.issueEntryToken(sessionBinding, viewerID, main.ID, detail.Item.Short.ID)
 	if err != nil {
 		return UnlockSurface{}, err
 	}

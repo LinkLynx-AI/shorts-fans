@@ -46,10 +46,16 @@ describe("api short surface builders", () => {
       reason: "unlock_required",
       status: "locked",
     });
+    expect(surface.unlock.entryContext).toEqual({
+      accessEntryPath: "/api/fan/mains/main_33333333333333333333333333333333/access-entry",
+      purchasePath: "/api/fan/mains/main_33333333333333333333333333333333/purchase",
+      token: "disabled-short_22222222222222222222222222222222",
+    });
     expect(surface.unlock.mainAccessEntry).toEqual({
       routePath: "/api/fan/mains/main_33333333333333333333333333333333/access-entry",
       token: "disabled-short_22222222222222222222222222222222",
     });
+    expect(surface.unlock.purchase.state).toBe("purchase_ready");
     expect(surface.viewer).toEqual({
       isFollowingCreator: false,
       isPinned: true,
@@ -93,11 +99,12 @@ describe("api short surface builders", () => {
 
     expect(surface.unlock.access).toEqual({
       mainId: "main_33333333333333333333333333333333",
-      reason: "session_unlocked",
+      reason: "purchased",
       status: "unlocked",
     });
     expect(surface.unlock.main.priceJpy).toBe(0);
     expect(surface.unlock.main.durationSeconds).toBe(16);
+    expect(surface.unlock.purchase.state).toBe("already_purchased");
     expect(surface.mainEntryEnabled).toBe(false);
     expect(surface.viewer).toEqual({
       isFollowingCreator: true,

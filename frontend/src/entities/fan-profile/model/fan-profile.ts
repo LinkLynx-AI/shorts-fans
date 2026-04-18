@@ -40,7 +40,7 @@ export type FanPinnedShortSummary = {
 export type FanLibraryItem = {
   access: {
     mainId: string;
-    reason: "owner_preview" | "session_unlocked";
+    reason: "owner_preview" | "purchased" | "session_unlocked";
     status: "owner" | "unlocked";
   };
   creator: CreatorSummary;
@@ -135,7 +135,7 @@ const libraryItems: readonly FanLibraryItem[] = libraryShortIds.map((shortId) =>
   return {
     access: {
       mainId: main.id,
-      reason: "session_unlocked" as const,
+      reason: "purchased" as const,
       status: "unlocked" as const,
     },
     creator: requireCreator(entryShort.creatorId),

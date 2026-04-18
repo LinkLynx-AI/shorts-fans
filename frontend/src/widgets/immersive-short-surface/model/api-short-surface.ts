@@ -1,6 +1,13 @@
 import type { CreatorSummary } from "@/entities/creator";
 import type { FanFeedItem, PublicShortDetail } from "@/entities/short";
-import { getMockMainAccessRoutePath, type MainAccessState, type UnlockCtaState, type UnlockSurfaceModel } from "@/features/unlock-entry";
+import {
+  getMockMainAccessRoutePath,
+  normalizeUnlockSurface,
+  type MainAccessState,
+  type RawUnlockSurfaceModel,
+  type UnlockCtaState,
+  type UnlockSurfaceModel,
+} from "@/features/unlock-entry";
 
 import type { DetailShortSurface, FeedShortSurface } from "./short-surface";
 
@@ -26,7 +33,7 @@ function buildMainAccessState(mainId: string, unlockCta: UnlockCtaState): MainAc
     case "continue_main":
       return {
         mainId,
-        reason: "session_unlocked",
+        reason: "purchased",
         status: "unlocked",
       };
     default:
@@ -47,26 +54,44 @@ function buildUnlockSurfaceModel({
   short: UnlockSurfaceModel["short"];
   unlockCta: UnlockCtaState;
 }): UnlockSurfaceModel {
-  return {
-    access: buildMainAccessState(short.canonicalMainId, unlockCta),
+  const access = buildMainAccessState(short.canonicalMainId, unlockCta);
+  const purchaseState =
+    unlockCta.state === "owner_preview"
+      ? "owner_preview"
+      : unlockCta.state === "continue_main"
+        ? "already_purchased"
+        : unlockCta.state === "setup_required"
+          ? "setup_required"
+          : "purchase_ready";
+
+  return normalizeUnlockSurface({
+    access,
     creator,
+    entryContext: {
+      accessEntryPath: getMockMainAccessRoutePath(short.canonicalMainId),
+      purchasePath: `/api/fan/mains/${short.canonicalMainId}/purchase`,
+      token: `disabled-${short.id}`,
+    },
     main: {
       durationSeconds: unlockCta.mainDurationSeconds ?? short.previewDurationSeconds,
       id: short.canonicalMainId,
       priceJpy: unlockCta.priceJpy ?? 0,
     },
-    mainAccessEntry: {
-      routePath: getMockMainAccessRoutePath(short.canonicalMainId),
-      token: `disabled-${short.id}`,
-    },
-    setup: {
-      required: unlockCta.state === "setup_required",
-      requiresAgeConfirmation: unlockCta.state === "setup_required",
-      requiresTermsAcceptance: unlockCta.state === "setup_required",
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: unlockCta.state === "setup_required",
+        requiresAgeConfirmation: unlockCta.state === "setup_required",
+        requiresCardSetup: unlockCta.state === "setup_required",
+        requiresTermsAcceptance: unlockCta.state === "setup_required",
+      },
+      state: purchaseState,
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     short,
     unlockCta,
-  };
+  } satisfies RawUnlockSurfaceModel);
 }
 
 function buildShortSurfaceBase(item: Pick<FanFeedItem, "creator" | "short" | "unlockCta">) {

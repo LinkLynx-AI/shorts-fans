@@ -13,7 +13,7 @@ describe("fetchFanProfileLibraryPage", () => {
               {
                 access: {
                   mainId: "main_11111111111111111111111111111111",
-                  reason: "session_unlocked",
+                  reason: "purchased",
                   status: "unlocked",
                 },
                 creator: {
@@ -61,7 +61,7 @@ describe("fetchFanProfileLibraryPage", () => {
         {
           access: {
             mainId: "main_11111111111111111111111111111111",
-            reason: "session_unlocked",
+            reason: "purchased",
             status: "unlocked",
           },
           creator: {
