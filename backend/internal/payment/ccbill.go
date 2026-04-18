@@ -40,15 +40,17 @@ var ErrChargeOutcomeUnknown = errors.New("payment charge outcome is unknown")
 
 // CCBillConfig は CCBill REST API 接続設定です。
 type CCBillConfig struct {
-	BaseURL             string
-	BackendClientID     string
-	BackendClientSecret string
-	ClientAccountNumber int32
-	ClientSubAccount    int32
-	CurrencyCode        int32
-	HTTPTimeout         time.Duration
-	InitialPeriodDays   int32
-	WebhookAllowedCIDRs []string
+	BaseURL              string
+	BackendClientID      string
+	BackendClientSecret  string
+	FrontendClientID     string
+	FrontendClientSecret string
+	ClientAccountNumber  int32
+	ClientSubAccount     int32
+	CurrencyCode         int32
+	HTTPTimeout          time.Duration
+	InitialPeriodDays    int32
+	WebhookAllowedCIDRs  []string
 }
 
 // ChargeInput は payment token charge 実行入力です。
@@ -73,6 +75,15 @@ type ChargeResult struct {
 	ProviderSessionRef       *string
 	ProviderTransactionRef   *string
 	Status                   string
+}
+
+// PaymentWidgetSession は frontend widget 初期化に必要な provider 情報です。
+type PaymentWidgetSession struct {
+	APIBaseURL             string
+	APIKey                 string
+	ClientAccountNumber    int32
+	ClientSubAccountNumber int32
+	InitialPeriodDays      int32
 }
 
 // CCBillClient は CCBill REST API への charge と webhook origin 検証を扱います。
@@ -126,6 +137,12 @@ func NewCCBillClient(cfg CCBillConfig, httpClient *http.Client) (*CCBillClient, 
 	}
 	if strings.TrimSpace(cfg.BackendClientSecret) == "" {
 		return nil, fmt.Errorf("ccbill backend client secret is required")
+	}
+	if strings.TrimSpace(cfg.FrontendClientID) == "" {
+		return nil, fmt.Errorf("ccbill frontend client id is required")
+	}
+	if strings.TrimSpace(cfg.FrontendClientSecret) == "" {
+		return nil, fmt.Errorf("ccbill frontend client secret is required")
 	}
 	if cfg.ClientAccountNumber <= 0 {
 		return nil, fmt.Errorf("ccbill client account number is required")
@@ -181,7 +198,7 @@ func (c *CCBillClient) Charge(ctx context.Context, input ChargeInput) (ChargeRes
 		return ChargeResult{}, fmt.Errorf("ccbill price jpy must be positive")
 	}
 
-	accessToken, err := c.fetchAccessToken(ctx)
+	accessToken, err := c.fetchAccessToken(ctx, c.config.BackendClientID, c.config.BackendClientSecret)
 	if err != nil {
 		return ChargeResult{}, err
 	}
@@ -241,6 +258,26 @@ func (c *CCBillClient) Charge(ctx context.Context, input ChargeInput) (ChargeRes
 	return c.mapChargeResult(chargeResponse), nil
 }
 
+// CreatePaymentWidgetSession は frontend payment widget 用の一時 API key を返します。
+func (c *CCBillClient) CreatePaymentWidgetSession(ctx context.Context) (PaymentWidgetSession, error) {
+	if c == nil {
+		return PaymentWidgetSession{}, fmt.Errorf("ccbill client is required")
+	}
+
+	apiKey, err := c.fetchAccessToken(ctx, c.config.FrontendClientID, c.config.FrontendClientSecret)
+	if err != nil {
+		return PaymentWidgetSession{}, err
+	}
+
+	return PaymentWidgetSession{
+		APIBaseURL:             c.config.BaseURL,
+		APIKey:                 apiKey,
+		ClientAccountNumber:    c.config.ClientAccountNumber,
+		ClientSubAccountNumber: c.config.ClientSubAccount,
+		InitialPeriodDays:      c.config.InitialPeriodDays,
+	}, nil
+}
+
 // ValidateWebhookOrigin は webhook 送信元 IP が許可範囲か検証します。
 func (c *CCBillClient) ValidateWebhookOrigin(remoteIP string) error {
 	if c == nil {
@@ -261,7 +298,7 @@ func (c *CCBillClient) ValidateWebhookOrigin(remoteIP string) error {
 	return fmt.Errorf("%w: remote ip %s", ErrCCBillWebhookOriginRejected, ip.String())
 }
 
-func (c *CCBillClient) fetchAccessToken(ctx context.Context) (string, error) {
+func (c *CCBillClient) fetchAccessToken(ctx context.Context, clientID string, clientSecret string) (string, error) {
 	form := url.Values{}
 	form.Set("grant_type", "client_credentials")
 
@@ -269,7 +306,7 @@ func (c *CCBillClient) fetchAccessToken(ctx context.Context) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("build ccbill oauth request: %w", err)
 	}
-	request.SetBasicAuth(c.config.BackendClientID, c.config.BackendClientSecret)
+	request.SetBasicAuth(clientID, clientSecret)
 	request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	response, err := c.httpClient.Do(request)

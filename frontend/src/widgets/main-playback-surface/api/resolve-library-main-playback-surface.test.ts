@@ -1,5 +1,6 @@
 import { getFanHubState, type FanLibraryItem } from "@/entities/fan-profile";
 import {
+  normalizeUnlockSurface,
   requestMainAccessEntry,
   requestUnlockSurfaceByShortId,
 } from "@/features/unlock-entry";
@@ -29,7 +30,7 @@ function createApiLibraryItem(overrides: Partial<FanLibraryItem> = {}): FanLibra
   return {
     access: {
       mainId: "main_11111111111111111111111111111111",
-      reason: "session_unlocked",
+      reason: "purchased",
       status: "unlocked",
     },
     creator: {
@@ -116,21 +117,46 @@ describe("resolveLibraryMainPlaybackSurface", () => {
       },
     } satisfies Awaited<ReturnType<typeof requestMainPlaybackSurface>>;
 
-    mockedRequestUnlockSurfaceByShortId.mockResolvedValue({
-      main: {
-        id: item.main.id,
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(normalizeUnlockSurface({
+      access: {
+        mainId: item.main.id,
+        reason: "purchased",
+        status: "unlocked",
       },
-      mainAccessEntry: {
-        routePath: `/api/fan/mains/${item.main.id}/access-entry`,
+      creator: item.creator,
+      entryContext: {
+        accessEntryPath: `/api/fan/mains/${item.main.id}/access-entry`,
+        purchasePath: `/api/fan/mains/${item.main.id}/purchase`,
         token: "entry-token",
       },
+      main: {
+        id: item.main.id,
+        durationSeconds: item.main.durationSeconds,
+        priceJpy: 1800,
+      },
+      purchase: {
+        pendingReason: null,
+        savedPaymentMethods: [],
+        setup: {
+          required: false,
+          requiresAgeConfirmation: false,
+          requiresCardSetup: false,
+          requiresTermsAcceptance: false,
+        },
+        state: "already_purchased",
+        supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
+      },
       short: {
+        ...item.entryShort,
         id: item.entryShort.id,
       },
       unlockCta: {
         state: "continue_main",
+        mainDurationSeconds: null,
+        priceJpy: null,
+        resumePositionSeconds: 120,
       },
-    } as Awaited<ReturnType<typeof requestUnlockSurfaceByShortId>>);
+    }));
     mockedRequestMainAccessEntry.mockResolvedValue({
       href: `/mains/${item.main.id}?fromShortId=${item.entryShort.id}&grant=grant-token`,
     });
@@ -144,8 +170,6 @@ describe("resolveLibraryMainPlaybackSurface", () => {
       shortId: item.entryShort.id,
     });
     expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
-      acceptedAge: false,
-      acceptedTerms: false,
       entryToken: "entry-token",
       fromShortId: item.entryShort.id,
       mainId: item.main.id,
@@ -161,21 +185,46 @@ describe("resolveLibraryMainPlaybackSurface", () => {
   it("returns a locked result when the api-backed item still requires setup", async () => {
     const item = createApiLibraryItem();
 
-    mockedRequestUnlockSurfaceByShortId.mockResolvedValue({
-      main: {
-        id: item.main.id,
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(normalizeUnlockSurface({
+      access: {
+        mainId: item.main.id,
+        reason: "unlock_required",
+        status: "locked",
       },
-      mainAccessEntry: {
-        routePath: `/api/fan/mains/${item.main.id}/access-entry`,
+      creator: item.creator,
+      entryContext: {
+        accessEntryPath: `/api/fan/mains/${item.main.id}/access-entry`,
+        purchasePath: `/api/fan/mains/${item.main.id}/purchase`,
         token: "entry-token",
       },
+      main: {
+        id: item.main.id,
+        durationSeconds: item.main.durationSeconds,
+        priceJpy: 1800,
+      },
+      purchase: {
+        pendingReason: null,
+        savedPaymentMethods: [],
+        setup: {
+          required: true,
+          requiresAgeConfirmation: true,
+          requiresCardSetup: true,
+          requiresTermsAcceptance: true,
+        },
+        state: "setup_required",
+        supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
+      },
       short: {
+        ...item.entryShort,
         id: item.entryShort.id,
       },
       unlockCta: {
         state: "setup_required",
+        mainDurationSeconds: item.main.durationSeconds,
+        priceJpy: 1800,
+        resumePositionSeconds: null,
       },
-    } as Awaited<ReturnType<typeof requestUnlockSurfaceByShortId>>);
+    }));
 
     await expect(resolveLibraryMainPlaybackSurface(item)).resolves.toEqual({
       kind: "locked",

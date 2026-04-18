@@ -416,13 +416,15 @@ func newWebhookTestClient(t *testing.T) *CCBillClient {
 	t.Helper()
 
 	client, err := NewCCBillClient(CCBillConfig{
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
-		WebhookAllowedCIDRs: []string{"203.0.113.0/24"},
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
+		WebhookAllowedCIDRs:  []string{"203.0.113.0/24"},
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewCCBillClient() error = %v, want nil", err)

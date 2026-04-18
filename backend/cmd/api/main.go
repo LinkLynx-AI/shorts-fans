@@ -108,14 +108,16 @@ func main() {
 	unlockRepository := unlock.NewRepository(pool)
 	paymentRepository := payment.NewRepository(pool)
 	ccbillClient, err := payment.NewCCBillClient(payment.CCBillConfig{
-		BaseURL:             cfg.CCBillBaseURL,
-		BackendClientID:     cfg.CCBillBackendClientID,
-		BackendClientSecret: cfg.CCBillBackendClientSecret,
-		ClientAccountNumber: cfg.CCBillClientAccountNumber,
-		ClientSubAccount:    cfg.CCBillClientSubAccountNumber,
-		CurrencyCode:        cfg.CCBillCurrencyCode,
-		InitialPeriodDays:   cfg.CCBillInitialPeriodDays,
-		WebhookAllowedCIDRs: cfg.CCBillWebhookAllowedCIDRs,
+		BaseURL:              cfg.CCBillBaseURL,
+		BackendClientID:      cfg.CCBillBackendClientID,
+		BackendClientSecret:  cfg.CCBillBackendClientSecret,
+		FrontendClientID:     cfg.CCBillFrontendClientID,
+		FrontendClientSecret: cfg.CCBillFrontendClientSecret,
+		ClientAccountNumber:  cfg.CCBillClientAccountNumber,
+		ClientSubAccount:     cfg.CCBillClientSubAccountNumber,
+		CurrencyCode:         cfg.CCBillCurrencyCode,
+		InitialPeriodDays:    cfg.CCBillInitialPeriodDays,
+		WebhookAllowedCIDRs:  cfg.CCBillWebhookAllowedCIDRs,
 	}, nil)
 	if err != nil {
 		logger.Error("failed to initialize ccbill client", "error", err)

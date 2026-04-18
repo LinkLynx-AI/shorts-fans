@@ -20,19 +20,27 @@ describe("requestUnlockSurfaceByShortId", () => {
               handle: "@minarei",
               id: "creator_mina_rei",
             },
+            entryContext: {
+              accessEntryPath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+              purchasePath: "/api/fan/mains/main_mina_quiet_rooftop/purchase",
+              token: "signed-token",
+            },
             main: {
               durationSeconds: 480,
               id: "main_mina_quiet_rooftop",
               priceJpy: 1800,
             },
-            mainAccessEntry: {
-              routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
-              token: "signed-token",
-            },
-            setup: {
-              required: true,
-              requiresAgeConfirmation: true,
-              requiresTermsAcceptance: true,
+            purchase: {
+              pendingReason: null,
+              savedPaymentMethods: [],
+              setup: {
+                required: true,
+                requiresAgeConfirmation: true,
+                requiresCardSetup: true,
+                requiresTermsAcceptance: true,
+              },
+              state: "setup_required",
+              supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
             },
             short: {
               caption: "quiet rooftop preview",
@@ -73,9 +81,23 @@ describe("requestUnlockSurfaceByShortId", () => {
         shortId: "short_mina_rooftop",
       }),
     ).resolves.toMatchObject({
+      entryContext: {
+        accessEntryPath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+        purchasePath: "/api/fan/mains/main_mina_quiet_rooftop/purchase",
+        token: "signed-token",
+      },
       mainAccessEntry: {
         routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
         token: "signed-token",
+      },
+      purchase: {
+        state: "setup_required",
+      },
+      setup: {
+        required: true,
+        requiresAgeConfirmation: true,
+        requiresCardSetup: true,
+        requiresTermsAcceptance: true,
       },
       short: {
         id: "short_mina_rooftop",

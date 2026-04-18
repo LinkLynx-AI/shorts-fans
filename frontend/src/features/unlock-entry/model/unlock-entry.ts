@@ -4,7 +4,7 @@ import type { ShortMediaAsset } from "@/entities/short";
 import type { UnlockCtaState } from "./unlock-cta";
 
 export type MainAccessStatus = "locked" | "owner" | "unlocked";
-export type MainAccessReason = "owner_preview" | "session_unlocked" | "unlock_required";
+export type MainAccessReason = "owner_preview" | "purchased" | "session_unlocked" | "unlock_required";
 
 export type MainAccessState = {
   mainId: string;
@@ -12,15 +12,48 @@ export type MainAccessState = {
   status: MainAccessStatus;
 };
 
+export type EntryContext = {
+  accessEntryPath: string;
+  purchasePath: string;
+  token: string;
+};
+
 export type UnlockSetupState = {
   required: boolean;
   requiresAgeConfirmation: boolean;
+  requiresCardSetup: boolean;
   requiresTermsAcceptance: boolean;
 };
 
 export type MainAccessEntry = {
   routePath: string;
   token: string;
+};
+
+export type SupportedCardBrand = "visa" | "mastercard" | "jcb" | "american_express";
+
+export type SavedPaymentMethodSummary = {
+  brand: SupportedCardBrand;
+  last4: string;
+  paymentMethodId: string;
+};
+
+export type UnlockPendingReason = "provider_processing";
+
+export type UnlockPurchaseStateType =
+  | "setup_required"
+  | "purchase_ready"
+  | "purchase_pending"
+  | "already_purchased"
+  | "owner_preview"
+  | "unavailable";
+
+export type UnlockPurchaseState = {
+  pendingReason: UnlockPendingReason | null;
+  savedPaymentMethods: readonly SavedPaymentMethodSummary[];
+  setup: UnlockSetupState;
+  state: UnlockPurchaseStateType;
+  supportedCardBrands: readonly SupportedCardBrand[];
 };
 
 export type UnlockMainSummary = {
@@ -43,12 +76,30 @@ export type MainPlaybackGrantKind = "owner" | "unlocked";
 export type UnlockSurfaceModel = {
   access: MainAccessState;
   creator: CreatorSummary;
+  entryContext: EntryContext;
   mainAccessEntry: MainAccessEntry;
   main: UnlockMainSummary;
+  purchase: UnlockPurchaseState;
   setup: UnlockSetupState;
   short: UnlockShortSummary;
   unlockCta: UnlockCtaState;
 };
+
+export type RawUnlockSurfaceModel = Omit<UnlockSurfaceModel, "mainAccessEntry" | "setup">;
+
+/**
+ * transport payload から互換 alias を含む unlock model を組み立てる。
+ */
+export function normalizeUnlockSurface(raw: RawUnlockSurfaceModel): UnlockSurfaceModel {
+  return {
+    ...raw,
+    mainAccessEntry: {
+      routePath: raw.entryContext.accessEntryPath,
+      token: raw.entryContext.token,
+    },
+    setup: raw.purchase.setup,
+  };
+}
 
 export type UnlockEntryAction = "open_main" | "open_paywall" | "unavailable";
 

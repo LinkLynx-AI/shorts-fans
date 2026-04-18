@@ -1,30 +1,39 @@
 import { viewerSessionCookieName } from "@/entities/viewer";
 import { requestJson } from "@/shared/api";
 
-import { mainAccessEntryResponseSchema } from "./contracts";
+import { mainPurchaseResponseSchema } from "./contracts";
 
-type RequestMainAccessEntryOptions = {
-  acceptedAge?: boolean | undefined;
-  acceptedTerms?: boolean | undefined;
+export type RequestMainPurchaseOptions = {
+  acceptedAge: boolean;
+  acceptedTerms: boolean;
   baseUrl?: string | undefined;
   credentials?: RequestCredentials | undefined;
   entryToken: string;
   fetcher?: typeof fetch | undefined;
   fromShortId: string;
   mainId: string;
-  routePath?: `/${string}` | undefined;
+  paymentMethod:
+    | {
+        mode: "saved_card";
+        paymentMethodId: string;
+      }
+    | {
+        cardSetupToken: string;
+        mode: "new_card";
+      };
+  purchasePath?: `/${string}` | undefined;
   sessionToken?: string | undefined;
   signal?: AbortSignal | undefined;
 };
 
-function buildMainAccessEntryPath(mainId: string): `/${string}` {
-  return `/api/fan/mains/${encodeURIComponent(mainId)}/access-entry`;
+function buildMainPurchasePath(mainId: string): `/${string}` {
+  return `/api/fan/mains/${encodeURIComponent(mainId)}/purchase`;
 }
 
 /**
- * main access entry を発行して playback href を返す。
+ * main purchase を実行し、purchase outcome を返す。
  */
-export async function requestMainAccessEntry({
+export async function requestMainPurchase({
   acceptedAge,
   acceptedTerms,
   baseUrl,
@@ -33,10 +42,11 @@ export async function requestMainAccessEntry({
   fetcher,
   fromShortId,
   mainId,
-  routePath,
+  paymentMethod,
+  purchasePath,
   sessionToken,
   signal,
-}: RequestMainAccessEntryOptions) {
+}: RequestMainPurchaseOptions) {
   const headers = new Headers();
 
   if (sessionToken) {
@@ -48,10 +58,11 @@ export async function requestMainAccessEntry({
     ...(fetcher ? { fetcher } : {}),
     init: {
       body: JSON.stringify({
+        acceptedAge,
+        acceptedTerms,
         entryToken,
         fromShortId,
-        ...(typeof acceptedAge === "boolean" ? { acceptedAge } : {}),
-        ...(typeof acceptedTerms === "boolean" ? { acceptedTerms } : {}),
+        paymentMethod,
       }),
       credentials,
       headers: {
@@ -61,8 +72,8 @@ export async function requestMainAccessEntry({
       method: "POST",
       ...(signal ? { signal } : {}),
     },
-    path: routePath ?? buildMainAccessEntryPath(mainId),
-    schema: mainAccessEntryResponseSchema,
+    path: purchasePath ?? buildMainPurchasePath(mainId),
+    schema: mainPurchaseResponseSchema,
   });
 
   return response.data;

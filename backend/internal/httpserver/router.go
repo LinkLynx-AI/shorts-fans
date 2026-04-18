@@ -89,9 +89,11 @@ type MainDisplayAssetResolver interface {
 
 // FanUnlockMainService は fan unlock / main playback 導線を表します。
 type FanUnlockMainService interface {
+	CreateCardSetupSession(ctx context.Context, sessionBinding string, input fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error)
 	GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error)
 	GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (fanmain.UnlockSurface, error)
 	IssueAccessEntry(ctx context.Context, sessionBinding string, input fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+	IssueCardSetupToken(ctx context.Context, sessionBinding string, input fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error)
 	PurchaseMain(ctx context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
 }
 

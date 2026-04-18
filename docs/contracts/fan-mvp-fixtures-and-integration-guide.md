@@ -39,6 +39,8 @@
    - `DELETE /api/fan/creators/{creatorId}/follow`
 5. `SHO-18`
    - `GET /api/fan/shorts/{shortId}/unlock`
+   - `POST /api/fan/mains/{mainId}/card-setup-session`
+   - `POST /api/fan/mains/{mainId}/card-setup-token`
    - `POST /api/fan/mains/{mainId}/purchase`
    - `POST /api/fan/mains/{mainId}/access-entry`
    - `GET /api/fan/mains/{mainId}/playback`
@@ -88,7 +90,7 @@
 | `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-115` | `creator profile follow CTA` | `fan-creator-follow-api-contract.md` | `follow_success`, `follow_auth_required`, `follow_not_found`, `follow_repeat`, `unfollow_success`, `unfollow_auth_required`, `unfollow_not_found`, `unfollow_repeat` |
-| `SHO-8` | `mini setup / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchase_pending`, `already_purchased`, `owner`, `main_not_unlockable`, `not_found`, `purchase_required`, `auth_required`, `purchase_succeeded`, `purchase_failed_declined`, `purchase_failed_authentication`, `purchase_failed_card_brand_unsupported`, `entry_issued_after_purchase`, `entry_issued_already_purchased`, `entry_issued_owner`, `playback_purchased`, `playback_owner` |
+| `SHO-8` | `mini setup / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchase_pending`, `already_purchased`, `owner`, `main_not_unlockable`, `not_found`, `purchase_required`, `auth_required`, `card_setup_session_issued`, `card_setup_session_main_not_unlockable`, `card_setup_token_issued`, `card_setup_token_main_not_unlockable`, `purchase_succeeded`, `purchase_failed_declined`, `purchase_failed_authentication`, `purchase_failed_card_brand_unsupported`, `entry_issued_after_purchase`, `entry_issued_already_purchased`, `entry_issued_owner`, `playback_purchased`, `playback_owner` |
 | `SHO-7` | `fan profile private hub` | `fan-profile-api-contract.md` | `overview_populated`, `overview_empty`, `following_populated`, `pinned_populated`, `library_populated`, `settings_default` |
 
 - `SHO-6` の creator profile 初回表示では `GET /api/fan/creators/{creatorId}` と `GET /api/fan/creators/{creatorId}/shorts` を並列取得します。
@@ -96,7 +98,7 @@
 - `SHO-169` の shared fan auth modal は primary entry を modal に固定し、auth success 後の behavior は current bootstrap refresh を正とします。
 - `SHO-163` の feed pin CTA は `PUT / DELETE /api/fan/shorts/{shortId}/pin` を使い、success body の `viewer.isPinned` で current surface state を更新できます。
 - `SHO-115` の creator profile follow CTA は `PUT / DELETE /api/fan/creators/{creatorId}/follow` を使い、success body の `viewer.isFollowing` と `stats.fanCount` で header state を更新できます。
-- `SHO-8` の `Unlock` CTA は `GET /api/fan/shorts/{shortId}/unlock` で paywall state を読み、未購入なら `POST /api/fan/mains/{mainId}/purchase`、購入済みまたは owner なら `POST /api/fan/mains/{mainId}/access-entry` を経て main route へ遷移します。
+- `SHO-8` の `Unlock` CTA は `GET /api/fan/shorts/{shortId}/unlock` で paywall state を読みます。`new_card` のときは `POST /api/fan/mains/{mainId}/card-setup-session` で widget 初期化情報と `sessionToken` を取得し、widget が返す `paymentTokenId` と `sessionToken` を `POST /api/fan/mains/{mainId}/card-setup-token` へ渡して opaque token に交換してから `POST /api/fan/mains/{mainId}/purchase` へ進みます。購入済みまたは owner なら `POST /api/fan/mains/{mainId}/access-entry` を経て main route へ遷移します。
 - `SHO-7` の初回表示では `GET /api/fan/profile` で counts を取得し、default tab の `GET /api/fan/profile/pinned-shorts` を別で呼びます。
 - `GET /api/fan/profile/library` は tab を開いた時点で初回 fetch し、以後は cursor を使って scroll 追加取得します。
 - auth viewer の self / session / active mode は app bootstrap 時の global state を正とし、surface payload からは参照しません。

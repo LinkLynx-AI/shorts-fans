@@ -2,6 +2,7 @@ import { viewerSessionCookieName } from "@/entities/viewer";
 import { requestJson } from "@/shared/api";
 
 import { unlockSurfaceResponseSchema } from "./contracts";
+import { normalizeUnlockSurface } from "../model/unlock-entry";
 
 type RequestUnlockSurfaceByShortIdOptions = {
   baseUrl?: string | undefined;
@@ -40,5 +41,5 @@ export async function requestUnlockSurfaceByShortId({
     schema: unlockSurfaceResponseSchema,
   });
 
-  return response.data;
+  return normalizeUnlockSurface(response.data);
 }

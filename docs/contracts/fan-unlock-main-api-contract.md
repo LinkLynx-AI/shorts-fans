@@ -21,6 +21,8 @@
 | method | path | auth | notes |
 | --- | --- | --- | --- |
 | `GET` | `/api/fan/shorts/{shortId}/unlock` | required | paywall を開く前の purchase / access state 読み出し |
+| `POST` | `/api/fan/mains/{mainId}/card-setup-session` | required | `new_card` widget 初期化に必要な frontend credential を返す |
+| `POST` | `/api/fan/mains/{mainId}/card-setup-token` | required | widget が返した provider payment token を app 内の opaque token へ交換する |
 | `POST` | `/api/fan/mains/{mainId}/purchase` | required | card-only one-time purchase を実行し、成功時だけ durable purchase を記録する |
 | `POST` | `/api/fan/mains/{mainId}/access-entry` | required | durable purchase または owner access を検証し、short-lived playback grant を発行する |
 | `GET` | `/api/fan/mains/{mainId}/playback` | required | grant 済み main player 開始用 |
@@ -61,6 +63,19 @@
 | `savedPaymentMethods` | `SavedCardSummary[]` | saved card 一覧。non-card method は返さない |
 | `setup` | `PurchaseSetupState` | purchase 前提条件 |
 | `pendingReason` | `"provider_processing" \| null` | `purchase_pending` のときだけ non-null |
+
+### `CardSetupSession`
+
+| field | type | notes |
+| --- | --- | --- |
+| `apiBaseUrl` | `string` | provider widget API base URL |
+| `apiKey` | `string` | widget 初期化に使う frontend credential。backend secret ではない |
+| `clientAccount` | `string` | provider client account |
+| `subAccount` | `string` | provider sub account |
+| `initialPrice` | `string` | price を widget 初期化向けに文字列化したもの |
+| `initialPeriod` | `string` | widget 初期化で使う period |
+| `currency` | `"JPY"` | MVP では JPY 固定 |
+| `sessionToken` | `string` | current viewer / short / main 文脈に束縛された opaque token。`POST /card-setup-token` へそのまま渡す |
 
 ## Request Contract
 
@@ -106,6 +121,84 @@
 | `main_not_unlockable` | `403` + `main_locked` |
 | `not_found` | `404` + `not_found` |
 
+### `POST /api/fan/mains/{mainId}/card-setup-session`
+
+#### Path
+
+| field | type | required |
+| --- | --- | --- |
+| `mainId` | `string` | yes |
+
+#### Body
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `fromShortId` | `string` | yes | entry context を作った short |
+| `entryToken` | `string` | yes | `GET /api/fan/shorts/{shortId}/unlock` で返した opaque token |
+
+#### Response
+
+- `data`: `CardSetupSession`
+- `meta.page = null`
+
+#### Interpretation Rules
+
+- この endpoint は purchase を実行しません。`new_card` widget の初期化に必要な provider frontend credential だけを返します。
+- `entryToken` は `viewer / short / main` の文脈が一致した場合だけ有効です。invalid token や linked short mismatch では widget session を返しません。
+- `apiKey` は frontend で widget を起動するための短命 credential として扱い、backend secret や purchase success proof と混同しません。
+- `sessionToken` は widget session 発行の事実を current session に閉じて証明する token であり、frontend は widget が返した `paymentTokenId` と組み合わせて `POST /card-setup-token` に渡します。
+- すでに durable purchase 済み、owner preview access を持つ、または purchase が pending の場合は card setup session を返さず `main_locked` を返します。
+
+#### HTTP States
+
+| case | status |
+| --- | --- |
+| widget session issued | `200` |
+| invalid payload | `400` |
+| unauthenticated | `401` + `auth_required` |
+| purchase no longer required / invalid entry context | `403` + `main_locked` |
+| linked short or main not found | `404` + `not_found` |
+
+### `POST /api/fan/mains/{mainId}/card-setup-token`
+
+#### Path
+
+| field | type | required |
+| --- | --- | --- |
+| `mainId` | `string` | yes |
+
+#### Body
+
+| field | type | required | notes |
+| --- | --- | --- | --- |
+| `fromShortId` | `string` | yes | entry context を作った short |
+| `entryToken` | `string` | yes | `GET /api/fan/shorts/{shortId}/unlock` で返した opaque token |
+| `paymentTokenId` | `string` | yes | widget が返した provider payment token |
+| `sessionToken` | `string` | yes | `POST /card-setup-session` が返した opaque token |
+
+#### Response
+
+- `data.cardSetupToken`: `string`
+- `meta.page = null`
+
+#### Interpretation Rules
+
+- `paymentTokenId` は provider widget が返した token であり、この endpoint はそれを app 内の opaque `cardSetupToken` に交換します。
+- `sessionToken` は直前の `POST /card-setup-session` 発行結果に束縛された proof として使い、任意の `paymentTokenId` だけで token 交換できないようにします。
+- frontend は `cardSetupToken` だけを `POST /purchase` に渡し、provider token 自体を purchase contract に直接流し込みません。
+- `cardSetupToken` は current session / viewer / short / main 文脈に束縛された opaque token として扱い、saved card identifier や purchase success proof と混同しません。
+- すでに durable purchase 済み、owner preview access を持つ、または purchase が pending の場合は token 交換を拒否します。
+
+#### HTTP States
+
+| case | status |
+| --- | --- |
+| opaque card setup token issued | `200` |
+| invalid payload | `400` |
+| unauthenticated | `401` + `auth_required` |
+| purchase no longer required / invalid entry context | `403` + `main_locked` |
+| linked short or main not found | `404` + `not_found` |
+
 ### `POST /api/fan/mains/{mainId}/purchase`
 
 #### Path
@@ -124,7 +217,7 @@
 | `acceptedTerms` | `boolean` | yes | `purchase.setup.requiresTermsAcceptance = true` のとき true 必須 |
 | `paymentMethod.mode` | `"saved_card" \| "new_card"` | yes | non-card method は受け付けない |
 | `paymentMethod.paymentMethodId` | `string` | no | `saved_card` のとき必須 |
-| `paymentMethod.cardSetupToken` | `string` | no | `new_card` のとき必須。provider-neutral な opaque token |
+| `paymentMethod.cardSetupToken` | `string` | no | `new_card` のとき必須。`POST /card-setup-token` が返す provider-neutral な opaque token |
 
 #### Response
 
@@ -236,6 +329,8 @@
 | endpoint | not purchased | purchase pending | purchased | owner | not_found |
 | --- | --- | --- | --- | --- | --- |
 | `GET /api/fan/shorts/{shortId}/unlock` | yes | yes | yes | yes | yes |
+| `POST /api/fan/mains/{mainId}/card-setup-session` | yes | no | no | no | yes |
+| `POST /api/fan/mains/{mainId}/card-setup-token` | yes | no | no | no | yes |
 | `POST /api/fan/mains/{mainId}/purchase` | yes | yes | yes | yes | yes |
 | `POST /api/fan/mains/{mainId}/access-entry` | yes | no | yes | yes | yes |
 | `GET /api/fan/mains/{mainId}/playback` | yes | no | yes | yes | yes |

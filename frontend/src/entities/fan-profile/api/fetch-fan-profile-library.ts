@@ -14,7 +14,7 @@ import {
 
 const mainAccessStateSchema = z.object({
   mainId: z.string().min(1),
-  reason: z.enum(["owner_preview", "session_unlocked"]),
+  reason: z.enum(["owner_preview", "purchased", "session_unlocked"]),
   status: z.enum(["owner", "unlocked"]),
 });
 
