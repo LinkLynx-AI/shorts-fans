@@ -344,6 +344,30 @@ type AppShort struct {
 	Caption              pgtype.Text
 }
 
+type AppSubmissionReviewIntake struct {
+	ID                 pgtype.UUID
+	CanonicalMainID    pgtype.UUID
+	CreatorUserID      pgtype.UUID
+	Status             string
+	SubmitKind         string
+	PreviousIntakeID   pgtype.UUID
+	MainMediaAssetID   pgtype.UUID
+	MainPriceMinor     int64
+	OwnershipConfirmed bool
+	ConsentConfirmed   bool
+	SubmittedAt        pgtype.Timestamptz
+	CreatedAt          pgtype.Timestamptz
+	UpdatedAt          pgtype.Timestamptz
+}
+
+type AppSubmissionReviewIntakeShort struct {
+	SubmissionReviewIntakeID pgtype.UUID
+	ShortID                  pgtype.UUID
+	MediaAssetID             pgtype.UUID
+	Caption                  pgtype.Text
+	CreatedAt                pgtype.Timestamptz
+}
+
 type AppUnlockableMain struct {
 	ID                  pgtype.UUID
 	CreatorUserID       pgtype.UUID

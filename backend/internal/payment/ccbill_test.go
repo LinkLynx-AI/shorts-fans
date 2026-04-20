@@ -55,13 +55,15 @@ func TestCCBillClientCharge(t *testing.T) {
 	defer server.Close()
 
 	client, err := NewCCBillClient(CCBillConfig{
-		BaseURL:             server.URL,
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
+		BaseURL:              server.URL,
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -166,13 +168,15 @@ func TestCCBillClientChargeMapsPendingAndFailedResults(t *testing.T) {
 			defer server.Close()
 
 			client, err := NewCCBillClient(CCBillConfig{
-				BaseURL:             server.URL,
-				BackendClientID:     "backend-id",
-				BackendClientSecret: "backend-secret",
-				ClientAccountNumber: 900100,
-				ClientSubAccount:    1,
-				CurrencyCode:        392,
-				InitialPeriodDays:   30,
+				BaseURL:              server.URL,
+				BackendClientID:      "backend-id",
+				BackendClientSecret:  "backend-secret",
+				FrontendClientID:     "frontend-id",
+				FrontendClientSecret: "frontend-secret",
+				ClientAccountNumber:  900100,
+				ClientSubAccount:     1,
+				CurrencyCode:         392,
+				InitialPeriodDays:    30,
 			}, nil)
 			if err != nil {
 				t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -206,13 +210,15 @@ func TestCCBillClientValidateWebhookOrigin(t *testing.T) {
 	t.Parallel()
 
 	client, err := NewCCBillClient(CCBillConfig{
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
-		WebhookAllowedCIDRs: []string{"203.0.113.0/24"},
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
+		WebhookAllowedCIDRs:  []string{"203.0.113.0/24"},
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -247,24 +253,28 @@ func TestNewCCBillClientValidationAndDefaults(t *testing.T) {
 		t.Fatal("NewCCBillClient() error = nil, want validation error")
 	}
 	if _, err := NewCCBillClient(CCBillConfig{
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
-		WebhookAllowedCIDRs: []string{"invalid-cidr"},
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
+		WebhookAllowedCIDRs:  []string{"invalid-cidr"},
 	}, nil); err == nil {
 		t.Fatal("NewCCBillClient() invalid cidr error = nil, want error")
 	}
 
 	client, err := NewCCBillClient(CCBillConfig{
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -284,12 +294,14 @@ func TestCCBillClientChargeErrors(t *testing.T) {
 		t.Parallel()
 
 		client, err := NewCCBillClient(CCBillConfig{
-			BackendClientID:     "backend-id",
-			BackendClientSecret: "backend-secret",
-			ClientAccountNumber: 900100,
-			ClientSubAccount:    1,
-			CurrencyCode:        392,
-			InitialPeriodDays:   30,
+			BackendClientID:      "backend-id",
+			BackendClientSecret:  "backend-secret",
+			FrontendClientID:     "frontend-id",
+			FrontendClientSecret: "frontend-secret",
+			ClientAccountNumber:  900100,
+			ClientSubAccount:     1,
+			CurrencyCode:         392,
+			InitialPeriodDays:    30,
 		}, nil)
 		if err != nil {
 			t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -318,13 +330,15 @@ func TestCCBillClientChargeErrors(t *testing.T) {
 		defer server.Close()
 
 		client, err := NewCCBillClient(CCBillConfig{
-			BaseURL:             server.URL,
-			BackendClientID:     "backend-id",
-			BackendClientSecret: "backend-secret",
-			ClientAccountNumber: 900100,
-			ClientSubAccount:    1,
-			CurrencyCode:        392,
-			InitialPeriodDays:   30,
+			BaseURL:              server.URL,
+			BackendClientID:      "backend-id",
+			BackendClientSecret:  "backend-secret",
+			FrontendClientID:     "frontend-id",
+			FrontendClientSecret: "frontend-secret",
+			ClientAccountNumber:  900100,
+			ClientSubAccount:     1,
+			CurrencyCode:         392,
+			InitialPeriodDays:    30,
 		}, nil)
 		if err != nil {
 			t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -356,13 +370,15 @@ func TestCCBillClientChargeErrors(t *testing.T) {
 		defer server.Close()
 
 		client, err := NewCCBillClient(CCBillConfig{
-			BaseURL:             server.URL,
-			BackendClientID:     "backend-id",
-			BackendClientSecret: "backend-secret",
-			ClientAccountNumber: 900100,
-			ClientSubAccount:    1,
-			CurrencyCode:        392,
-			InitialPeriodDays:   30,
+			BaseURL:              server.URL,
+			BackendClientID:      "backend-id",
+			BackendClientSecret:  "backend-secret",
+			FrontendClientID:     "frontend-id",
+			FrontendClientSecret: "frontend-secret",
+			ClientAccountNumber:  900100,
+			ClientSubAccount:     1,
+			CurrencyCode:         392,
+			InitialPeriodDays:    30,
 		}, nil)
 		if err != nil {
 			t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -401,13 +417,15 @@ func TestCCBillClientChargeErrors(t *testing.T) {
 		defer server.Close()
 
 		client, err := NewCCBillClient(CCBillConfig{
-			BaseURL:             server.URL,
-			BackendClientID:     "backend-id",
-			BackendClientSecret: "backend-secret",
-			ClientAccountNumber: 900100,
-			ClientSubAccount:    1,
-			CurrencyCode:        392,
-			InitialPeriodDays:   30,
+			BaseURL:              server.URL,
+			BackendClientID:      "backend-id",
+			BackendClientSecret:  "backend-secret",
+			FrontendClientID:     "frontend-id",
+			FrontendClientSecret: "frontend-secret",
+			ClientAccountNumber:  900100,
+			ClientSubAccount:     1,
+			CurrencyCode:         392,
+			InitialPeriodDays:    30,
 		}, nil)
 		if err != nil {
 			t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -453,12 +471,14 @@ func TestCCBillClientAdditionalHelpers(t *testing.T) {
 	t.Parallel()
 
 	client, err := NewCCBillClient(CCBillConfig{
-		BackendClientID:     "backend-id",
-		BackendClientSecret: "backend-secret",
-		ClientAccountNumber: 900100,
-		ClientSubAccount:    1,
-		CurrencyCode:        392,
-		InitialPeriodDays:   30,
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
 	}, nil)
 	if err != nil {
 		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
@@ -502,5 +522,50 @@ func TestCCBillClientAdditionalHelpers(t *testing.T) {
 				t.Fatalf("stringFromAny(%T) got %q want %q", tt.value, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCCBillClientCreatePaymentWidgetSession(t *testing.T) {
+	t.Parallel()
+
+	var tokenRequestAuth string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != ccbillOAuthTokenPath {
+			t.Fatalf("unexpected path %q", r.URL.Path)
+		}
+
+		tokenRequestAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"frontend-token"}`))
+	}))
+	defer server.Close()
+
+	client, err := NewCCBillClient(CCBillConfig{
+		BaseURL:              server.URL,
+		BackendClientID:      "backend-id",
+		BackendClientSecret:  "backend-secret",
+		FrontendClientID:     "frontend-id",
+		FrontendClientSecret: "frontend-secret",
+		ClientAccountNumber:  900100,
+		ClientSubAccount:     1,
+		CurrencyCode:         392,
+		InitialPeriodDays:    30,
+	}, nil)
+	if err != nil {
+		t.Fatalf("NewCCBillClient() error = %v, want nil", err)
+	}
+
+	session, err := client.CreatePaymentWidgetSession(context.Background())
+	if err != nil {
+		t.Fatalf("CreatePaymentWidgetSession() error = %v, want nil", err)
+	}
+	if tokenRequestAuth != "Basic "+base64.StdEncoding.EncodeToString([]byte("frontend-id:frontend-secret")) {
+		t.Fatalf("oauth Authorization header got %q", tokenRequestAuth)
+	}
+	if session.APIKey != "frontend-token" {
+		t.Fatalf("CreatePaymentWidgetSession() apiKey got %q want %q", session.APIKey, "frontend-token")
+	}
+	if session.ClientAccountNumber != 900100 || session.ClientSubAccountNumber != 1 || session.InitialPeriodDays != 30 {
+		t.Fatalf("CreatePaymentWidgetSession() session got %#v", session)
 	}
 }

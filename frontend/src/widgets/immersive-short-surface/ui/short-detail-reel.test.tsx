@@ -109,9 +109,27 @@ function createInitialSurface(shortId: string): DetailShortSurface {
         routePath: `/api/fan/mains/main_${shortId}/access-entry`,
         token: `token_${shortId}`,
       },
+      entryContext: {
+        accessEntryPath: `/api/fan/mains/main_${shortId}/access-entry`,
+        purchasePath: `/api/fan/mains/main_${shortId}/purchase`,
+        token: `token_${shortId}`,
+      },
+      purchase: {
+        pendingReason: null,
+        savedPaymentMethods: [],
+        setup: {
+          required: false,
+          requiresAgeConfirmation: false,
+          requiresCardSetup: false,
+          requiresTermsAcceptance: false,
+        },
+        state: "purchase_ready",
+        supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
+      },
       setup: {
         required: false,
         requiresAgeConfirmation: false,
+        requiresCardSetup: false,
         requiresTermsAcceptance: false,
       },
       short: {

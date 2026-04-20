@@ -14,21 +14,23 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 const (
-	creatorWorkspaceAuthRequiredMessage         = "creator workspace requires authentication"
-	creatorWorkspaceMainDetailRequestScope      = "creator_workspace_main_preview_detail"
-	creatorWorkspaceMainListRequestScope        = "creator_workspace_mains"
-	creatorWorkspaceRequestScope                = "creator_workspace"
-	creatorWorkspaceProfileUpdateRequestScope   = "creator_workspace_profile_update"
-	creatorWorkspaceShortCaptionPutRequestScope = "creator_workspace_short_caption_put"
-	creatorWorkspaceMainPriceUpdateRequestScope = "creator_workspace_main_price_update"
-	creatorWorkspaceShortDetailRequestScope     = "creator_workspace_short_preview_detail"
-	creatorWorkspaceShortListRequestScope       = "creator_workspace_shorts"
-	creatorWorkspaceTopPerformersScope          = "creator_workspace_top_performers"
+	creatorWorkspaceAuthRequiredMessage          = "creator workspace requires authentication"
+	creatorWorkspaceMainDetailRequestScope       = "creator_workspace_main_preview_detail"
+	creatorWorkspaceMainListRequestScope         = "creator_workspace_mains"
+	creatorWorkspaceRequestScope                 = "creator_workspace"
+	creatorWorkspaceProfileUpdateRequestScope    = "creator_workspace_profile_update"
+	creatorWorkspaceShortCaptionPutRequestScope  = "creator_workspace_short_caption_put"
+	creatorWorkspaceMainPriceUpdateRequestScope  = "creator_workspace_main_price_update"
+	creatorWorkspaceSubmissionReviewRequestScope = "creator_workspace_submission_review_post"
+	creatorWorkspaceShortDetailRequestScope      = "creator_workspace_short_preview_detail"
+	creatorWorkspaceShortListRequestScope        = "creator_workspace_shorts"
+	creatorWorkspaceTopPerformersScope           = "creator_workspace_top_performers"
 )
 
 type creatorWorkspaceResponseData struct {
@@ -190,6 +192,7 @@ func registerCreatorWorkspaceRoutes(
 	router gin.IRouter,
 	reader CreatorWorkspaceReader,
 	mainPriceWriter CreatorWorkspaceMainPriceWriter,
+	submissionReviewWriter CreatorWorkspaceSubmissionReviewWriter,
 	profileWriter CreatorWorkspaceProfileWriter,
 	avatarUploads ViewerCreatorAvatarUploadHandler,
 	shortCaptionWriter CreatorWorkspaceShortCaptionWriter,
@@ -250,6 +253,16 @@ func registerCreatorWorkspaceRoutes(
 			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainPriceUpdateRequestScope, creatorWorkspaceAuthRequiredMessage),
 			func(c *gin.Context) {
 				handleCreatorWorkspaceMainPriceUpdate(c, mainPriceWriter)
+			},
+		)
+	}
+
+	if submissionReviewWriter != nil {
+		router.POST(
+			"/api/creator/workspace/mains/:mainId/review-submissions",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceSubmissionReviewRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceSubmissionReviewCreate(c, submissionReviewWriter)
 			},
 		)
 	}
@@ -676,6 +689,87 @@ func handleCreatorWorkspaceMainPriceUpdate(c *gin.Context, writer CreatorWorkspa
 		},
 		Error: nil,
 	})
+}
+
+func handleCreatorWorkspaceSubmissionReviewCreate(c *gin.Context, writer CreatorWorkspaceSubmissionReviewWriter) {
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceSubmissionReviewRequestScope,
+			http.StatusInternalServerError,
+			"internal_error",
+			"creator workspace submission review could not be created",
+		)
+		return
+	}
+
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeCreatorWorkspaceMutationError(
+			c,
+			creatorWorkspaceSubmissionReviewRequestScope,
+			http.StatusNotFound,
+			"not_found",
+			"creator workspace submission package was not found",
+		)
+		return
+	}
+
+	if err := writer.SubmitPackage(c.Request.Context(), viewerUserID, mainID); err != nil {
+		switch {
+		case errors.Is(err, submissionreview.ErrCreatorModeUnavailable):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceSubmissionReviewRequestScope,
+				http.StatusForbidden,
+				"creator_mode_unavailable",
+				"creator mode is not available",
+			)
+			return
+		case errors.Is(err, submissionreview.ErrSubmissionPackageNotFound):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceSubmissionReviewRequestScope,
+				http.StatusNotFound,
+				"not_found",
+				"creator workspace submission package was not found",
+			)
+			return
+		case errors.Is(err, submissionreview.ErrReviewStateConflict):
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceSubmissionReviewRequestScope,
+				http.StatusConflict,
+				"review_state_conflict",
+				"creator workspace submission package could not be submitted from the current review state",
+			)
+			return
+		default:
+			var notReadyErr *submissionreview.NotReadyError
+			if errors.As(err, &notReadyErr) {
+				writeCreatorWorkspaceMutationError(
+					c,
+					creatorWorkspaceSubmissionReviewRequestScope,
+					http.StatusUnprocessableEntity,
+					"submission_not_ready",
+					"creator workspace submission package is not ready",
+				)
+				return
+			}
+
+			writeCreatorWorkspaceMutationError(
+				c,
+				creatorWorkspaceSubmissionReviewRequestScope,
+				http.StatusInternalServerError,
+				"internal_error",
+				"creator workspace submission review could not be created",
+			)
+			return
+		}
+	}
+
+	c.Status(http.StatusNoContent)
 }
 
 func parseCreatorWorkspaceMainPriceJpy(raw json.RawMessage) (int64, error) {

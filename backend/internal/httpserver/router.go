@@ -58,6 +58,11 @@ type CreatorWorkspaceMainPriceWriter interface {
 	UpdateWorkspaceMainPrice(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID, priceJpy int64) (creator.WorkspaceMainPrice, error)
 }
 
+// CreatorWorkspaceSubmissionReviewWriter は creator workspace review submit mutation を表します。
+type CreatorWorkspaceSubmissionReviewWriter interface {
+	SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) error
+}
+
 // CreatorWorkspaceProfileWriter は creator workspace profile mutation を表します。
 type CreatorWorkspaceProfileWriter interface {
 	GetProfile(ctx context.Context, userID uuid.UUID) (viewerprofile.Profile, error)
@@ -105,9 +110,11 @@ type MainDisplayAssetResolver interface {
 
 // FanUnlockMainService は fan unlock / main playback 導線を表します。
 type FanUnlockMainService interface {
+	CreateCardSetupSession(ctx context.Context, sessionBinding string, input fanmain.CardSetupSessionInput) (fanmain.CardSetupSessionResult, error)
 	GetPlaybackSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, mainID uuid.UUID, fromShortID uuid.UUID, grantToken string) (fanmain.PlaybackSurface, error)
 	GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sessionBinding string, shortID uuid.UUID) (fanmain.UnlockSurface, error)
 	IssueAccessEntry(ctx context.Context, sessionBinding string, input fanmain.AccessEntryInput) (fanmain.AccessEntryResult, error)
+	IssueCardSetupToken(ctx context.Context, sessionBinding string, input fanmain.CardSetupTokenInput) (fanmain.CardSetupTokenResult, error)
 	PurchaseMain(ctx context.Context, sessionBinding string, input fanmain.PurchaseInput) (fanmain.PurchaseResult, error)
 }
 
@@ -199,40 +206,41 @@ type FanProfileLibraryReader interface {
 
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
-	AppEnv                       string
-	AdminCreatorReview           AdminCreatorReviewService
-	CreatorSearch                CreatorSearchReader
-	CreatorWorkspace             CreatorWorkspaceReader
-	CreatorWorkspaceMainPrice    CreatorWorkspaceMainPriceWriter
-	CreatorWorkspaceProfile      CreatorWorkspaceProfileWriter
-	CreatorWorkspaceShortCaption CreatorWorkspaceShortCaptionWriter
-	CreatorUpload                CreatorUploadHandler
-	CreatorProfile               CreatorProfileReader
-	CreatorProfileShorts         CreatorProfileShortsReader
-	FanFeed                      FanFeedReader
-	FanFeedCursorCodec           FanFeedCursorCodec
-	RecommendationSignalExposure RecommendationSignalExposureStore
-	RecommendationSignals        RecommendationSignalWriter
-	FanUnlockMain                FanUnlockMainService
-	FanShortPin                  FanShortPinWriter
-	CreatorFollow                CreatorFollowWriter
-	CreatorAvatarUpload          ViewerCreatorAvatarUploadHandler
-	CreatorRegistration          ViewerCreatorRegistrationService
-	CreatorRegistrationEvidence  ViewerCreatorRegistrationEvidenceUploadHandler
-	CCBillWebhook                PaymentWebhookHandler
-	FanProfileLibrary            FanProfileLibraryReader
-	FanProfileFollowing          FanProfileFollowingReader
-	FanProfilePinnedShorts       FanProfilePinnedShortsReader
-	FanProfileOverview           FanProfileOverviewReader
-	ViewerProfile                ViewerProfileReader
-	ViewerProfileWriter          ViewerProfileWriter
-	FanAuth                      FanAuthService
-	AuthCookie                   AuthCookieConfig
-	ShortDisplayAssets           ShortDisplayAssetResolver
-	MainDisplayAssets            MainDisplayAssetResolver
-	ViewerActiveMode             ViewerActiveModeSwitcher
-	ViewerBootstrap              ViewerBootstrapReader
-	Dependencies                 []Dependency
+	AppEnv                           string
+	AdminCreatorReview               AdminCreatorReviewService
+	CreatorSearch                    CreatorSearchReader
+	CreatorWorkspace                 CreatorWorkspaceReader
+	CreatorWorkspaceMainPrice        CreatorWorkspaceMainPriceWriter
+	CreatorWorkspaceSubmissionReview CreatorWorkspaceSubmissionReviewWriter
+	CreatorWorkspaceProfile          CreatorWorkspaceProfileWriter
+	CreatorWorkspaceShortCaption     CreatorWorkspaceShortCaptionWriter
+	CreatorUpload                    CreatorUploadHandler
+	CreatorProfile                   CreatorProfileReader
+	CreatorProfileShorts             CreatorProfileShortsReader
+	FanFeed                          FanFeedReader
+	FanFeedCursorCodec               FanFeedCursorCodec
+	RecommendationSignalExposure     RecommendationSignalExposureStore
+	RecommendationSignals            RecommendationSignalWriter
+	FanUnlockMain                    FanUnlockMainService
+	FanShortPin                      FanShortPinWriter
+	CreatorFollow                    CreatorFollowWriter
+	CreatorAvatarUpload              ViewerCreatorAvatarUploadHandler
+	CreatorRegistration              ViewerCreatorRegistrationService
+	CreatorRegistrationEvidence      ViewerCreatorRegistrationEvidenceUploadHandler
+	CCBillWebhook                    PaymentWebhookHandler
+	FanProfileLibrary                FanProfileLibraryReader
+	FanProfileFollowing              FanProfileFollowingReader
+	FanProfilePinnedShorts           FanProfilePinnedShortsReader
+	FanProfileOverview               FanProfileOverviewReader
+	ViewerProfile                    ViewerProfileReader
+	ViewerProfileWriter              ViewerProfileWriter
+	FanAuth                          FanAuthService
+	AuthCookie                       AuthCookieConfig
+	ShortDisplayAssets               ShortDisplayAssetResolver
+	MainDisplayAssets                MainDisplayAssetResolver
+	ViewerActiveMode                 ViewerActiveModeSwitcher
+	ViewerBootstrap                  ViewerBootstrapReader
+	Dependencies                     []Dependency
 }
 
 // Config は HTTP サーバーの実行設定を表します。
@@ -302,6 +310,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		router,
 		config.CreatorWorkspace,
 		config.CreatorWorkspaceMainPrice,
+		config.CreatorWorkspaceSubmissionReview,
 		config.CreatorWorkspaceProfile,
 		config.CreatorAvatarUpload,
 		config.CreatorWorkspaceShortCaption,

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -19,17 +19,10 @@ import {
   type CreatorProfileRouteOrigin,
 } from "@/features/creator-navigation";
 import {
-  isAuthRequiredApiError,
-  isAuthRequiredResponse,
-  isFreshAuthRequiredApiError,
-  isFreshAuthRequiredResponse,
   useFanAuthDialogControls,
 } from "@/features/fan-auth";
 import {
-  getUnlockEntryAction,
-  requestMainAccessEntry,
-  requestUnlockSurfaceByShortId,
-  type UnlockSurfaceModel,
+  useUnlockPaywallController,
   UnlockCta,
   UnlockPaywallDialog,
 } from "@/features/unlock-entry";
@@ -121,21 +114,6 @@ function calculatePlaybackProgress(currentTime: number, duration: number) {
   }
 
   return clampPlaybackProgress(currentTime / duration);
-}
-
-function buildUnlockStateKey(unlock: UnlockSurfaceModel): string {
-  return [
-    unlock.short.id,
-    unlock.main.id,
-    unlock.access.status,
-    unlock.access.reason,
-    unlock.unlockCta.state,
-    unlock.mainAccessEntry.routePath,
-    unlock.mainAccessEntry.token,
-    unlock.setup.required ? "setup-required" : "setup-optional",
-    unlock.setup.requiresAgeConfirmation ? "age-required" : "age-optional",
-    unlock.setup.requiresTermsAcceptance ? "terms-required" : "terms-optional",
-  ].join("::");
 }
 
 export type ImmersiveShortSurfaceProps =
@@ -575,6 +553,10 @@ function FeedCreatorBlock({
  * `feed` と `short detail` で共有する immersive short surface を表示する。
  */
 export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
+  const [feedPlaybackProgressState, setFeedPlaybackProgressState] = useState({
+    mediaId: props.surface.short.media.id,
+    progress: 0,
+  });
   const currentViewer = useCurrentViewer();
   const hasViewerSession = useHasViewerSession();
   const router = useRouter();
@@ -583,21 +565,9 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { creator, short, unlock, viewer } = surface;
   const viewerIdentityKey = currentViewer?.id ?? null;
   const usesApiBackedUnlockFlow = short.id.startsWith("short_");
-  const [isHydrated, setIsHydrated] = useState(false);
-  const [acceptAge, setAcceptAge] = useState(false);
-  const [acceptTerms, setAcceptTerms] = useState(false);
-  const [feedPlaybackProgress, setFeedPlaybackProgress] = useState(0);
-  const [isPaywallOpen, setIsPaywallOpen] = useState(false);
   const [isRecommendationSurfaceReady, setIsRecommendationSurfaceReady] = useState(
     () => viewerIdentityKey !== null || !usesApiBackedUnlockFlow,
   );
-  const [isSubmittingMainAccess, setIsSubmittingMainAccess] = useState(false);
-  const [resolvedUnlockState, setResolvedUnlockState] = useState<{
-    baseUnlockKey: string;
-    shortId: string;
-    viewerIdentityKey: string | null;
-    unlock: UnlockSurfaceModel;
-  } | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const detailPresentation = mode === "detail" ? props.presentation ?? "default" : "default";
   const usesFeedPresentation = mode === "feed" || detailPresentation === "feedLike";
@@ -609,19 +579,12 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const isActive = props.isActive ?? true;
   const pinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : detailPinState.errorMessage;
   const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : detailPinState.isPinned;
-  const propUnlockKey = buildUnlockStateKey(unlock);
+  const feedPlaybackProgress =
+    feedPlaybackProgressState.mediaId === short.media.id ? feedPlaybackProgressState.progress : 0;
   const previousViewerIdentityKeyRef = useRef<string | null>(viewerIdentityKey);
   const pendingRecommendationPrimeViewerIDRef = useRef<string | null>(null);
   const pendingRecommendationMainClickAfterAuthRef = useRef(false);
   const recommendationPrimeRequestKeyRef = useRef(0);
-  const resolvedUnlock =
-    resolvedUnlockState?.shortId === short.id &&
-    resolvedUnlockState.baseUnlockKey === propUnlockKey &&
-    resolvedUnlockState.viewerIdentityKey === viewerIdentityKey
-      ? resolvedUnlockState.unlock
-      : null;
-  const activeUnlock = resolvedUnlock ?? unlock;
-  const unlockAction = getUnlockEntryAction(activeUnlock);
   const surfaceStyle = usesFeedPresentation ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
     mode === "feed"
@@ -644,56 +607,6 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     viewerId: currentViewer?.id ?? null,
   });
 
-  const closePaywall = () => {
-    setIsPaywallOpen(false);
-  };
-
-  const resetPaywallSelections = () => {
-    setAcceptAge(false);
-    setAcceptTerms(false);
-  };
-
-  const resetPaywallState = () => {
-    resetPaywallSelections();
-    closePaywall();
-  };
-
-  const storeResolvedUnlock = (
-    nextUnlock: UnlockSurfaceModel,
-    resolvedViewerIdentityKey: string | null,
-  ) => {
-    setResolvedUnlockState({
-      baseUnlockKey: propUnlockKey,
-      shortId: short.id,
-      viewerIdentityKey: resolvedViewerIdentityKey,
-      unlock: nextUnlock,
-    });
-  };
-
-  const resolveUnlockSurfaceAfterAuth = async ({
-    resolvedViewerIdentityKey,
-  }: {
-    resolvedViewerIdentityKey: string | null;
-  }) => {
-    if (!usesApiBackedUnlockFlow) {
-      return null;
-    }
-
-    const nextUnlock = await requestUnlockSurfaceByShortId({
-      shortId: short.id,
-    });
-
-    storeResolvedUnlock(nextUnlock, resolvedViewerIdentityKey);
-
-    return nextUnlock;
-  };
-
-  const shouldOpenPaywallForUnlock = (targetUnlock: UnlockSurfaceModel) => {
-    const targetAction = getUnlockEntryAction(targetUnlock);
-
-    return targetAction === "open_paywall" || (usesFeedPresentation && targetUnlock.unlockCta.state === "unlock_available");
-  };
-
   const prepareRecommendationSurfaceAfterAuth = useCallback((nextViewerIdentityKey: string | null) => {
     if (!usesApiBackedUnlockFlow || nextViewerIdentityKey === null) {
       return;
@@ -703,7 +616,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     setIsRecommendationSurfaceReady(false);
   }, [usesApiBackedUnlockFlow]);
 
-  const primeRecommendationSurfaceForViewer = useCallback(async (nextViewerIdentityKey: string) => {
+  const primeRecommendationSurfaceForViewer = useEffectEvent(async (nextViewerIdentityKey: string) => {
     if (!usesApiBackedUnlockFlow) {
       setIsRecommendationSurfaceReady(true);
       return;
@@ -728,101 +641,96 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     }
 
     setIsRecommendationSurfaceReady(true);
-  }, [currentViewer?.id, short.id, usesApiBackedUnlockFlow]);
+  });
 
-  const restoreUnlockSurfaceAfterAuth = async ({
-    preservePaywallSelections,
-    restoredViewer,
-    targetUnlock,
+  const openUnlockAuthDialog = ({
+    onAfterAuthenticated,
   }: {
-    preservePaywallSelections: boolean;
-    restoredViewer?: {
-      id: string;
-    } | null | undefined;
-    targetUnlock: UnlockSurfaceModel;
+    onAfterAuthenticated?: ((restoredViewer: { id: string } | null | undefined) => Promise<void> | void) | undefined;
   }) => {
-    let unlockAfterAuth = targetUnlock;
-    const restoredViewerIdentityKey = restoredViewer?.id ?? null;
-
-    if (restoredViewerIdentityKey !== null && viewerIdentityKey !== restoredViewerIdentityKey) {
-      prepareRecommendationSurfaceAfterAuth(restoredViewerIdentityKey);
-    }
-
-    if (usesApiBackedUnlockFlow) {
-      const nextUnlock = await resolveUnlockSurfaceAfterAuth({
-        resolvedViewerIdentityKey: restoredViewerIdentityKey,
-      });
-      if (nextUnlock) {
-        unlockAfterAuth = nextUnlock;
-      }
-    }
-
-    const shouldRestorePaywall = shouldOpenPaywallForUnlock(unlockAfterAuth);
-
-    if (!preservePaywallSelections) {
-      resetPaywallSelections();
-    }
-
-    closePaywall();
-
-    if (shouldRestorePaywall) {
-      setIsPaywallOpen(true);
-    }
-  };
-
-  const openReAuthDialog = ({
-    preservePaywallSelections = isPaywallOpen,
-    targetUnlock = activeUnlock,
-  }: {
-    preservePaywallSelections?: boolean;
-    targetUnlock?: UnlockSurfaceModel;
-  } = {}) => {
     openFanAuthDialog({
-      allowClose: false,
-      initialMode: "re-auth",
-      onAfterAuthenticated:
-        usesApiBackedUnlockFlow || preservePaywallSelections
-          ? async (restoredViewer) => {
-              await restoreUnlockSurfaceAfterAuth({
-                preservePaywallSelections,
-                restoredViewer,
-                targetUnlock,
-              });
-            }
-          : undefined,
-      postAuthNavigation: "none",
-    });
-  };
-
-  const openAuthDialogForUnlock = (
-    targetUnlock: UnlockSurfaceModel = activeUnlock,
-    {
-      preservePaywallSelections = isPaywallOpen,
-      recordMainClickAfterAuthenticated = false,
-    }: {
-      preservePaywallSelections?: boolean;
-      recordMainClickAfterAuthenticated?: boolean;
-    } = {},
-  ) => {
-    const shouldRefreshUnlockAfterAuth = usesApiBackedUnlockFlow;
-    const shouldRestoreUnlockAfterAuth =
-      shouldRefreshUnlockAfterAuth || preservePaywallSelections || shouldOpenPaywallForUnlock(targetUnlock);
-
-    openFanAuthDialog({
-      onAfterAuthenticated: shouldRestoreUnlockAfterAuth
+      onAfterAuthenticated: onAfterAuthenticated
         ? async (restoredViewer) => {
-            if (recordMainClickAfterAuthenticated && restoredViewer?.id) {
+            const restoredViewerIdentityKey = restoredViewer?.id ?? null;
+
+            if (restoredViewerIdentityKey !== null && viewerIdentityKey !== restoredViewerIdentityKey) {
+              prepareRecommendationSurfaceAfterAuth(restoredViewerIdentityKey);
               pendingRecommendationMainClickAfterAuthRef.current = true;
             }
-            await restoreUnlockSurfaceAfterAuth({
-              preservePaywallSelections,
-              restoredViewer,
-              targetUnlock,
-            });
+
+            await onAfterAuthenticated(restoredViewer);
           }
         : undefined,
       postAuthNavigation: "none",
     });
+  };
+
+  const openUnlockReAuthDialog = ({
+    onAfterAuthenticated,
+  }: {
+    onAfterAuthenticated?: ((restoredViewer: { id: string } | null | undefined) => Promise<void> | void) | undefined;
+  }) => {
+    openFanAuthDialog({
+      allowClose: false,
+      initialMode: "re-auth",
+      onAfterAuthenticated: onAfterAuthenticated
+        ? async (restoredViewer) => {
+            const restoredViewerIdentityKey = restoredViewer?.id ?? null;
+
+            if (restoredViewerIdentityKey !== null && viewerIdentityKey !== restoredViewerIdentityKey) {
+              prepareRecommendationSurfaceAfterAuth(restoredViewerIdentityKey);
+            }
+
+            await onAfterAuthenticated(restoredViewer);
+          }
+        : undefined,
+      postAuthNavigation: "none",
+    });
+  };
+
+  const {
+    acceptAge,
+    acceptTerms,
+    activeCardSetupSession,
+    activeUnlock,
+    cardSetupErrorMessage,
+    handleActivateUnlock,
+    handleCardPaymentTokenCreated,
+    handleClosePaywall,
+    handlePaywallConfirm,
+    handlePaymentSelectionChange,
+    isBusy,
+    isDevelopmentPaymentBypassEnabled,
+    isLoadingCardSetupSession,
+    isPaywallOpen,
+    isSubmitting,
+    paymentSelection,
+    purchaseErrorMessage,
+    setAcceptAge,
+    setAcceptTerms,
+    unlockAction,
+  } = useUnlockPaywallController({
+    baseUnlock: unlock,
+    hasViewerSession,
+    onFallbackNavigation: () => {
+      router.push(`/shorts/${short.id}`);
+    },
+    onNavigateToMain: (href) => {
+      router.push(href);
+    },
+    onOpenAuthDialog: openUnlockAuthDialog,
+    onOpenReAuthDialog: openUnlockReAuthDialog,
+    shortId: short.id,
+    usePurchaseFlow: usesApiBackedUnlockFlow,
+    viewerIdentityKey,
+  });
+
+  const handleUnlockCtaClick = () => {
+    if (hasViewerSession) {
+      recordMainClick();
+    }
+
+    void handleActivateUnlock();
   };
   const seekFeedPlayback = (nextProgress: number) => {
     if (!usesFeedPresentation) {
@@ -847,12 +755,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
 
     markManualSeek();
     video.currentTime = resolvedDuration * clampedProgress;
-    setFeedPlaybackProgress(clampedProgress);
+    setFeedPlaybackProgressState({
+      mediaId: short.media.id,
+      progress: clampedProgress,
+    });
   };
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   useEffect(() => {
     const previousViewerIdentityKey = previousViewerIdentityKeyRef.current;
@@ -862,12 +769,16 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       recommendationPrimeRequestKeyRef.current += 1;
       pendingRecommendationPrimeViewerIDRef.current = null;
       pendingRecommendationMainClickAfterAuthRef.current = false;
-      setIsRecommendationSurfaceReady(false);
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(false);
+      });
       return;
     }
 
     if (!usesApiBackedUnlockFlow) {
-      setIsRecommendationSurfaceReady(true);
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(true);
+      });
       return;
     }
 
@@ -876,7 +787,9 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       || previousViewerIdentityKey !== viewerIdentityKey;
 
     if (viewerNeedsPrime) {
-      setIsRecommendationSurfaceReady(false);
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(false);
+      });
     }
 
     if (!isActive) {
@@ -888,8 +801,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       return;
     }
 
-    setIsRecommendationSurfaceReady(true);
-  }, [isActive, isRecommendationSurfaceReady, primeRecommendationSurfaceForViewer, usesApiBackedUnlockFlow, viewerIdentityKey]);
+    startTransition(() => {
+      setIsRecommendationSurfaceReady(true);
+    });
+  }, [isActive, isRecommendationSurfaceReady, usesApiBackedUnlockFlow, viewerIdentityKey]);
 
   useEffect(() => {
     if (!pendingRecommendationMainClickAfterAuthRef.current) {
@@ -918,12 +833,15 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     const syncProgress = () => {
       const nextProgress = calculatePlaybackProgress(video.currentTime, video.duration);
 
-      setFeedPlaybackProgress((currentProgress) =>
-        Math.abs(currentProgress - nextProgress) < 0.001 ? currentProgress : nextProgress,
+      setFeedPlaybackProgressState((currentState) =>
+        currentState.mediaId === short.media.id && Math.abs(currentState.progress - nextProgress) < 0.001
+          ? currentState
+          : {
+              mediaId: short.media.id,
+              progress: nextProgress,
+            },
       );
     };
-
-    setFeedPlaybackProgress(0);
 
     video.addEventListener("durationchange", syncProgress);
     video.addEventListener("emptied", syncProgress);
@@ -958,148 +876,6 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       });
     }
   }, [isActive, short.media.url]);
-
-  /**
-   * setup dialog を閉じる。送信中は多重操作を防ぐ。
-   */
-  const handleClosePaywall = () => {
-    if (isSubmittingMainAccess) {
-      return;
-    }
-
-    resetPaywallState();
-  };
-
-  /**
-   * main access entry を叩いて main playback へ遷移する。
-   */
-  const handleOpenMain = async (targetUnlock: UnlockSurfaceModel) => {
-    if (!hasViewerSession) {
-      openAuthDialogForUnlock(targetUnlock);
-      return;
-    }
-
-    if (isSubmittingMainAccess) {
-      return;
-    }
-
-    setIsSubmittingMainAccess(true);
-
-    try {
-      if (usesApiBackedUnlockFlow) {
-        const response = await requestMainAccessEntry({
-          acceptedAge: acceptAge,
-          acceptedTerms: acceptTerms,
-          entryToken: targetUnlock.mainAccessEntry.token,
-          fromShortId: short.id,
-          mainId: targetUnlock.main.id,
-          routePath: targetUnlock.mainAccessEntry.routePath as `/${string}`,
-        });
-
-        resetPaywallState();
-        router.push(response.href);
-        return;
-      }
-
-      const response = await fetch(targetUnlock.mainAccessEntry.routePath, {
-        body: JSON.stringify({
-          acceptedAge: acceptAge,
-          acceptedTerms: acceptTerms,
-          entryToken: targetUnlock.mainAccessEntry.token,
-          fromShortId: short.id,
-        }),
-        headers: {
-          "Content-Type": "application/json",
-        },
-        method: "POST",
-      });
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            data?: {
-              href?: string;
-            } | null;
-            error?: {
-              code: string;
-              message: string;
-            } | null;
-          }
-        | null;
-
-      if (!response.ok && isAuthRequiredResponse(payload)) {
-        openAuthDialogForUnlock(targetUnlock, {
-          preservePaywallSelections: isPaywallOpen,
-        });
-        return;
-      }
-
-      if (!response.ok && isFreshAuthRequiredResponse(payload)) {
-        openReAuthDialog({
-          preservePaywallSelections: isPaywallOpen,
-          targetUnlock,
-        });
-        return;
-      }
-
-      if (response.ok && payload?.data?.href) {
-        resetPaywallState();
-        router.push(payload.data.href);
-        return;
-      }
-    } catch (error) {
-      if (isAuthRequiredApiError(error)) {
-        openAuthDialogForUnlock(targetUnlock, {
-          preservePaywallSelections: isPaywallOpen,
-        });
-        return;
-      }
-
-      if (isFreshAuthRequiredApiError(error)) {
-        openReAuthDialog({
-          preservePaywallSelections: isPaywallOpen,
-          targetUnlock,
-        });
-        return;
-      }
-
-      router.push(`/shorts/${short.id}`);
-    } finally {
-      setIsSubmittingMainAccess(false);
-    }
-  };
-
-  /**
-   * CTA 押下時に必要な unlock surface を解決して既存 flow へ接続する。
-   */
-  const handleActivateUnlock = async () => {
-    if (!hasViewerSession) {
-      openAuthDialogForUnlock(activeUnlock, {
-        preservePaywallSelections: isPaywallOpen,
-        recordMainClickAfterAuthenticated: true,
-      });
-      return;
-    }
-
-    if (isSubmittingMainAccess) {
-      return;
-    }
-
-    const targetUnlock = activeUnlock;
-    const nextAction = getUnlockEntryAction(targetUnlock);
-    const shouldOpenPaywall = shouldOpenPaywallForUnlock(targetUnlock);
-
-    recordMainClick();
-
-    if (shouldOpenPaywall) {
-      resetPaywallSelections();
-      setIsPaywallOpen(true);
-      return;
-    }
-
-    if (nextAction === "open_main") {
-      await handleOpenMain(targetUnlock);
-    }
-  };
-
   const pinProps =
     mode === "feed" && props.pin
       ? {
@@ -1153,13 +929,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             className="mb-4 w-full"
             cta={activeUnlock.unlockCta}
-            disabled={!isHydrated || isSubmittingMainAccess}
+            disabled={isBusy}
             variant="feed"
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
-                  onClick: () => {
-                    void handleActivateUnlock();
-                  },
+                  onClick: handleUnlockCtaClick,
                 }
               : {})}
           />
@@ -1177,15 +951,26 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}
-          isSubmitting={isSubmittingMainAccess}
+          cardSetupErrorMessage={cardSetupErrorMessage}
+          cardSetupSession={activeCardSetupSession}
+          isDevelopmentPaymentBypassEnabled={isDevelopmentPaymentBypassEnabled}
+          isLoadingCardSetupSession={isLoadingCardSetupSession}
+          isSubmitting={isSubmitting}
           onAcceptAgeChange={setAcceptAge}
           onAcceptTermsChange={setAcceptTerms}
+          onCardPaymentTokenCreated={(paymentTokenId) => {
+            void handleCardPaymentTokenCreated(paymentTokenId);
+          }}
           onClose={handleClosePaywall}
           onConfirm={() => {
-            void handleOpenMain(activeUnlock);
+            void handlePaywallConfirm();
           }}
+          onPaymentSelectionChange={handlePaymentSelectionChange}
           open={isPaywallOpen}
+          purchaseErrorMessage={purchaseErrorMessage}
+          selection={paymentSelection}
           unlock={activeUnlock}
+          usePurchaseFlow={usesApiBackedUnlockFlow}
         />
       </FeedLikeShortBackdrop>
     );
@@ -1243,12 +1028,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           <UnlockCta
             className="w-full"
             cta={activeUnlock.unlockCta}
-            disabled={!isHydrated || isSubmittingMainAccess}
+            disabled={isBusy}
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
-                  onClick: () => {
-                    void handleActivateUnlock();
-                  },
+                  onClick: handleUnlockCtaClick,
                 }
               : {})}
           />
@@ -1264,15 +1047,26 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <UnlockPaywallDialog
           acceptAge={acceptAge}
           acceptTerms={acceptTerms}
-          isSubmitting={isSubmittingMainAccess}
+          cardSetupErrorMessage={cardSetupErrorMessage}
+          cardSetupSession={activeCardSetupSession}
+          isDevelopmentPaymentBypassEnabled={isDevelopmentPaymentBypassEnabled}
+          isLoadingCardSetupSession={isLoadingCardSetupSession}
+          isSubmitting={isSubmitting}
           onAcceptAgeChange={setAcceptAge}
           onAcceptTermsChange={setAcceptTerms}
+          onCardPaymentTokenCreated={(paymentTokenId) => {
+            void handleCardPaymentTokenCreated(paymentTokenId);
+          }}
           onClose={handleClosePaywall}
           onConfirm={() => {
-            void handleOpenMain(activeUnlock);
+            void handlePaywallConfirm();
           }}
+          onPaymentSelectionChange={handlePaymentSelectionChange}
           open={isPaywallOpen}
+          purchaseErrorMessage={purchaseErrorMessage}
+          selection={paymentSelection}
           unlock={activeUnlock}
+          usePurchaseFlow={usesApiBackedUnlockFlow}
         />
       </div>
     </section>

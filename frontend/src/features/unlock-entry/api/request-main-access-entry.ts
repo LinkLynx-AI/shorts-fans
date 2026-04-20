@@ -4,8 +4,8 @@ import { requestJson } from "@/shared/api";
 import { mainAccessEntryResponseSchema } from "./contracts";
 
 type RequestMainAccessEntryOptions = {
-  acceptedAge: boolean;
-  acceptedTerms: boolean;
+  acceptedAge?: boolean | undefined;
+  acceptedTerms?: boolean | undefined;
   baseUrl?: string | undefined;
   credentials?: RequestCredentials | undefined;
   entryToken: string;
@@ -48,10 +48,10 @@ export async function requestMainAccessEntry({
     ...(fetcher ? { fetcher } : {}),
     init: {
       body: JSON.stringify({
-        acceptedAge,
-        acceptedTerms,
         entryToken,
         fromShortId,
+        ...(typeof acceptedAge === "boolean" ? { acceptedAge } : {}),
+        ...(typeof acceptedTerms === "boolean" ? { acceptedTerms } : {}),
       }),
       credentials,
       headers: {
