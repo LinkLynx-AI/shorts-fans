@@ -99,6 +99,7 @@ describe("getPublicShortDetail", () => {
     expect(new Headers(fetcher.mock.calls[0]?.[1]?.headers).get("Cookie")).toBe(
       `${viewerSessionCookieName}=raw-session-token`,
     );
+    expect(fetcher.mock.calls[0]?.[1]?.credentials).toBe("include");
   });
 
   it("accepts short detail responses with an empty caption", async () => {
@@ -161,5 +162,6 @@ describe("getPublicShortDetail", () => {
         caption: "",
       },
     });
+    expect(fetcher.mock.calls[0]?.[1]?.credentials).toBe("include");
   });
 });

@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+import { useEffect } from "react";
 import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
@@ -5,7 +7,13 @@ import {
   CreatorFollowApiError,
   updateCreatorFollow,
 } from "@/entities/creator";
-import { CurrentViewerProvider, ViewerSessionProvider } from "@/entities/viewer";
+import { getPublicShortDetail } from "@/entities/short";
+import {
+  CurrentViewerProvider,
+  ViewerSessionProvider,
+  useSetCurrentViewer,
+  useSetViewerSession,
+} from "@/entities/viewer";
 import {
   useFanAuthDialog,
   useFanAuthDialogControls,
@@ -14,6 +22,7 @@ import {
   requestMainAccessEntry,
   requestUnlockSurfaceByShortId,
 } from "@/features/unlock-entry";
+import { useShortRecommendationSignals } from "@/features/recommendation-signal";
 import { ApiError } from "@/shared/api";
 import {
   buildDetailSurfaceFromApi,
@@ -32,6 +41,15 @@ vi.mock("@/entities/creator", async (importOriginal) => {
   return {
     ...actual,
     updateCreatorFollow: vi.fn(),
+  };
+});
+
+vi.mock("@/entities/short", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/entities/short")>();
+
+  return {
+    ...actual,
+    getPublicShortDetail: vi.fn(actual.getPublicShortDetail),
   };
 });
 
@@ -55,6 +73,10 @@ vi.mock("@/features/unlock-entry", async (importOriginal) => {
   };
 });
 
+vi.mock("@/features/recommendation-signal", () => ({
+  useShortRecommendationSignals: vi.fn(),
+}));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push,
@@ -62,14 +84,42 @@ vi.mock("next/navigation", () => ({
 }));
 
 const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
+const mockedGetPublicShortDetail = vi.mocked(getPublicShortDetail);
 const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
 const mockedRequestMainAccessEntry = vi.mocked(requestMainAccessEntry);
 const mockedRequestUnlockSurfaceByShortId = vi.mocked(requestUnlockSurfaceByShortId);
+const mockedUseShortRecommendationSignals = vi.mocked(useShortRecommendationSignals);
 const openFanAuthDialog = vi.fn();
+const handleRecommendationTimeUpdate = vi.fn();
+const handleRecommendationVideoPlay = vi.fn();
+const markRecommendationManualSeek = vi.fn();
+const recordRecommendationMainClick = vi.fn();
+const recordRecommendationProfileClick = vi.fn();
+
+function ViewerStateControls({
+  onReady,
+}: {
+  onReady: (controls: {
+    setCurrentViewer: ReturnType<typeof useSetCurrentViewer>;
+    setViewerSession: ReturnType<typeof useSetViewerSession>;
+  }) => void;
+}) {
+  const setCurrentViewer = useSetCurrentViewer();
+  const setViewerSession = useSetViewerSession();
+
+  useEffect(() => {
+    onReady({
+      setCurrentViewer,
+      setViewerSession,
+    });
+  }, [onReady, setCurrentViewer, setViewerSession]);
+
+  return null;
+}
 
 function renderWithViewerSession(
-  ui: React.ReactElement,
+  ui: ReactElement,
   {
     currentViewer = null,
     hasSession,
@@ -82,13 +132,44 @@ function renderWithViewerSession(
     hasSession: boolean;
   },
 ) {
-  return render(
+  const viewerStateControls: {
+    setCurrentViewer?: ReturnType<typeof useSetCurrentViewer>;
+    setViewerSession?: ReturnType<typeof useSetViewerSession>;
+  } = {};
+
+  const view = render(
     <ViewerSessionProvider hasSession={hasSession}>
       <CurrentViewerProvider currentViewer={currentViewer}>
+        <ViewerStateControls
+          onReady={({ setCurrentViewer, setViewerSession }) => {
+            viewerStateControls.setCurrentViewer = setCurrentViewer;
+            viewerStateControls.setViewerSession = setViewerSession;
+          }}
+        />
         {ui}
       </CurrentViewerProvider>
     </ViewerSessionProvider>,
   );
+
+  return {
+    ...view,
+    setViewerState: ({
+      currentViewer: nextCurrentViewer = null,
+      hasSession: nextHasSession,
+    }: {
+      currentViewer?: {
+        activeMode: "creator" | "fan";
+        canAccessCreatorMode: boolean;
+        id: string;
+      } | null;
+      hasSession: boolean;
+    }) => {
+      act(() => {
+        viewerStateControls.setCurrentViewer?.(nextCurrentViewer);
+        viewerStateControls.setViewerSession?.(nextHasSession);
+      });
+    },
+  };
 }
 
 function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
@@ -128,7 +209,11 @@ function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_
 }
 
 function createApiDetailSurface(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
-  return buildDetailSurfaceFromApi({
+  return buildDetailSurfaceFromApi(createPublicShortDetail(state));
+}
+
+function createPublicShortDetail(state: "continue_main" | "owner_preview" | "setup_required" | "unlock_available") {
+  return {
     creator: {
       avatar: null,
       bio: "night preview specialist",
@@ -160,7 +245,7 @@ function createApiDetailSurface(state: "continue_main" | "owner_preview" | "setu
       isFollowingCreator: false,
       isPinned: true,
     },
-  });
+  } satisfies Awaited<ReturnType<typeof getPublicShortDetail>>;
 }
 
 describe("ImmersiveShortSurface", () => {
@@ -179,10 +264,17 @@ describe("ImmersiveShortSurface", () => {
 
   beforeEach(() => {
     mockedUpdateCreatorFollow.mockReset();
+    mockedGetPublicShortDetail.mockReset();
     mockedUseFanAuthDialogControls.mockReset();
     mockedRequestMainAccessEntry.mockReset();
     mockedRequestUnlockSurfaceByShortId.mockReset();
     mockedUseFanAuthDialog.mockReset();
+    mockedUseShortRecommendationSignals.mockReset();
+    handleRecommendationTimeUpdate.mockReset();
+    handleRecommendationVideoPlay.mockReset();
+    markRecommendationManualSeek.mockReset();
+    recordRecommendationMainClick.mockReset();
+    recordRecommendationProfileClick.mockReset();
     openFanAuthDialog.mockReset();
     mockedUseFanAuthDialogControls.mockReturnValue({
       closeFanAuthDialog: vi.fn(),
@@ -193,6 +285,14 @@ describe("ImmersiveShortSurface", () => {
       isFanAuthDialogOpen: false,
       openFanAuthDialog,
     });
+    mockedUseShortRecommendationSignals.mockReturnValue({
+      handleTimeUpdate: handleRecommendationTimeUpdate,
+      handleVideoPlay: handleRecommendationVideoPlay,
+      markManualSeek: markRecommendationManualSeek,
+      recordMainClick: recordRecommendationMainClick,
+      recordProfileClick: recordRecommendationProfileClick,
+    });
+    mockedGetPublicShortDetail.mockResolvedValue(createPublicShortDetail("unlock_available"));
   });
 
   afterEach(() => {
@@ -265,6 +365,7 @@ describe("ImmersiveShortSurface", () => {
     fireEvent(video, new Event("timeupdate"));
 
     expect(progressFill).toHaveStyle("transform: scaleX(0.5)");
+    expect(handleRecommendationTimeUpdate).toHaveBeenCalledWith(8, 16);
   });
 
   it("seeks the feed video when the playback progress bar is clicked", () => {
@@ -309,6 +410,56 @@ describe("ImmersiveShortSurface", () => {
 
     expect(video.currentTime).toBe(4);
     expect(screen.getByTestId("feed-playback-progress-fill")).toHaveStyle("transform: scaleX(0.25)");
+    expect(markRecommendationManualSeek).toHaveBeenCalledTimes(1);
+  });
+
+  it("records recommendation signal handlers for feed creator, playback, and unlock interactions", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant",
+    });
+
+    const { container } = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      {
+        currentViewer: {
+          activeMode: "fan",
+          canAccessCreatorMode: false,
+          id: "viewer_1",
+        },
+        hasSession: true,
+      },
+    );
+
+    const video = container.querySelector("video");
+
+    if (!video) {
+      throw new Error("video element missing");
+    }
+
+    Object.defineProperty(video, "duration", {
+      configurable: true,
+      value: 16,
+    });
+    Object.defineProperty(video, "currentTime", {
+      configurable: true,
+      value: 0,
+      writable: true,
+    });
+
+    fireEvent.play(video);
+    video.currentTime = 12;
+    fireEvent(video, new Event("timeupdate"));
+
+    await user.click(screen.getByRole("link", { name: /Mina Rei/i }));
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    expect(handleRecommendationVideoPlay).toHaveBeenCalled();
+    expect(handleRecommendationTimeUpdate).toHaveBeenCalledWith(12, 16);
+    expect(recordRecommendationProfileClick).toHaveBeenCalledTimes(1);
+    expect(recordRecommendationMainClick).toHaveBeenCalledTimes(1);
   });
 
   it("uses the short duration fallback when the feed video duration is unavailable during seek", () => {
@@ -601,6 +752,158 @@ describe("ImmersiveShortSurface", () => {
         postAuthNavigation: "none",
       }),
     );
+  });
+
+  it("primes recommendation exposure before reenabling signals after in-place auth recovery", async () => {
+    const surface = createApiFeedSurface("unlock_available");
+    const view = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    expect(
+      mockedUseShortRecommendationSignals.mock.calls.some(
+        ([options]) => options.viewerId === null && options.isSurfaceReady === false,
+      ),
+    ).toBe(true);
+
+    mockedUseShortRecommendationSignals.mockClear();
+
+    view.setViewerState({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_1",
+      },
+      hasSession: true,
+    });
+
+    await waitFor(() => {
+      expect(
+        mockedUseShortRecommendationSignals.mock.calls.some(
+          ([options]) => options.viewerId === "viewer_1" && options.isSurfaceReady === false,
+        ),
+      ).toBe(true);
+    });
+
+    await waitFor(() => {
+      expect(mockedGetPublicShortDetail).toHaveBeenCalledWith({
+        credentials: "include",
+        shortId: surface.short.id,
+      });
+    });
+    await waitFor(() => {
+      expect(mockedUseShortRecommendationSignals).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          isSurfaceReady: true,
+          viewerId: "viewer_1",
+        }),
+      );
+    });
+  });
+
+  it("records main_click after unauthenticated unlock auth recovery completes", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(surface.unlock);
+
+    const view = renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: false },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    const options = openFanAuthDialog.mock.calls[0]?.[0];
+
+    if (!options?.onAfterAuthenticated) {
+      throw new Error("unlock recovery callback missing");
+    }
+
+    await act(async () => {
+      await options.onAfterAuthenticated?.({
+        id: "viewer_1",
+      });
+    });
+
+    view.setViewerState({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_1",
+      },
+      hasSession: true,
+    });
+
+    await waitFor(() => {
+      expect(mockedGetPublicShortDetail).toHaveBeenCalledWith({
+        credentials: "include",
+        shortId: surface.short.id,
+      });
+    });
+    await waitFor(() => {
+      expect(recordRecommendationMainClick).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("primes only the active surface after auth recovery restores viewer state", async () => {
+    const primarySurface = createApiFeedSurface("unlock_available");
+    const secondaryBaseSurface = createApiFeedSurface("unlock_available");
+    const secondarySurface = {
+      ...secondaryBaseSurface,
+      short: {
+        ...secondaryBaseSurface.short,
+        id: "short_mina_secondary",
+        media: {
+          ...secondaryBaseSurface.short.media,
+          id: "asset_short_mina_secondary",
+        },
+      },
+      unlock: {
+        ...secondaryBaseSurface.unlock,
+        main: {
+          ...secondaryBaseSurface.unlock.main,
+          id: "main_mina_secondary",
+        },
+        mainAccessEntry: {
+          ...secondaryBaseSurface.unlock.mainAccessEntry,
+          routePath: "/api/fan/mains/main_mina_secondary/access-entry",
+          token: "entry-token-secondary",
+        },
+        short: {
+          ...secondaryBaseSurface.unlock.short,
+          id: "short_mina_secondary",
+        },
+      },
+    };
+
+    const view = renderWithViewerSession(
+      <>
+        <ImmersiveShortSurface activeTab="recommended" isActive mode="feed" surface={primarySurface} />
+        <ImmersiveShortSurface activeTab="recommended" isActive={false} mode="feed" surface={secondarySurface} />
+      </>,
+      { hasSession: false },
+    );
+
+    mockedGetPublicShortDetail.mockClear();
+
+    view.setViewerState({
+      currentViewer: {
+        activeMode: "fan",
+        canAccessCreatorMode: false,
+        id: "viewer_1",
+      },
+      hasSession: true,
+    });
+
+    await waitFor(() => {
+      expect(mockedGetPublicShortDetail).toHaveBeenCalledTimes(1);
+    });
+    expect(mockedGetPublicShortDetail).toHaveBeenCalledWith({
+      credentials: "include",
+      shortId: primarySurface.short.id,
+    });
   });
 
   it("resolves the unlock surface before reopening the paywall after auth", async () => {
