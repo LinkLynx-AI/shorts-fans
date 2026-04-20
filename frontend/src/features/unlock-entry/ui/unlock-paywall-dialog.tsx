@@ -4,6 +4,7 @@ import { cn } from "@/shared/lib";
 
 import { getUnlockCtaMeta } from "../model/unlock-cta";
 import type { UnlockSurfaceModel } from "../model/unlock-entry";
+import type { CardSetupSession } from "../api/contracts";
 import { CCBillPaymentWidget } from "./ccbill-payment-widget";
 
 export type PaywallPaymentSelection =
@@ -15,22 +16,11 @@ export type PaywallPaymentSelection =
       paymentMethodId: string;
     };
 
-type PaymentWidgetSession = {
-  apiBaseUrl: string;
-  apiKey: string;
-  clientAccount: string;
-  currency: "JPY";
-  initialPeriod: string;
-  initialPrice: string;
-  sessionToken: string;
-  subAccount: string;
-};
-
 export type UnlockPaywallDialogProps = {
   acceptAge: boolean;
   acceptTerms: boolean;
   cardSetupErrorMessage?: string | null | undefined;
-  cardSetupSession?: PaymentWidgetSession | null | undefined;
+  cardSetupSession?: CardSetupSession | null | undefined;
   isDevelopmentPaymentBypassEnabled?: boolean;
   isLoadingCardSetupSession?: boolean;
   isSubmitting?: boolean;

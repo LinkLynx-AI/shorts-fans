@@ -152,6 +152,10 @@ func (s *Service) CreateCardSetupSession(
 	sessionBinding string,
 	input CardSetupSessionInput,
 ) (CardSetupSessionResult, error) {
+	if s == nil {
+		return CardSetupSessionResult{}, fmt.Errorf("fanmain: nil service")
+	}
+
 	detail, main, err := s.loadLinkedSurface(ctx, input.ViewerID, input.FromShortID)
 	if err != nil {
 		switch {
@@ -194,8 +198,8 @@ func (s *Service) CreateCardSetupSession(
 	if strings.TrimSpace(main.CurrencyCode) != "JPY" {
 		return CardSetupSessionResult{}, fmt.Errorf("unsupported widget currency %q", main.CurrencyCode)
 	}
-	if s == nil || s.paymentWidgetSessionSource == nil {
-		return CardSetupSessionResult{}, fmt.Errorf("fan main payment widget session source が初期化されていません")
+	if s.paymentWidgetSessionSource == nil {
+		return CardSetupSessionResult{}, ErrMainLocked
 	}
 
 	session, err := s.paymentWidgetSessionSource.CreatePaymentWidgetSession(ctx)

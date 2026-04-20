@@ -3,25 +3,39 @@
 import { createElement, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/shared/lib";
-
-type PaymentWidgetSession = {
-  apiBaseUrl: string;
-  apiKey: string;
-  clientAccount: string;
-  currency: "JPY";
-  initialPeriod: string;
-  initialPrice: string;
-  subAccount: string;
-};
+import type { CardSetupSession } from "../api/contracts";
 
 export type CCBillPaymentWidgetProps = {
   className?: string | undefined;
   onPaymentTokenCreated: (paymentTokenId: string) => void;
-  session: PaymentWidgetSession;
+  session: CardSetupSession;
 };
 
 const ccbillPaymentWidgetScriptSrc = "https://js.ccbill.com/payment-widget/v1/index.js";
 let ccbillPaymentWidgetScriptPromise: Promise<void> | null = null;
+const ccbillPaymentWidgetScriptStatusAttribute = "data-ccbill-payment-widget-status";
+
+function attachScriptLoadListeners(script: HTMLScriptElement, onError: () => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    script.addEventListener(
+      "load",
+      () => {
+        script.dataset.ccbillPaymentWidgetStatus = "loaded";
+        resolve();
+      },
+      { once: true },
+    );
+    script.addEventListener(
+      "error",
+      () => {
+        script.dataset.ccbillPaymentWidgetStatus = "error";
+        onError();
+        reject(new Error("ccbill widget script failed"));
+      },
+      { once: true },
+    );
+  });
+}
 
 function loadCCBillPaymentWidgetScript(): Promise<void> {
   if (typeof window === "undefined") {
@@ -32,29 +46,42 @@ function loadCCBillPaymentWidgetScript(): Promise<void> {
     return Promise.resolve();
   }
 
-  if (ccbillPaymentWidgetScriptPromise) {
+  const existing = document.querySelector<HTMLScriptElement>('script[data-ccbill-payment-widget="true"]');
+  if (existing) {
+    const status = existing.getAttribute(ccbillPaymentWidgetScriptStatusAttribute);
+    if (status === "loaded") {
+      return Promise.resolve();
+    }
+    if (status === "error") {
+      existing.remove();
+    } else if (ccbillPaymentWidgetScriptPromise) {
+      return ccbillPaymentWidgetScriptPromise;
+    } else {
+      const scriptPromise = attachScriptLoadListeners(existing, () => {
+        ccbillPaymentWidgetScriptPromise = null;
+        existing.remove();
+      });
+      ccbillPaymentWidgetScriptPromise = scriptPromise;
+
+      return scriptPromise;
+    }
+  } else if (ccbillPaymentWidgetScriptPromise) {
     return ccbillPaymentWidgetScriptPromise;
   }
 
-  ccbillPaymentWidgetScriptPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>('script[data-ccbill-payment-widget="true"]');
-
-    if (existing) {
-      existing.addEventListener("load", () => resolve(), { once: true });
-      existing.addEventListener("error", () => reject(new Error("ccbill widget script failed")), { once: true });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.async = true;
-    script.dataset.ccbillPaymentWidget = "true";
-    script.src = ccbillPaymentWidgetScriptSrc;
-    script.addEventListener("load", () => resolve(), { once: true });
-    script.addEventListener("error", () => reject(new Error("ccbill widget script failed")), { once: true });
-    document.head.appendChild(script);
+  const script = document.createElement("script");
+  script.async = true;
+  script.dataset.ccbillPaymentWidget = "true";
+  script.dataset.ccbillPaymentWidgetStatus = "loading";
+  script.src = ccbillPaymentWidgetScriptSrc;
+  const scriptPromise = attachScriptLoadListeners(script, () => {
+    ccbillPaymentWidgetScriptPromise = null;
+    script.remove();
   });
+  ccbillPaymentWidgetScriptPromise = scriptPromise;
+  document.head.appendChild(script);
 
-  return ccbillPaymentWidgetScriptPromise;
+  return scriptPromise;
 }
 
 /**

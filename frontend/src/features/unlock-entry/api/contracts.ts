@@ -126,6 +126,8 @@ export const cardSetupSessionResponseSchema = z.object({
   }),
 });
 
+export type CardSetupSession = z.infer<typeof cardSetupSessionResponseSchema>["data"];
+
 export const cardSetupTokenResponseSchema = z.object({
   data: z.object({
     cardSetupToken: z.string().min(1),

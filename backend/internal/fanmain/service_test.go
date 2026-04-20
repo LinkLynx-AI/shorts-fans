@@ -305,6 +305,17 @@ func TestCreateCardSetupSessionReturnsWidgetConfig(t *testing.T) {
 	}
 }
 
+func TestCreateCardSetupSessionRejectsNilService(t *testing.T) {
+	t.Parallel()
+
+	var service *Service
+
+	_, err := service.CreateCardSetupSession(context.Background(), "session-binding", CardSetupSessionInput{})
+	if err == nil || !strings.Contains(err.Error(), "fanmain: nil service") {
+		t.Fatalf("CreateCardSetupSession() error got %v want nil service", err)
+	}
+}
+
 func TestIssueCardSetupTokenWrapsProviderToken(t *testing.T) {
 	t.Parallel()
 
@@ -519,8 +530,8 @@ func TestCreateCardSetupSessionRequiresWidgetSessionSource(t *testing.T) {
 		MainID:      fixture.mainID,
 		ViewerID:    fixture.viewerID,
 	})
-	if err == nil || !strings.Contains(err.Error(), "fan main payment widget session source が初期化されていません") {
-		t.Fatalf("CreateCardSetupSession() error got %v want missing widget session source", err)
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
 	}
 }
 
