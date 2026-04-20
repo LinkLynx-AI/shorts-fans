@@ -28,6 +28,8 @@ const (
 	ccbillBaseURLEnv           = "CCBILL_BASE_URL"
 	ccbillBackendClientIDEnv   = "CCBILL_BACKEND_CLIENT_ID"
 	ccbillBackendSecretEnv     = "CCBILL_BACKEND_CLIENT_SECRET"
+	ccbillFrontendClientIDEnv  = "CCBILL_FRONTEND_CLIENT_ID"
+	ccbillFrontendSecretEnv    = "CCBILL_FRONTEND_CLIENT_SECRET"
 	ccbillAccountNumberEnv     = "CCBILL_CLIENT_ACCOUNT_NUMBER"
 	ccbillSubAccountNumberEnv  = "CCBILL_CLIENT_SUB_ACCOUNT_NUMBER"
 	ccbillCurrencyCodeEnv      = "CCBILL_CURRENCY_CODE"
@@ -37,6 +39,7 @@ const (
 
 // Config は backend コマンドの実行時設定を保持します。
 type Config struct {
+	AppEnvExplicitlySet             bool
 	AppEnv                          string
 	APIAddr                         string
 	PostgresDSN                     string
@@ -47,6 +50,8 @@ type Config struct {
 	CCBillBaseURL                   string
 	CCBillBackendClientID           string
 	CCBillBackendClientSecret       string
+	CCBillFrontendClientID          string
+	CCBillFrontendClientSecret      string
 	CCBillClientAccountNumber       int32
 	CCBillClientSubAccountNumber    int32
 	CCBillCurrencyCode              int32
@@ -71,8 +76,10 @@ func Load() Config {
 
 // LoadFromEnv は任意の lookup 関数から Config を構築します。
 func LoadFromEnv(lookup func(string) string) Config {
+	appEnv := trimmedLookup(lookup, "APP_ENV")
 	cfg := Config{
-		AppEnv:                          trimmedLookup(lookup, "APP_ENV"),
+		AppEnv:                          appEnv,
+		AppEnvExplicitlySet:             appEnv != "",
 		APIAddr:                         trimmedLookup(lookup, "API_ADDR"),
 		PostgresDSN:                     trimmedLookup(lookup, "POSTGRES_DSN"),
 		RedisAddr:                       trimmedLookup(lookup, "REDIS_ADDR"),
@@ -82,6 +89,8 @@ func LoadFromEnv(lookup func(string) string) Config {
 		CCBillBaseURL:                   trimmedLookup(lookup, ccbillBaseURLEnv),
 		CCBillBackendClientID:           trimmedLookup(lookup, ccbillBackendClientIDEnv),
 		CCBillBackendClientSecret:       trimmedLookup(lookup, ccbillBackendSecretEnv),
+		CCBillFrontendClientID:          trimmedLookup(lookup, ccbillFrontendClientIDEnv),
+		CCBillFrontendClientSecret:      trimmedLookup(lookup, ccbillFrontendSecretEnv),
 		CCBillClientAccountNumber:       int32Lookup(lookup, ccbillAccountNumberEnv),
 		CCBillClientSubAccountNumber:    int32Lookup(lookup, ccbillSubAccountNumberEnv),
 		CCBillCurrencyCode:              int32Lookup(lookup, ccbillCurrencyCodeEnv),
@@ -130,8 +139,10 @@ func (c Config) ValidateAPI() error {
 	if err := c.ValidateFanAuth(); err != nil {
 		return err
 	}
-	if err := c.ValidatePayment(); err != nil {
-		return err
+	if !c.PaymentBypassEnabled() {
+		if err := c.ValidatePayment(); err != nil {
+			return err
+		}
 	}
 
 	if err := c.validateMediaSandbox(true); err != nil {
@@ -163,28 +174,50 @@ func (c Config) ValidateAPI() error {
 
 // ValidatePayment は payment runtime が必要とする CCBill 設定を検証します。
 func (c Config) ValidatePayment() error {
+	missing := c.missingPaymentEnvNames()
+	if len(missing) > 0 {
+		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
+	}
+
+	return nil
+}
+
+// PaymentBypassEnabled は明示的な development 実行時だけ許可する暫定 bypass を表します。
+func (c Config) PaymentBypassEnabled() bool {
+	return c.AppEnvExplicitlySet && c.resolvedAppEnv() == defaultAppEnv
+}
+
+func (c Config) resolvedAppEnv() string {
+	appEnv := strings.TrimSpace(c.AppEnv)
+	if appEnv == "" {
+		return defaultAppEnv
+	}
+
+	return appEnv
+}
+
+func (c Config) missingPaymentEnvNames() []string {
 	required := []struct {
 		name    string
 		present bool
 	}{
 		{name: ccbillBackendClientIDEnv, present: c.CCBillBackendClientID != ""},
 		{name: ccbillBackendSecretEnv, present: c.CCBillBackendClientSecret != ""},
+		{name: ccbillFrontendClientIDEnv, present: c.CCBillFrontendClientID != ""},
+		{name: ccbillFrontendSecretEnv, present: c.CCBillFrontendClientSecret != ""},
 		{name: ccbillAccountNumberEnv, present: c.CCBillClientAccountNumber > 0},
 		{name: ccbillSubAccountNumberEnv, present: c.CCBillClientSubAccountNumber > 0},
 		{name: ccbillInitialPeriodDaysEnv, present: c.CCBillInitialPeriodDays > 0},
 	}
 
-	var missing []string
+	missing := make([]string, 0, len(required))
 	for _, field := range required {
 		if !field.present {
 			missing = append(missing, field.name)
 		}
 	}
-	if len(missing) > 0 {
-		return fmt.Errorf("missing required environment variables: %s", strings.Join(missing, ", "))
-	}
 
-	return nil
+	return missing
 }
 
 // ValidateWorker は worker 設定の整合性を検証します。

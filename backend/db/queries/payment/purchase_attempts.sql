@@ -32,8 +32,7 @@ RETURNING *;
 
 -- name: AcquireMainPurchaseLock :exec
 SELECT pg_advisory_xact_lock(
-    hashtextextended(sqlc.arg(user_key), 0),
-    hashtextextended(sqlc.arg(main_key), 0)
+    hashtextextended(sqlc.arg(user_key) || ':' || sqlc.arg(main_key), 0)
 );
 
 -- name: GetMainPurchaseAttemptByID :one

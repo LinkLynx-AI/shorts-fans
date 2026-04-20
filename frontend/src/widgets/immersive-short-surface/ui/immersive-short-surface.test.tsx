@@ -19,8 +19,13 @@ import {
   useFanAuthDialogControls,
 } from "@/features/fan-auth";
 import {
+  normalizeUnlockSurface,
+  requestCardSetupSession,
+  requestCardSetupToken,
   requestMainAccessEntry,
+  requestMainPurchase,
   requestUnlockSurfaceByShortId,
+  type UnlockSurfaceModel,
 } from "@/features/unlock-entry";
 import { useShortRecommendationSignals } from "@/features/recommendation-signal";
 import { ApiError } from "@/shared/api";
@@ -65,11 +70,223 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
 
 vi.mock("@/features/unlock-entry", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/unlock-entry")>();
+  const mockedRequestCardSetupSession = vi.fn(actual.requestCardSetupSession);
+  const mockedRequestCardSetupToken = vi.fn(actual.requestCardSetupToken);
+  const mockedRequestMainAccessEntry = vi.fn(actual.requestMainAccessEntry);
+  const mockedRequestMainPurchase = vi.fn(actual.requestMainPurchase);
+  const mockedRequestUnlockSurfaceByShortId = vi.fn(actual.requestUnlockSurfaceByShortId);
+  const buildMockPaywallTitle = (caption: string) => {
+    const normalizedCaption = caption.trim().replace(/[。.!?]+$/u, "");
+
+    return normalizedCaption ? `${normalizedCaption} の続きを見る` : "この short の続きを見る";
+  };
+  const buildLegacyUnlockLabel = (unlock: UnlockSurfaceModel) => {
+    switch (unlock.unlockCta.state) {
+      case "continue_main":
+        return "Continue main";
+      case "owner_preview":
+        return "Owner preview";
+      case "setup_required":
+      case "unlock_available": {
+        const priceLabel = `¥${unlock.main.priceJpy.toLocaleString("ja-JP")}`;
+        const minutesLabel = `${Math.max(1, Math.round(unlock.main.durationSeconds / 60))}分`;
+
+        return `Unlock ${priceLabel} | ${minutesLabel}`;
+      }
+      case "unavailable":
+        return "Unlock";
+    }
+  };
+  const buildPurchaseFlowLabel = (
+    selection: {
+      mode: "new_card" | "saved_card";
+      paymentMethodId?: string;
+    },
+    isDevelopmentPaymentBypassEnabled: boolean,
+    unlock: UnlockSurfaceModel,
+  ) => {
+    switch (unlock.purchase.state) {
+      case "already_purchased":
+        return "Continue main";
+      case "owner_preview":
+        return "Owner preview";
+      case "purchase_ready":
+      case "setup_required":
+        if (selection.mode === "saved_card") {
+          return `Purchase ¥${unlock.main.priceJpy.toLocaleString("ja-JP")}`;
+        }
+
+        return isDevelopmentPaymentBypassEnabled ? "支払いをスキップして進む" : null;
+      default:
+        return null;
+    }
+  };
 
   return {
     ...actual,
-    requestMainAccessEntry: vi.fn(actual.requestMainAccessEntry),
-    requestUnlockSurfaceByShortId: vi.fn(actual.requestUnlockSurfaceByShortId),
+    UnlockPaywallDialog: ({
+      acceptAge,
+      acceptTerms,
+      cardSetupSession,
+      isDevelopmentPaymentBypassEnabled = false,
+      isSubmitting = false,
+      onAcceptAgeChange,
+      onAcceptTermsChange,
+      onCardPaymentTokenCreated,
+      onClose,
+      onConfirm,
+      onPaymentSelectionChange,
+      open,
+      selection,
+      unlock,
+      usePurchaseFlow = true,
+    }: {
+      acceptAge: boolean;
+      acceptTerms: boolean;
+      cardSetupSession?: object | null;
+      isDevelopmentPaymentBypassEnabled?: boolean;
+      isSubmitting?: boolean;
+      onAcceptAgeChange: (checked: boolean) => void;
+      onAcceptTermsChange: (checked: boolean) => void;
+      onCardPaymentTokenCreated: (paymentTokenId: string) => void;
+      onClose: () => void;
+      onConfirm: () => void;
+      onPaymentSelectionChange: (selection: {
+        mode: "new_card" | "saved_card";
+        paymentMethodId?: string;
+      }) => void;
+      open: boolean;
+      selection: {
+        mode: "new_card" | "saved_card";
+        paymentMethodId?: string;
+      };
+      unlock: UnlockSurfaceModel;
+      usePurchaseFlow?: boolean;
+    }) => {
+      if (!open) {
+        return null;
+      }
+
+      const supportsSelection =
+        usePurchaseFlow &&
+        (unlock.purchase.state === "purchase_ready" || unlock.purchase.state === "setup_required");
+      const consentSatisfied =
+        (!unlock.setup.requiresAgeConfirmation || acceptAge) &&
+        (!unlock.setup.requiresTermsAcceptance || acceptTerms);
+      const confirmEnabled =
+        consentSatisfied && !isSubmitting;
+      const primaryActionLabel = usePurchaseFlow
+        ? buildPurchaseFlowLabel(selection, isDevelopmentPaymentBypassEnabled, unlock)
+        : buildLegacyUnlockLabel(unlock);
+
+      return (
+        <div aria-label={buildMockPaywallTitle(unlock.short.caption)} role="dialog">
+          {isDevelopmentPaymentBypassEnabled ? (
+            <span>development では CCBill を呼ばずに unlock 導線だけ確認します。</span>
+          ) : null}
+          {unlock.setup.requiresAgeConfirmation ? (
+            <label>
+              <input
+                checked={acceptAge}
+                onChange={(event) => {
+                  onAcceptAgeChange(event.target.checked);
+                }}
+                type="checkbox"
+              />
+              <span>18歳以上であり、年齢確認に同意する</span>
+            </label>
+          ) : null}
+          {unlock.setup.requiresTermsAcceptance ? (
+            <label>
+              <input
+                checked={acceptTerms}
+                onChange={(event) => {
+                  onAcceptTermsChange(event.target.checked);
+                }}
+                type="checkbox"
+              />
+              <span>利用規約とポリシーに同意し、main purchase へ進む</span>
+            </label>
+          ) : null}
+          {supportsSelection &&
+          !isDevelopmentPaymentBypassEnabled &&
+          unlock.purchase.savedPaymentMethods.length > 0 ? (
+            unlock.purchase.savedPaymentMethods.map((method) => (
+              <label key={method.paymentMethodId}>
+                <input
+                  checked={selection.mode === "saved_card" && selection.paymentMethodId === method.paymentMethodId}
+                  name="paywall-payment-method"
+                  onChange={() => {
+                    onPaymentSelectionChange({
+                      mode: "saved_card",
+                      paymentMethodId: method.paymentMethodId,
+                    });
+                  }}
+                  type="radio"
+                />
+                <span>{`Saved card ${method.last4}`}</span>
+              </label>
+            ))
+          ) : null}
+          {supportsSelection ? (
+            <label>
+              <input
+                checked={selection.mode === "new_card"}
+                name="paywall-payment-method"
+                onChange={() => {
+                  onPaymentSelectionChange({
+                    mode: "new_card",
+                  });
+                }}
+                type="radio"
+              />
+              <span>新しい card を使う</span>
+            </label>
+          ) : null}
+          {selection.mode === "new_card" && !consentSatisfied ? (
+            <span>年齢確認と利用規約への同意を完了すると card widget を表示します。</span>
+          ) : null}
+          {selection.mode === "new_card" &&
+          cardSetupSession &&
+          consentSatisfied &&
+          !isDevelopmentPaymentBypassEnabled ? (
+            <button
+              onClick={() => {
+                onCardPaymentTokenCreated("widget-payment-token");
+              }}
+              type="button"
+            >
+              Mock card widget
+            </button>
+          ) : null}
+          {primaryActionLabel ? (
+            <button disabled={!confirmEnabled} onClick={onConfirm} type="button">
+              {primaryActionLabel}
+            </button>
+          ) : null}
+          {isSubmitting ? <span>Submitting purchase</span> : null}
+          <button onClick={onClose} type="button">
+            閉じる
+          </button>
+        </div>
+      );
+    },
+    requestCardSetupSession: mockedRequestCardSetupSession,
+    requestCardSetupToken: mockedRequestCardSetupToken,
+    requestMainAccessEntry: mockedRequestMainAccessEntry,
+    requestMainPurchase: mockedRequestMainPurchase,
+    requestUnlockSurfaceByShortId: mockedRequestUnlockSurfaceByShortId,
+    useUnlockPaywallController: (options: Parameters<typeof actual.useUnlockPaywallController>[0]) =>
+      actual.useUnlockPaywallController({
+        ...options,
+        deps: {
+          requestCardSetupSession: mockedRequestCardSetupSession,
+          requestCardSetupToken: mockedRequestCardSetupToken,
+          requestMainAccessEntry: mockedRequestMainAccessEntry,
+          requestMainPurchase: mockedRequestMainPurchase,
+          requestUnlockSurfaceByShortId: mockedRequestUnlockSurfaceByShortId,
+        },
+      }),
   };
 });
 
@@ -87,7 +304,10 @@ const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
 const mockedGetPublicShortDetail = vi.mocked(getPublicShortDetail);
 const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedRequestCardSetupSession = vi.mocked(requestCardSetupSession);
+const mockedRequestCardSetupToken = vi.mocked(requestCardSetupToken);
 const mockedRequestMainAccessEntry = vi.mocked(requestMainAccessEntry);
+const mockedRequestMainPurchase = vi.mocked(requestMainPurchase);
 const mockedRequestUnlockSurfaceByShortId = vi.mocked(requestUnlockSurfaceByShortId);
 const mockedUseShortRecommendationSignals = vi.mocked(useShortRecommendationSignals);
 const openFanAuthDialog = vi.fn();
@@ -248,6 +468,95 @@ function createPublicShortDetail(state: "continue_main" | "owner_preview" | "set
   } satisfies Awaited<ReturnType<typeof getPublicShortDetail>>;
 }
 
+function createResolvedApiUnlock({
+  accessReason = "unlock_required",
+  accessStatus = "locked",
+  entryToken = "resolved-entry-token",
+  paymentBypassEnabled = false,
+  purchaseState,
+  requiresAgeConfirmation = false,
+  requiresCardSetup = false,
+  requiresTermsAcceptance = false,
+  savedPaymentMethods = [],
+  unlockCtaState,
+}: {
+  accessReason?: UnlockSurfaceModel["access"]["reason"];
+  accessStatus?: UnlockSurfaceModel["access"]["status"];
+  entryToken?: string;
+  paymentBypassEnabled?: boolean;
+  purchaseState: UnlockSurfaceModel["purchase"]["state"];
+  requiresAgeConfirmation?: boolean;
+  requiresCardSetup?: boolean;
+  requiresTermsAcceptance?: boolean;
+  savedPaymentMethods?: UnlockSurfaceModel["purchase"]["savedPaymentMethods"];
+  unlockCtaState: UnlockSurfaceModel["unlockCta"]["state"];
+}): UnlockSurfaceModel {
+  const baseUnlock = createApiFeedSurface("setup_required").unlock;
+
+  return normalizeUnlockSurface({
+    access: {
+      mainId: baseUnlock.main.id,
+      reason: accessReason,
+      status: accessStatus,
+    },
+    creator: baseUnlock.creator,
+    entryContext: {
+      accessEntryPath: baseUnlock.entryContext.accessEntryPath,
+      purchasePath: baseUnlock.entryContext.purchasePath,
+      token: entryToken,
+    },
+    main: baseUnlock.main,
+    purchase: {
+      paymentBypassEnabled,
+      pendingReason: purchaseState === "purchase_pending" ? "provider_processing" : null,
+      savedPaymentMethods,
+      setup: {
+        required: requiresAgeConfirmation || requiresCardSetup || requiresTermsAcceptance,
+        requiresAgeConfirmation,
+        requiresCardSetup,
+        requiresTermsAcceptance,
+      },
+      state: purchaseState,
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
+    },
+    short: baseUnlock.short,
+    unlockCta: {
+      mainDurationSeconds:
+        unlockCtaState === "continue_main" || unlockCtaState === "owner_preview" ? null : baseUnlock.main.durationSeconds,
+      priceJpy:
+        unlockCtaState === "continue_main" || unlockCtaState === "owner_preview" ? null : baseUnlock.main.priceJpy,
+      resumePositionSeconds: unlockCtaState === "continue_main" ? 120 : null,
+      state: unlockCtaState,
+    },
+  });
+}
+
+function createMainLockedApiError() {
+  return new ApiError("main is not available for unlock", {
+    code: "http",
+    details: JSON.stringify({
+      error: {
+        code: "main_locked",
+        message: "main is not available for unlock",
+      },
+    }),
+    status: 403,
+  });
+}
+
+function createMockCardSetupSession() {
+  return {
+    apiBaseUrl: "https://api.ccbill.test",
+    apiKey: "widget-api-key",
+    clientAccount: "900000",
+    currency: "JPY" as const,
+    initialPeriod: "1",
+    initialPrice: "1800.00",
+    sessionToken: "card-setup-session-token",
+    subAccount: "0001",
+  };
+}
+
 describe("ImmersiveShortSurface", () => {
   const feedSurface = getFeedSurfaceByTab("recommended");
   const detailSurface = getShortSurfaceById("rooftop");
@@ -263,10 +572,14 @@ describe("ImmersiveShortSurface", () => {
   };
 
   beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.com");
     mockedUpdateCreatorFollow.mockReset();
+    mockedRequestCardSetupSession.mockReset();
+    mockedRequestCardSetupToken.mockReset();
     mockedGetPublicShortDetail.mockReset();
     mockedUseFanAuthDialogControls.mockReset();
     mockedRequestMainAccessEntry.mockReset();
+    mockedRequestMainPurchase.mockReset();
     mockedRequestUnlockSurfaceByShortId.mockReset();
     mockedUseFanAuthDialog.mockReset();
     mockedUseShortRecommendationSignals.mockReset();
@@ -298,6 +611,7 @@ describe("ImmersiveShortSurface", () => {
   afterEach(() => {
     push.mockReset();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("opens the mini paywall for setup-required feed content", async () => {
@@ -568,8 +882,19 @@ describe("ImmersiveShortSurface", () => {
     });
   });
 
-  it("opens the paywall directly for API-backed feed content without refetching unlock state", async () => {
+  it("resolves the unlock surface before opening the API-backed paywall", async () => {
     const user = userEvent.setup();
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("setup_required")} />,
       { hasSession: true },
@@ -577,16 +902,110 @@ describe("ImmersiveShortSurface", () => {
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
-    expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
-    expect(mockedRequestUnlockSurfaceByShortId).not.toHaveBeenCalled();
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+    expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+      shortId: "short_mina_rooftop",
+    });
+    expect(mockedRequestCardSetupSession).toHaveBeenCalledWith({
+      entryToken: "resolved-entry-token",
+      fromShortId: "short_mina_rooftop",
+      mainId: "main_mina_quiet_rooftop",
+    });
   });
 
-  it("uses the current unlock surface to open the paywall and main for API-backed direct unlock feed content", async () => {
+  it("reuses the resolved unlock state when reopening the API-backed paywall", async () => {
+    const user = userEvent.setup();
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={createApiFeedSurface("setup_required")} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledTimes(1);
+    expect(mockedRequestCardSetupSession).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "閉じる" }));
+    expect(screen.queryByRole("dialog", { name: feedDialogTitle })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledTimes(1);
+    expect(mockedRequestCardSetupSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows a saved-card purchase CTA for API-backed direct unlock feed content", async () => {
     const user = userEvent.setup();
     const surface = createApiFeedSurface("unlock_available");
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "purchase_ready",
+      savedPaymentMethods: [
+        {
+          brand: "visa",
+          last4: "4242",
+          paymentMethodId: "paymeth_saved_visa",
+        },
+      ],
+      unlockCtaState: "unlock_available",
+    });
 
-    mockedRequestMainAccessEntry.mockResolvedValue({
-      href: "/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant",
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenCalledWith({
+      shortId: "short_mina_rooftop",
+    });
+    expect(screen.getByRole("button", { name: "Purchase ¥1,800" })).toBeInTheDocument();
+  });
+
+  it("tokenizes a new card in the API-backed paywall before purchase submission", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+    mockedRequestCardSetupToken.mockResolvedValue({
+      cardSetupToken: "opaque-card-setup-token",
+    });
+    mockedRequestMainPurchase.mockResolvedValue({
+      access: {
+        mainId: "main_mina_quiet_rooftop",
+        reason: "unlock_required",
+        status: "locked",
+      },
+      entryContext: null,
+      purchase: {
+        canRetry: true,
+        failureReason: "purchase_declined",
+        status: "failed",
+      },
     });
 
     renderWithViewerSession(
@@ -597,19 +1016,434 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
     expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Unlock ¥1,800/ }));
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
+    await user.click(screen.getByRole("button", { name: "Mock card widget" }));
 
     await waitFor(() => {
-      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?fromShortId=short_mina_rooftop&grant=test-grant");
+      expect(mockedRequestCardSetupToken).toHaveBeenCalledWith({
+        cardSetupSessionToken: "card-setup-session-token",
+        entryToken: "resolved-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        paymentTokenId: "widget-payment-token",
+      });
     });
-    expect(mockedRequestUnlockSurfaceByShortId).not.toHaveBeenCalled();
-    expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
-      acceptedAge: false,
-      acceptedTerms: false,
-      entryToken: surface.unlock.mainAccessEntry.token,
-      fromShortId: "short_mina_rooftop",
-      mainId: "main_mina_quiet_rooftop",
-      routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+
+    await waitFor(() => {
+      expect(mockedRequestMainPurchase).toHaveBeenCalledWith({
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: "resolved-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        paymentMethod: {
+          cardSetupToken: "opaque-card-setup-token",
+          mode: "new_card",
+        },
+        purchasePath: resolvedUnlock.entryContext.purchasePath,
+      });
+    });
+  });
+
+  it("opens main playback after a new-card purchase succeeds", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+    mockedRequestCardSetupToken.mockResolvedValue({
+      cardSetupToken: "opaque-card-setup-token",
+    });
+    mockedRequestMainPurchase.mockResolvedValue({
+      access: {
+        mainId: "main_mina_quiet_rooftop",
+        reason: "purchased",
+        status: "unlocked",
+      },
+      entryContext: {
+        accessEntryPath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+        purchasePath: "/api/fan/mains/main_mina_quiet_rooftop/purchase",
+        token: "purchase-success-entry-token",
+      },
+      purchase: {
+        canRetry: false,
+        failureReason: null,
+        status: "succeeded",
+      },
+    });
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?grant=purchase-success",
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
+    await user.click(screen.getByRole("button", { name: "Mock card widget" }));
+
+    await waitFor(() => {
+      expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
+        entryToken: "purchase-success-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+      });
+      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?grant=purchase-success");
+    });
+  });
+
+  it("skips the card widget and unlocks through the development payment bypass", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = createResolvedApiUnlock({
+      paymentBypassEnabled: true,
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      savedPaymentMethods: [
+        {
+          brand: "visa",
+          last4: "4242",
+          paymentMethodId: "paymeth_saved_1",
+        },
+      ],
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestMainPurchase.mockResolvedValue({
+      access: {
+        mainId: "main_mina_quiet_rooftop",
+        reason: "purchased",
+        status: "unlocked",
+      },
+      entryContext: {
+        accessEntryPath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+        purchasePath: "/api/fan/mains/main_mina_quiet_rooftop/purchase",
+        token: "bypass-entry-token",
+      },
+      purchase: {
+        canRetry: false,
+        failureReason: null,
+        status: "succeeded",
+      },
+    });
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?grant=development-bypass",
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    expect(screen.getByText("development では CCBill を呼ばずに unlock 導線だけ確認します。")).toBeInTheDocument();
+    expect(screen.queryByText("Saved card 4242")).not.toBeInTheDocument();
+    expect(mockedRequestCardSetupSession).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "Mock card widget" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
+    await user.click(screen.getByRole("button", { name: "支払いをスキップして進む" }));
+
+    await waitFor(() => {
+      expect(mockedRequestMainPurchase).toHaveBeenCalledWith({
+        acceptedAge: true,
+        acceptedTerms: true,
+        entryToken: "resolved-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        paymentMethod: {
+          cardSetupToken: "development-payment-bypass",
+          mode: "new_card",
+        },
+        purchasePath: resolvedUnlock.entryContext.purchasePath,
+      });
+    });
+
+    expect(mockedRequestCardSetupToken).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
+        entryToken: "bypass-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        routePath: "/api/fan/mains/main_mina_quiet_rooftop/access-entry",
+      });
+      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?grant=development-bypass");
+    });
+  });
+
+  it("keeps the card setup flow when bypass flag is not enabled even in development", async () => {
+    vi.stubEnv("NODE_ENV", "development");
+
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = createResolvedApiUnlock({
+      paymentBypassEnabled: false,
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue({
+      apiBaseUrl: "https://payments.example.com",
+      apiKey: "widget-public-token",
+      clientAccount: "900100",
+      currency: "JPY",
+      initialPeriod: "30",
+      initialPrice: "1800",
+      sessionToken: "widget-session-token",
+      subAccount: "0001",
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(mockedRequestCardSetupSession).toHaveBeenCalledWith({
+        entryToken: "resolved-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+      });
+    });
+
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
+
+    expect(screen.queryByText("development では CCBill を呼ばずに unlock 導線だけ確認します。")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Mock card widget" })).toBeInTheDocument();
+  });
+
+  it("does not exchange or purchase a new card before required consent is completed", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+
+    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    expect(
+      screen.getByText("年齢確認と利用規約への同意を完了すると card widget を表示します。"),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mock card widget" })).not.toBeInTheDocument();
+    expect(mockedRequestCardSetupToken).not.toHaveBeenCalled();
+    expect(mockedRequestMainPurchase).not.toHaveBeenCalled();
+  });
+
+  it("recovers a stale card-setup session into the current continue-main access state", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const initialUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+    const recoveredUnlock = createResolvedApiUnlock({
+      accessReason: "purchased",
+      accessStatus: "unlocked",
+      entryToken: "recovered-entry-token",
+      purchaseState: "already_purchased",
+      unlockCtaState: "continue_main",
+    });
+
+    mockedRequestUnlockSurfaceByShortId
+      .mockResolvedValueOnce(initialUnlock)
+      .mockResolvedValue(recoveredUnlock);
+    mockedRequestCardSetupSession.mockRejectedValue(createMainLockedApiError());
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?grant=recovered-session",
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+
+    await waitFor(() => {
+      expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
+        entryToken: "recovered-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        routePath: recoveredUnlock.entryContext.accessEntryPath,
+      });
+      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?grant=recovered-session");
+    });
+  });
+
+  it("recovers a stale card token exchange into the current continue-main access state", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("setup_required");
+    const initialUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
+    const recoveredUnlock = createResolvedApiUnlock({
+      accessReason: "purchased",
+      accessStatus: "unlocked",
+      entryToken: "recovered-token-exchange-entry-token",
+      purchaseState: "already_purchased",
+      unlockCtaState: "continue_main",
+    });
+
+    mockedRequestUnlockSurfaceByShortId
+      .mockResolvedValueOnce(initialUnlock)
+      .mockResolvedValue(recoveredUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
+    mockedRequestCardSetupToken.mockRejectedValue(createMainLockedApiError());
+    mockedRequestMainAccessEntry.mockResolvedValue({
+      href: "/mains/main_mina_quiet_rooftop?grant=recovered-token-exchange",
+    });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
+    await user.click(screen.getByRole("button", { name: "Mock card widget" }));
+
+    await waitFor(() => {
+      expect(mockedRequestMainAccessEntry).toHaveBeenCalledWith({
+        entryToken: "recovered-token-exchange-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        routePath: recoveredUnlock.entryContext.accessEntryPath,
+      });
+      expect(push).toHaveBeenCalledWith("/mains/main_mina_quiet_rooftop?grant=recovered-token-exchange");
+    });
+  });
+
+  it("refreshes the paywall state after a stale saved-card purchase hits main_locked", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+    const initialUnlock = createResolvedApiUnlock({
+      entryToken: "stale-entry-token",
+      purchaseState: "purchase_ready",
+      savedPaymentMethods: [
+        {
+          brand: "visa",
+          last4: "4242",
+          paymentMethodId: "paymeth_saved_visa",
+        },
+      ],
+      unlockCtaState: "unlock_available",
+    });
+    const refreshedUnlock = createResolvedApiUnlock({
+      entryToken: "refreshed-entry-token",
+      purchaseState: "purchase_ready",
+      savedPaymentMethods: [
+        {
+          brand: "visa",
+          last4: "4242",
+          paymentMethodId: "paymeth_saved_visa",
+        },
+      ],
+      unlockCtaState: "unlock_available",
+    });
+
+    mockedRequestUnlockSurfaceByShortId
+      .mockResolvedValueOnce(initialUnlock)
+      .mockResolvedValue(refreshedUnlock);
+    mockedRequestMainPurchase
+      .mockRejectedValueOnce(createMainLockedApiError())
+      .mockResolvedValue({
+        access: {
+          mainId: "main_mina_quiet_rooftop",
+          reason: "unlock_required",
+          status: "locked",
+        },
+        entryContext: null,
+        purchase: {
+          canRetry: true,
+          failureReason: "purchase_declined",
+          status: "failed",
+        },
+      });
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: /Unlock/i }));
+    expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Purchase ¥1,800" }));
+
+    await waitFor(() => {
+      expect(mockedRequestUnlockSurfaceByShortId).toHaveBeenNthCalledWith(2, {
+        shortId: "short_mina_rooftop",
+      });
+      expect(screen.getByRole("button", { name: "Purchase ¥1,800" })).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Purchase ¥1,800" }));
+
+    await waitFor(() => {
+      expect(mockedRequestMainPurchase).toHaveBeenNthCalledWith(2, {
+        acceptedAge: false,
+        acceptedTerms: false,
+        entryToken: "refreshed-entry-token",
+        fromShortId: "short_mina_rooftop",
+        mainId: "main_mina_quiet_rooftop",
+        paymentMethod: {
+          mode: "saved_card",
+          paymentMethodId: "paymeth_saved_visa",
+        },
+        purchasePath: refreshedUnlock.entryContext.purchasePath,
+      });
     });
   });
 
@@ -909,15 +1743,13 @@ describe("ImmersiveShortSurface", () => {
   it("resolves the unlock surface before reopening the paywall after auth", async () => {
     const user = userEvent.setup();
     const surface = createApiFeedSurface("unlock_available");
-    const resolvedUnlock = {
-      ...surface.unlock,
-      mainAccessEntry: {
-        ...surface.unlock.mainAccessEntry,
-        token: "entry-token-after-auth",
-      },
-    };
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "purchase_ready",
+      unlockCtaState: "unlock_available",
+    });
 
     mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
 
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
@@ -1013,9 +1845,16 @@ describe("ImmersiveShortSurface", () => {
   it("refreshes stale continue-main auth recovery into the current paywall state", async () => {
     const user = userEvent.setup();
     const surface = createApiFeedSurface("continue_main");
-    const resolvedUnlock = createApiFeedSurface("setup_required").unlock;
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
 
     mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
 
     renderWithViewerSession(
       <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
@@ -1083,37 +1922,34 @@ describe("ImmersiveShortSurface", () => {
 
   it("preserves paywall setup selections across auth-required recovery", async () => {
     const user = userEvent.setup();
-    const surface = createApiFeedSurface("setup_required");
-    const resolvedUnlock = {
-      ...surface.unlock,
-      mainAccessEntry: {
-        ...surface.unlock.mainAccessEntry,
-        token: "entry-token-after-auth",
-      },
-    };
-
-    mockedRequestMainAccessEntry.mockRejectedValueOnce(
-      new ApiError("auth required", {
-        code: "http",
-        details: JSON.stringify({
-          error: {
-            code: "auth_required",
-            message: "login required",
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "auth_required",
+              message: "login required",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 401,
           },
-        }),
-        status: 401,
-      }),
+        ),
+      ),
     );
-    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
 
     renderWithViewerSession(
-      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
       { hasSession: true },
     );
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
     await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
-    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
     await user.click(screen.getByRole("button", { name: "Unlock ¥1,800 | 8分" }));
 
     const options = openFanAuthDialog.mock.calls[0]?.[0];
@@ -1129,43 +1965,40 @@ describe("ImmersiveShortSurface", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
       expect(screen.getByLabelText("18歳以上であり、年齢確認に同意する")).toBeChecked();
-      expect(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む")).toBeChecked();
+      expect(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む")).toBeChecked();
     });
   });
 
   it("restores the paywall after re-auth success when fresh-auth blocks unlock entry", async () => {
     const user = userEvent.setup();
-    const surface = createApiFeedSurface("setup_required");
-    const resolvedUnlock = {
-      ...surface.unlock,
-      mainAccessEntry: {
-        ...surface.unlock.mainAccessEntry,
-        token: "entry-token-after-auth",
-      },
-    };
-
-    mockedRequestMainAccessEntry.mockRejectedValueOnce(
-      new ApiError("fresh auth required", {
-        code: "http",
-        details: JSON.stringify({
-          error: {
-            code: "fresh_auth_required",
-            message: "recent auth required",
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof fetch>().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: {
+              code: "fresh_auth_required",
+              message: "recent auth required",
+            },
+          }),
+          {
+            headers: {
+              "Content-Type": "application/json",
+            },
+            status: 403,
           },
-        }),
-        status: 403,
-      }),
+        ),
+      ),
     );
-    mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
 
     renderWithViewerSession(
-      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />,
       { hasSession: true },
     );
 
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
     await user.click(screen.getByLabelText("18歳以上であり、年齢確認に同意する"));
-    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む"));
+    await user.click(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む"));
     await user.click(screen.getByRole("button", { name: "Unlock ¥1,800 | 8分" }));
 
     const options = openFanAuthDialog.mock.calls[0]?.[0];
@@ -1186,7 +2019,7 @@ describe("ImmersiveShortSurface", () => {
     await waitFor(() => {
       expect(screen.getByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
       expect(screen.getByLabelText("18歳以上であり、年齢確認に同意する")).toBeChecked();
-      expect(screen.getByLabelText("利用規約とポリシーに同意し、main 再生へ進む")).toBeChecked();
+      expect(screen.getByLabelText("利用規約とポリシーに同意し、main purchase へ進む")).toBeChecked();
     });
   });
 
@@ -1196,15 +2029,16 @@ describe("ImmersiveShortSurface", () => {
       ...createApiDetailSurface("setup_required"),
       mainEntryEnabled: true,
     };
-    const resolvedUnlock = {
-      ...surface.unlock,
-      mainAccessEntry: {
-        ...surface.unlock.mainAccessEntry,
-        token: "entry-token-after-auth",
-      },
-    };
+    const resolvedUnlock = createResolvedApiUnlock({
+      purchaseState: "setup_required",
+      requiresAgeConfirmation: true,
+      requiresCardSetup: true,
+      requiresTermsAcceptance: true,
+      unlockCtaState: "setup_required",
+    });
 
     mockedRequestUnlockSurfaceByShortId.mockResolvedValue(resolvedUnlock);
+    mockedRequestCardSetupSession.mockResolvedValue(createMockCardSetupSession());
 
     renderWithViewerSession(
       <ImmersiveShortSurface

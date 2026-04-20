@@ -13,8 +13,7 @@ import (
 
 const acquireMainPurchaseLock = `-- name: AcquireMainPurchaseLock :exec
 SELECT pg_advisory_xact_lock(
-    hashtextextended($1, 0),
-    hashtextextended($2, 0)
+    hashtextextended($1 || ':' || $2, 0)
 )
 `
 
