@@ -6,7 +6,10 @@ import {
   ViewerSessionProvider,
 } from "@/entities/viewer";
 import { FanAuthDialogProvider } from "@/features/fan-auth";
-import type { CreatorSearchState } from "@/features/creator-search";
+import {
+  buildLoadingCreatorSearchState,
+  createCreatorSearchHistoryScope,
+} from "@/features/creator-search";
 import { DetailShell } from "@/widgets/detail-shell";
 import { FanHubShell } from "@/widgets/fan-hub-shell";
 import { FeedShell, getFollowingFeedShellState, getMockFeedShellState } from "@/widgets/feed-shell";
@@ -20,6 +23,11 @@ const mockedRouter = vi.hoisted(() => ({
   refresh: vi.fn(),
   replace: vi.fn(),
 }));
+
+const guestHistoryScope = createCreatorSearchHistoryScope({
+  hasViewerSession: false,
+  viewerId: null,
+});
 
 vi.mock("next/navigation", async () => {
   const actual = await vi.importActual<typeof import("next/navigation")>("next/navigation");
@@ -105,8 +113,12 @@ describe("widgets", () => {
   });
 
   it("renders the search UI and keeps query text", () => {
-    const readyState: CreatorSearchState = {
-      items: [
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    expect(guestHistoryScope).not.toBeNull();
+    window.sessionStorage.setItem(
+      guestHistoryScope!.storageKey,
+      JSON.stringify([
         {
           avatar: null,
           bio: "soft light と close framing の short を中心に更新中。",
@@ -114,11 +126,10 @@ describe("widgets", () => {
           handle: "@aoina",
           id: "creator_aoi_n",
         },
-      ],
-      kind: "ready",
-      query: "",
-    };
-    const { rerender } = render(<SearchShell initialState={readyState} query="" />);
+      ]),
+    );
+
+    const { rerender } = render(<SearchShell initialState={buildLoadingCreatorSearchState("")} query="" />);
 
     expect(screen.getByRole("searchbox")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Aoi N/i })).toBeInTheDocument();

@@ -21,8 +21,12 @@ const DefaultPageSize = 20
 // ErrPublicShortNotFound は対象の public short が存在しないことを表します。
 var ErrPublicShortNotFound = errors.New("public short が見つかりません")
 
+// ErrFollowingCursorInvalid は following feed cursor が継続取得に必要な情報を欠いていることを表します。
+var ErrFollowingCursorInvalid = errors.New("public short following feed cursor が不正です")
+
 type queries interface {
 	GetPublicShortDetailItem(ctx context.Context, arg sqlc.GetPublicShortDetailItemParams) (sqlc.GetPublicShortDetailItemRow, error)
+	ListFeedItemsByShortIDs(ctx context.Context, arg sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error)
 	ListFollowingPublicFeedItems(ctx context.Context, arg sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error)
 	ListRecommendedPublicFeedItems(ctx context.Context, arg sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error)
 }
@@ -34,8 +38,9 @@ type Repository struct {
 
 // Cursor は feed keyset pagination 用の cursor です。
 type Cursor struct {
-	PublishedAt time.Time
-	ShortID     uuid.UUID
+	FollowingRemainingShortIDs []uuid.UUID
+	PublishedAt                time.Time
+	ShortID                    uuid.UUID
 }
 
 // CreatorSummary は public short surface の creator 表示情報です。
@@ -105,14 +110,29 @@ func (r *Repository) ListRecommended(ctx context.Context, viewerUserID *uuid.UUI
 
 // ListFollowing は follow 中 creator の public short feed 1 page を返します。
 func (r *Repository) ListFollowing(ctx context.Context, viewerUserID uuid.UUID, cursor *Cursor, limit int) ([]Item, *Cursor, error) {
-	params, pageLimit := buildFollowingPageParams(viewerUserID, cursor, limit)
+	pageLimit := resolvePageLimit(limit)
+	if cursor == nil {
+		rankingReferenceAt := currentFollowingRankingReferenceAt()
+		rows, err := r.queries.ListFollowingPublicFeedItems(
+			ctx,
+			buildInitialFollowingPageParams(viewerUserID, rankingReferenceAt),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("public short following feed 取得 viewer=%s: %w", viewerUserID, err)
+		}
 
-	rows, err := r.queries.ListFollowingPublicFeedItems(ctx, params)
-	if err != nil {
-		return nil, nil, fmt.Errorf("public short following feed 取得 viewer=%s: %w", viewerUserID, err)
+		return mapInitialFollowingPage(
+			rows,
+			pageLimit,
+			fmt.Sprintf("public short following feed 取得結果の変換 viewer=%s", viewerUserID),
+		)
 	}
 
-	return mapFollowingPage(rows, pageLimit, fmt.Sprintf("public short following feed 取得結果の変換 viewer=%s", viewerUserID))
+	if err := validateFollowingCursor(cursor); err != nil {
+		return nil, nil, fmt.Errorf("public short following feed cursor viewer=%s: %w", viewerUserID, err)
+	}
+
+	return r.listFollowingSnapshotPage(ctx, viewerUserID, cursor.FollowingRemainingShortIDs, pageLimit)
 }
 
 // GetDetail は public short detail を返します。
@@ -138,9 +158,7 @@ func (r *Repository) GetDetail(ctx context.Context, shortID uuid.UUID, viewerUse
 }
 
 func buildRecommendedPageParams(viewerUserID *uuid.UUID, cursor *Cursor, limit int) (sqlc.ListRecommendedPublicFeedItemsParams, int) {
-	if limit <= 0 {
-		limit = DefaultPageSize
-	}
+	limit = resolvePageLimit(limit)
 
 	params := sqlc.ListRecommendedPublicFeedItemsParams{
 		LimitCount: int32(limit + 1),
@@ -158,23 +176,11 @@ func buildRecommendedPageParams(viewerUserID *uuid.UUID, cursor *Cursor, limit i
 	return params, limit
 }
 
-func buildFollowingPageParams(viewerUserID uuid.UUID, cursor *Cursor, limit int) (sqlc.ListFollowingPublicFeedItemsParams, int) {
-	if limit <= 0 {
-		limit = DefaultPageSize
+func buildInitialFollowingPageParams(viewerUserID uuid.UUID, rankingReferenceAt time.Time) sqlc.ListFollowingPublicFeedItemsParams {
+	return sqlc.ListFollowingPublicFeedItemsParams{
+		ViewerUserID:       postgres.UUIDToPG(viewerUserID),
+		RankingReferenceAt: postgres.TimeToPG(&rankingReferenceAt),
 	}
-
-	params := sqlc.ListFollowingPublicFeedItemsParams{
-		ViewerUserID: postgres.UUIDToPG(viewerUserID),
-		LimitCount:   int32(limit + 1),
-	}
-	if cursor == nil {
-		return params, limit
-	}
-
-	params.CursorPublishedAt = postgres.TimeToPG(&cursor.PublishedAt)
-	params.CursorShortID = postgres.UUIDToPG(cursor.ShortID)
-
-	return params, limit
 }
 
 func mapRecommendedPage(rows []sqlc.ListRecommendedPublicFeedItemsRow, limit int, label string) ([]Item, *Cursor, error) {
@@ -215,11 +221,22 @@ func mapRecommendedPage(rows []sqlc.ListRecommendedPublicFeedItemsRow, limit int
 	return mapFeedPageCursor(items, rows, limit)
 }
 
-func mapFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit int, label string) ([]Item, *Cursor, error) {
+func mapInitialFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit int, label string) ([]Item, *Cursor, error) {
+	if len(rows) == 0 {
+		return []Item{}, nil, nil
+	}
+
 	items := make([]Item, 0, min(limit, len(rows)))
+	remainingShortIDs := make([]uuid.UUID, 0, max(0, len(rows)-limit))
 	for index, row := range rows {
 		if index >= limit {
-			break
+			shortID, err := postgres.UUIDFromPG(row.ID)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s: public short item の short id 変換: %w", label, err)
+			}
+
+			remainingShortIDs = append(remainingShortIDs, shortID)
+			continue
 		}
 
 		item, err := mapFeedItem(
@@ -250,7 +267,7 @@ func mapFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit int, la
 		items = append(items, item)
 	}
 
-	return mapFeedPageCursor(items, rows, limit)
+	return items, buildFollowingSnapshotCursor(remainingShortIDs), nil
 }
 
 func mapFeedPageCursor[T interface {
@@ -274,6 +291,8 @@ func mapFeedPageCursor[T interface {
 
 func lengthOfRows(rows any) int {
 	switch typedRows := rows.(type) {
+	case []sqlc.ListFeedItemsByShortIDsRow:
+		return len(typedRows)
 	case []sqlc.ListFollowingPublicFeedItemsRow:
 		return len(typedRows)
 	case []sqlc.ListRecommendedPublicFeedItemsRow:
@@ -281,6 +300,136 @@ func lengthOfRows(rows any) int {
 	default:
 		return 0
 	}
+}
+
+func validateFollowingCursor(cursor *Cursor) error {
+	if cursor == nil {
+		return nil
+	}
+	if len(cursor.FollowingRemainingShortIDs) == 0 {
+		return fmt.Errorf("%w: remaining short ids がありません", ErrFollowingCursorInvalid)
+	}
+	if !cursor.PublishedAt.IsZero() {
+		return fmt.Errorf("%w: following cursor に published_at が含まれています", ErrFollowingCursorInvalid)
+	}
+	if cursor.ShortID != uuid.Nil {
+		return fmt.Errorf("%w: following cursor に short id が含まれています", ErrFollowingCursorInvalid)
+	}
+	for _, shortID := range cursor.FollowingRemainingShortIDs {
+		if shortID == uuid.Nil {
+			return fmt.Errorf("%w: remaining short ids に nil short id が含まれます", ErrFollowingCursorInvalid)
+		}
+	}
+
+	return nil
+}
+
+func resolvePageLimit(limit int) int {
+	if limit <= 0 {
+		return DefaultPageSize
+	}
+
+	return limit
+}
+
+func currentFollowingRankingReferenceAt() time.Time {
+	return time.Now().UTC()
+}
+
+func buildFollowingSnapshotCursor(remainingShortIDs []uuid.UUID) *Cursor {
+	if len(remainingShortIDs) == 0 {
+		return nil
+	}
+
+	nextRemainingShortIDs := append([]uuid.UUID(nil), remainingShortIDs...)
+
+	return &Cursor{FollowingRemainingShortIDs: nextRemainingShortIDs}
+}
+
+func (r *Repository) listFollowingSnapshotPage(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	remainingShortIDs []uuid.UUID,
+	limit int,
+) ([]Item, *Cursor, error) {
+	items := make([]Item, 0, min(limit, len(remainingShortIDs)))
+	consumedCount := 0
+
+	for len(items) < limit && consumedCount < len(remainingShortIDs) {
+		batchSize := min(limit-len(items), len(remainingShortIDs)-consumedCount)
+		batchItems, err := r.hydrateFollowingSnapshotItems(
+			ctx,
+			viewerUserID,
+			remainingShortIDs[consumedCount:consumedCount+batchSize],
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		items = append(items, batchItems...)
+		consumedCount += batchSize
+	}
+
+	return items, buildFollowingSnapshotCursor(remainingShortIDs[consumedCount:]), nil
+}
+
+func (r *Repository) hydrateFollowingSnapshotItems(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	shortIDs []uuid.UUID,
+) ([]Item, error) {
+	rows, err := r.queries.ListFeedItemsByShortIDs(ctx, sqlc.ListFeedItemsByShortIDsParams{
+		ViewerUserID: postgres.UUIDToPG(viewerUserID),
+		ShortIds:     uuidSliceToPG(shortIDs),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("public short following snapshot hydrate viewer=%s: %w", viewerUserID, err)
+	}
+
+	items := make([]Item, 0, len(rows))
+	for _, row := range rows {
+		item, mapErr := mapFeedItem(
+			mapFeedRow{
+				AvatarUrl:          row.AvatarUrl,
+				Bio:                row.Bio,
+				CanonicalMainID:    row.CanonicalMainID,
+				Caption:            row.Caption,
+				CreatorUserID:      row.CreatorUserID,
+				DisplayName:        row.DisplayName,
+				Handle:             row.Handle,
+				ID:                 row.ID,
+				IsOwner:            row.IsOwner,
+				IsPinned:           row.IsPinned,
+				IsUnlocked:         row.IsUnlocked,
+				IsFollowingCreator: row.IsFollowingCreator,
+				MainDurationMs:     row.MainDurationMs,
+				MainPriceMinor:     row.MainPriceMinor,
+				MediaAssetID:       row.MediaAssetID,
+				PublishedAt:        row.PublishedAt,
+				ShortDurationMs:    row.ShortDurationMs,
+			},
+		)
+		if mapErr != nil {
+			return nil, fmt.Errorf(
+				"public short following snapshot hydrate 取得結果の変換 viewer=%s: %w",
+				viewerUserID,
+				mapErr,
+			)
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+func uuidSliceToPG(values []uuid.UUID) []pgtype.UUID {
+	result := make([]pgtype.UUID, 0, len(values))
+	for _, value := range values {
+		result = append(result, postgres.UUIDToPG(value))
+	}
+
+	return result
 }
 
 type mapFeedRow struct {

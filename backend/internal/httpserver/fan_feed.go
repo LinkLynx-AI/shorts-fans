@@ -2,12 +2,9 @@ package httpserver
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
@@ -71,24 +68,20 @@ type unlockCtaStatePayload struct {
 	State                 string `json:"state"`
 }
 
-type fanFeedCursorPayload struct {
-	PublishedAt string `json:"publishedAt"`
-	ShortID     string `json:"shortId"`
-}
-
 func registerFanFeedRoutes(
 	router gin.IRouter,
 	reader FanFeedReader,
+	cursorCodec FanFeedCursorCodec,
 	shortDisplayAssets ShortDisplayAssetResolver,
 	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
-	if router == nil || reader == nil || shortDisplayAssets == nil {
+	if router == nil || reader == nil || cursorCodec == nil || shortDisplayAssets == nil {
 		return
 	}
 
 	router.GET("/api/fan/feed", func(c *gin.Context) {
-		handleFanFeed(c, reader, shortDisplayAssets, recommendationSignalExposure, viewerBootstrap)
+		handleFanFeed(c, reader, cursorCodec, shortDisplayAssets, recommendationSignalExposure, viewerBootstrap)
 	})
 	router.GET("/api/fan/shorts/:shortId", func(c *gin.Context) {
 		handleFanShortDetail(c, reader, shortDisplayAssets, recommendationSignalExposure, viewerBootstrap)
@@ -98,15 +91,30 @@ func registerFanFeedRoutes(
 func handleFanFeed(
 	c *gin.Context,
 	reader FanFeedReader,
+	cursorCodec FanFeedCursorCodec,
 	shortDisplayAssets ShortDisplayAssetResolver,
 	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	tab := normalizeFanFeedTab(c.Query("tab"))
-	cursor := decodeFanFeedCursor(strings.TrimSpace(c.Query("cursor")))
-
 	viewerUserID, err := resolveOptionalViewerUserID(c, viewerBootstrap)
 	if err != nil {
+		writeInternalServerError(c, fanFeedRequestScope)
+		return
+	}
+	if tab == "following" && viewerUserID == nil {
+		writeAuthRequiredError(c, fanFeedRequestScope, fanFeedFollowingAuthRequiredMessage)
+		return
+	}
+	cursorOwnerBinding := fanFeedCursorOwnerBinding(viewerUserID)
+
+	cursor, err := cursorCodec.Decode(c.Request.Context(), tab, cursorOwnerBinding, strings.TrimSpace(c.Query("cursor")))
+	if err != nil {
+		if errors.Is(err, errFanFeedCursorInvalid) {
+			writeInvalidFanFeedRequest(c, "feed cursor was invalid")
+			return
+		}
+
 		writeInternalServerError(c, fanFeedRequestScope)
 		return
 	}
@@ -117,11 +125,6 @@ func handleFanFeed(
 	)
 	switch tab {
 	case "following":
-		if viewerUserID == nil {
-			writeAuthRequiredError(c, fanFeedRequestScope, fanFeedFollowingAuthRequiredMessage)
-			return
-		}
-
 		items, nextCursor, err = reader.ListFollowing(c.Request.Context(), *viewerUserID, cursor, feed.DefaultPageSize)
 	default:
 		items, nextCursor, err = reader.ListRecommended(c.Request.Context(), viewerUserID, cursor, feed.DefaultPageSize)
@@ -146,6 +149,12 @@ func handleFanFeed(
 	creatorIDs := collectRecommendationFeedCreatorIDs(items)
 	rememberRecommendationFeedExposure(c.Request.Context(), recommendationSignalExposure, viewerUserID, shortIDs, creatorIDs)
 
+	encodedCursor, err := cursorCodec.Encode(c.Request.Context(), tab, cursorOwnerBinding, nextCursor)
+	if err != nil {
+		writeInternalServerError(c, fanFeedRequestScope)
+		return
+	}
+
 	c.JSON(http.StatusOK, responseEnvelope[fanFeedResponseData]{
 		Data: &fanFeedResponseData{
 			Items: responseItems,
@@ -155,7 +164,7 @@ func handleFanFeed(
 			RequestID: newRequestID(fanFeedRequestScope),
 			Page: &cursorPageInfo{
 				HasNext:    nextCursor != nil,
-				NextCursor: encodeFanFeedCursor(nextCursor),
+				NextCursor: encodedCursor,
 			},
 		},
 		Error: nil,
@@ -366,50 +375,24 @@ func normalizeFanFeedTab(value string) string {
 	return "recommended"
 }
 
-func decodeFanFeedCursor(encoded string) *feed.Cursor {
-	if encoded == "" {
-		return nil
+func fanFeedCursorOwnerBinding(viewerUserID *uuid.UUID) string {
+	if viewerUserID == nil {
+		return "public"
 	}
 
-	decoded, err := base64.RawURLEncoding.DecodeString(encoded)
-	if err != nil {
-		return nil
-	}
-
-	var payload fanFeedCursorPayload
-	if err := json.Unmarshal(decoded, &payload); err != nil {
-		return nil
-	}
-
-	publishedAt, err := time.Parse(time.RFC3339Nano, payload.PublishedAt)
-	if err != nil {
-		return nil
-	}
-
-	shortID, err := uuid.Parse(strings.TrimSpace(payload.ShortID))
-	if err != nil {
-		return nil
-	}
-
-	return &feed.Cursor{
-		PublishedAt: publishedAt,
-		ShortID:     shortID,
-	}
+	return "viewer:" + viewerUserID.String()
 }
 
-func encodeFanFeedCursor(cursor *feed.Cursor) *string {
-	if cursor == nil {
-		return nil
-	}
-
-	payload, err := json.Marshal(fanFeedCursorPayload{
-		PublishedAt: cursor.PublishedAt.Format(time.RFC3339Nano),
-		ShortID:     cursor.ShortID.String(),
+func writeInvalidFanFeedRequest(c *gin.Context, message string) {
+	c.JSON(http.StatusBadRequest, responseEnvelope[struct{}]{
+		Data: nil,
+		Meta: responseMeta{
+			RequestID: newRequestID(fanFeedRequestScope),
+			Page:      nil,
+		},
+		Error: &responseError{
+			Code:    "invalid_request",
+			Message: message,
+		},
 	})
-	if err != nil {
-		return nil
-	}
-
-	encoded := base64.RawURLEncoding.EncodeToString(payload)
-	return &encoded
 }
