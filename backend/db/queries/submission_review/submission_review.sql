@@ -5,6 +5,7 @@ SELECT
     m.media_asset_id,
     m.state,
     m.review_reason_code,
+    m.review_note,
     m.post_report_state,
     m.price_minor,
     m.currency_code,
@@ -29,6 +30,7 @@ SELECT
     s.media_asset_id,
     s.state,
     s.review_reason_code,
+    s.review_note,
     s.post_report_state,
     s.approved_for_publish_at,
     s.published_at,
@@ -121,6 +123,7 @@ UPDATE app.mains
 SET
     state = 'pending_review',
     review_reason_code = NULL,
+    review_note = NULL,
     review_decision_source = NULL,
     review_decisioned_at = NULL,
     approved_for_unlock_at = NULL,
@@ -133,6 +136,7 @@ UPDATE app.shorts
 SET
     state = 'pending_review',
     review_reason_code = NULL,
+    review_note = NULL,
     review_decision_source = NULL,
     review_decisioned_at = NULL,
     approved_for_publish_at = NULL,
@@ -147,6 +151,7 @@ INSERT INTO app.submission_review_main_decisions (
     main_id,
     target_state,
     reason_code,
+    review_note,
     decision_source,
     decisioned_at
 ) VALUES (
@@ -154,6 +159,7 @@ INSERT INTO app.submission_review_main_decisions (
     sqlc.arg(main_id),
     sqlc.arg(target_state),
     sqlc.narg(reason_code),
+    sqlc.narg(review_note),
     sqlc.arg(decision_source),
     sqlc.arg(decisioned_at)
 );
@@ -164,6 +170,7 @@ INSERT INTO app.submission_review_short_decisions (
     short_id,
     target_state,
     reason_code,
+    review_note,
     decision_source,
     decisioned_at
 ) VALUES (
@@ -171,6 +178,7 @@ INSERT INTO app.submission_review_short_decisions (
     sqlc.arg(short_id),
     sqlc.arg(target_state),
     sqlc.narg(reason_code),
+    sqlc.narg(review_note),
     sqlc.arg(decision_source),
     sqlc.arg(decisioned_at)
 );
@@ -180,6 +188,7 @@ UPDATE app.mains
 SET
     state = sqlc.arg(state),
     review_reason_code = sqlc.narg(review_reason_code),
+    review_note = sqlc.narg(review_note),
     review_decision_source = sqlc.arg(review_decision_source),
     review_decisioned_at = sqlc.arg(review_decisioned_at),
     approved_for_unlock_at = sqlc.narg(approved_for_unlock_at),
@@ -192,6 +201,7 @@ UPDATE app.shorts
 SET
     state = sqlc.arg(state),
     review_reason_code = sqlc.narg(review_reason_code),
+    review_note = sqlc.narg(review_note),
     review_decision_source = sqlc.arg(review_decision_source),
     review_decisioned_at = sqlc.arg(review_decisioned_at),
     approved_for_publish_at = sqlc.narg(approved_for_publish_at),

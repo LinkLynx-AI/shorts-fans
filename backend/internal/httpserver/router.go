@@ -21,6 +21,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
 )
 
@@ -184,6 +185,13 @@ type AdminCreatorReviewService interface {
 	ListCases(ctx context.Context, state string) ([]creatorregistration.ReviewQueueItem, error)
 }
 
+// AdminSubmissionReviewService は localhost 向け submission review admin transport を表します。
+type AdminSubmissionReviewService interface {
+	ApplyDecision(ctx context.Context, input submissionreview.ReviewDecisionInput) error
+	GetCase(ctx context.Context, intakeID uuid.UUID) (submissionreview.AdminReviewCase, error)
+	ListCases(ctx context.Context) ([]submissionreview.AdminReviewQueueItem, error)
+}
+
 // FanProfileOverviewReader は fan profile overview 用の read 操作を表します。
 type FanProfileOverviewReader interface {
 	GetOverview(ctx context.Context, viewerUserID uuid.UUID) (fanprofile.Overview, error)
@@ -208,6 +216,7 @@ type FanProfileLibraryReader interface {
 type HandlerConfig struct {
 	AppEnv                           string
 	AdminCreatorReview               AdminCreatorReviewService
+	AdminSubmissionReview            AdminSubmissionReviewService
 	CreatorSearch                    CreatorSearchReader
 	CreatorWorkspace                 CreatorWorkspaceReader
 	CreatorWorkspaceReviewSurface    CreatorWorkspaceReviewReader
@@ -361,6 +370,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.ViewerBootstrap,
 	)
 	registerAdminCreatorReviewRoutes(router, config.AppEnv, config.AdminCreatorReview)
+	registerAdminSubmissionReviewRoutes(router, config.AppEnv, config.AdminSubmissionReview)
 
 	return router
 }

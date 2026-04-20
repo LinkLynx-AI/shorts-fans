@@ -25,7 +25,7 @@ import (
 
 const (
 	integrationPostgresDSNEnv = "POSTGRES_DSN"
-	latestMigrationVersion    = 18
+	latestMigrationVersion    = 19
 )
 
 func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
@@ -496,11 +496,15 @@ func TestAcquireMainPurchaseLockQueryLatestRevision(t *testing.T) {
 
 	queries := sqlc.New(tx)
 	if err := queries.AcquireMainPurchaseLock(ctx, sqlc.AcquireMainPurchaseLockParams{
-		UserKey: "viewer-lock-key",
-		MainKey: "main-lock-key",
+		UserKey: TextToPG(ptrString("viewer-lock-key")),
+		MainKey: TextToPG(ptrString("main-lock-key")),
 	}); err != nil {
 		t.Fatalf("AcquireMainPurchaseLock() error = %v, want nil", err)
 	}
+}
+
+func ptrString(value string) *string {
+	return &value
 }
 
 func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {

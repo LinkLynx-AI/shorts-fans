@@ -46,7 +46,7 @@ INSERT INTO app.shorts (
     $8,
     $9
 )
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 type CreateShortParams struct {
@@ -89,6 +89,7 @@ func (q *Queries) CreateShort(ctx context.Context, arg CreateShortParams) (AppSh
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -137,7 +138,7 @@ func (q *Queries) GetPublicShortByID(ctx context.Context, id pgtype.UUID) (AppPu
 }
 
 const getShortByID = `-- name: GetShortByID :one
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 FROM app.shorts
 WHERE id = $1
 LIMIT 1
@@ -161,12 +162,13 @@ func (q *Queries) GetShortByID(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
 
 const getShortByMediaAssetID = `-- name: GetShortByMediaAssetID :one
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 FROM app.shorts
 WHERE media_asset_id = $1
 LIMIT 1
@@ -190,6 +192,7 @@ func (q *Queries) GetShortByMediaAssetID(ctx context.Context, mediaAssetID pgtyp
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -310,7 +313,7 @@ func (q *Queries) ListPublicShortsByCreatorUserID(ctx context.Context, creatorUs
 }
 
 const listShortsByCreatorUserID = `-- name: ListShortsByCreatorUserID :many
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 FROM app.shorts
 WHERE creator_user_id = $1
 ORDER BY created_at DESC, id DESC
@@ -340,6 +343,7 @@ func (q *Queries) ListShortsByCreatorUserID(ctx context.Context, creatorUserID p
 			&i.Caption,
 			&i.ReviewDecisionSource,
 			&i.ReviewDecisionedAt,
+			&i.ReviewNote,
 		); err != nil {
 			return nil, err
 		}
@@ -362,7 +366,7 @@ WHERE id = $1
     approved_for_publish_at IS NOT NULL
     OR (review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
   )
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 func (q *Queries) PublishShort(ctx context.Context, id pgtype.UUID) (AppShort, error) {
@@ -383,6 +387,7 @@ func (q *Queries) PublishShort(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -414,7 +419,7 @@ SET
     caption = $1,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $2
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 type UpdateShortCaptionParams struct {
@@ -440,6 +445,7 @@ func (q *Queries) UpdateShortCaption(ctx context.Context, arg UpdateShortCaption
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -456,7 +462,7 @@ SET
 WHERE id = $6
   AND state NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
   AND $1 NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 type UpdateShortStateParams struct {
@@ -493,6 +499,7 @@ func (q *Queries) UpdateShortState(ctx context.Context, arg UpdateShortStatePara
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }

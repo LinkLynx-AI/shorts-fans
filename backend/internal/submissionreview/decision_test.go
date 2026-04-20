@@ -219,6 +219,122 @@ func TestApplyDecisionSuccess(t *testing.T) {
 	}
 }
 
+func TestApplyDecisionPersistsReviewNote(t *testing.T) {
+	t.Parallel()
+
+	now := time.Date(2026, 4, 20, 11, 0, 0, 0, time.UTC)
+	intakeID := uuid.MustParse("77777777-7777-7777-7777-777777777777")
+	mainID := uuid.MustParse("88888888-8888-8888-8888-888888888888")
+	shortID := uuid.MustParse("99999999-9999-9999-9999-999999999999")
+	mainAssetID := uuid.MustParse("aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa")
+	shortAssetID := uuid.MustParse("bbbbbbbb-2222-2222-2222-bbbbbbbbbbbb")
+	caption := "snapshot caption"
+	mainNote := "unlock ready"
+	shortNote := "reframe intro"
+	shortReason := "quality_issue"
+
+	var gotMainLogNote *string
+	var gotMainApplyNote *string
+	var gotShortLogNote *string
+	var gotShortApplyNote *string
+
+	service := &Service{
+		beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) { return &txStub{}, nil }},
+		now:      func() time.Time { return now },
+		newQueries: func(sqlc.DBTX) queries {
+			return queriesStub{
+				getPendingSubmissionReviewIntakeByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+					return sqlc.AppSubmissionReviewIntake{
+						ID:                 postgres.UUIDToPG(intakeID),
+						CanonicalMainID:    postgres.UUIDToPG(mainID),
+						MainMediaAssetID:   postgres.UUIDToPG(mainAssetID),
+						MainPriceMinor:     1800,
+						OwnershipConfirmed: true,
+						ConsentConfirmed:   true,
+					}, nil
+				},
+				getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+					return sqlc.GetSubmissionReviewMainByIDForUpdateRow{
+						ID:                   postgres.UUIDToPG(mainID),
+						MediaAssetID:         postgres.UUIDToPG(mainAssetID),
+						MediaProcessingState: mediaStateReady,
+						State:                mainStatePendingReview,
+						PriceMinor:           1800,
+						OwnershipConfirmed:   true,
+						ConsentConfirmed:     true,
+					}, nil
+				},
+				listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+					return []sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow{{
+						ID:                   postgres.UUIDToPG(shortID),
+						MediaAssetID:         postgres.UUIDToPG(shortAssetID),
+						MediaProcessingState: mediaStateReady,
+						State:                shortStatePendingReview,
+						Caption:              postgres.TextToPG(&caption),
+					}}, nil
+				},
+				listSubmissionReviewIntakeShortsByIntakeID: func(context.Context, pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error) {
+					return []sqlc.AppSubmissionReviewIntakeShort{{
+						SubmissionReviewIntakeID: postgres.UUIDToPG(intakeID),
+						ShortID:                  postgres.UUIDToPG(shortID),
+						MediaAssetID:             postgres.UUIDToPG(shortAssetID),
+						Caption:                  postgres.TextToPG(&caption),
+					}}, nil
+				},
+				createSubmissionReviewMainDecision: func(_ context.Context, arg sqlc.CreateSubmissionReviewMainDecisionParams) error {
+					gotMainLogNote = postgres.OptionalTextFromPG(arg.ReviewNote)
+					return nil
+				},
+				applySubmissionReviewMainDecision: func(_ context.Context, arg sqlc.ApplySubmissionReviewMainDecisionParams) (sqlc.AppMain, error) {
+					gotMainApplyNote = postgres.OptionalTextFromPG(arg.ReviewNote)
+					return sqlc.AppMain{}, nil
+				},
+				createSubmissionReviewShortDecision: func(_ context.Context, arg sqlc.CreateSubmissionReviewShortDecisionParams) error {
+					gotShortLogNote = postgres.OptionalTextFromPG(arg.ReviewNote)
+					return nil
+				},
+				applySubmissionReviewShortDecision: func(_ context.Context, arg sqlc.ApplySubmissionReviewShortDecisionParams) (sqlc.AppShort, error) {
+					gotShortApplyNote = postgres.OptionalTextFromPG(arg.ReviewNote)
+					return sqlc.AppShort{}, nil
+				},
+				markSubmissionReviewIntakeDecisionApplied: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+					return sqlc.AppSubmissionReviewIntake{}, nil
+				},
+			}
+		},
+	}
+
+	err := service.ApplyDecision(context.Background(), ReviewDecisionInput{
+		IntakeID: intakeID,
+		MainDecision: &MainReviewDecisionInput{
+			Decision:   reviewDecisionApproved,
+			ReviewNote: &mainNote,
+		},
+		ShortDecisions: []ShortReviewDecisionInput{{
+			ShortID:    shortID,
+			Decision:   reviewDecisionRevisionRequested,
+			ReasonCode: &shortReason,
+			ReviewNote: &shortNote,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("ApplyDecision() error = %v, want nil", err)
+	}
+
+	if gotMainLogNote == nil || *gotMainLogNote != mainNote {
+		t.Fatalf("CreateSubmissionReviewMainDecision() review note got %v want %q", gotMainLogNote, mainNote)
+	}
+	if gotMainApplyNote == nil || *gotMainApplyNote != mainNote {
+		t.Fatalf("ApplySubmissionReviewMainDecision() review note got %v want %q", gotMainApplyNote, mainNote)
+	}
+	if gotShortLogNote == nil || *gotShortLogNote != shortNote {
+		t.Fatalf("CreateSubmissionReviewShortDecision() review note got %v want %q", gotShortLogNote, shortNote)
+	}
+	if gotShortApplyNote == nil || *gotShortApplyNote != shortNote {
+		t.Fatalf("ApplySubmissionReviewShortDecision() review note got %v want %q", gotShortApplyNote, shortNote)
+	}
+}
+
 func TestApplyDecisionRejectsMissingShortCoverage(t *testing.T) {
 	t.Parallel()
 
