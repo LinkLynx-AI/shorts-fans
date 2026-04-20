@@ -1,0 +1,4 @@
+interface:
+  display_name: "Empirical Prompt Tuning"
+  short_description: "Evaluate prompts with unbiased subagents and iterate"
+  default_prompt: "Use $empirical-prompt-tuning to evaluate this prompt with unbiased subagent runs and tighten the instructions."
