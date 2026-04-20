@@ -583,6 +583,329 @@ func TestRepositoryListFollowingContinuationPreservesSnapshotAfterFollowMutation
 	}
 }
 
+func TestRepositoryListRecommendedRanksPersonalizedCandidates(t *testing.T) {
+	t.Parallel()
+
+	ctx, pool, cleanup := newFeedTestDatabase(t)
+	defer cleanup()
+
+	viewerID := uuid.MustParse("80808080-8080-8080-8080-808080808080")
+	if err := insertFeedViewer(ctx, pool, viewerID); err != nil {
+		t.Fatalf("insertFeedViewer() error = %v, want nil", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	creatorA := creatorScenario{
+		userID:      uuid.MustParse("81818181-8181-8181-8181-818181818181"),
+		mainID:      uuid.MustParse("82828282-8282-8282-8282-828282828282"),
+		mainAssetID: uuid.MustParse("83838383-8383-8383-8383-838383838383"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("84848484-8484-8484-8484-848484848484"),
+			assetID:     uuid.MustParse("85858585-8585-8585-8585-858585858585"),
+			caption:     "cold but recent short",
+			publishedAt: now.Add(-10 * time.Minute),
+		}},
+		displayName: "Recommended A",
+		handle:      "recommendeda",
+	}
+	creatorB := creatorScenario{
+		userID:      uuid.MustParse("86868686-8686-8686-8686-868686868686"),
+		mainID:      uuid.MustParse("87878787-8787-8787-8787-878787878787"),
+		mainAssetID: uuid.MustParse("88888888-8888-8888-8888-888888888888"),
+		shorts: []scenarioShort{
+			{
+				id:          uuid.MustParse("89898989-8989-8989-8989-898989898989"),
+				assetID:     uuid.MustParse("8a8a8a8a-8a8a-8a8a-8a8a-8a8a8a8a8a8a"),
+				caption:     "preferred creator short one",
+				publishedAt: now.Add(-1 * time.Hour),
+			},
+			{
+				id:          uuid.MustParse("8b8b8b8b-8b8b-8b8b-8b8b-8b8b8b8b8b8b"),
+				assetID:     uuid.MustParse("8c8c8c8c-8c8c-8c8c-8c8c-8c8c8c8c8c8c"),
+				caption:     "preferred creator short two",
+				publishedAt: now.Add(-2 * time.Hour),
+			},
+		},
+		displayName: "Recommended B",
+		handle:      "recommendedb",
+	}
+	creatorC := creatorScenario{
+		userID:      uuid.MustParse("8d8d8d8d-8d8d-8d8d-8d8d-8d8d8d8d8d8d"),
+		mainID:      uuid.MustParse("8e8e8e8e-8e8e-8e8e-8e8e-8e8e8e8e8e8e"),
+		mainAssetID: uuid.MustParse("8f8f8f8f-8f8f-8f8f-8f8f-8f8f8f8f8f8f"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("90909090-9090-9090-9090-909090909091"),
+			assetID:     uuid.MustParse("90909090-9090-9090-9090-909090909092"),
+			caption:     "secondary creator short",
+			publishedAt: now.Add(-30 * time.Minute),
+		}},
+		displayName: "Recommended C",
+		handle:      "recommendedc",
+	}
+
+	for _, creator := range []creatorScenario{creatorA, creatorB, creatorC} {
+		followViewer := creator.userID == creatorB.userID
+		if err := insertCreatorScenario(ctx, pool, creator, followViewer, viewerID); err != nil {
+			t.Fatalf("insertCreatorScenario(%s) error = %v, want nil", creator.handle, err)
+		}
+	}
+
+	if err := upsertViewerCreatorFeatures(ctx, pool, viewerID, creatorB.userID, 2, 1); err != nil {
+		t.Fatalf("upsertViewerCreatorFeatures(creatorB) error = %v, want nil", err)
+	}
+	if err := upsertViewerMainFeatures(ctx, pool, viewerID, creatorB.mainID, creatorB.userID, 2); err != nil {
+		t.Fatalf("upsertViewerMainFeatures(creatorB) error = %v, want nil", err)
+	}
+	for _, short := range creatorB.shorts {
+		if err := upsertShortGlobalFeatures(ctx, pool, short.id, creatorB.userID, creatorB.mainID, 2, 5); err != nil {
+			t.Fatalf("upsertShortGlobalFeatures(creatorB short=%s) error = %v, want nil", short.id, err)
+		}
+	}
+	if err := upsertViewerCreatorFeatures(ctx, pool, viewerID, creatorC.userID, 2, 0); err != nil {
+		t.Fatalf("upsertViewerCreatorFeatures(creatorC) error = %v, want nil", err)
+	}
+	if err := upsertViewerMainFeatures(ctx, pool, viewerID, creatorC.mainID, creatorC.userID, 2); err != nil {
+		t.Fatalf("upsertViewerMainFeatures(creatorC) error = %v, want nil", err)
+	}
+	if err := upsertShortGlobalFeatures(ctx, pool, creatorC.shorts[0].id, creatorC.userID, creatorC.mainID, 1, 1); err != nil {
+		t.Fatalf("upsertShortGlobalFeatures(creatorC) error = %v, want nil", err)
+	}
+
+	repo := NewRepository(pool)
+
+	items, nextCursor, err := repo.ListRecommended(ctx, &viewerID, nil, 3)
+	if err != nil {
+		t.Fatalf("ListRecommended() error = %v, want nil", err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("ListRecommended() item len got %d want %d", len(items), 3)
+	}
+	wantFirstPage := []uuid.UUID{
+		creatorB.shorts[0].id,
+		creatorC.shorts[0].id,
+		creatorB.shorts[1].id,
+	}
+	for index, wantShortID := range wantFirstPage {
+		if items[index].Short.ID != wantShortID {
+			t.Fatalf("ListRecommended() first page short[%d] got %s want %s", index, items[index].Short.ID, wantShortID)
+		}
+	}
+	if nextCursor == nil || len(nextCursor.RecommendedRemainingShortIDs) != 1 || nextCursor.RecommendedRemainingShortIDs[0] != creatorA.shorts[0].id {
+		t.Fatalf("ListRecommended() next cursor got %#v want remaining [%s]", nextCursor, creatorA.shorts[0].id)
+	}
+}
+
+func TestRepositoryListRecommendedUsesGlobalFallbackForPublicViewer(t *testing.T) {
+	t.Parallel()
+
+	ctx, pool, cleanup := newFeedTestDatabase(t)
+	defer cleanup()
+
+	now := time.Now().UTC().Truncate(time.Second)
+	dummyViewerID := uuid.MustParse("91919191-9191-9191-9191-919191919191")
+	creatorA := creatorScenario{
+		userID:      uuid.MustParse("92929292-9292-9292-9292-929292929292"),
+		mainID:      uuid.MustParse("93939393-9393-9393-9393-939393939393"),
+		mainAssetID: uuid.MustParse("94949494-9494-9494-9494-949494949494"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("95959595-9595-9595-9595-959595959595"),
+			assetID:     uuid.MustParse("96969696-9696-9696-9696-969696969696"),
+			caption:     "recent low-prior short",
+			publishedAt: now.Add(-10 * time.Minute),
+		}},
+		displayName: "Fallback A",
+		handle:      "fallbacka",
+	}
+	creatorB := creatorScenario{
+		userID:      uuid.MustParse("97979797-9797-9797-9797-979797979797"),
+		mainID:      uuid.MustParse("98989898-9898-9898-9898-989898989898"),
+		mainAssetID: uuid.MustParse("99999999-9999-9999-9999-999999999999"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("aaaaaaaa-1111-2222-3333-bbbbbbbbbbbb"),
+			assetID:     uuid.MustParse("cccccccc-1111-2222-3333-dddddddddddd"),
+			caption:     "older but high-prior short",
+			publishedAt: now.Add(-2 * time.Hour),
+		}},
+		displayName: "Fallback B",
+		handle:      "fallbackb",
+	}
+
+	for _, creator := range []creatorScenario{creatorA, creatorB} {
+		if err := insertCreatorScenario(ctx, pool, creator, false, dummyViewerID); err != nil {
+			t.Fatalf("insertCreatorScenario(%s) error = %v, want nil", creator.handle, err)
+		}
+	}
+	if err := upsertShortGlobalFeatures(ctx, pool, creatorB.shorts[0].id, creatorB.userID, creatorB.mainID, 6, 8); err != nil {
+		t.Fatalf("upsertShortGlobalFeatures(creatorB) error = %v, want nil", err)
+	}
+
+	repo := NewRepository(pool)
+
+	items, nextCursor, err := repo.ListRecommended(ctx, nil, nil, 10)
+	if err != nil {
+		t.Fatalf("ListRecommended() error = %v, want nil", err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("ListRecommended() item len got %d want %d", len(items), 2)
+	}
+	if items[0].Short.ID != creatorB.shorts[0].id || items[1].Short.ID != creatorA.shorts[0].id {
+		t.Fatalf("ListRecommended() got [%s %s] want [%s %s]", items[0].Short.ID, items[1].Short.ID, creatorB.shorts[0].id, creatorA.shorts[0].id)
+	}
+	if items[0].Viewer.IsFollowingCreator || items[0].Viewer.IsPinned || items[0].Unlock.IsUnlocked {
+		t.Fatalf("ListRecommended() public viewer state got %#v want false relation state", items[0])
+	}
+	if nextCursor != nil {
+		t.Fatalf("ListRecommended() cursor got %#v want nil", nextCursor)
+	}
+}
+
+func TestRepositoryListRecommendedContinuationPreservesSnapshotAfterMutation(t *testing.T) {
+	t.Parallel()
+
+	ctx, pool, cleanup := newFeedTestDatabase(t)
+	defer cleanup()
+
+	viewerID := uuid.MustParse("10101010-2020-3030-4040-505050505050")
+	if err := insertFeedViewer(ctx, pool, viewerID); err != nil {
+		t.Fatalf("insertFeedViewer() error = %v, want nil", err)
+	}
+
+	now := time.Now().UTC().Truncate(time.Second)
+	creatorA := creatorScenario{
+		userID:      uuid.MustParse("11111111-2222-3333-4444-555555555556"),
+		mainID:      uuid.MustParse("66666666-7777-8888-9999-aaaaaaaaaaab"),
+		mainAssetID: uuid.MustParse("bbbbbbbb-cccc-dddd-eeee-fffffffffff0"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("12121212-3434-5656-7878-909090909091"),
+			assetID:     uuid.MustParse("13131313-3535-5757-7979-919191919192"),
+			caption:     "recommended first page",
+			publishedAt: now.Add(-10 * time.Minute),
+		}},
+		displayName: "Recommended Snapshot A",
+		handle:      "recsnapa",
+	}
+	creatorB := creatorScenario{
+		userID:      uuid.MustParse("14141414-2424-3434-4444-545454545454"),
+		mainID:      uuid.MustParse("15151515-2525-3535-4545-555555555555"),
+		mainAssetID: uuid.MustParse("16161616-2626-3636-4646-565656565656"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("17171717-2727-3737-4747-575757575757"),
+			assetID:     uuid.MustParse("18181818-2828-3838-4848-585858585858"),
+			caption:     "recommended second page",
+			publishedAt: now.Add(-20 * time.Minute),
+		}},
+		displayName: "Recommended Snapshot B",
+		handle:      "recsnapb",
+	}
+	creatorC := creatorScenario{
+		userID:      uuid.MustParse("19191919-2929-3939-4949-595959595959"),
+		mainID:      uuid.MustParse("1a1a1a1a-2a2a-3a3a-4a4a-5a5a5a5a5a5a"),
+		mainAssetID: uuid.MustParse("1b1b1b1b-2b2b-3b3b-4b4b-5b5b5b5b5b5b"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("1c1c1c1c-2c2c-3c3c-4c4c-5c5c5c5c5c5c"),
+			assetID:     uuid.MustParse("1d1d1d1d-2d2d-3d3d-4d4d-5d5d5d5d5d5d"),
+			caption:     "recommended third page",
+			publishedAt: now.Add(-30 * time.Minute),
+		}},
+		displayName: "Recommended Snapshot C",
+		handle:      "recsnapc",
+	}
+
+	for _, creator := range []creatorScenario{creatorA, creatorB, creatorC} {
+		if err := insertCreatorScenario(ctx, pool, creator, false, viewerID); err != nil {
+			t.Fatalf("insertCreatorScenario(%s) error = %v, want nil", creator.handle, err)
+		}
+	}
+
+	if err := upsertViewerCreatorFeatures(ctx, pool, viewerID, creatorA.userID, 3, 0); err != nil {
+		t.Fatalf("upsertViewerCreatorFeatures(creatorA) error = %v, want nil", err)
+	}
+	if err := upsertViewerMainFeatures(ctx, pool, viewerID, creatorA.mainID, creatorA.userID, 3); err != nil {
+		t.Fatalf("upsertViewerMainFeatures(creatorA) error = %v, want nil", err)
+	}
+	if err := upsertViewerCreatorFeatures(ctx, pool, viewerID, creatorB.userID, 2, 0); err != nil {
+		t.Fatalf("upsertViewerCreatorFeatures(creatorB) error = %v, want nil", err)
+	}
+	if err := upsertViewerMainFeatures(ctx, pool, viewerID, creatorB.mainID, creatorB.userID, 2); err != nil {
+		t.Fatalf("upsertViewerMainFeatures(creatorB) error = %v, want nil", err)
+	}
+	if err := upsertViewerCreatorFeatures(ctx, pool, viewerID, creatorC.userID, 1, 0); err != nil {
+		t.Fatalf("upsertViewerCreatorFeatures(creatorC) error = %v, want nil", err)
+	}
+	if err := upsertViewerMainFeatures(ctx, pool, viewerID, creatorC.mainID, creatorC.userID, 1); err != nil {
+		t.Fatalf("upsertViewerMainFeatures(creatorC) error = %v, want nil", err)
+	}
+
+	repo := NewRepository(pool)
+
+	firstPage, nextCursor, err := repo.ListRecommended(ctx, &viewerID, nil, 1)
+	if err != nil {
+		t.Fatalf("ListRecommended(first page) error = %v, want nil", err)
+	}
+	if len(firstPage) != 1 || nextCursor == nil {
+		t.Fatalf("ListRecommended(first page) got items=%d cursor=%#v want 1 snapshot cursor", len(firstPage), nextCursor)
+	}
+	if firstPage[0].Short.ID != creatorA.shorts[0].id {
+		t.Fatalf("ListRecommended(first page) got short %s want %s", firstPage[0].Short.ID, creatorA.shorts[0].id)
+	}
+
+	hotCreator := creatorScenario{
+		userID:      uuid.MustParse("1e1e1e1e-2e2e-3e3e-4e4e-5e5e5e5e5e5e"),
+		mainID:      uuid.MustParse("1f1f1f1f-2f2f-3f3f-4f4f-5f5f5f5f5f5f"),
+		mainAssetID: uuid.MustParse("20202020-3030-4040-5050-606060606060"),
+		shorts: []scenarioShort{{
+			id:          uuid.MustParse("21212121-3131-4141-5151-616161616161"),
+			assetID:     uuid.MustParse("22222222-3232-4242-5252-626262626262"),
+			caption:     "mutation should not inject",
+			publishedAt: now.Add(-5 * time.Minute),
+		}},
+		displayName: "Recommended Snapshot D",
+		handle:      "recsnapd",
+	}
+	if err := insertCreatorScenario(ctx, pool, hotCreator, false, viewerID); err != nil {
+		t.Fatalf("insertCreatorScenario(%s) error = %v, want nil", hotCreator.handle, err)
+	}
+	if err := upsertShortGlobalFeatures(ctx, pool, hotCreator.shorts[0].id, hotCreator.userID, hotCreator.mainID, 10, 10); err != nil {
+		t.Fatalf("upsertShortGlobalFeatures(hotCreator) error = %v, want nil", err)
+	}
+	if _, err := pool.Exec(
+		ctx,
+		`INSERT INTO app.main_unlocks (user_id, main_id, payment_provider_purchase_ref, purchased_at) VALUES ($1, $2, $3, $4)
+		 ON CONFLICT (user_id, main_id) DO NOTHING`,
+		viewerID,
+		creatorB.mainID,
+		"snapshot-b-unlock",
+		now,
+	); err != nil {
+		t.Fatalf("INSERT main_unlocks(creatorB) error = %v, want nil", err)
+	}
+
+	secondPage, finalCursor, err := repo.ListRecommended(ctx, &viewerID, nextCursor, 2)
+	if err != nil {
+		t.Fatalf("ListRecommended(second page) error = %v, want nil", err)
+	}
+	if len(secondPage) != 2 || finalCursor != nil {
+		t.Fatalf("ListRecommended(second page) got items=%d cursor=%#v want 2 nil", len(secondPage), finalCursor)
+	}
+	if secondPage[0].Short.ID != creatorB.shorts[0].id || secondPage[1].Short.ID != creatorC.shorts[0].id {
+		t.Fatalf(
+			"ListRecommended(second page) got [%s %s] want snapshot [%s %s]",
+			secondPage[0].Short.ID,
+			secondPage[1].Short.ID,
+			creatorB.shorts[0].id,
+			creatorC.shorts[0].id,
+		)
+	}
+	if !secondPage[0].Unlock.IsUnlocked {
+		t.Fatalf("ListRecommended(second page) creatorB unlock got %t want true after mutation", secondPage[0].Unlock.IsUnlocked)
+	}
+	for _, item := range secondPage {
+		if item.Short.ID == hotCreator.shorts[0].id {
+			t.Fatalf("ListRecommended(second page) injected new hot short %s", item.Short.ID)
+		}
+	}
+}
+
 type scenarioShort struct {
 	id          uuid.UUID
 	assetID     uuid.UUID

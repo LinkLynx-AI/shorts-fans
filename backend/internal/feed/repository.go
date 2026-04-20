@@ -15,11 +15,18 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DefaultPageSize は public short feed の既定 page size です。
-const DefaultPageSize = 20
+const (
+	// DefaultPageSize は public short feed の既定 page size です。
+	DefaultPageSize = 20
+	// RecommendedSnapshotMaxShortIDs は initial recommended ranking と snapshot continuation で保持する short 上限です。
+	RecommendedSnapshotMaxShortIDs = 500
+)
 
 // ErrPublicShortNotFound は対象の public short が存在しないことを表します。
 var ErrPublicShortNotFound = errors.New("public short が見つかりません")
+
+// ErrRecommendedCursorInvalid は recommended feed cursor が継続取得に必要な情報を欠いていることを表します。
+var ErrRecommendedCursorInvalid = errors.New("public short recommended feed cursor が不正です")
 
 // ErrFollowingCursorInvalid は following feed cursor が継続取得に必要な情報を欠いていることを表します。
 var ErrFollowingCursorInvalid = errors.New("public short following feed cursor が不正です")
@@ -28,7 +35,8 @@ type queries interface {
 	GetPublicShortDetailItem(ctx context.Context, arg sqlc.GetPublicShortDetailItemParams) (sqlc.GetPublicShortDetailItemRow, error)
 	ListFeedItemsByShortIDs(ctx context.Context, arg sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error)
 	ListFollowingPublicFeedItems(ctx context.Context, arg sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error)
-	ListRecommendedPublicFeedItems(ctx context.Context, arg sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error)
+	ListLegacyRecommendedPublicFeedItems(ctx context.Context, arg sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error)
+	ListRecommendedPublicFeedShortIDs(ctx context.Context, arg sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error)
 }
 
 // Repository は fan public short feed/detail 向けの read 操作をまとめます。
@@ -38,9 +46,10 @@ type Repository struct {
 
 // Cursor は feed keyset pagination 用の cursor です。
 type Cursor struct {
-	FollowingRemainingShortIDs []uuid.UUID
-	PublishedAt                time.Time
-	ShortID                    uuid.UUID
+	RecommendedRemainingShortIDs []uuid.UUID
+	FollowingRemainingShortIDs   []uuid.UUID
+	PublishedAt                  time.Time
+	ShortID                      uuid.UUID
 }
 
 // CreatorSummary は public short surface の creator 表示情報です。
@@ -98,14 +107,54 @@ func NewRepository(pool *pgxpool.Pool) *Repository {
 
 // ListRecommended は public short recommended feed の 1 page を返します。
 func (r *Repository) ListRecommended(ctx context.Context, viewerUserID *uuid.UUID, cursor *Cursor, limit int) ([]Item, *Cursor, error) {
-	params, pageLimit := buildRecommendedPageParams(viewerUserID, cursor, limit)
+	pageLimit := resolvePageLimit(limit)
+	if cursor == nil {
+		rankingReferenceAt := currentRecommendedRankingReferenceAt()
+		shortIDs, err := r.listRecommendedShortIDs(
+			ctx,
+			viewerUserID,
+			rankingReferenceAt,
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("public short recommended feed 取得: %w", err)
+		}
 
-	rows, err := r.queries.ListRecommendedPublicFeedItems(ctx, params)
-	if err != nil {
-		return nil, nil, fmt.Errorf("public short recommended feed 取得: %w", err)
+		return r.listRecommendedSnapshotPage(
+			ctx,
+			viewerUserID,
+			shortIDs,
+			pageLimit,
+			"public short recommended feed initial snapshot hydrate",
+		)
 	}
 
-	return mapRecommendedPage(rows, pageLimit, "public short recommended feed 取得結果の変換")
+	if isLegacyRecommendedCursor(cursor) {
+		rows, err := r.queries.ListLegacyRecommendedPublicFeedItems(
+			ctx,
+			buildLegacyRecommendedPageParams(viewerUserID, cursor, pageLimit),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("public short legacy recommended feed 取得: %w", err)
+		}
+
+		return mapLegacyRecommendedPage(rows, pageLimit, "public short legacy recommended feed 取得結果の変換")
+	}
+
+	if err := validateRecommendedCursor(cursor); err != nil {
+		if viewerUserID == nil {
+			return nil, nil, fmt.Errorf("public short recommended feed cursor public: %w", err)
+		}
+
+		return nil, nil, fmt.Errorf("public short recommended feed cursor viewer=%s: %w", *viewerUserID, err)
+	}
+
+	return r.listRecommendedSnapshotPage(
+		ctx,
+		viewerUserID,
+		cursor.RecommendedRemainingShortIDs,
+		pageLimit,
+		"public short recommended feed continuation snapshot hydrate",
+	)
 }
 
 // ListFollowing は follow 中 creator の public short feed 1 page を返します。
@@ -157,23 +206,36 @@ func (r *Repository) GetDetail(ctx context.Context, shortID uuid.UUID, viewerUse
 	return detail, nil
 }
 
-func buildRecommendedPageParams(viewerUserID *uuid.UUID, cursor *Cursor, limit int) (sqlc.ListRecommendedPublicFeedItemsParams, int) {
-	limit = resolvePageLimit(limit)
-
-	params := sqlc.ListRecommendedPublicFeedItemsParams{
-		LimitCount: int32(limit + 1),
+func buildInitialRecommendedShortIDsParams(
+	viewerUserID *uuid.UUID,
+	rankingReferenceAt time.Time,
+) sqlc.ListRecommendedPublicFeedShortIDsParams {
+	params := sqlc.ListRecommendedPublicFeedShortIDsParams{
+		RankingReferenceAt: postgres.TimeToPG(&rankingReferenceAt),
+		LimitCount:         int32(RecommendedSnapshotMaxShortIDs),
 	}
 	if viewerUserID != nil {
 		params.ViewerUserID = optionalUUIDToPG(viewerUserID)
 	}
-	if cursor == nil {
-		return params, limit
+
+	return params
+}
+
+func buildLegacyRecommendedPageParams(
+	viewerUserID *uuid.UUID,
+	cursor *Cursor,
+	limit int,
+) sqlc.ListLegacyRecommendedPublicFeedItemsParams {
+	params := sqlc.ListLegacyRecommendedPublicFeedItemsParams{
+		CursorPublishedAt: postgres.TimeToPG(&cursor.PublishedAt),
+		CursorShortID:     postgres.UUIDToPG(cursor.ShortID),
+		LimitCount:        int32(limit + 1),
+	}
+	if viewerUserID != nil {
+		params.ViewerUserID = optionalUUIDToPG(viewerUserID)
 	}
 
-	params.CursorPublishedAt = postgres.TimeToPG(&cursor.PublishedAt)
-	params.CursorShortID = postgres.UUIDToPG(cursor.ShortID)
-
-	return params, limit
+	return params
 }
 
 func buildInitialFollowingPageParams(viewerUserID uuid.UUID, rankingReferenceAt time.Time) sqlc.ListFollowingPublicFeedItemsParams {
@@ -183,7 +245,11 @@ func buildInitialFollowingPageParams(viewerUserID uuid.UUID, rankingReferenceAt 
 	}
 }
 
-func mapRecommendedPage(rows []sqlc.ListRecommendedPublicFeedItemsRow, limit int, label string) ([]Item, *Cursor, error) {
+func mapLegacyRecommendedPage(rows []sqlc.ListLegacyRecommendedPublicFeedItemsRow, limit int, label string) ([]Item, *Cursor, error) {
+	if len(rows) == 0 {
+		return []Item{}, nil, nil
+	}
+
 	items := make([]Item, 0, min(limit, len(rows)))
 	for index, row := range rows {
 		if index >= limit {
@@ -293,13 +359,49 @@ func lengthOfRows(rows any) int {
 	switch typedRows := rows.(type) {
 	case []sqlc.ListFeedItemsByShortIDsRow:
 		return len(typedRows)
-	case []sqlc.ListFollowingPublicFeedItemsRow:
+	case []sqlc.ListLegacyRecommendedPublicFeedItemsRow:
 		return len(typedRows)
-	case []sqlc.ListRecommendedPublicFeedItemsRow:
+	case []sqlc.ListFollowingPublicFeedItemsRow:
 		return len(typedRows)
 	default:
 		return 0
 	}
+}
+
+func isLegacyRecommendedCursor(cursor *Cursor) bool {
+	if cursor == nil {
+		return false
+	}
+
+	return len(cursor.RecommendedRemainingShortIDs) == 0 &&
+		len(cursor.FollowingRemainingShortIDs) == 0 &&
+		!cursor.PublishedAt.IsZero() &&
+		cursor.ShortID != uuid.Nil
+}
+
+func validateRecommendedCursor(cursor *Cursor) error {
+	if cursor == nil {
+		return nil
+	}
+	if len(cursor.RecommendedRemainingShortIDs) == 0 {
+		return fmt.Errorf("%w: remaining short ids がありません", ErrRecommendedCursorInvalid)
+	}
+	if len(cursor.FollowingRemainingShortIDs) > 0 {
+		return fmt.Errorf("%w: following cursor state が混在しています", ErrRecommendedCursorInvalid)
+	}
+	if !cursor.PublishedAt.IsZero() {
+		return fmt.Errorf("%w: recommended cursor に published_at が含まれています", ErrRecommendedCursorInvalid)
+	}
+	if cursor.ShortID != uuid.Nil {
+		return fmt.Errorf("%w: recommended cursor に short id が含まれています", ErrRecommendedCursorInvalid)
+	}
+	for _, shortID := range cursor.RecommendedRemainingShortIDs {
+		if shortID == uuid.Nil {
+			return fmt.Errorf("%w: remaining short ids に nil short id が含まれます", ErrRecommendedCursorInvalid)
+		}
+	}
+
+	return nil
 }
 
 func validateFollowingCursor(cursor *Cursor) error {
@@ -308,6 +410,9 @@ func validateFollowingCursor(cursor *Cursor) error {
 	}
 	if len(cursor.FollowingRemainingShortIDs) == 0 {
 		return fmt.Errorf("%w: remaining short ids がありません", ErrFollowingCursorInvalid)
+	}
+	if len(cursor.RecommendedRemainingShortIDs) > 0 {
+		return fmt.Errorf("%w: recommended cursor state が混在しています", ErrFollowingCursorInvalid)
 	}
 	if !cursor.PublishedAt.IsZero() {
 		return fmt.Errorf("%w: following cursor に published_at が含まれています", ErrFollowingCursorInvalid)
@@ -336,6 +441,20 @@ func currentFollowingRankingReferenceAt() time.Time {
 	return time.Now().UTC()
 }
 
+func currentRecommendedRankingReferenceAt() time.Time {
+	return time.Now().UTC()
+}
+
+func buildRecommendedSnapshotCursor(remainingShortIDs []uuid.UUID) *Cursor {
+	if len(remainingShortIDs) == 0 {
+		return nil
+	}
+
+	nextRemainingShortIDs := append([]uuid.UUID(nil), remainingShortIDs...)
+
+	return &Cursor{RecommendedRemainingShortIDs: nextRemainingShortIDs}
+}
+
 func buildFollowingSnapshotCursor(remainingShortIDs []uuid.UUID) *Cursor {
 	if len(remainingShortIDs) == 0 {
 		return nil
@@ -344,6 +463,61 @@ func buildFollowingSnapshotCursor(remainingShortIDs []uuid.UUID) *Cursor {
 	nextRemainingShortIDs := append([]uuid.UUID(nil), remainingShortIDs...)
 
 	return &Cursor{FollowingRemainingShortIDs: nextRemainingShortIDs}
+}
+
+func (r *Repository) listRecommendedShortIDs(
+	ctx context.Context,
+	viewerUserID *uuid.UUID,
+	rankingReferenceAt time.Time,
+) ([]uuid.UUID, error) {
+	rows, err := r.queries.ListRecommendedPublicFeedShortIDs(
+		ctx,
+		buildInitialRecommendedShortIDsParams(viewerUserID, rankingReferenceAt),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	shortIDs := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		shortID, decodeErr := postgres.UUIDFromPG(row)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("public short recommended feed short id 変換: %w", decodeErr)
+		}
+
+		shortIDs = append(shortIDs, shortID)
+	}
+
+	return shortIDs, nil
+}
+
+func (r *Repository) listRecommendedSnapshotPage(
+	ctx context.Context,
+	viewerUserID *uuid.UUID,
+	remainingShortIDs []uuid.UUID,
+	limit int,
+	label string,
+) ([]Item, *Cursor, error) {
+	items := make([]Item, 0, min(limit, len(remainingShortIDs)))
+	consumedCount := 0
+
+	for len(items) < limit && consumedCount < len(remainingShortIDs) {
+		batchSize := min(limit-len(items), len(remainingShortIDs)-consumedCount)
+		batchItems, err := r.hydrateSnapshotItems(
+			ctx,
+			viewerUserID,
+			remainingShortIDs[consumedCount:consumedCount+batchSize],
+			label,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		items = append(items, batchItems...)
+		consumedCount += batchSize
+	}
+
+	return items, buildRecommendedSnapshotCursor(remainingShortIDs[consumedCount:]), nil
 }
 
 func (r *Repository) listFollowingSnapshotPage(
@@ -357,10 +531,11 @@ func (r *Repository) listFollowingSnapshotPage(
 
 	for len(items) < limit && consumedCount < len(remainingShortIDs) {
 		batchSize := min(limit-len(items), len(remainingShortIDs)-consumedCount)
-		batchItems, err := r.hydrateFollowingSnapshotItems(
+		batchItems, err := r.hydrateSnapshotItems(
 			ctx,
-			viewerUserID,
+			&viewerUserID,
 			remainingShortIDs[consumedCount:consumedCount+batchSize],
+			fmt.Sprintf("public short following snapshot hydrate viewer=%s", viewerUserID),
 		)
 		if err != nil {
 			return nil, nil, err
@@ -373,17 +548,18 @@ func (r *Repository) listFollowingSnapshotPage(
 	return items, buildFollowingSnapshotCursor(remainingShortIDs[consumedCount:]), nil
 }
 
-func (r *Repository) hydrateFollowingSnapshotItems(
+func (r *Repository) hydrateSnapshotItems(
 	ctx context.Context,
-	viewerUserID uuid.UUID,
+	viewerUserID *uuid.UUID,
 	shortIDs []uuid.UUID,
+	label string,
 ) ([]Item, error) {
 	rows, err := r.queries.ListFeedItemsByShortIDs(ctx, sqlc.ListFeedItemsByShortIDsParams{
-		ViewerUserID: postgres.UUIDToPG(viewerUserID),
+		ViewerUserID: optionalUUIDToPG(viewerUserID),
 		ShortIds:     uuidSliceToPG(shortIDs),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("public short following snapshot hydrate viewer=%s: %w", viewerUserID, err)
+		return nil, fmt.Errorf("%s: %w", label, err)
 	}
 
 	items := make([]Item, 0, len(rows))
@@ -410,11 +586,7 @@ func (r *Repository) hydrateFollowingSnapshotItems(
 			},
 		)
 		if mapErr != nil {
-			return nil, fmt.Errorf(
-				"public short following snapshot hydrate 取得結果の変換 viewer=%s: %w",
-				viewerUserID,
-				mapErr,
-			)
+			return nil, fmt.Errorf("%s 取得結果の変換: %w", label, mapErr)
 		}
 
 		items = append(items, item)
