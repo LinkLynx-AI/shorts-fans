@@ -94,7 +94,7 @@ export function CreatorSearchPanel({
               q: state.query,
             })}
             onClick={() => {
-              markCreatorSelectionPending(creator);
+              markCreatorSelectionPending(creator, state.query);
             }}
           >
             <span className="flex min-w-0 items-center gap-3">

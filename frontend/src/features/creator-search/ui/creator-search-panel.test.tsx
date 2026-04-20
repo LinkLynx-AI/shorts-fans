@@ -105,7 +105,7 @@ describe("CreatorSearchPanel", () => {
   it("loads creator history for an empty query and applies the filter after a short delay", async () => {
     expect(guestHistoryScope).not.toBeNull();
     window.sessionStorage.setItem(
-      guestHistoryScope?.storageKey ?? "",
+      guestHistoryScope!.storageKey,
       JSON.stringify([
         {
           avatar: null,
@@ -185,6 +185,50 @@ describe("CreatorSearchPanel", () => {
     });
 
     expect(screen.getByText("まだ検索履歴はありません。")).toBeInTheDocument();
+  });
+
+  it("sanitizes an invalid stored history payload after hydration", async () => {
+    expect(guestHistoryScope).not.toBeNull();
+    window.sessionStorage.setItem(guestHistoryScope!.storageKey, "{");
+
+    render(<CreatorSearchPanel initialQuery="" initialState={buildEmptyCreatorSearchState("")} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(window.sessionStorage.getItem(guestHistoryScope!.storageKey)).toBeNull();
+    expect(screen.getByText("まだ検索履歴はありません。")).toBeInTheDocument();
+  });
+
+  it("stores the same query string used by the creator profile link", async () => {
+    expect(guestHistoryScope).not.toBeNull();
+    window.sessionStorage.setItem(
+      guestHistoryScope!.storageKey,
+      JSON.stringify([
+        {
+          avatar: null,
+          bio: "soft light と close framing の short を中心に更新中。",
+          displayName: "Aoi N",
+          handle: "@aoina",
+          id: "creator_aoi_n",
+        },
+      ]),
+    );
+
+    render(<CreatorSearchPanel initialQuery="" initialState={buildEmptyCreatorSearchState("")} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    fireEvent.change(screen.getByRole("searchbox"), {
+      target: { value: "   " },
+    });
+
+    fireEvent.click(screen.getByRole("link", { name: /Aoi N/i }));
+
+    expect(window.sessionStorage.getItem(creatorSearchHistoryPendingNavigationKey)).toContain("\"query\":\"\"");
   });
 
   it("does not render a false empty history state during server render", () => {

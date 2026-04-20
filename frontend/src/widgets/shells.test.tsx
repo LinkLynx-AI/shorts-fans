@@ -117,7 +117,7 @@ describe("widgets", () => {
     window.sessionStorage.clear();
     expect(guestHistoryScope).not.toBeNull();
     window.sessionStorage.setItem(
-      guestHistoryScope?.storageKey ?? "",
+      guestHistoryScope!.storageKey,
       JSON.stringify([
         {
           avatar: null,

@@ -15,6 +15,7 @@ import {
 import {
   createCreatorSearchHistoryScope,
   markPendingCreatorSearchHistorySelection,
+  readCreatorSearchHistory,
   parseCreatorSearchHistorySnapshot,
   readCreatorSearchHistorySnapshot,
   subscribeCreatorSearchHistory,
@@ -72,6 +73,16 @@ export function useCreatorSearch({
   }
 
   useEffect(() => {
+    if (!usesHistory || !isHydrated) {
+      return;
+    }
+
+    readCreatorSearchHistory({
+      scope: historyScope,
+    });
+  }, [historyScope, historySnapshot, isHydrated, usesHistory]);
+
+  useEffect(() => {
     if (isFirstLoadRef.current) {
       isFirstLoadRef.current = false;
       if (
@@ -106,14 +117,14 @@ export function useCreatorSearch({
 
   return {
     isHistoryHydrating: usesHistory && !isHydrated,
-    markCreatorSelectionPending: (creator: CreatorSummary) => {
+    markCreatorSelectionPending: (creator: CreatorSummary, selectedQuery: string) => {
       if (!historyScope) {
         return;
       }
 
       markPendingCreatorSearchHistorySelection({
         creatorId: creator.id,
-        query,
+        query: selectedQuery,
       });
     },
     query,

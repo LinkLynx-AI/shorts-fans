@@ -178,6 +178,14 @@ function resolveSessionStorage(storage?: Storage): Storage | null {
   }
 }
 
+function dispatchCreatorSearchHistoryUpdated(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.dispatchEvent(new Event(creatorSearchHistoryUpdatedEventName));
+}
+
 function parseCreatorSearchHistory(rawValue: string | null): readonly CreatorSummary[] {
   if (!rawValue) {
     return [];
@@ -237,6 +245,7 @@ export function readCreatorSearchHistory(options: CreatorSearchHistoryOptions): 
 
     if (rawValue && history.length === 0) {
       resolvedStorage.storage.removeItem(resolvedStorage.storageKey);
+      dispatchCreatorSearchHistoryUpdated();
     }
 
     return history;
@@ -271,9 +280,7 @@ export function recordCreatorSearchHistory(
 
   try {
     resolvedStorage.storage.setItem(resolvedStorage.storageKey, JSON.stringify(nextHistory));
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event(creatorSearchHistoryUpdatedEventName));
-    }
+    dispatchCreatorSearchHistoryUpdated();
   } catch {
     return nextHistory;
   }
