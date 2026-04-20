@@ -21,12 +21,13 @@ export function CreatorSearchPanel({
   initialState,
   initialQuery,
 }: CreatorSearchPanelProps) {
-  const { query, retry, setQuery, state } = useCreatorSearch({
+  const { isHistoryHydrating, markCreatorSelectionPending, query, retry, setQuery, state } = useCreatorSearch({
     initialQuery,
     initialState,
   });
   const showsRecentLabel = query.trim().length === 0;
-  const creators = state.kind === "ready" ? state.items : [];
+  const suppressHistoryContent = showsRecentLabel && isHistoryHydrating;
+  const creators = state.kind === "ready" && !suppressHistoryContent ? state.items : [];
 
   return (
     <div className="mt-1">
@@ -48,7 +49,9 @@ export function CreatorSearchPanel({
         />
       </div>
 
-      {showsRecentLabel ? <p className="mt-4 text-[13px] font-bold text-muted">最近</p> : null}
+      {showsRecentLabel && !suppressHistoryContent ? (
+        <p className="mt-4 text-[13px] font-bold text-muted">最近見たクリエイター</p>
+      ) : null}
 
       {state.kind === "loading" ? (
         <p className="mt-4 text-[13px] font-bold text-muted" role="status">
@@ -69,9 +72,9 @@ export function CreatorSearchPanel({
         </div>
       ) : null}
 
-      {state.kind === "empty" ? (
+      {state.kind === "empty" && !suppressHistoryContent ? (
         <p className="mt-4 text-[13px] leading-6 text-muted">
-          {showsRecentLabel ? "表示できる creator がまだいません。" : "一致する creator は見つかりませんでした。"}
+          {showsRecentLabel ? "まだ検索履歴はありません。" : "一致する creator は見つかりませんでした。"}
         </p>
       ) : null}
 
@@ -90,6 +93,9 @@ export function CreatorSearchPanel({
               from: "search",
               q: state.query,
             })}
+            onClick={() => {
+              markCreatorSelectionPending(creator, state.query);
+            }}
           >
             <span className="flex min-w-0 items-center gap-3">
               <CreatorAvatar

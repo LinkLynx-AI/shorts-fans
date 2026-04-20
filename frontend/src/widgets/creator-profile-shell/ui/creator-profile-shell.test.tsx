@@ -14,6 +14,11 @@ import {
   useHasViewerSession,
 } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
+import {
+  createCreatorSearchHistoryScope,
+  creatorSearchHistoryPendingNavigationKey,
+  markPendingCreatorSearchHistorySelection,
+} from "@/features/creator-search";
 import { useFanAuthDialogControls } from "@/features/fan-auth";
 import {
   CreatorProfileShell,
@@ -64,6 +69,10 @@ const mockedUseCreatorModeEntry = vi.mocked(useCreatorModeEntry);
 const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const openFanAuthDialog = vi.fn();
 const enterCreatorMode = vi.fn();
+const signedInHistoryScope = createCreatorSearchHistoryScope({
+  hasViewerSession: true,
+  viewerId: "viewer_123",
+});
 
 function buildReadyState(
   overrides?: Partial<Extract<CreatorProfileShellState, { kind: "ready" }>>,
@@ -140,6 +149,7 @@ describe("CreatorProfileShell", () => {
     mockedUseCreatorModeEntry.mockReset();
     openFanAuthDialog.mockReset();
     enterCreatorMode.mockReset();
+    window.sessionStorage.clear();
     mockedUseCurrentViewer.mockReturnValue(null);
     mockedUseCreatorModeEntry.mockReturnValue({
       clearError: vi.fn(),
@@ -155,6 +165,18 @@ describe("CreatorProfileShell", () => {
 
   it("renders the contract-backed creator profile header and short grid", () => {
     mockedUseHasViewerSession.mockReturnValue(true);
+    mockedUseCurrentViewer.mockReturnValue({
+      activeMode: "fan",
+      canAccessCreatorMode: false,
+      id: "viewer_123",
+    });
+    markPendingCreatorSearchHistorySelection(
+      {
+        creatorId: "creator_mina_rei",
+        query: "mina",
+      },
+      window.sessionStorage,
+    );
 
     render(
       <CreatorProfileShell
@@ -174,6 +196,9 @@ describe("CreatorProfileShell", () => {
       "href",
       "/shorts/short_mina_rooftop?creatorId=creator_mina_rei&from=creator&profileFrom=search&profileQ=mina",
     );
+    expect(window.sessionStorage.getItem(creatorSearchHistoryPendingNavigationKey)).toBeNull();
+    expect(signedInHistoryScope).not.toBeNull();
+    expect(window.sessionStorage.getItem(signedInHistoryScope?.storageKey ?? "")).toContain("creator_mina_rei");
   });
 
   it("replaces the follow CTA with a creator page entry button on self profile", async () => {

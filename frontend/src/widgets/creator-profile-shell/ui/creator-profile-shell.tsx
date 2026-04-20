@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
@@ -13,6 +14,7 @@ import {
   useHasViewerSession,
 } from "@/entities/viewer";
 import { useCreatorModeEntry } from "@/features/creator-entry";
+import { useCreatorSearchHistoryRecorder } from "@/features/creator-search";
 import {
   buildCreatorShortDetailHref,
   resolveCreatorProfileBackHref,
@@ -142,6 +144,7 @@ export function CreatorProfileShell({
   } = useCreatorModeEntry();
   const backHref = resolveCreatorProfileBackHref(routeState);
   const isSelfProfile = isSelfCreatorProfile(currentViewer?.id, creator.id);
+  const { recordVisitedCreatorFromSearch } = useCreatorSearchHistoryRecorder();
   const {
     errorMessage,
     fanCount,
@@ -165,6 +168,17 @@ export function CreatorProfileShell({
     },
   });
   const primaryActionErrorMessage = isSelfProfile ? creatorModeEntryErrorMessage : errorMessage;
+
+  useEffect(() => {
+    if (routeState.from !== "search") {
+      return;
+    }
+
+    recordVisitedCreatorFromSearch({
+      creator,
+      query: routeState.q,
+    });
+  }, [creator, recordVisitedCreatorFromSearch, routeState.from, routeState.q]);
 
   return (
     <section className="min-h-full overflow-y-auto bg-white pb-28 text-foreground">

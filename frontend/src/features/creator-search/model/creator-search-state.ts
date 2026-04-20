@@ -33,6 +33,17 @@ export function normalizeCreatorSearchQuery(query: string): string {
 }
 
 /**
+ * creator search の empty state を組み立てる。
+ */
+export function buildEmptyCreatorSearchState(query: string): CreatorSearchState {
+  return {
+    items: [],
+    kind: "empty",
+    query,
+  };
+}
+
+/**
  * creator search の loading state を組み立てる。
  */
 export function buildLoadingCreatorSearchState(query: string): CreatorSearchState {
@@ -51,6 +62,20 @@ export function buildErrorCreatorSearchState(query: string): CreatorSearchState 
     items: [],
     kind: "error",
     message: creatorSearchErrorMessage,
+    query,
+  };
+}
+
+/**
+ * creator search の ready state を組み立てる。
+ */
+export function buildReadyCreatorSearchState(
+  query: string,
+  items: readonly CreatorSummary[],
+): CreatorSearchState {
+  return {
+    items,
+    kind: "ready",
     query,
   };
 }
