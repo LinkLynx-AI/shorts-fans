@@ -1,8 +1,23 @@
+import { renderToString } from "react-dom/server";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
-import type { CreatorSearchState } from "@/features/creator-search";
-import { CreatorSearchPanel } from "@/features/creator-search";
+import {
+  buildEmptyCreatorSearchState,
+  creatorSearchHistoryPendingNavigationKey,
+  type CreatorSearchState,
+  createCreatorSearchHistoryScope,
+  CreatorSearchPanel,
+} from "@/features/creator-search";
 import { getCreatorSearchResults } from "@/entities/creator";
+import {
+  useCurrentViewer,
+  useHasViewerSession,
+} from "@/entities/viewer";
+
+const guestHistoryScope = createCreatorSearchHistoryScope({
+  hasViewerSession: false,
+  viewerId: null,
+});
 
 vi.mock("@/entities/creator", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/entities/creator")>();
@@ -13,7 +28,19 @@ vi.mock("@/entities/creator", async (importOriginal) => {
   };
 });
 
+vi.mock("@/entities/viewer", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/entities/viewer")>();
+
+  return {
+    ...actual,
+    useCurrentViewer: vi.fn(),
+    useHasViewerSession: vi.fn(),
+  };
+});
+
 const mockedGetCreatorSearchResults = vi.mocked(getCreatorSearchResults);
+const mockedUseCurrentViewer = vi.mocked(useCurrentViewer);
+const mockedUseHasViewerSession = vi.mocked(useHasViewerSession);
 
 const initialState: CreatorSearchState = {
   items: [
@@ -33,6 +60,12 @@ describe("CreatorSearchPanel", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockedGetCreatorSearchResults.mockReset();
+    mockedUseCurrentViewer.mockReset();
+    mockedUseHasViewerSession.mockReset();
+    mockedUseCurrentViewer.mockReturnValue(null);
+    mockedUseHasViewerSession.mockReturnValue(false);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
@@ -51,9 +84,29 @@ describe("CreatorSearchPanel", () => {
     expect(screen.queryByText("open")).not.toBeInTheDocument();
   });
 
-  it("applies the filter after a short delay", async () => {
-    const recentState: CreatorSearchState = {
-      items: [
+  it("records creator history when a search result link is clicked", async () => {
+    render(<CreatorSearchPanel initialQuery="mina" initialState={initialState} />);
+
+    fireEvent.click(screen.getByRole("link", { name: /Mina Rei/i }));
+
+    expect(window.sessionStorage.getItem(creatorSearchHistoryPendingNavigationKey)).toContain("creator_mina_rei");
+  });
+
+  it("does not record pending history while a viewer session is unresolved", async () => {
+    mockedUseHasViewerSession.mockReturnValue(true);
+
+    render(<CreatorSearchPanel initialQuery="mina" initialState={initialState} />);
+
+    fireEvent.click(screen.getByRole("link", { name: /Mina Rei/i }));
+
+    expect(window.sessionStorage.getItem(creatorSearchHistoryPendingNavigationKey)).toBeNull();
+  });
+
+  it("loads creator history for an empty query and applies the filter after a short delay", async () => {
+    expect(guestHistoryScope).not.toBeNull();
+    window.sessionStorage.setItem(
+      guestHistoryScope?.storageKey ?? "",
+      JSON.stringify([
         {
           avatar: null,
           bio: "soft light と close framing の short を中心に更新中。",
@@ -68,10 +121,8 @@ describe("CreatorSearchPanel", () => {
           handle: "@minarei",
           id: "creator_mina_rei",
         },
-      ],
-      kind: "ready",
-      query: "",
-    };
+      ]),
+    );
 
     mockedGetCreatorSearchResults.mockResolvedValue({
       items: [
@@ -94,17 +145,22 @@ describe("CreatorSearchPanel", () => {
     render(
       <CreatorSearchPanel
         initialQuery=""
-        initialState={recentState}
+        initialState={buildEmptyCreatorSearchState("")}
       />,
     );
 
-    expect(screen.getByText("最近")).toBeInTheDocument();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("最近見たクリエイター")).toBeInTheDocument();
+    expect(screen.getByText("Aoi N")).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("searchbox"), {
       target: { value: "sora" },
     });
 
-    expect(screen.queryByText("最近")).not.toBeInTheDocument();
+    expect(screen.queryByText("最近見たクリエイター")).not.toBeInTheDocument();
     expect(screen.queryByText("Sora Vale")).not.toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("読み込み中...");
 
@@ -119,6 +175,28 @@ describe("CreatorSearchPanel", () => {
       "/creators/creator_sora_vale?from=search&q=sora",
     );
     expect(screen.queryByText("Aoi N")).not.toBeInTheDocument();
+  });
+
+  it("renders the empty history state when there is no stored creator history", async () => {
+    render(<CreatorSearchPanel initialQuery="" initialState={buildEmptyCreatorSearchState("")} />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(screen.getByText("まだ検索履歴はありません。")).toBeInTheDocument();
+  });
+
+  it("does not render a false empty history state during server render", () => {
+    const html = renderToString(
+      <CreatorSearchPanel
+        initialQuery=""
+        initialState={buildEmptyCreatorSearchState("")}
+      />,
+    );
+
+    expect(html).not.toContain("最近見たクリエイター");
+    expect(html).not.toContain("まだ検索履歴はありません。");
   });
 
   it("renders the empty state when no creators match", async () => {

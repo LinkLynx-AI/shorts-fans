@@ -1,7 +1,9 @@
 import { getCreatorSearchResults } from "@/entities/creator";
 
 import {
+  buildEmptyCreatorSearchState,
   buildErrorCreatorSearchState,
+  buildReadyCreatorSearchState,
   type CreatorSearchState,
   normalizeCreatorSearchQuery,
 } from "./creator-search-state";
@@ -26,18 +28,10 @@ export async function loadCreatorSearchState(
     });
 
     if (response.items.length === 0) {
-      return {
-        items: [],
-        kind: "empty",
-        query: response.query,
-      };
+      return buildEmptyCreatorSearchState(response.query);
     }
 
-    return {
-      items: response.items,
-      kind: "ready",
-      query: response.query,
-    };
+    return buildReadyCreatorSearchState(response.query, response.items);
   } catch {
     return buildErrorCreatorSearchState(normalizedQuery);
   }
