@@ -2427,6 +2427,102 @@ func TestCreatorWorkspaceReviewSurfaceRoute(t *testing.T) {
 	}
 }
 
+func TestCreatorWorkspaceReviewSurfaceRouteMapsReaderErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{
+			name:       "creator mode unavailable",
+			err:        submissionreview.ErrCreatorModeUnavailable,
+			wantCode:   "creator_mode_unavailable",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "unexpected failure",
+			err:        errors.New("boom"),
+			wantCode:   "internal_error",
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewHandler(HandlerConfig{
+				CreatorWorkspace: stubCreatorWorkspaceReader{},
+				CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+					getWorkspaceReviewSurface: func(context.Context, uuid.UUID) (submissionreview.WorkspaceReviewSurface, error) {
+						return submissionreview.WorkspaceReviewSurface{}, tt.err
+					},
+				},
+				ViewerBootstrap: viewerBootstrapReaderStub{
+					readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+						return auth.Bootstrap{
+							CurrentViewer: &auth.CurrentViewer{
+								ID:                   uuid.MustParse("11112222-3333-4444-5555-666677778888"),
+								CanAccessCreatorMode: true,
+							},
+						}, nil
+					},
+				},
+			})
+
+			req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/review-surface", nil)
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("GET /api/creator/workspace/review-surface status got %d want %d", rec.Code, tt.wantStatus)
+			}
+
+			var response responseEnvelope[struct{}]
+			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+			}
+			if response.Error == nil || response.Error.Code != tt.wantCode {
+				t.Fatalf("response.Error got %#v want %q", response.Error, tt.wantCode)
+			}
+			if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_review_surface_") {
+				t.Fatalf("response.Meta.RequestID got %q want review surface prefix", response.Meta.RequestID)
+			}
+		})
+	}
+}
+
+func TestHandleCreatorWorkspaceReviewSurfaceReturnsInternalErrorWithoutAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/creator/workspace/review-surface", nil)
+
+	handleCreatorWorkspaceReviewSurface(ctx, stubCreatorWorkspaceReviewReader{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("handleCreatorWorkspaceReviewSurface() status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_review_surface_") {
+		t.Fatalf("response.Meta.RequestID got %q want review surface prefix", response.Meta.RequestID)
+	}
+}
+
 func TestCreatorWorkspaceMainReviewSurfaceRoute(t *testing.T) {
 	t.Parallel()
 
@@ -2502,6 +2598,214 @@ func TestCreatorWorkspaceMainReviewSurfaceRoute(t *testing.T) {
 	}
 	if response.Data.ReviewSurface.Review.ReasonCode == nil || *response.Data.ReviewSurface.Review.ReasonCode != reasonCode {
 		t.Fatalf("response.Data.ReviewSurface.Review.ReasonCode got %v want %q", response.Data.ReviewSurface.Review.ReasonCode, reasonCode)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_review_surface_") {
+		t.Fatalf("response.Meta.RequestID got %q want main review surface prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceMainReviewSurfaceRouteRejectsInvalidMainID(t *testing.T) {
+	t.Parallel()
+
+	readerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+			getMainReviewSurface: func(context.Context, uuid.UUID, uuid.UUID) (submissionreview.ItemReviewSurface, error) {
+				readerCalled = true
+				return submissionreview.ItemReviewSurface{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/not_a_main_id/review-surface", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/mains/:mainId/review-surface status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if readerCalled {
+		t.Fatal("readerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
+		t.Fatalf("response body got %q want not_found", rec.Body.String())
+	}
+}
+
+func TestCreatorWorkspaceMainReviewSurfaceRouteMapsReaderErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{
+			name:       "creator mode unavailable",
+			err:        submissionreview.ErrCreatorModeUnavailable,
+			wantCode:   "creator_mode_unavailable",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "review surface not found",
+			err:        submissionreview.ErrReviewSurfaceNotFound,
+			wantCode:   "not_found",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "unexpected failure",
+			err:        errors.New("boom"),
+			wantCode:   "internal_error",
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewHandler(HandlerConfig{
+				CreatorWorkspace: stubCreatorWorkspaceReader{},
+				CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+					getMainReviewSurface: func(context.Context, uuid.UUID, uuid.UUID) (submissionreview.ItemReviewSurface, error) {
+						return submissionreview.ItemReviewSurface{}, tt.err
+					},
+				},
+				ViewerBootstrap: viewerBootstrapReaderStub{
+					readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+						return auth.Bootstrap{
+							CurrentViewer: &auth.CurrentViewer{
+								ID:                   uuid.MustParse("11112222-3333-4444-5555-666677778888"),
+								CanAccessCreatorMode: true,
+							},
+						}, nil
+					},
+				},
+			})
+
+			req := httptest.NewRequest(
+				http.MethodGet,
+				"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("99990000-aaaa-bbbb-cccc-ddddeeeeffff"))+"/review-surface",
+				nil,
+			)
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("GET /api/creator/workspace/mains/:mainId/review-surface status got %d want %d", rec.Code, tt.wantStatus)
+			}
+
+			var response responseEnvelope[struct{}]
+			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+			}
+			if response.Error == nil || response.Error.Code != tt.wantCode {
+				t.Fatalf("response.Error got %#v want %q", response.Error, tt.wantCode)
+			}
+			if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_review_surface_") {
+				t.Fatalf("response.Meta.RequestID got %q want main review surface prefix", response.Meta.RequestID)
+			}
+		})
+	}
+}
+
+func TestCreatorWorkspaceMainReviewSurfaceRouteReturnsInternalErrorForUnsupportedTargetKind(t *testing.T) {
+	t.Parallel()
+
+	mainID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+			getMainReviewSurface: func(context.Context, uuid.UUID, uuid.UUID) (submissionreview.ItemReviewSurface, error) {
+				return submissionreview.ItemReviewSurface{
+					Package: submissionreview.WorkspaceReviewPackageSummary{
+						CanonicalMainID:  mainID,
+						LinkedShortCount: 1,
+						Readiness:        "ready",
+						ReviewStatus:     "draft",
+						SubmitActionKind: "submit",
+					},
+					Review: submissionreview.WorkspaceReviewTargetState{State: "draft"},
+					Target: submissionreview.WorkspaceReviewTarget{
+						CanonicalMainID: mainID,
+						ID:              mainID,
+						Kind:            "unsupported",
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/review-surface", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/creator/workspace/mains/:mainId/review-surface status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"internal_error"`) {
+		t.Fatalf("response body got %q want internal_error", rec.Body.String())
+	}
+}
+
+func TestHandleCreatorWorkspaceMainReviewSurfaceReturnsInternalErrorWithoutAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	mainID := uuid.MustParse("12121212-1212-1212-1212-121212121212")
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/creator/workspace/mains/"+mainPublicID(mainID)+"/review-surface", nil)
+	ctx.Params = gin.Params{
+		{
+			Key:   "mainId",
+			Value: mainPublicID(mainID),
+		},
+	}
+
+	handleCreatorWorkspaceMainReviewSurface(ctx, stubCreatorWorkspaceReviewReader{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("handleCreatorWorkspaceMainReviewSurface() status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
 	}
 	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_review_surface_") {
 		t.Fatalf("response.Meta.RequestID got %q want main review surface prefix", response.Meta.RequestID)
@@ -2588,6 +2892,48 @@ func TestCreatorWorkspaceShortReviewSurfaceRouteMapsReaderErrors(t *testing.T) {
 	}
 }
 
+func TestCreatorWorkspaceShortReviewSurfaceRouteRejectsInvalidShortID(t *testing.T) {
+	t.Parallel()
+
+	readerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+			getShortReviewSurface: func(context.Context, uuid.UUID, uuid.UUID) (submissionreview.ItemReviewSurface, error) {
+				readerCalled = true
+				return submissionreview.ItemReviewSurface{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/not_a_short_id/review-surface", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("GET /api/creator/workspace/shorts/:shortId/review-surface status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if readerCalled {
+		t.Fatal("readerCalled = true, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"not_found"`) {
+		t.Fatalf("response body got %q want not_found", rec.Body.String())
+	}
+}
+
 func TestCreatorWorkspaceShortReviewSurfaceRoute(t *testing.T) {
 	t.Parallel()
 
@@ -2670,6 +3016,92 @@ func TestCreatorWorkspaceShortReviewSurfaceRoute(t *testing.T) {
 	}
 	if response.Data.ReviewSurface.Package.SubmitAction != "resubmit" {
 		t.Fatalf("response.Data.ReviewSurface.Package.SubmitAction got %q want %q", response.Data.ReviewSurface.Package.SubmitAction, "resubmit")
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_short_review_surface_") {
+		t.Fatalf("response.Meta.RequestID got %q want short review surface prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceShortReviewSurfaceRouteReturnsInternalErrorForUnsupportedTargetKind(t *testing.T) {
+	t.Parallel()
+
+	mainID := uuid.MustParse("88880000-1111-2222-3333-444455556666")
+	shortID := uuid.MustParse("77770000-1111-2222-3333-444455556666")
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceReviewSurface: stubCreatorWorkspaceReviewReader{
+			getShortReviewSurface: func(context.Context, uuid.UUID, uuid.UUID) (submissionreview.ItemReviewSurface, error) {
+				return submissionreview.ItemReviewSurface{
+					Package: submissionreview.WorkspaceReviewPackageSummary{
+						CanonicalMainID:  mainID,
+						LinkedShortCount: 1,
+						Readiness:        "ready",
+						ReviewStatus:     "draft",
+						SubmitActionKind: "submit",
+					},
+					Review: submissionreview.WorkspaceReviewTargetState{State: "draft"},
+					Target: submissionreview.WorkspaceReviewTarget{
+						CanonicalMainID: mainID,
+						ID:              shortID,
+						Kind:            "unsupported",
+					},
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						ID:                   uuid.MustParse("99990000-1111-2222-3333-444455556666"),
+						CanAccessCreatorMode: true,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/review-surface", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/creator/workspace/shorts/:shortId/review-surface status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"internal_error"`) {
+		t.Fatalf("response body got %q want internal_error", rec.Body.String())
+	}
+}
+
+func TestHandleCreatorWorkspaceShortReviewSurfaceReturnsInternalErrorWithoutAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	shortID := uuid.MustParse("12121212-1212-1212-1212-121212121212")
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/creator/workspace/shorts/"+shortPublicID(shortID)+"/review-surface", nil)
+	ctx.Params = gin.Params{
+		{
+			Key:   "shortId",
+			Value: shortPublicID(shortID),
+		},
+	}
+
+	handleCreatorWorkspaceShortReviewSurface(ctx, stubCreatorWorkspaceReviewReader{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("handleCreatorWorkspaceShortReviewSurface() status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
 	}
 	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_short_review_surface_") {
 		t.Fatalf("response.Meta.RequestID got %q want short review surface prefix", response.Meta.RequestID)
