@@ -30,12 +30,20 @@ export function formatDurationLabel(totalSeconds: number): string {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
-export function buildPreviewShortAriaLabel(item: CreatorWorkspacePreviewShortItem, index: number): string {
-  return `ショート詳細を開く ${index + 1}件目 ${formatDurationLabel(item.previewDurationSeconds)}`;
+export function buildPreviewShortAriaLabel(
+  item: CreatorWorkspacePreviewShortItem,
+  index: number,
+  statusLabel?: string | null,
+): string {
+  return `ショート詳細を開く ${index + 1}件目${statusLabel ? ` ${statusLabel}` : ""} ${formatDurationLabel(item.previewDurationSeconds)}`;
 }
 
-export function buildPreviewMainAriaLabel(item: CreatorWorkspacePreviewMainItem, index: number): string {
-  return `本編詳細を開く ${index + 1}件目 ${formatJpy(item.priceJpy)} ${formatDurationLabel(item.durationSeconds)}`;
+export function buildPreviewMainAriaLabel(
+  item: CreatorWorkspacePreviewMainItem,
+  index: number,
+  statusLabel?: string | null,
+): string {
+  return `本編詳細を開く ${index + 1}件目${statusLabel ? ` ${statusLabel}` : ""} ${formatJpy(item.priceJpy)} ${formatDurationLabel(item.durationSeconds)}`;
 }
 
 export function buildRevisionRequestedDetail({

@@ -9,12 +9,14 @@ import type {
   ApprovedCreatorWorkspaceOverviewMetrics,
   ApprovedCreatorWorkspaceRevisionRequestedSummary,
 } from "../model/approved-creator-workspace";
+import type { CreatorWorkspaceReviewSurfaceState } from "../model/creator-workspace-review-surface";
 import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
 import {
   buildRevisionRequestedDetail,
   formatCount,
   formatJpy,
 } from "../lib/creator-mode-shell-ui";
+import { CreatorWorkspaceReviewNotices } from "./creator-workspace-review-notices";
 
 function CreatorWorkspaceMetricStrip({
   overviewMetrics,
@@ -171,10 +173,14 @@ function CreatorWorkspaceSummaryError({
 }
 
 export function CreatorWorkspaceSummarySection({
+  onRetryReviewSurface,
   onRetry,
+  reviewSurfaceState,
   state,
 }: {
+  onRetryReviewSurface: () => void;
   onRetry: () => void;
+  reviewSurfaceState: CreatorWorkspaceReviewSurfaceState;
   state: CreatorWorkspaceSummaryState;
 }) {
   if (state.kind === "loading") {
@@ -191,7 +197,10 @@ export function CreatorWorkspaceSummarySection({
         creator={state.summary.creator}
         overviewMetrics={state.summary.overviewMetrics}
       />
-      <CreatorWorkspaceRevisionNotice revisionRequestedSummary={state.summary.revisionRequestedSummary} />
+      <CreatorWorkspaceReviewNotices onRetry={onRetryReviewSurface} state={reviewSurfaceState} />
+      {reviewSurfaceState.kind !== "ready" ? (
+        <CreatorWorkspaceRevisionNotice revisionRequestedSummary={state.summary.revisionRequestedSummary} />
+      ) : null}
     </>
   );
 }

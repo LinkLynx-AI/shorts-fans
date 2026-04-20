@@ -21,6 +21,7 @@ import type {
   ApprovedCreatorWorkspaceState,
 } from "../model/approved-creator-workspace";
 import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
+import type { CreatorWorkspaceReviewSurfaceState } from "../model/creator-workspace-review-surface";
 import type { CreatorWorkspaceSummaryState } from "../model/creator-workspace-summary";
 import type { CreatorWorkspaceTopPerformersState } from "../model/creator-workspace-top-performers";
 import type {
@@ -108,6 +109,7 @@ function CreatorWorkspaceManagedPosts({
   activeTab,
   onChangeTab,
   onOpenPreviewDetail,
+  reviewSurfaceState,
   onRetry,
   state,
   workspace,
@@ -115,6 +117,7 @@ function CreatorWorkspaceManagedPosts({
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
   onOpenPreviewDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+  reviewSurfaceState: CreatorWorkspaceReviewSurfaceState;
   onRetry: () => void;
   state: CreatorWorkspacePreviewCollectionsState;
   workspace: ApprovedCreatorWorkspaceState;
@@ -153,6 +156,7 @@ function CreatorWorkspaceManagedPosts({
         activeTabLabel={activeTabLabel}
         onOpenDetail={onOpenPreviewDetail}
         onRetry={onRetry}
+        reviewSurfaceState={reviewSurfaceState}
         state={state}
       />
     </>
@@ -165,9 +169,11 @@ export function CreatorWorkspaceDashboard({
   onChangeTab,
   onOpenPreviewDetail,
   onRetryPreviewCollections,
+  onRetryReviewSurface,
   onRetrySummary,
   onRetryTopPerformers,
   previewCollectionsState,
+  reviewSurfaceState,
   state,
   summaryState,
   topPerformersState,
@@ -177,9 +183,11 @@ export function CreatorWorkspaceDashboard({
   onChangeTab: (tab: ApprovedCreatorWorkspaceManagedTab) => void;
   onOpenPreviewDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetryPreviewCollections: () => void;
+  onRetryReviewSurface: () => void;
   onRetrySummary: () => void;
   onRetryTopPerformers: () => void;
   previewCollectionsState: CreatorWorkspacePreviewCollectionsState;
+  reviewSurfaceState: CreatorWorkspaceReviewSurfaceState;
   state: CreatorModeShellReadyState;
   summaryState: CreatorWorkspaceSummaryState;
   topPerformersState: CreatorWorkspaceTopPerformersState;
@@ -188,7 +196,12 @@ export function CreatorWorkspaceDashboard({
     <section className="relative z-[2] min-h-svh overflow-y-auto px-4 pb-24 pt-[14px] text-foreground">
       <h1 className="sr-only">{creator.displayName} creator workspace</h1>
       <CreatorWorkspaceTopBar />
-      <CreatorWorkspaceSummarySection onRetry={onRetrySummary} state={summaryState} />
+      <CreatorWorkspaceSummarySection
+        onRetry={onRetrySummary}
+        onRetryReviewSurface={onRetryReviewSurface}
+        reviewSurfaceState={reviewSurfaceState}
+        state={summaryState}
+      />
       <CreatorWorkspaceTopPerformers
         onOpenDetail={onOpenPreviewDetail}
         onRetry={onRetryTopPerformers}
@@ -199,6 +212,7 @@ export function CreatorWorkspaceDashboard({
         activeTab={activeTab}
         onChangeTab={onChangeTab}
         onOpenPreviewDetail={onOpenPreviewDetail}
+        reviewSurfaceState={reviewSurfaceState}
         onRetry={onRetryPreviewCollections}
         state={previewCollectionsState}
         workspace={state.workspace}

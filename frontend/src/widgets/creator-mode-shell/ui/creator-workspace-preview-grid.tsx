@@ -13,11 +13,17 @@ import type {
 } from "../model/approved-creator-workspace";
 import type { CreatorWorkspacePreviewCollectionsState } from "../model/creator-workspace-preview-collections";
 import {
+  resolveCreatorWorkspaceObjectReviewBadge,
+  type CreatorWorkspaceReviewBadge,
+  type CreatorWorkspaceReviewSurfaceState,
+} from "../model/creator-workspace-review-surface";
+import {
   buildPreviewMainAriaLabel,
   buildPreviewShortAriaLabel,
   createVideoPosterStyle,
   formatDurationLabel,
   formatJpy,
+  getManagedTileStatusClassName,
 } from "../lib/creator-mode-shell-ui";
 import type { CreatorWorkspacePreviewDetailSelection } from "./creator-mode-shell.types";
 
@@ -26,11 +32,13 @@ function CreatorWorkspacePreviewTileFrame({
   bottomLeft,
   bottomRight,
   posterUrl,
+  statusBadge,
 }: {
   badge: string;
   bottomLeft: string | null;
   bottomRight: string;
   posterUrl: string;
+  statusBadge: CreatorWorkspaceReviewBadge | null;
 }) {
   return (
     <article
@@ -39,7 +47,7 @@ function CreatorWorkspacePreviewTileFrame({
     >
       <span
         aria-hidden="true"
-        className="block aspect-[3/4] bg-[#dbeaf2]"
+        className={`block aspect-[3/4] bg-[#dbeaf2] ${statusBadge && statusBadge.tone !== "approved" ? "brightness-[0.76] saturate-[0.84]" : ""}`}
         style={createVideoPosterStyle(posterUrl)}
       />
       <div className="absolute inset-0 flex flex-col justify-between bg-[linear-gradient(180deg,rgba(6,21,33,0.12)_0%,rgba(6,21,33,0.03)_34%,rgba(6,21,33,0.66)_100%)] p-2.5">
@@ -50,7 +58,13 @@ function CreatorWorkspacePreviewTileFrame({
           >
             {badge}
           </span>
-          <span className="sr-only">{badge}</span>
+          {statusBadge ? (
+            <span
+              className={`inline-flex min-h-6 items-center justify-center rounded-full px-2.5 text-[10px] font-bold tracking-[0.02em] backdrop-blur-[10px] ${getManagedTileStatusClassName(statusBadge.tone)}`}
+            >
+              {statusBadge.label}
+            </span>
+          ) : null}
         </div>
         <div className="flex items-end justify-between gap-2">
           {bottomLeft ? (
@@ -92,14 +106,16 @@ function CreatorWorkspacePreviewShortTile({
   index,
   item,
   onOpenDetail,
+  statusBadge,
 }: {
   index: number;
   item: CreatorWorkspacePreviewShortItem;
   onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+  statusBadge: CreatorWorkspaceReviewBadge | null;
 }) {
   return (
     <CreatorWorkspacePreviewTileButton
-      ariaLabel={buildPreviewShortAriaLabel(item, index)}
+      ariaLabel={buildPreviewShortAriaLabel(item, index, statusBadge?.label)}
       onClick={() => {
         onOpenDetail({
           index,
@@ -114,6 +130,7 @@ function CreatorWorkspacePreviewShortTile({
         bottomLeft={null}
         bottomRight={formatDurationLabel(item.previewDurationSeconds)}
         posterUrl={item.media.posterUrl}
+        statusBadge={statusBadge}
       />
     </CreatorWorkspacePreviewTileButton>
   );
@@ -123,14 +140,16 @@ function CreatorWorkspacePreviewMainTile({
   index,
   item,
   onOpenDetail,
+  statusBadge,
 }: {
   index: number;
   item: CreatorWorkspacePreviewMainItem;
   onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+  statusBadge: CreatorWorkspaceReviewBadge | null;
 }) {
   return (
     <CreatorWorkspacePreviewTileButton
-      ariaLabel={buildPreviewMainAriaLabel(item, index)}
+      ariaLabel={buildPreviewMainAriaLabel(item, index, statusBadge?.label)}
       onClick={() => {
         onOpenDetail({
           index,
@@ -145,6 +164,7 @@ function CreatorWorkspacePreviewMainTile({
         bottomLeft={formatJpy(item.priceJpy)}
         bottomRight={formatDurationLabel(item.durationSeconds)}
         posterUrl={item.media.posterUrl}
+        statusBadge={statusBadge}
       />
     </CreatorWorkspacePreviewTileButton>
   );
@@ -201,17 +221,38 @@ function CreatorWorkspacePreviewEmpty({ activeTabLabel }: { activeTabLabel: stri
 export function CreatorWorkspacePreviewDetailLinkedGrid({
   items,
   onOpenDetail,
+  reviewSurfaceState,
 }: {
   items: readonly (CreatorWorkspacePreviewMainItem | CreatorWorkspacePreviewShortItem)[];
   onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
+  reviewSurfaceState?: CreatorWorkspaceReviewSurfaceState;
 }) {
+  const mainReviewBadges = reviewSurfaceState?.kind === "ready"
+    ? new Map(reviewSurfaceState.surface.mains.map((item) => [item.id, resolveCreatorWorkspaceObjectReviewBadge(item.state)]))
+    : null;
+  const shortReviewBadges = reviewSurfaceState?.kind === "ready"
+    ? new Map(reviewSurfaceState.surface.shorts.map((item) => [item.id, resolveCreatorWorkspaceObjectReviewBadge(item.state)]))
+    : null;
+
   return (
     <div className="grid grid-cols-3 gap-[3px]">
       {items.map((item, index) => (
         "priceJpy" in item ? (
-          <CreatorWorkspacePreviewMainTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+          <CreatorWorkspacePreviewMainTile
+            index={index}
+            item={item}
+            key={item.id}
+            onOpenDetail={onOpenDetail}
+            statusBadge={mainReviewBadges?.get(item.id) ?? null}
+          />
         ) : (
-          <CreatorWorkspacePreviewShortTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+          <CreatorWorkspacePreviewShortTile
+            index={index}
+            item={item}
+            key={item.id}
+            onOpenDetail={onOpenDetail}
+            statusBadge={shortReviewBadges?.get(item.id) ?? null}
+          />
         )
       ))}
     </div>
@@ -223,12 +264,14 @@ export function CreatorWorkspacePreviewGrid({
   activeTabLabel,
   onOpenDetail,
   onRetry,
+  reviewSurfaceState,
   state,
 }: {
   activeTab: ApprovedCreatorWorkspaceManagedTab;
   activeTabLabel: string;
   onOpenDetail: (selection: CreatorWorkspacePreviewDetailSelection) => void;
   onRetry: () => void;
+  reviewSurfaceState: CreatorWorkspaceReviewSurfaceState;
   state: CreatorWorkspacePreviewCollectionsState;
 }) {
   if (state.kind === "loading") {
@@ -239,6 +282,12 @@ export function CreatorWorkspacePreviewGrid({
     return <CreatorWorkspacePreviewError message={state.message} onRetry={onRetry} />;
   }
 
+  const mainReviewBadges = reviewSurfaceState.kind === "ready"
+    ? new Map(reviewSurfaceState.surface.mains.map((item) => [item.id, resolveCreatorWorkspaceObjectReviewBadge(item.state)]))
+    : null;
+  const shortReviewBadges = reviewSurfaceState.kind === "ready"
+    ? new Map(reviewSurfaceState.surface.shorts.map((item) => [item.id, resolveCreatorWorkspaceObjectReviewBadge(item.state)]))
+    : null;
   const activeItems = activeTab === "shorts" ? state.collections.shorts.items : state.collections.mains.items;
 
   if (activeItems.length === 0) {
@@ -249,10 +298,22 @@ export function CreatorWorkspacePreviewGrid({
     <section className="mt-[18px] grid grid-cols-3 gap-[3px]">
       {activeTab === "shorts"
         ? state.collections.shorts.items.map((item, index) => (
-            <CreatorWorkspacePreviewShortTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+            <CreatorWorkspacePreviewShortTile
+              index={index}
+              item={item}
+              key={item.id}
+              onOpenDetail={onOpenDetail}
+              statusBadge={shortReviewBadges?.get(item.id) ?? null}
+            />
           ))
         : state.collections.mains.items.map((item, index) => (
-            <CreatorWorkspacePreviewMainTile index={index} item={item} key={item.id} onOpenDetail={onOpenDetail} />
+            <CreatorWorkspacePreviewMainTile
+              index={index}
+              item={item}
+              key={item.id}
+              onOpenDetail={onOpenDetail}
+              statusBadge={mainReviewBadges?.get(item.id) ?? null}
+            />
           ))}
     </section>
   );

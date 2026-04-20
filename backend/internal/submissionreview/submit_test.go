@@ -21,13 +21,21 @@ type queriesStub struct {
 	createSubmissionReviewIntake                         func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error)
 	createSubmissionReviewIntakeShort                    func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error
 	createSubmissionReviewShortDecision                  func(context.Context, sqlc.CreateSubmissionReviewShortDecisionParams) error
+	getCreatorCapabilityByUserID                         func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	getCreatorCapabilityByUserIDForUpdate                func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
+	getMainByID                                          func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
+	getMediaAssetByID                                    func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
 	getLatestSubmissionReviewIntakeByCanonicalMainID     func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	getPendingSubmissionReviewIntakeByCanonicalMainID    func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	getPendingSubmissionReviewIntakeByIDForUpdate        func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	getShortByID                                         func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 	getSubmissionReviewCreatorUserIDByIntakeID           func(context.Context, pgtype.UUID) (pgtype.UUID, error)
 	getSubmissionReviewMainByIDForUpdate                 func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error)
+	listMediaAssetsByCreatorUserID                       func(context.Context, pgtype.UUID) ([]sqlc.AppMediaAsset, error)
+	listMainsByCreatorUserID                             func(context.Context, pgtype.UUID) ([]sqlc.AppMain, error)
 	listSubmissionReviewIntakeShortsByIntakeID           func(context.Context, pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error)
+	listShortsByCanonicalMainID                          func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
+	listShortsByCreatorUserID                            func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
 	listSubmissionReviewShortsByCanonicalMainIDForUpdate func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error)
 	markSubmissionReviewIntakeDecisionApplied            func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	publishShort                                         func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
@@ -84,6 +92,27 @@ func (s queriesStub) GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, 
 	return s.getCreatorCapabilityByUserIDForUpdate(ctx, userID)
 }
 
+func (s queriesStub) GetCreatorCapabilityByUserID(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+	if s.getCreatorCapabilityByUserID == nil {
+		return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+	}
+	return s.getCreatorCapabilityByUserID(ctx, userID)
+}
+
+func (s queriesStub) GetMainByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
+	if s.getMainByID == nil {
+		unexpectedSubmitQuery("GetMainByID")
+	}
+	return s.getMainByID(ctx, id)
+}
+
+func (s queriesStub) GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
+	if s.getMediaAssetByID == nil {
+		unexpectedSubmitQuery("GetMediaAssetByID")
+	}
+	return s.getMediaAssetByID(ctx, id)
+}
+
 func (s queriesStub) GetLatestSubmissionReviewIntakeByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
 	return s.getLatestSubmissionReviewIntakeByCanonicalMainID(ctx, canonicalMainID)
 }
@@ -99,6 +128,13 @@ func (s queriesStub) GetPendingSubmissionReviewIntakeByIDForUpdate(ctx context.C
 	return s.getPendingSubmissionReviewIntakeByIDForUpdate(ctx, id)
 }
 
+func (s queriesStub) GetShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+	if s.getShortByID == nil {
+		unexpectedSubmitQuery("GetShortByID")
+	}
+	return s.getShortByID(ctx, id)
+}
+
 func (s queriesStub) GetSubmissionReviewCreatorUserIDByIntakeID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
 	if s.getSubmissionReviewCreatorUserIDByIntakeID == nil {
 		return pgtype.UUID{}, nil
@@ -110,11 +146,39 @@ func (s queriesStub) GetSubmissionReviewMainByIDForUpdate(ctx context.Context, i
 	return s.getSubmissionReviewMainByIDForUpdate(ctx, id)
 }
 
+func (s queriesStub) ListMainsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppMain, error) {
+	if s.listMainsByCreatorUserID == nil {
+		unexpectedSubmitQuery("ListMainsByCreatorUserID")
+	}
+	return s.listMainsByCreatorUserID(ctx, creatorUserID)
+}
+
+func (s queriesStub) ListMediaAssetsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppMediaAsset, error) {
+	if s.listMediaAssetsByCreatorUserID == nil {
+		unexpectedSubmitQuery("ListMediaAssetsByCreatorUserID")
+	}
+	return s.listMediaAssetsByCreatorUserID(ctx, creatorUserID)
+}
+
 func (s queriesStub) ListSubmissionReviewIntakeShortsByIntakeID(ctx context.Context, submissionReviewIntakeID pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error) {
 	if s.listSubmissionReviewIntakeShortsByIntakeID == nil {
 		unexpectedSubmitQuery("ListSubmissionReviewIntakeShortsByIntakeID")
 	}
 	return s.listSubmissionReviewIntakeShortsByIntakeID(ctx, submissionReviewIntakeID)
+}
+
+func (s queriesStub) ListShortsByCreatorUserID(ctx context.Context, creatorUserID pgtype.UUID) ([]sqlc.AppShort, error) {
+	if s.listShortsByCreatorUserID == nil {
+		unexpectedSubmitQuery("ListShortsByCreatorUserID")
+	}
+	return s.listShortsByCreatorUserID(ctx, creatorUserID)
+}
+
+func (s queriesStub) ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error) {
+	if s.listShortsByCanonicalMainID == nil {
+		unexpectedSubmitQuery("ListShortsByCanonicalMainID")
+	}
+	return s.listShortsByCanonicalMainID(ctx, canonicalMainID)
 }
 
 func (s queriesStub) ListSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
