@@ -15,9 +15,10 @@ import (
 )
 
 const (
-	defaultFanFeedCursorTTL = 24 * time.Hour
-	fanFeedCursorKeyPrefix  = "fan_feed_cursor:"
-	fanFeedCursorVersion    = 1
+	defaultFanFeedCursorTTL                   = 24 * time.Hour
+	fanFeedCursorKeyPrefix                    = "fan_feed_cursor:"
+	fanFeedCursorVersion                      = 1
+	maxFanFeedRecommendedSnapshotPayloadBytes = 32 * 1024
 )
 
 var errFanFeedCursorInvalid = errors.New("fan feed cursor is invalid")
@@ -263,6 +264,9 @@ func validateRecommendedFeedCursor(cursor *feed.Cursor) error {
 	if len(cursor.RecommendedRemainingShortIDs) == 0 {
 		return errFanFeedCursorInvalid
 	}
+	if len(cursor.RecommendedRemainingShortIDs) > feed.RecommendedSnapshotMaxShortIDs {
+		return errFanFeedCursorInvalid
+	}
 	if len(cursor.FollowingRemainingShortIDs) > 0 {
 		return errFanFeedCursorInvalid
 	}
@@ -315,6 +319,9 @@ func (c *fanFeedCursorCodec) saveRecommendedSnapshot(ctx context.Context, shortI
 	if c == nil || c.store == nil {
 		return "", errFanFeedCursorInvalid
 	}
+	if len(shortIDs) == 0 || len(shortIDs) > feed.RecommendedSnapshotMaxShortIDs {
+		return "", errFanFeedCursorInvalid
+	}
 
 	snapshotState := fanFeedRecommendedSnapshotState{
 		RemainingShortIDs: append([]uuid.UUID(nil), shortIDs...),
@@ -322,6 +329,9 @@ func (c *fanFeedCursorCodec) saveRecommendedSnapshot(ctx context.Context, shortI
 	payload, err := json.Marshal(snapshotState)
 	if err != nil {
 		return "", fmt.Errorf("marshal recommended snapshot: %w", err)
+	}
+	if len(payload) > maxFanFeedRecommendedSnapshotPayloadBytes {
+		return "", errFanFeedCursorInvalid
 	}
 
 	snapshotID := uuid.NewString()
@@ -341,12 +351,15 @@ func (c *fanFeedCursorCodec) loadRecommendedSnapshot(ctx context.Context, snapsh
 	if err != nil {
 		return nil, err
 	}
+	if len(payload) > maxFanFeedRecommendedSnapshotPayloadBytes {
+		return nil, errFanFeedCursorInvalid
+	}
 
 	var snapshotState fanFeedRecommendedSnapshotState
 	if err := json.Unmarshal(payload, &snapshotState); err != nil {
 		return nil, errFanFeedCursorInvalid
 	}
-	if len(snapshotState.RemainingShortIDs) == 0 {
+	if len(snapshotState.RemainingShortIDs) == 0 || len(snapshotState.RemainingShortIDs) > feed.RecommendedSnapshotMaxShortIDs {
 		return nil, errFanFeedCursorInvalid
 	}
 	for _, shortID := range snapshotState.RemainingShortIDs {

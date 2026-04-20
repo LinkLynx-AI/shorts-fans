@@ -98,6 +98,15 @@ ranking_weights AS (
         20000::bigint AS zero_impression_exploration_bonus,
         10000::bigint AS low_impression_exploration_bonus
 ),
+candidate_recommended_short_ids AS (
+    SELECT
+        s.id
+    FROM app.public_shorts AS s
+    CROSS JOIN ranking_context
+    WHERE s.published_at <= ranking_context.reference_at
+    ORDER BY s.published_at DESC, s.id DESC
+    LIMIT sqlc.arg(limit_count)
+),
 candidate_recommended AS (
     SELECT
         s.id,
@@ -136,8 +145,10 @@ candidate_recommended AS (
         COALESCE(short_global.main_click_count, 0) AS short_global_main_click_count,
         COALESCE(short_global.view_completion_count, 0) AS short_global_view_completion_count,
         COALESCE(short_global.rewatch_loop_count, 0) AS short_global_view_rewatch_loop_count
-    FROM app.public_shorts AS s
+    FROM candidate_recommended_short_ids
     CROSS JOIN ranking_context
+    JOIN app.public_shorts AS s
+        ON s.id = candidate_recommended_short_ids.id
     JOIN app.media_assets AS short_media
         ON short_media.id = s.media_asset_id
     JOIN app.creator_profiles AS creator_profile
@@ -166,7 +177,6 @@ candidate_recommended AS (
         AND viewer_main.canonical_main_id = s.canonical_main_id
     LEFT JOIN app.recommendation_short_global_features AS short_global
         ON short_global.short_id = s.id
-    WHERE s.published_at <= ranking_context.reference_at
 ),
 scored_recommended AS (
     SELECT

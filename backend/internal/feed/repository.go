@@ -15,8 +15,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// DefaultPageSize は public short feed の既定 page size です。
-const DefaultPageSize = 20
+const (
+	// DefaultPageSize は public short feed の既定 page size です。
+	DefaultPageSize = 20
+	// RecommendedSnapshotMaxShortIDs は initial recommended ranking と snapshot continuation で保持する short 上限です。
+	RecommendedSnapshotMaxShortIDs = 500
+)
 
 // ErrPublicShortNotFound は対象の public short が存在しないことを表します。
 var ErrPublicShortNotFound = errors.New("public short が見つかりません")
@@ -208,6 +212,7 @@ func buildInitialRecommendedShortIDsParams(
 ) sqlc.ListRecommendedPublicFeedShortIDsParams {
 	params := sqlc.ListRecommendedPublicFeedShortIDsParams{
 		RankingReferenceAt: postgres.TimeToPG(&rankingReferenceAt),
+		LimitCount:         int32(RecommendedSnapshotMaxShortIDs),
 	}
 	if viewerUserID != nil {
 		params.ViewerUserID = optionalUUIDToPG(viewerUserID)

@@ -66,6 +66,13 @@ func TestBuildInitialRecommendedShortIDsParams(t *testing.T) {
 	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
 		t.Fatalf("buildInitialRecommendedShortIDsParams() ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
 	}
+	if params.LimitCount != int32(RecommendedSnapshotMaxShortIDs) {
+		t.Fatalf(
+			"buildInitialRecommendedShortIDsParams() limit count got %d want %d",
+			params.LimitCount,
+			RecommendedSnapshotMaxShortIDs,
+		)
+	}
 
 	params = buildInitialRecommendedShortIDsParams(nil, rankingReferenceAt)
 	if params.ViewerUserID.Valid {
@@ -73,6 +80,13 @@ func TestBuildInitialRecommendedShortIDsParams(t *testing.T) {
 	}
 	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
 		t.Fatalf("buildInitialRecommendedShortIDsParams() public ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
+	}
+	if params.LimitCount != int32(RecommendedSnapshotMaxShortIDs) {
+		t.Fatalf(
+			"buildInitialRecommendedShortIDsParams() public limit count got %d want %d",
+			params.LimitCount,
+			RecommendedSnapshotMaxShortIDs,
+		)
 	}
 }
 
@@ -432,6 +446,9 @@ func TestRepositoryListRecommendedAndFollowing(t *testing.T) {
 				}
 				if !arg.RankingReferenceAt.Valid {
 					t.Fatal("ListRecommendedPublicFeedShortIDs() ranking reference valid = false, want true")
+				}
+				if arg.LimitCount != int32(RecommendedSnapshotMaxShortIDs) {
+					t.Fatalf("ListRecommendedPublicFeedShortIDs() limit count got %d want %d", arg.LimitCount, RecommendedSnapshotMaxShortIDs)
 				}
 				return []pgtype.UUID{
 					postgres.UUIDToPG(shortID),
