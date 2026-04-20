@@ -28,6 +28,7 @@ import (
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/unlock"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
 )
@@ -109,6 +110,7 @@ func main() {
 	recommendationSignalExposureStore := recommendation.NewRedisSignalExposureStore(redisClient)
 	unlockConversionRetryStore := recommendation.NewRedisUnlockConversionRetryStore(redisClient)
 	shortsRepository := shorts.NewRepository(pool)
+	submissionReviewService := submissionreview.NewService(pool)
 	unlockRepository := unlock.NewRepository(pool)
 	paymentRepository := payment.NewRepository(pool)
 	ccbillClient, err := payment.NewCCBillClient(payment.CCBillConfig{
@@ -216,38 +218,39 @@ func main() {
 		},
 		logger,
 		httpserver.HandlerConfig{
-			AppEnv:                       cfg.AppEnv,
-			AdminCreatorReview:           adminCreatorReviewService,
-			CreatorSearch:                creatorRepository,
-			CreatorWorkspace:             creatorRepository,
-			CreatorWorkspaceMainPrice:    creatorRepository,
-			CreatorWorkspaceProfile:      viewerProfileRepository,
-			CreatorWorkspaceShortCaption: creatorRepository,
-			CreatorUpload:                creatorUploadService,
-			CreatorProfile:               creatorRepository,
-			CreatorProfileShorts:         creatorRepository,
-			FanFeed:                      feedRepository,
-			RecommendationSignalExposure: recommendationSignalExposureStore,
-			RecommendationSignals:        recommendationSignalService,
-			FanUnlockMain:                fanUnlockMainService,
-			FanShortPin:                  shortsRepository,
-			CreatorFollow:                creatorRepository,
-			CreatorAvatarUpload:          creatorAvatarService,
-			CreatorRegistration:          creatorRegistrationRepository,
-			CreatorRegistrationEvidence:  creatorRegistrationEvidenceService,
-			CCBillWebhook:                ccbillWebhookHandler,
-			FanProfileLibrary:            fanProfileRepository,
-			FanProfileOverview:           fanProfileRepository,
-			FanProfileFollowing:          fanProfileRepository,
-			FanProfilePinnedShorts:       fanProfileRepository,
-			FanAuth:                      authLifecycle,
-			AuthCookie:                   httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
-			ShortDisplayAssets:           shortDisplayDelivery,
-			MainDisplayAssets:            shortDisplayDelivery,
-			ViewerActiveMode:             modeSwitcher,
-			ViewerBootstrap:              viewerBootstrapReader,
-			ViewerProfile:                viewerProfileRepository,
-			ViewerProfileWriter:          viewerProfileRepository,
+			AppEnv:                           cfg.AppEnv,
+			AdminCreatorReview:               adminCreatorReviewService,
+			CreatorSearch:                    creatorRepository,
+			CreatorWorkspace:                 creatorRepository,
+			CreatorWorkspaceMainPrice:        creatorRepository,
+			CreatorWorkspaceSubmissionReview: submissionReviewService,
+			CreatorWorkspaceProfile:          viewerProfileRepository,
+			CreatorWorkspaceShortCaption:     creatorRepository,
+			CreatorUpload:                    creatorUploadService,
+			CreatorProfile:                   creatorRepository,
+			CreatorProfileShorts:             creatorRepository,
+			FanFeed:                          feedRepository,
+			RecommendationSignalExposure:     recommendationSignalExposureStore,
+			RecommendationSignals:            recommendationSignalService,
+			FanUnlockMain:                    fanUnlockMainService,
+			FanShortPin:                      shortsRepository,
+			CreatorFollow:                    creatorRepository,
+			CreatorAvatarUpload:              creatorAvatarService,
+			CreatorRegistration:              creatorRegistrationRepository,
+			CreatorRegistrationEvidence:      creatorRegistrationEvidenceService,
+			CCBillWebhook:                    ccbillWebhookHandler,
+			FanProfileLibrary:                fanProfileRepository,
+			FanProfileOverview:               fanProfileRepository,
+			FanProfileFollowing:              fanProfileRepository,
+			FanProfilePinnedShorts:           fanProfileRepository,
+			FanAuth:                          authLifecycle,
+			AuthCookie:                       httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
+			ShortDisplayAssets:               shortDisplayDelivery,
+			MainDisplayAssets:                shortDisplayDelivery,
+			ViewerActiveMode:                 modeSwitcher,
+			ViewerBootstrap:                  viewerBootstrapReader,
+			ViewerProfile:                    viewerProfileRepository,
+			ViewerProfileWriter:              viewerProfileRepository,
 			Dependencies: []httpserver.Dependency{
 				{Name: "postgres", Checker: postgres.NewReadinessChecker(pool)},
 				{Name: "redis", Checker: redis.NewReadinessChecker(redisClient)},
