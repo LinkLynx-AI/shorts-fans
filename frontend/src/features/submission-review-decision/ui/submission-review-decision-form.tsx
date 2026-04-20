@@ -68,14 +68,18 @@ function DecisionPicker({
   draft,
   disabled,
   label,
+  targetKey,
   onChange,
 }: {
   draft: DecisionDraft;
   disabled: boolean;
   label: string;
+  targetKey: string;
   onChange: (nextDraft: DecisionDraft) => void;
 }) {
   const requiresReason = doesSubmissionReviewDecisionRequireReason(draft.decision);
+  const reasonFieldId = `${targetKey}-reason`;
+  const reviewNoteFieldId = `${targetKey}-review-note`;
 
   return (
     <div className="rounded-[22px] border border-border bg-[#fbfdff] px-4 py-4">
@@ -114,15 +118,15 @@ function DecisionPicker({
       </div>
 
       {requiresReason ? (
-        <label className="mt-4 grid gap-2" htmlFor={`${label}-reason`}>
+        <label className="mt-4 grid gap-2" htmlFor={reasonFieldId}>
           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-ink">
             Reason code
           </span>
           <select
-            aria-label={`${label}-reason`}
+            aria-label={reasonFieldId}
             className="min-h-12 rounded-[18px] border border-border bg-white px-4 text-sm text-foreground outline-none transition focus:border-accent focus:ring-4 focus:ring-ring/60"
             disabled={disabled}
-            id={`${label}-reason`}
+            id={reasonFieldId}
             onChange={(event) => {
               onChange({
                 ...draft,
@@ -148,15 +152,15 @@ function DecisionPicker({
         </label>
       ) : null}
 
-      <label className="mt-4 grid gap-2" htmlFor={`${label}-review-note`}>
+      <label className="mt-4 grid gap-2" htmlFor={reviewNoteFieldId}>
         <span className="text-xs font-semibold uppercase tracking-[0.16em] text-accent-ink">
           Review note
         </span>
         <textarea
-          aria-label={`${label}-review-note`}
+          aria-label={reviewNoteFieldId}
           className="min-h-28 rounded-[18px] border border-border bg-white px-4 py-3 text-sm leading-6 text-foreground outline-none transition focus:border-accent focus:ring-4 focus:ring-ring/60"
           disabled={disabled}
-          id={`${label}-review-note`}
+          id={reviewNoteFieldId}
           onChange={(event) => {
             onChange({
               ...draft,
@@ -280,6 +284,7 @@ export function SubmissionReviewDecisionForm({
             disabled={isSubmitting}
             draft={mainDraft}
             label="main"
+            targetKey="main"
             onChange={(nextDraft) => {
               setMainDraft(nextDraft);
               setErrorMessage(null);
@@ -293,6 +298,7 @@ export function SubmissionReviewDecisionForm({
             draft={shortDrafts[item.id] ?? createEmptyDecisionDraft()}
             key={item.id}
             label={`short ${index + 1}`}
+            targetKey={`short-${index + 1}`}
             onChange={(nextDraft) => {
               setShortDrafts((current) => ({
                 ...current,

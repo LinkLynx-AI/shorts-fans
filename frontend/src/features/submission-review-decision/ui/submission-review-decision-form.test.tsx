@@ -136,8 +136,8 @@ describe("SubmissionReviewDecisionForm", () => {
     await user.click(screen.getAllByRole("button", { name: "承認する" })[0]!);
     await user.type(screen.getByLabelText("main-review-note"), "unlock ready");
     await user.click(screen.getAllByRole("button", { name: "修正依頼にする" })[1]!);
-    await user.selectOptions(screen.getByLabelText("short 1-reason"), "quality_issue");
-    await user.type(screen.getByLabelText("short 1-review-note"), "reframe intro");
+    await user.selectOptions(screen.getByLabelText("short-1-reason"), "quality_issue");
+    await user.type(screen.getByLabelText("short-1-review-note"), "reframe intro");
     await user.click(screen.getByRole("button", { name: "decision を反映する" }));
 
     await waitFor(() => {
