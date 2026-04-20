@@ -167,6 +167,100 @@ func TestFanShortUnlockRoute(t *testing.T) {
 	if response.Data.Purchase.State != "purchase_ready" || len(response.Data.Purchase.SavedPaymentMethods) != 1 {
 		t.Fatalf("response.Data.Purchase got %#v want purchase_ready with saved card", response.Data.Purchase)
 	}
+	if response.Data.Purchase.PaymentBypassEnabled {
+		t.Fatal("response.Data.Purchase.PaymentBypassEnabled = true, want false")
+	}
+}
+
+func TestFanShortUnlockRouteReturnsPaymentBypassFlag(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	shortAssetID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	mainDurationSeconds := int64(480)
+	priceJPY := int64(1800)
+
+	router := newFanUnlockMainRouter(t, stubFanUnlockMainService{
+		getUnlockSurface: func(_ context.Context, gotViewerID uuid.UUID, sessionBinding string, gotShortID uuid.UUID) (fanmain.UnlockSurface, error) {
+			if gotViewerID != viewerID || gotShortID != shortID || sessionBinding == "" {
+				t.Fatalf("GetUnlockSurface() got viewer=%s short=%s session=%q", gotViewerID, gotShortID, sessionBinding)
+			}
+
+			return fanmain.UnlockSurface{
+				Access: fanmain.MainAccessState{
+					MainID: mainID,
+					Reason: "unlock_required",
+					Status: "locked",
+				},
+				Creator: fanmain.CreatorSummary{
+					Bio:         "quiet rooftop specialist",
+					DisplayName: "Mina Rei",
+					Handle:      "minarei",
+					ID:          viewerID,
+				},
+				Main: fanmain.MainSummary{
+					DurationSeconds: 480,
+					ID:              mainID,
+					MediaAssetID:    uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+					PriceJPY:        1800,
+				},
+				MainAccessToken: "signed-entry-token",
+				Purchase: fanmain.UnlockPurchaseState{
+					PaymentBypassEnabled: true,
+					SavedPaymentMethods:  []fanmain.SavedPaymentMethodSummary{},
+					Setup: fanmain.PurchaseSetupState{
+						Required:                true,
+						RequiresAgeConfirmation: true,
+						RequiresCardSetup:       true,
+						RequiresTermsAcceptance: true,
+					},
+					State: "setup_required",
+					SupportedCardBrands: []string{
+						"visa",
+						"mastercard",
+						"jcb",
+						"american_express",
+					},
+				},
+				Short: fanmain.ShortSummary{
+					Caption:                "quiet rooftop preview",
+					CanonicalMainID:        mainID,
+					CreatorUserID:          viewerID,
+					ID:                     shortID,
+					MediaAssetID:           shortAssetID,
+					PreviewDurationSeconds: 16,
+				},
+				UnlockCta: fanmain.UnlockCtaState{
+					MainDurationSeconds: &mainDurationSeconds,
+					PriceJPY:            &priceJPY,
+					State:               "setup_required",
+				},
+			}, nil
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/shorts/short_22222222222222222222222222222222/unlock", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/shorts/:shortId/unlock status got %d want %d", rec.Code, http.StatusOK)
+	}
+
+	var response responseEnvelope[unlockSurfaceResponseData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Data == nil {
+		t.Fatal("response.Data = nil, want value")
+	}
+	if !response.Data.Purchase.PaymentBypassEnabled {
+		t.Fatal("response.Data.Purchase.PaymentBypassEnabled = false, want true")
+	}
 }
 
 func TestFanMainPurchaseRouteReturnsAcceptedForPending(t *testing.T) {
@@ -337,12 +431,12 @@ func TestFanMainCardSetupSessionRouteErrors(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name        string
-		path        string
-		body        string
-		service     stubFanUnlockMainService
-		wantCode    string
-		wantStatus  int
+		name       string
+		path       string
+		body       string
+		service    stubFanUnlockMainService
+		wantCode   string
+		wantStatus int
 	}{
 		{
 			name:       "invalid request body",
@@ -413,12 +507,12 @@ func TestFanMainCardSetupTokenRouteErrors(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name        string
-		path        string
-		body        string
-		service     stubFanUnlockMainService
-		wantCode    string
-		wantStatus  int
+		name       string
+		path       string
+		body       string
+		service    stubFanUnlockMainService
+		wantCode   string
+		wantStatus int
 	}{
 		{
 			name:       "invalid request body",

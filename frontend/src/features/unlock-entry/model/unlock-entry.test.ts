@@ -142,4 +142,10 @@ describe("unlock-entry model", () => {
     });
     expect(unlock.setup).toEqual(unlock.purchase.setup);
   });
+
+  it("defaults paymentBypassEnabled to false when the transport payload omits it", () => {
+    const unlock = createUnlockSurfaceModel("setup_required");
+
+    expect(unlock.purchase.paymentBypassEnabled).toBe(false);
+  });
 });

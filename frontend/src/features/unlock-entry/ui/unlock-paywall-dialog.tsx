@@ -31,6 +31,7 @@ export type UnlockPaywallDialogProps = {
   acceptTerms: boolean;
   cardSetupErrorMessage?: string | null | undefined;
   cardSetupSession?: PaymentWidgetSession | null | undefined;
+  isDevelopmentPaymentBypassEnabled?: boolean;
   isLoadingCardSetupSession?: boolean;
   isSubmitting?: boolean;
   onAcceptAgeChange: (checked: boolean) => void;
@@ -68,7 +69,15 @@ function getSavedCardLabel(method: UnlockSurfaceModel["purchase"]["savedPaymentM
   return `${getCardBrandLabel(method.brand)} •••• ${method.last4}`;
 }
 
-function getPrimaryActionLabel(unlock: UnlockSurfaceModel, selection: PaywallPaymentSelection): string | null {
+function getPrimaryActionLabel(
+  unlock: UnlockSurfaceModel,
+  selection: PaywallPaymentSelection,
+  {
+    isDevelopmentPaymentBypassEnabled = false,
+  }: {
+    isDevelopmentPaymentBypassEnabled?: boolean;
+  } = {},
+): string | null {
   switch (unlock.purchase.state) {
     case "already_purchased":
       return "Continue main";
@@ -78,6 +87,10 @@ function getPrimaryActionLabel(unlock: UnlockSurfaceModel, selection: PaywallPay
     case "setup_required":
       if (selection.mode === "saved_card") {
         return `Purchase ¥${unlock.main.priceJpy.toLocaleString("ja-JP")}`;
+      }
+
+      if (isDevelopmentPaymentBypassEnabled) {
+        return "支払いをスキップして進む";
       }
 
       return null;
@@ -129,6 +142,7 @@ export function UnlockPaywallDialog({
   acceptTerms,
   cardSetupErrorMessage = null,
   cardSetupSession = null,
+  isDevelopmentPaymentBypassEnabled = false,
   isLoadingCardSetupSession = false,
   isSubmitting = false,
   onAcceptAgeChange,
@@ -149,11 +163,17 @@ export function UnlockPaywallDialog({
   const confirmEnabled = consentSatisfied && !isSubmitting;
   const title = buildShortPaywallTitle(unlock.short.caption);
   const stateSummary = getStateSummary(unlock);
-  const buttonLabel = usePurchaseFlow ? getPrimaryActionLabel(unlock, selection) : getUnlockButtonLabel(unlock);
+  const buttonLabel = usePurchaseFlow
+    ? getPrimaryActionLabel(unlock, selection, {
+        isDevelopmentPaymentBypassEnabled,
+      })
+    : getUnlockButtonLabel(unlock);
   const supportsSelection =
     usePurchaseFlow && (unlock.purchase.state === "purchase_ready" || unlock.purchase.state === "setup_required");
-  const showSavedCards = supportsSelection && unlock.purchase.savedPaymentMethods.length > 0;
-  const showNewCardWidget = supportsSelection && selection.mode === "new_card";
+  const showSavedCards =
+    supportsSelection && !isDevelopmentPaymentBypassEnabled && unlock.purchase.savedPaymentMethods.length > 0;
+  const showNewCardWidget =
+    supportsSelection && selection.mode === "new_card" && !isDevelopmentPaymentBypassEnabled;
   const canRenderNewCardWidget = showNewCardWidget && consentSatisfied;
 
   return (
@@ -187,6 +207,12 @@ export function UnlockPaywallDialog({
             <p className="text-sm font-bold">{stateSummary.title}</p>
             <p className="mt-1 text-xs leading-6 text-muted">{stateSummary.body}</p>
           </div>
+
+          {isDevelopmentPaymentBypassEnabled ? (
+            <div className="mt-3 rounded-[20px] border border-[#c6e9f7] bg-[#f4fcff] px-4 py-3 text-xs leading-6 text-[#23536e]">
+              development では CCBill を呼ばずに unlock 導線だけ確認します。
+            </div>
+          ) : null}
 
           {unlock.purchase.supportedCardBrands.length > 0 ? (
             <div className="mt-3">

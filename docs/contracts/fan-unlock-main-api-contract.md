@@ -59,6 +59,7 @@
 | field | type | notes |
 | --- | --- | --- |
 | `state` | `"setup_required" \| "purchase_ready" \| "purchase_pending" \| "already_purchased" \| "owner_preview" \| "unavailable"` | paywall 内の primary state |
+| `paymentBypassEnabled` | `boolean` | backend が development payment bypass を有効化しているときだけ true。frontend はこの flag を見て card setup を skip する |
 | `supportedCardBrands` | `("visa" \| "mastercard" \| "jcb" \| "american_express")[]` | MVP ではこの 4 ブランドだけを返す |
 | `savedPaymentMethods` | `SavedCardSummary[]` | saved card 一覧。non-card method は返さない |
 | `setup` | `PurchaseSetupState` | purchase 前提条件 |

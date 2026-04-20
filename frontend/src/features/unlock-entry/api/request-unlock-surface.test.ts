@@ -31,6 +31,7 @@ describe("requestUnlockSurfaceByShortId", () => {
               priceJpy: 1800,
             },
             purchase: {
+              paymentBypassEnabled: true,
               pendingReason: null,
               savedPaymentMethods: [],
               setup: {
@@ -91,6 +92,7 @@ describe("requestUnlockSurfaceByShortId", () => {
         token: "signed-token",
       },
       purchase: {
+        paymentBypassEnabled: true,
         state: "setup_required",
       },
       setup: {

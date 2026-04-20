@@ -21,12 +21,41 @@ func TestLoadFromEnvDefaults(t *testing.T) {
 	if cfg.CCBillCurrencyCode != 392 {
 		t.Fatalf("LoadFromEnv() default ccbill currency code got %d want %d", cfg.CCBillCurrencyCode, 392)
 	}
+	if cfg.AppEnvExplicitlySet {
+		t.Fatal("LoadFromEnv() AppEnvExplicitlySet = true, want false")
+	}
+	if cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = true, want false")
+	}
+}
+
+func TestLoadFromEnvTracksExplicitAppEnvForPaymentBypass(t *testing.T) {
+	t.Parallel()
+
+	cfg := LoadFromEnv(func(key string) string {
+		if key == "APP_ENV" {
+			return "development"
+		}
+
+		return ""
+	})
+
+	if cfg.AppEnv != "development" {
+		t.Fatalf("LoadFromEnv() explicit app env got %q want %q", cfg.AppEnv, "development")
+	}
+	if !cfg.AppEnvExplicitlySet {
+		t.Fatal("LoadFromEnv() AppEnvExplicitlySet = false, want true")
+	}
+	if !cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = false, want true")
+	}
 }
 
 func TestValidateAPI(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnvExplicitlySet:             true,
 		PostgresDSN:                     "postgres://example",
 		RedisAddr:                       "localhost:6379",
 		AWSRegion:                       "ap-northeast-1",
@@ -69,6 +98,7 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
 		CCBillBackendClientID:        "backend-client-id",
@@ -86,10 +116,71 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	}
 }
 
+func TestValidateAPIAllowsMissingPaymentConfigInDevelopment(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		AppEnv:                          "development",
+		AppEnvExplicitlySet:             true,
+		PostgresDSN:                     "postgres://example",
+		RedisAddr:                       "localhost:6379",
+		AWSRegion:                       "ap-northeast-1",
+		CognitoUserPoolClientID:         "exampleclientid",
+		MediaJobsQueueURL:               "https://example.com/queue",
+		MediaRawBucketName:              "raw-bucket",
+		MediaShortPublicBucketName:      "short-bucket",
+		MediaShortPublicBaseURL:         "https://example.com/shorts",
+		MediaMainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN:      "arn:aws:iam::123456789012:role/media-role",
+		CreatorAvatarUploadBucketName:   "avatar-upload-bucket",
+		CreatorAvatarDeliveryBucketName: "avatar-delivery-bucket",
+		CreatorAvatarBaseURL:            "https://example.com/avatar",
+		CreatorReviewEvidenceBucketName: "creator-review-evidence-bucket",
+	}
+
+	if err := cfg.ValidateAPI(); err != nil {
+		t.Fatalf("ValidateAPI() unexpected error in development bypass: %v", err)
+	}
+	if !cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = false, want true")
+	}
+}
+
+func TestValidateAPIStillRequiresPaymentConfigOutsideDevelopment(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		AppEnv:                          "production",
+		AppEnvExplicitlySet:             true,
+		PostgresDSN:                     "postgres://example",
+		RedisAddr:                       "localhost:6379",
+		AWSRegion:                       "ap-northeast-1",
+		CognitoUserPoolClientID:         "exampleclientid",
+		MediaJobsQueueURL:               "https://example.com/queue",
+		MediaRawBucketName:              "raw-bucket",
+		MediaShortPublicBucketName:      "short-bucket",
+		MediaShortPublicBaseURL:         "https://example.com/shorts",
+		MediaMainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN:      "arn:aws:iam::123456789012:role/media-role",
+		CreatorAvatarUploadBucketName:   "avatar-upload-bucket",
+		CreatorAvatarDeliveryBucketName: "avatar-delivery-bucket",
+		CreatorAvatarBaseURL:            "https://example.com/avatar",
+		CreatorReviewEvidenceBucketName: "creator-review-evidence-bucket",
+	}
+
+	if err := cfg.ValidateAPI(); err == nil {
+		t.Fatal("ValidateAPI() error = nil, want payment config error")
+	}
+	if cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = true, want false")
+	}
+}
+
 func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
 		AWSRegion:                    "ap-northeast-1",
@@ -133,6 +224,35 @@ func TestValidatePayment(t *testing.T) {
 
 	if err := (Config{}).ValidatePayment(); err == nil {
 		t.Fatal("ValidatePayment() error = nil, want error")
+	}
+}
+
+func TestValidateAPIRequiresExplicitDevelopmentOptInForPaymentBypass(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		AppEnv:                          "development",
+		PostgresDSN:                     "postgres://example",
+		RedisAddr:                       "localhost:6379",
+		AWSRegion:                       "ap-northeast-1",
+		CognitoUserPoolClientID:         "exampleclientid",
+		MediaJobsQueueURL:               "https://example.com/queue",
+		MediaRawBucketName:              "raw-bucket",
+		MediaShortPublicBucketName:      "short-bucket",
+		MediaShortPublicBaseURL:         "https://example.com/shorts",
+		MediaMainPrivateBucketName:      "main-bucket",
+		MediaConvertServiceRoleARN:      "arn:aws:iam::123456789012:role/media-role",
+		CreatorAvatarUploadBucketName:   "avatar-upload-bucket",
+		CreatorAvatarDeliveryBucketName: "avatar-delivery-bucket",
+		CreatorAvatarBaseURL:            "https://example.com/avatar",
+		CreatorReviewEvidenceBucketName: "creator-review-evidence-bucket",
+	}
+
+	if err := cfg.ValidateAPI(); err == nil {
+		t.Fatal("ValidateAPI() error = nil, want payment config error when APP_ENV was not explicit")
+	}
+	if cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = true, want false")
 	}
 }
 

@@ -72,11 +72,12 @@ type savedCardSummaryPayload struct {
 }
 
 type unlockPurchaseStatePayload struct {
-	PendingReason       *string                   `json:"pendingReason"`
-	SavedPaymentMethods []savedCardSummaryPayload `json:"savedPaymentMethods"`
-	Setup               purchaseSetupPayload      `json:"setup"`
-	State               string                    `json:"state"`
-	SupportedCardBrands []string                  `json:"supportedCardBrands"`
+	PaymentBypassEnabled bool                      `json:"paymentBypassEnabled"`
+	PendingReason        *string                   `json:"pendingReason"`
+	SavedPaymentMethods  []savedCardSummaryPayload `json:"savedPaymentMethods"`
+	Setup                purchaseSetupPayload      `json:"setup"`
+	State                string                    `json:"state"`
+	SupportedCardBrands  []string                  `json:"supportedCardBrands"`
 }
 
 type mainAccessEntryRequestPayload struct {
@@ -381,11 +382,11 @@ func handleFanMainCardSetupToken(c *gin.Context, service FanUnlockMainService) {
 
 	result, err := service.IssueCardSetupToken(c.Request.Context(), sessionBinding, fanmain.CardSetupTokenInput{
 		CardSetupSessionToken: request.SessionToken,
-		EntryToken:      request.EntryToken,
-		FromShortID:     fromShortID,
-		MainID:          mainID,
-		PaymentTokenRef: request.PaymentTokenID,
-		ViewerID:        viewer.ID,
+		EntryToken:            request.EntryToken,
+		FromShortID:           fromShortID,
+		MainID:                mainID,
+		PaymentTokenRef:       request.PaymentTokenID,
+		ViewerID:              viewer.ID,
 	})
 	if err != nil {
 		switch {
@@ -693,8 +694,9 @@ func buildUnlockPurchaseStatePayload(state fanmain.UnlockPurchaseState) unlockPu
 	}
 
 	return unlockPurchaseStatePayload{
-		PendingReason:       state.PendingReason,
-		SavedPaymentMethods: savedMethods,
+		PaymentBypassEnabled: state.PaymentBypassEnabled,
+		PendingReason:        state.PendingReason,
+		SavedPaymentMethods:  savedMethods,
 		Setup: purchaseSetupPayload{
 			Required:                state.Setup.Required,
 			RequiresAgeConfirmation: state.Setup.RequiresAgeConfirmation,

@@ -107,24 +107,41 @@ func main() {
 	shortsRepository := shorts.NewRepository(pool)
 	unlockRepository := unlock.NewRepository(pool)
 	paymentRepository := payment.NewRepository(pool)
-	ccbillClient, err := payment.NewCCBillClient(payment.CCBillConfig{
-		BaseURL:              cfg.CCBillBaseURL,
-		BackendClientID:      cfg.CCBillBackendClientID,
-		BackendClientSecret:  cfg.CCBillBackendClientSecret,
-		FrontendClientID:     cfg.CCBillFrontendClientID,
-		FrontendClientSecret: cfg.CCBillFrontendClientSecret,
-		ClientAccountNumber:  cfg.CCBillClientAccountNumber,
-		ClientSubAccount:     cfg.CCBillClientSubAccountNumber,
-		CurrencyCode:         cfg.CCBillCurrencyCode,
-		InitialPeriodDays:    cfg.CCBillInitialPeriodDays,
-		WebhookAllowedCIDRs:  cfg.CCBillWebhookAllowedCIDRs,
-	}, nil)
-	if err != nil {
-		logger.Error("failed to initialize ccbill client", "error", err)
-		os.Exit(1)
+	paymentBypassEnabled := cfg.PaymentBypassEnabled()
+	var ccbillClient *payment.CCBillClient
+	var ccbillWebhookHandler httpserver.PaymentWebhookHandler
+	if !paymentBypassEnabled {
+		ccbillClient, err = payment.NewCCBillClient(payment.CCBillConfig{
+			BaseURL:              cfg.CCBillBaseURL,
+			BackendClientID:      cfg.CCBillBackendClientID,
+			BackendClientSecret:  cfg.CCBillBackendClientSecret,
+			FrontendClientID:     cfg.CCBillFrontendClientID,
+			FrontendClientSecret: cfg.CCBillFrontendClientSecret,
+			ClientAccountNumber:  cfg.CCBillClientAccountNumber,
+			ClientSubAccount:     cfg.CCBillClientSubAccountNumber,
+			CurrencyCode:         cfg.CCBillCurrencyCode,
+			InitialPeriodDays:    cfg.CCBillInitialPeriodDays,
+			WebhookAllowedCIDRs:  cfg.CCBillWebhookAllowedCIDRs,
+		}, nil)
+		if err != nil {
+			logger.Error("failed to initialize ccbill client", "error", err)
+			os.Exit(1)
+		}
+	} else {
+		logger.Warn("ccbill payment bypass is enabled in development; payment requests will be skipped")
 	}
-	ccbillWebhookHandler := payment.NewCCBillWebhookHandler(paymentRepository, unlockRepository, ccbillClient)
-	fanUnlockMainService := fanmain.NewService(feedRepository, shortsRepository, unlockRepository, paymentRepository, ccbillClient)
+	if ccbillClient != nil {
+		ccbillWebhookHandler = payment.NewCCBillWebhookHandler(paymentRepository, unlockRepository, ccbillClient)
+	}
+	var fanUnlockMainService *fanmain.Service
+	if paymentBypassEnabled {
+		fanUnlockMainService = fanmain.NewService(feedRepository, shortsRepository, unlockRepository, paymentRepository, nil)
+	} else {
+		fanUnlockMainService = fanmain.NewService(feedRepository, shortsRepository, unlockRepository, paymentRepository, ccbillClient)
+	}
+	if paymentBypassEnabled {
+		fanUnlockMainService.EnableDevelopmentPaymentBypass()
+	}
 	fanProfileRepository := fanprofile.NewRepository(pool)
 	authRepository := auth.NewRepository(pool)
 	signUpDraftStore := auth.NewRedisSignUpDraftStore(redisClient)

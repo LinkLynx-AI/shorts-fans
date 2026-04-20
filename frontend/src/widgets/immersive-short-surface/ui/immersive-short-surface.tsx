@@ -607,6 +607,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     handlePaywallConfirm,
     handlePaymentSelectionChange,
     isBusy,
+    isDevelopmentPaymentBypassEnabled,
     isLoadingCardSetupSession,
     isPaywallOpen,
     isSubmitting,
@@ -791,6 +792,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           acceptTerms={acceptTerms}
           cardSetupErrorMessage={cardSetupErrorMessage}
           cardSetupSession={activeCardSetupSession}
+          isDevelopmentPaymentBypassEnabled={isDevelopmentPaymentBypassEnabled}
           isLoadingCardSetupSession={isLoadingCardSetupSession}
           isSubmitting={isSubmitting}
           onAcceptAgeChange={setAcceptAge}
@@ -883,6 +885,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           acceptTerms={acceptTerms}
           cardSetupErrorMessage={cardSetupErrorMessage}
           cardSetupSession={activeCardSetupSession}
+          isDevelopmentPaymentBypassEnabled={isDevelopmentPaymentBypassEnabled}
           isLoadingCardSetupSession={isLoadingCardSetupSession}
           isSubmitting={isSubmitting}
           onAcceptAgeChange={setAcceptAge}

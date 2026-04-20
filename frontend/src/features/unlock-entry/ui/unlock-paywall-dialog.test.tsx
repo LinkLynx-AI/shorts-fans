@@ -1,5 +1,6 @@
 import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
+import { afterEach } from "vitest";
 
 import { normalizeUnlockSurface, type UnlockSurfaceModel } from "@/features/unlock-entry";
 
@@ -144,6 +145,10 @@ function renderDialog({
   );
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
 describe("UnlockPaywallDialog", () => {
   it("renders saved-card purchase controls for purchase-ready state", () => {
     renderDialog({
@@ -208,6 +213,88 @@ describe("UnlockPaywallDialog", () => {
     await user.click(screen.getByRole("button", { name: "Mock card widget" }));
 
     expect(onCardPaymentTokenCreated).toHaveBeenCalledWith("widget-payment-token");
+  });
+
+  it("shows a direct confirm button instead of the widget during development payment bypass", () => {
+    render(
+      <UnlockPaywallDialog
+        acceptAge
+        acceptTerms
+        cardSetupSession={{
+          apiBaseUrl: "https://api.ccbill.test",
+          apiKey: "widget-api-key",
+          clientAccount: "900000",
+          currency: "JPY",
+          initialPeriod: "1",
+          initialPrice: "1800.00",
+          sessionToken: "card-setup-session-token",
+          subAccount: "0001",
+        }}
+        isDevelopmentPaymentBypassEnabled
+        onAcceptAgeChange={vi.fn()}
+        onAcceptTermsChange={vi.fn()}
+        onCardPaymentTokenCreated={vi.fn()}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        onPaymentSelectionChange={vi.fn()}
+        open
+        selection={{
+          mode: "new_card",
+        }}
+        unlock={createUnlockModel({
+          purchaseState: "setup_required",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("development では CCBill を呼ばずに unlock 導線だけ確認します。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "支払いをスキップして進む" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mock card widget" })).not.toBeInTheDocument();
+  });
+
+  it("hides saved-card rows during development payment bypass", () => {
+    render(
+      <UnlockPaywallDialog
+        acceptAge
+        acceptTerms
+        cardSetupSession={{
+          apiBaseUrl: "https://api.ccbill.test",
+          apiKey: "widget-api-key",
+          clientAccount: "900000",
+          currency: "JPY",
+          initialPeriod: "1",
+          initialPrice: "1800.00",
+          sessionToken: "card-setup-session-token",
+          subAccount: "0001",
+        }}
+        isDevelopmentPaymentBypassEnabled
+        onAcceptAgeChange={vi.fn()}
+        onAcceptTermsChange={vi.fn()}
+        onCardPaymentTokenCreated={vi.fn()}
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        onPaymentSelectionChange={vi.fn()}
+        open
+        selection={{
+          mode: "new_card",
+        }}
+        unlock={createUnlockModel({
+          purchaseState: "setup_required",
+          savedPaymentMethods: [
+            {
+              brand: "visa",
+              last4: "4242",
+              paymentMethodId: "paymeth_saved_visa",
+            },
+          ],
+        })}
+      />,
+    );
+
+    expect(screen.queryByText("Visa •••• 4242")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Mock card widget" })).not.toBeInTheDocument();
+    expect(screen.getByText("development では CCBill を呼ばずに unlock 導線だけ確認します。")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "支払いをスキップして進む" })).toBeInTheDocument();
   });
 
   it("withholds the new-card widget until required consent is completed", () => {

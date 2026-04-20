@@ -49,6 +49,7 @@ export type UnlockPurchaseStateType =
   | "unavailable";
 
 export type UnlockPurchaseState = {
+  paymentBypassEnabled?: boolean;
   pendingReason: UnlockPendingReason | null;
   savedPaymentMethods: readonly SavedPaymentMethodSummary[];
   setup: UnlockSetupState;
@@ -85,7 +86,13 @@ export type UnlockSurfaceModel = {
   unlockCta: UnlockCtaState;
 };
 
-export type RawUnlockSurfaceModel = Omit<UnlockSurfaceModel, "mainAccessEntry" | "setup">;
+export type RawUnlockPurchaseState = Omit<UnlockPurchaseState, "paymentBypassEnabled"> & {
+  paymentBypassEnabled?: boolean | undefined;
+};
+
+export type RawUnlockSurfaceModel = Omit<UnlockSurfaceModel, "mainAccessEntry" | "purchase" | "setup"> & {
+  purchase: RawUnlockPurchaseState;
+};
 
 /**
  * transport payload から互換 alias を含む unlock model を組み立てる。
@@ -93,6 +100,10 @@ export type RawUnlockSurfaceModel = Omit<UnlockSurfaceModel, "mainAccessEntry" |
 export function normalizeUnlockSurface(raw: RawUnlockSurfaceModel): UnlockSurfaceModel {
   return {
     ...raw,
+    purchase: {
+      ...raw.purchase,
+      paymentBypassEnabled: raw.purchase.paymentBypassEnabled ?? false,
+    },
     mainAccessEntry: {
       routePath: raw.entryContext.accessEntryPath,
       token: raw.entryContext.token,

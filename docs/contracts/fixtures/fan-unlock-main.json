@@ -54,6 +54,7 @@
           },
           "purchase": {
             "state": "setup_required",
+            "paymentBypassEnabled": false,
             "supportedCardBrands": [
               "visa",
               "mastercard",
@@ -131,6 +132,7 @@
           },
           "purchase": {
             "state": "purchase_ready",
+            "paymentBypassEnabled": false,
             "supportedCardBrands": [
               "visa",
               "mastercard",
@@ -214,6 +216,7 @@
           },
           "purchase": {
             "state": "purchase_pending",
+            "paymentBypassEnabled": false,
             "supportedCardBrands": [
               "visa",
               "mastercard",
@@ -297,6 +300,7 @@
           },
           "purchase": {
             "state": "already_purchased",
+            "paymentBypassEnabled": false,
             "supportedCardBrands": [
               "visa",
               "mastercard",
@@ -380,6 +384,7 @@
           },
           "purchase": {
             "state": "owner_preview",
+            "paymentBypassEnabled": false,
             "supportedCardBrands": [
               "visa",
               "mastercard",

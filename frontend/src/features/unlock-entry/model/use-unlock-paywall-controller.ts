@@ -9,6 +9,7 @@ import { requestCardSetupToken } from "../api/request-card-setup-token";
 import { requestMainAccessEntry } from "../api/request-main-access-entry";
 import { requestMainPurchase } from "../api/request-main-purchase";
 import { requestUnlockSurfaceByShortId } from "../api/request-unlock-surface";
+import { isDevelopmentPaymentBypassEnabled } from "./payment-bypass";
 import { getUnlockEntryAction, type UnlockSurfaceModel } from "./unlock-entry";
 
 type PaymentSelection =
@@ -52,6 +53,8 @@ type UseUnlockPaywallControllerOptions = {
   viewerIdentityKey: string | null;
 };
 
+const developmentPaymentBypassToken = "development-payment-bypass";
+
 function buildUnlockStateKey(unlock: UnlockSurfaceModel): string {
   return [
     unlock.short.id,
@@ -63,6 +66,7 @@ function buildUnlockStateKey(unlock: UnlockSurfaceModel): string {
     unlock.entryContext.purchasePath,
     unlock.entryContext.token,
     unlock.purchase.state,
+    unlock.purchase.paymentBypassEnabled ? "payment-bypass" : "payment-live",
     unlock.purchase.pendingReason ?? "no-pending",
     unlock.purchase.savedPaymentMethods.map((method) => method.paymentMethodId).join(","),
     unlock.setup.required ? "setup-required" : "setup-optional",
@@ -72,6 +76,12 @@ function buildUnlockStateKey(unlock: UnlockSurfaceModel): string {
 }
 
 function getDefaultPaywallSelection(unlock: UnlockSurfaceModel): PaymentSelection {
+  if (isDevelopmentPaymentBypassEnabled(unlock)) {
+    return {
+      mode: "new_card",
+    };
+  }
+
   const firstSavedMethod = unlock.purchase.savedPaymentMethods[0];
 
   if (firstSavedMethod && !unlock.purchase.setup.requiresCardSetup) {
@@ -143,6 +153,10 @@ function isPaywallSelectionValid(
   unlock: UnlockSurfaceModel,
   selection: PaymentSelection,
 ) {
+  if (isDevelopmentPaymentBypassEnabled(unlock)) {
+    return selection.mode === "new_card";
+  }
+
   if (!supportsPurchaseSelection(unlock)) {
     return selection.mode === "new_card";
   }
@@ -232,6 +246,7 @@ export function useUnlockPaywallController({
   const requestMainPurchaseImpl = deps?.requestMainPurchase ?? requestMainPurchase;
   const requestUnlockSurfaceByShortIdImpl =
     deps?.requestUnlockSurfaceByShortId ?? requestUnlockSurfaceByShortId;
+  const isDevelopmentPaymentBypassEnabledForFlow = isDevelopmentPaymentBypassEnabled(activeUnlock);
   const isBusy =
     isResolvingUnlock ||
     isSubmittingMainAccess ||
@@ -390,7 +405,11 @@ export function useUnlockPaywallController({
   const ensureCardSetupSession = async (
     targetUnlock: UnlockSurfaceModel,
   ) => {
-    if (!usePurchaseFlow || !supportsPurchaseSelection(targetUnlock)) {
+    if (
+      !usePurchaseFlow ||
+      !supportsPurchaseSelection(targetUnlock) ||
+      isDevelopmentPaymentBypassEnabled(targetUnlock)
+    ) {
       return;
     }
 
@@ -464,7 +483,11 @@ export function useUnlockPaywallController({
     setSelectedPaymentSelection(nextSelection);
     setIsPaywallOpen(true);
 
-    if (usePurchaseFlow && nextSelection.mode === "new_card") {
+    if (
+      usePurchaseFlow &&
+      nextSelection.mode === "new_card" &&
+      !isDevelopmentPaymentBypassEnabled(targetUnlock)
+    ) {
       await ensureCardSetupSession(targetUnlock);
     }
   };
@@ -831,11 +854,20 @@ export function useUnlockPaywallController({
         return;
       case "purchase_ready":
       case "setup_required":
+        if (isDevelopmentPaymentBypassEnabled(activeUnlock)) {
+          await handlePurchase(activeUnlock, {
+            cardSetupToken: developmentPaymentBypassToken,
+            mode: "new_card",
+          });
+          return;
+        }
+
         if (paymentSelection.mode === "saved_card") {
           await handlePurchase(activeUnlock, {
             mode: "saved_card",
             paymentMethodId: paymentSelection.paymentMethodId,
           });
+          return;
         }
         return;
       default:
@@ -844,6 +876,14 @@ export function useUnlockPaywallController({
   };
 
   const handlePaymentSelectionChange = (nextSelection: PaymentSelection) => {
+    if (isDevelopmentPaymentBypassEnabled(activeUnlock)) {
+      setSelectedPaymentSelection({
+        mode: "new_card",
+      });
+      clearPaywallMessages();
+      return;
+    }
+
     setSelectedPaymentSelection(nextSelection);
     clearPaywallMessages();
 
@@ -871,6 +911,7 @@ export function useUnlockPaywallController({
     purchaseErrorMessage,
     setAcceptAge,
     setAcceptTerms,
+    isDevelopmentPaymentBypassEnabled: isDevelopmentPaymentBypassEnabledForFlow,
     unlockAction,
   };
 }

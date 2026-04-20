@@ -187,6 +187,9 @@ func TestGetUnlockSurfaceReturnsSetupRequiredPurchaseState(t *testing.T) {
 	if surface.Purchase.State != "setup_required" {
 		t.Fatalf("GetUnlockSurface() purchase state got %q want %q", surface.Purchase.State, "setup_required")
 	}
+	if surface.Purchase.PaymentBypassEnabled {
+		t.Fatal("GetUnlockSurface() payment bypass flag = true, want false")
+	}
 	if !surface.Purchase.Setup.Required || !surface.Purchase.Setup.RequiresCardSetup {
 		t.Fatalf("GetUnlockSurface() setup got %#v want required card setup", surface.Purchase.Setup)
 	}
@@ -195,6 +198,26 @@ func TestGetUnlockSurfaceReturnsSetupRequiredPurchaseState(t *testing.T) {
 	}
 	if surface.MainAccessToken == "" {
 		t.Fatal("GetUnlockSurface() main access token = empty, want value")
+	}
+}
+
+func TestGetUnlockSurfaceIncludesDevelopmentPaymentBypassFlag(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	service := fixture.newService(stubPaymentRepository{
+		listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+			return []payment.SavedPaymentMethod{}, nil
+		},
+	})
+	service.EnableDevelopmentPaymentBypass()
+
+	surface, err := service.GetUnlockSurface(context.Background(), fixture.viewerID, fixture.sessionBinding, fixture.shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+	if !surface.Purchase.PaymentBypassEnabled {
+		t.Fatal("GetUnlockSurface() payment bypass flag = false, want true")
 	}
 }
 
@@ -1012,6 +1035,216 @@ func TestPurchaseMainChargeFailureReturnsContractFailure(t *testing.T) {
 	}
 }
 
+func TestPurchaseMainBypassesPaymentInDevelopment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	attemptID := uuid.MustParse("99999999-9999-9999-9999-999999999999")
+	charges := 0
+	createdAttempts := 0
+	recordedUnlocks := 0
+	touchedMethods := 0
+	updatedAttempts := 0
+	var succeededAttempt *payment.MainPurchaseAttempt
+	service := fixture.newService(
+		stubPaymentRepository{
+			listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+				return []payment.SavedPaymentMethod{
+					{
+						PaymentMethodID:         "paymeth_saved_1",
+						ProviderPaymentTokenRef: "saved-token-should-not-be-used",
+					},
+				}, nil
+			},
+			createMainPurchaseAttempt: func(_ context.Context, input payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+				createdAttempts++
+				if input.MainID != fixture.mainID || input.UserID != fixture.viewerID {
+					t.Fatalf("CreateMainPurchaseAttempt() input got %+v", input)
+				}
+				if input.PaymentMethodMode != payment.PaymentMethodModeNewCard || input.ProviderPaymentTokenRef != "development-payment-bypass" {
+					t.Fatalf("CreateMainPurchaseAttempt() payment input got %+v", input)
+				}
+
+				return payment.MainPurchaseAttempt{
+					ID:     attemptID,
+					MainID: fixture.mainID,
+					Status: payment.PurchaseAttemptStatusProcessing,
+					UserID: fixture.viewerID,
+				}, nil
+			},
+			getLatestSucceededMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+				if succeededAttempt == nil {
+					return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptNotFound
+				}
+
+				return *succeededAttempt, nil
+			},
+			updateMainPurchaseAttemptOutcome: func(_ context.Context, input payment.UpdateMainPurchaseAttemptOutcomeInput) (payment.MainPurchaseAttempt, error) {
+				updatedAttempts++
+				if input.ID != attemptID || input.Status != payment.PurchaseAttemptStatusSucceeded {
+					t.Fatalf("UpdateMainPurchaseAttemptOutcome() input got %+v", input)
+				}
+				if input.ProviderProcessedAt == nil || !input.ProviderProcessedAt.Equal(fixture.now) {
+					t.Fatalf("UpdateMainPurchaseAttemptOutcome() processedAt got %#v want %s", input.ProviderProcessedAt, fixture.now)
+				}
+
+				succeededAttempt = &payment.MainPurchaseAttempt{
+					ID:                  attemptID,
+					MainID:              fixture.mainID,
+					ProviderProcessedAt: input.ProviderProcessedAt,
+					Status:              input.Status,
+					UserID:              fixture.viewerID,
+				}
+
+				return *succeededAttempt, nil
+			},
+			touchSavedPaymentMethodLastUsedAt: func(context.Context, uuid.UUID, string, *time.Time) (payment.SavedPaymentMethod, error) {
+				touchedMethods++
+				return payment.SavedPaymentMethod{}, nil
+			},
+		},
+		stubPurchaseGateway{
+			charge: func(context.Context, payment.ChargeInput) (payment.ChargeResult, error) {
+				charges++
+				return payment.ChargeResult{}, errors.New("charge should not be called during development bypass")
+			},
+		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				recordedUnlocks++
+				if input.UserID != fixture.viewerID || input.MainID != fixture.mainID {
+					t.Fatalf("RecordMainUnlock() input got %+v", input)
+				}
+				if input.PaymentProviderPurchaseRef != nil {
+					t.Fatalf("RecordMainUnlock() provider ref got %#v want nil", input.PaymentProviderPurchaseRef)
+				}
+				if input.PurchasedAt == nil || !input.PurchasedAt.Equal(fixture.now) {
+					t.Fatalf("RecordMainUnlock() purchasedAt got %#v want %s", input.PurchasedAt, fixture.now)
+				}
+
+				return unlock.MainUnlock{}, nil
+			},
+		},
+	)
+	service.EnableDevelopmentPaymentBypass()
+
+	result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+		AcceptedAge:   true,
+		AcceptedTerms: true,
+		EntryToken:    entryToken,
+		FromShortID:   fixture.shortID,
+		MainID:        fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:           payment.PaymentMethodModeNewCard,
+			CardSetupToken: "development-payment-bypass",
+		},
+		ViewerID: fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("PurchaseMain() error = %v, want nil", err)
+	}
+	if charges != 0 {
+		t.Fatalf("Charge() calls got %d want 0", charges)
+	}
+	if createdAttempts != 1 || updatedAttempts != 1 {
+		t.Fatalf("PurchaseMain() attempt writes got create=%d update=%d want 1/1", createdAttempts, updatedAttempts)
+	}
+	if recordedUnlocks != 1 {
+		t.Fatalf("RecordMainUnlock() calls got %d want 1", recordedUnlocks)
+	}
+	if touchedMethods != 0 {
+		t.Fatalf("TouchSavedPaymentMethodLastUsedAt() calls got %d want 0", touchedMethods)
+	}
+	if result.Purchase.Status != "succeeded" {
+		t.Fatalf("PurchaseMain() status got %q want %q", result.Purchase.Status, "succeeded")
+	}
+	if result.Access.Reason != "purchased" || result.Access.Status != "unlocked" {
+		t.Fatalf("PurchaseMain() access got %#v want purchased/unlocked", result.Access)
+	}
+	if result.EntryToken == nil || *result.EntryToken == "" {
+		t.Fatalf("PurchaseMain() entry token got %#v want value", result.EntryToken)
+	}
+	issued, err := service.IssueAccessEntry(context.Background(), fixture.sessionBinding, AccessEntryInput{
+		EntryToken:  *result.EntryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindPurchased {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindPurchased)
+	}
+	if issued.GrantToken == "" {
+		t.Fatal("IssueAccessEntry() grant token = empty, want value")
+	}
+	playback, err := service.GetPlaybackSurface(
+		context.Background(),
+		fixture.viewerID,
+		fixture.sessionBinding,
+		fixture.mainID,
+		fixture.shortID,
+		issued.GrantToken,
+	)
+	if err != nil {
+		t.Fatalf("GetPlaybackSurface() error = %v, want nil", err)
+	}
+	if playback.Access.Reason != "purchased" || playback.Access.Status != "unlocked" {
+		t.Fatalf("GetPlaybackSurface() access got %#v want purchased/unlocked", playback.Access)
+	}
+	if playback.Main.ID != fixture.mainID {
+		t.Fatalf("GetPlaybackSurface() main got %s want %s", playback.Main.ID, fixture.mainID)
+	}
+	if playback.EntryShort.ID != fixture.shortID {
+		t.Fatalf("GetPlaybackSurface() entry short got %s want %s", playback.EntryShort.ID, fixture.shortID)
+	}
+}
+
+func TestPurchaseMainRejectsSavedCardInDevelopmentBypass(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	service := fixture.newService(stubPaymentRepository{
+		listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+			return []payment.SavedPaymentMethod{
+				{
+					PaymentMethodID:         "paymeth_saved_1",
+					ProviderPaymentTokenRef: "saved-token-should-not-be-used",
+				},
+			}, nil
+		},
+		getSavedPaymentMethod: func(context.Context, uuid.UUID, string) (payment.SavedPaymentMethod, error) {
+			t.Fatal("GetSavedPaymentMethod() was called unexpectedly")
+			return payment.SavedPaymentMethod{}, nil
+		},
+		createMainPurchaseAttempt: func(context.Context, payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+			t.Fatal("CreateMainPurchaseAttempt() was called unexpectedly")
+			return payment.MainPurchaseAttempt{}, nil
+		},
+		touchSavedPaymentMethodLastUsedAt: func(context.Context, uuid.UUID, string, *time.Time) (payment.SavedPaymentMethod, error) {
+			t.Fatal("TouchSavedPaymentMethodLastUsedAt() was called unexpectedly")
+			return payment.SavedPaymentMethod{}, nil
+		},
+	})
+	service.EnableDevelopmentPaymentBypass()
+
+	_, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+		EntryToken:  fixture.entryToken(t),
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:            payment.PaymentMethodModeSavedCard,
+			PaymentMethodID: "paymeth_saved_1",
+		},
+		ViewerID: fixture.viewerID,
+	})
+	if !errors.Is(err, ErrInvalidPurchaseRequest) {
+		t.Fatalf("PurchaseMain() error got %v want %v", err, ErrInvalidPurchaseRequest)
+	}
+}
+
 func TestIssueAccessEntryRejectsViewerWithoutPurchase(t *testing.T) {
 	t.Parallel()
 
@@ -1385,7 +1618,7 @@ func TestUnlockPurchaseStateAndCTAHelpers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			purchaseState := buildUnlockPurchaseState(tt.preview, tt.savedMethods, tt.inflight)
+			purchaseState := buildUnlockPurchaseState(tt.preview, tt.savedMethods, tt.inflight, false)
 			if purchaseState.State != tt.wantPurchase {
 				t.Fatalf("buildUnlockPurchaseState() state got %q want %q", purchaseState.State, tt.wantPurchase)
 			}

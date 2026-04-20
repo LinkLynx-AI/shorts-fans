@@ -59,6 +59,7 @@ type Service struct {
 	paymentRepository          paymentRepository
 	purchaseGateway            purchaseGateway
 	paymentWidgetSessionSource paymentWidgetSessionProvider
+	developmentPaymentBypass   bool
 	now                        func() time.Time
 	tokenTTL                   time.Duration
 	grantTTL                   time.Duration
@@ -176,6 +177,15 @@ func NewService(
 	}
 }
 
+// EnableDevelopmentPaymentBypass は local development 向けに決済呼び出しを一時的に迂回します。
+func (s *Service) EnableDevelopmentPaymentBypass() {
+	if s == nil {
+		return
+	}
+
+	s.developmentPaymentBypass = true
+}
+
 func (s *Service) issueEntryToken(sessionBinding string, viewerID uuid.UUID, mainID uuid.UUID, fromShortID uuid.UUID) (string, error) {
 	return issueSignedToken(sessionBinding, s.now().UTC(), s.tokenTTL, signedTokenPayload{
 		Kind:        entryTokenKind,
@@ -220,7 +230,7 @@ func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sess
 		return UnlockSurface{}, err
 	}
 
-	purchaseState := buildUnlockPurchaseState(detail.Item.Unlock, savedMethods, inflightAttempt)
+	purchaseState := buildUnlockPurchaseState(detail.Item.Unlock, savedMethods, inflightAttempt, s.developmentPaymentBypass)
 
 	return UnlockSurface{
 		Access:          buildMainAccessState(detail.Item.Unlock, main.ID),

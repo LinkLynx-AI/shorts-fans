@@ -38,6 +38,7 @@ export const savedPaymentMethodSummarySchema = z.object({
 });
 
 export const unlockPurchaseStateSchema = z.object({
+  paymentBypassEnabled: z.boolean().optional(),
   pendingReason: z.enum(["provider_processing"]).nullable(),
   savedPaymentMethods: z.array(savedPaymentMethodSummarySchema),
   setup: purchaseSetupStateSchema,

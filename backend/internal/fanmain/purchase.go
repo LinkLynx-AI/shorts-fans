@@ -105,11 +105,12 @@ type PurchaseSetupState struct {
 
 // UnlockPurchaseState は paywall 上の purchase state です。
 type UnlockPurchaseState struct {
-	PendingReason       *string
-	SavedPaymentMethods []SavedPaymentMethodSummary
-	Setup               PurchaseSetupState
-	State               string
-	SupportedCardBrands []string
+	PaymentBypassEnabled bool
+	PendingReason        *string
+	SavedPaymentMethods  []SavedPaymentMethodSummary
+	Setup                PurchaseSetupState
+	State                string
+	SupportedCardBrands  []string
 }
 
 // PurchasePaymentMethodInput は purchase に使う payment method 入力です。
@@ -400,6 +401,10 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 		return PurchaseResult{}, err
 	}
 
+	if s.developmentPaymentBypass {
+		return s.completeDevelopmentBypassPurchase(ctx, sessionBinding, main, savedMethods, input)
+	}
+
 	if err := validatePurchaseInput(input, savedMethods); err != nil {
 		return PurchaseResult{}, err
 	}
@@ -571,6 +576,103 @@ func (s *Service) purchaseMainWithLockedPaymentState(
 	}
 }
 
+func (s *Service) completeDevelopmentBypassPurchase(
+	ctx context.Context,
+	sessionBinding string,
+	main shorts.Main,
+	savedMethods []payment.SavedPaymentMethod,
+	input PurchaseInput,
+) (PurchaseResult, error) {
+	if err := validatePurchaseInput(input, savedMethods); err != nil {
+		return PurchaseResult{}, err
+	}
+
+	requestedCurrencyCode, err := currencyNumericCode(main.CurrencyCode)
+	if err != nil {
+		return PurchaseResult{}, err
+	}
+
+	paymentMode := strings.TrimSpace(input.PaymentMethod.Mode)
+	providerPaymentTokenRef := ""
+
+	switch paymentMode {
+	case payment.PaymentMethodModeSavedCard:
+		return PurchaseResult{}, ErrInvalidPurchaseRequest
+	case payment.PaymentMethodModeNewCard:
+		providerPaymentTokenRef = strings.TrimSpace(input.PaymentMethod.CardSetupToken)
+	default:
+		return PurchaseResult{}, ErrInvalidPurchaseRequest
+	}
+
+	idempotencyKey := buildPurchaseIdempotencyKey(input, providerPaymentTokenRef)
+	if existingAttempt, err := s.paymentRepository.GetMainPurchaseAttemptByIdempotencyKeyForUpdate(ctx, idempotencyKey); err == nil {
+		freshEntryToken, tokenErr := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+		if tokenErr != nil {
+			return PurchaseResult{}, tokenErr
+		}
+
+		return buildPurchaseResultFromAttempt(main.ID, existingAttempt, freshEntryToken), nil
+	} else if !errors.Is(err, payment.ErrMainPurchaseAttemptNotFound) {
+		return PurchaseResult{}, fmt.Errorf("purchase attempt idempotency 取得 viewer=%s main=%s: %w", input.ViewerID, input.MainID, err)
+	}
+
+	attempt, err := s.paymentRepository.CreateMainPurchaseAttempt(ctx, payment.CreateMainPurchaseAttemptInput{
+		AcceptedAge:             input.AcceptedAge,
+		AcceptedTerms:           input.AcceptedTerms,
+		FromShortID:             input.FromShortID,
+		IdempotencyKey:          idempotencyKey,
+		MainID:                  input.MainID,
+		PaymentMethodMode:       paymentMode,
+		Provider:                payment.ProviderCCBill,
+		ProviderPaymentTokenRef: providerPaymentTokenRef,
+		RequestedCurrencyCode:   requestedCurrencyCode,
+		RequestedPriceJPY:       main.PriceMinor,
+		Status:                  payment.PurchaseAttemptStatusProcessing,
+		UserID:                  input.ViewerID,
+	})
+	if err != nil {
+		if errors.Is(err, payment.ErrMainPurchaseAttemptConflict) {
+			existingAttempt, resolveErr := s.resolveConflictingPurchaseAttempt(ctx, input.ViewerID, input.MainID, idempotencyKey)
+			if resolveErr != nil {
+				return PurchaseResult{}, resolveErr
+			}
+
+			freshEntryToken, tokenErr := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+			if tokenErr != nil {
+				return PurchaseResult{}, tokenErr
+			}
+			return buildPurchaseResultFromAttempt(main.ID, existingAttempt, freshEntryToken), nil
+		}
+
+		return PurchaseResult{}, err
+	}
+
+	processedAt := s.now().UTC()
+	if err := s.recordPurchaseUnlock(ctx, input.ViewerID, input.MainID, processedAt, nil); err != nil {
+		return PurchaseResult{}, err
+	}
+	if _, err := s.paymentRepository.UpdateMainPurchaseAttemptOutcome(ctx, payment.UpdateMainPurchaseAttemptOutcomeInput{
+		ID:                  attempt.ID,
+		ProviderProcessedAt: &processedAt,
+		Status:              payment.PurchaseAttemptStatusSucceeded,
+	}); err != nil {
+		return PurchaseResult{}, fmt.Errorf("purchase success outcome 更新 attempt=%s: %w", attempt.ID, err)
+	}
+	freshEntryToken, err := s.issueEntryToken(sessionBinding, input.ViewerID, input.MainID, input.FromShortID)
+	if err != nil {
+		return PurchaseResult{}, err
+	}
+
+	return PurchaseResult{
+		Access:     buildPurchasedAccessState(main.ID),
+		EntryToken: stringPtr(freshEntryToken),
+		Purchase: PurchaseOutcome{
+			CanRetry: false,
+			Status:   "succeeded",
+		},
+	}, nil
+}
+
 func currencyNumericCode(currencyCode string) (int32, error) {
 	switch strings.ToUpper(strings.TrimSpace(currencyCode)) {
 	case "JPY":
@@ -727,6 +829,7 @@ func buildUnlockPurchaseState(
 	source feed.UnlockPreview,
 	savedMethods []payment.SavedPaymentMethod,
 	inflight *payment.MainPurchaseAttempt,
+	paymentBypassEnabled bool,
 ) UnlockPurchaseState {
 	state := "purchase_ready"
 	setup := PurchaseSetupState{}
@@ -763,11 +866,12 @@ func buildUnlockPurchaseState(
 	}
 
 	return UnlockPurchaseState{
-		PendingReason:       pendingReason,
-		SavedPaymentMethods: summaries,
-		Setup:               setup,
-		State:               state,
-		SupportedCardBrands: append([]string(nil), supportedCardBrands...),
+		PaymentBypassEnabled: paymentBypassEnabled,
+		PendingReason:        pendingReason,
+		SavedPaymentMethods:  summaries,
+		Setup:                setup,
+		State:                state,
+		SupportedCardBrands:  append([]string(nil), supportedCardBrands...),
 	}
 }
 
