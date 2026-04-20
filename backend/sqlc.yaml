@@ -18,6 +18,7 @@ sql:
       - "db/migrations/000014_add_creator_registration_intake.up.sql"
       - "db/migrations/000015_add_recommendation_foundation.up.sql"
       - "db/migrations/000016_add_payment_purchase_state.up.sql"
+      - "db/migrations/000017_add_submission_review_intakes.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

@@ -19,6 +19,7 @@ source:
         - 000013_add_cognito_session_foundation.up.sql
         - 000014_add_creator_registration_intake.up.sql
         - 000015_add_recommendation_foundation.up.sql
+        - 000017_add_submission_review_intakes.up.sql
 schemas:
     - name: app
       tables:
@@ -1715,6 +1716,248 @@ schemas:
               columns:
                 - state
               definition: CREATE INDEX idx_shorts_state ON app.shorts USING btree (state)
+        - name: submission_review_intake_shorts
+          columns:
+            - name: submission_review_intake_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: media_asset_id
+              type: uuid
+              nullable: false
+            - name: caption
+              type: text
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - submission_review_intake_id
+            - short_id
+          foreign_keys:
+            - name: submission_review_intake_short_submission_review_intake_id_fkey
+              columns:
+                - submission_review_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: submission_review_intake_shorts_media_asset_id_fkey
+              columns:
+                - media_asset_id
+              references:
+                schema: app
+                table: media_assets
+                columns:
+                    - id
+            - name: submission_review_intake_shorts_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+          indexes:
+            - name: idx_submission_review_intake_shorts_short_id
+              columns:
+                - short_id
+              definition: CREATE INDEX idx_submission_review_intake_shorts_short_id ON app.submission_review_intake_shorts USING btree (short_id)
+        - name: submission_review_intakes
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: canonical_main_id
+              type: uuid
+              nullable: false
+            - name: creator_user_id
+              type: uuid
+              nullable: false
+            - name: status
+              type: text
+              nullable: false
+            - name: submit_kind
+              type: text
+              nullable: false
+            - name: previous_intake_id
+              type: uuid
+              nullable: true
+            - name: main_media_asset_id
+              type: uuid
+              nullable: false
+            - name: main_price_minor
+              type: bigint
+              nullable: false
+            - name: ownership_confirmed
+              type: boolean
+              nullable: false
+            - name: consent_confirmed
+              type: boolean
+              nullable: false
+            - name: submitted_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: submission_review_intakes_canonical_main_id_creator_user_i_fkey
+              columns:
+                - canonical_main_id
+                - creator_user_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+                    - creator_user_id
+            - name: submission_review_intakes_creator_user_id_fkey
+              columns:
+                - creator_user_id
+              references:
+                schema: app
+                table: creator_capabilities
+                columns:
+                    - user_id
+            - name: submission_review_intakes_main_media_asset_id_fkey
+              columns:
+                - main_media_asset_id
+              references:
+                schema: app
+                table: media_assets
+                columns:
+                    - id
+            - name: submission_review_intakes_previous_intake_id_fkey
+              columns:
+                - previous_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+          check_constraints:
+            - name: submission_review_intakes_check
+              expression: CHECK (submit_kind = 'initial_submit'::text AND previous_intake_id IS NULL OR submit_kind = 'resubmit'::text AND previous_intake_id IS NOT NULL)
+            - name: submission_review_intakes_main_price_minor_check
+              expression: CHECK (main_price_minor > 0)
+            - name: submission_review_intakes_status_check
+              expression: CHECK (status = ANY (ARRAY['pending_review'::text, 'decision_applied'::text]))
+            - name: submission_review_intakes_submit_kind_check
+              expression: CHECK (submit_kind = ANY (ARRAY['initial_submit'::text, 'resubmit'::text]))
+          indexes:
+            - name: idx_submission_review_intakes_canonical_main_id
+              columns:
+                - canonical_main_id
+                - submitted_at
+                - id
+              definition: CREATE INDEX idx_submission_review_intakes_canonical_main_id ON app.submission_review_intakes USING btree (canonical_main_id, submitted_at DESC, id DESC)
+            - name: idx_submission_review_intakes_creator_user_id
+              columns:
+                - creator_user_id
+                - submitted_at
+                - id
+              definition: CREATE INDEX idx_submission_review_intakes_creator_user_id ON app.submission_review_intakes USING btree (creator_user_id, submitted_at DESC, id DESC)
+            - name: uq_submission_review_intakes_pending_main
+              columns:
+                - canonical_main_id
+              unique: true
+              predicate: (status = 'pending_review'::text)
+              definition: CREATE UNIQUE INDEX uq_submission_review_intakes_pending_main ON app.submission_review_intakes USING btree (canonical_main_id) WHERE (status = 'pending_review'::text)
+            - name: uq_submission_review_intakes_previous_intake_id
+              columns:
+                - previous_intake_id
+              unique: true
+              predicate: (previous_intake_id IS NOT NULL)
+              definition: CREATE UNIQUE INDEX uq_submission_review_intakes_previous_intake_id ON app.submission_review_intakes USING btree (previous_intake_id) WHERE (previous_intake_id IS NOT NULL)
+        - name: user_payment_methods
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: provider
+              type: text
+              nullable: false
+            - name: provider_payment_token_ref
+              type: text
+              nullable: false
+            - name: provider_payment_account_ref
+              type: text
+              nullable: false
+            - name: brand
+              type: text
+              nullable: false
+            - name: last4
+              type: text
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: last_used_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: user_payment_methods_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+          unique_constraints:
+            - name: user_payment_methods_id_user_id_key
+              columns:
+                - id
+                - user_id
+            - name: user_payment_methods_provider_payment_token_ref_key
+              columns:
+                - provider_payment_token_ref
+            - name: user_payment_methods_user_id_provider_payment_account_ref_key
+              columns:
+                - user_id
+                - provider_payment_account_ref
+          check_constraints:
+            - name: user_payment_methods_brand_check
+              expression: CHECK (brand = ANY (ARRAY['visa'::text, 'mastercard'::text, 'jcb'::text, 'american_express'::text]))
+            - name: user_payment_methods_last4_check
+              expression: CHECK (last4 ~ '^[0-9]{4}$'::text)
+            - name: user_payment_methods_provider_check
+              expression: CHECK (provider = 'ccbill'::text)
+          indexes:
+            - name: idx_user_payment_methods_user_last_used_at
+              columns:
+                - user_id
+                - last_used_at
+                - id
+              definition: CREATE INDEX idx_user_payment_methods_user_last_used_at ON app.user_payment_methods USING btree (user_id, last_used_at DESC, id DESC)
         - name: user_profiles
           columns:
             - name: user_id

@@ -14,6 +14,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/creator"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -121,6 +122,22 @@ func (s stubCreatorWorkspaceMainPriceWriter) UpdateWorkspaceMainPrice(
 	}
 
 	return s.updateWorkspaceMainPrice(ctx, viewerUserID, mainID, priceJpy)
+}
+
+type stubCreatorWorkspaceSubmissionReviewWriter struct {
+	submitPackage func(context.Context, uuid.UUID, uuid.UUID) error
+}
+
+func (s stubCreatorWorkspaceSubmissionReviewWriter) SubmitPackage(
+	ctx context.Context,
+	viewerUserID uuid.UUID,
+	mainID uuid.UUID,
+) error {
+	if s.submitPackage == nil {
+		return nil
+	}
+
+	return s.submitPackage(ctx, viewerUserID, mainID)
 }
 
 func TestCreatorWorkspaceRoute(t *testing.T) {
@@ -2003,6 +2020,284 @@ func TestHandleCreatorWorkspaceMainPriceUpdateReturnsInternalErrorWithoutAuthent
 	}
 	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_main_price_update_") {
 		t.Fatalf("response.Meta.RequestID got %q want creator workspace main price update prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceSubmissionReviewCreateRoute(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
+	mainID := uuid.MustParse("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee")
+	writerCalled := false
+
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceSubmissionReview: stubCreatorWorkspaceSubmissionReviewWriter{
+			submitPackage: func(_ context.Context, gotViewerUserID uuid.UUID, gotMainID uuid.UUID) error {
+				writerCalled = true
+				if gotViewerUserID != viewerID {
+					t.Fatalf("SubmitPackage() viewer got %s want %s", gotViewerUserID, viewerID)
+				}
+				if gotMainID != mainID {
+					t.Fatalf("SubmitPackage() main got %s want %s", gotMainID, mainID)
+				}
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   viewerID,
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/creator/workspace/mains/"+mainPublicID(mainID)+"/review-submissions",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("POST /api/creator/workspace/mains/:mainId/review-submissions status got %d want %d", rec.Code, http.StatusNoContent)
+	}
+	if !writerCalled {
+		t.Fatal("SubmitPackage() called = false, want true")
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("POST /api/creator/workspace/mains/:mainId/review-submissions body length got %d want 0", rec.Body.Len())
+	}
+}
+
+func TestCreatorWorkspaceSubmissionReviewCreateRouteRejectsInvalidMainID(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceSubmissionReview: stubCreatorWorkspaceSubmissionReviewWriter{
+			submitPackage: func(context.Context, uuid.UUID, uuid.UUID) error {
+				writerCalled = true
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{
+					CurrentViewer: &auth.CurrentViewer{
+						CanAccessCreatorMode: true,
+						ID:                   uuid.MustParse("ffffffff-ffff-ffff-ffff-ffffffffffff"),
+					},
+				}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/creator/workspace/mains/not-a-public-main-id/review-submissions",
+		nil,
+	)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("POST /api/creator/workspace/mains/:mainId/review-submissions status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+	if writerCalled {
+		t.Fatal("SubmitPackage() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "not_found" {
+		t.Fatalf("response.Error got %#v want not_found", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_submission_review_post_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace submission review prefix", response.Meta.RequestID)
+	}
+}
+
+func TestCreatorWorkspaceSubmissionReviewCreateRouteRejectsUnauthenticatedRequest(t *testing.T) {
+	t.Parallel()
+
+	writerCalled := false
+	router := NewHandler(HandlerConfig{
+		CreatorWorkspace: stubCreatorWorkspaceReader{},
+		CreatorWorkspaceSubmissionReview: stubCreatorWorkspaceSubmissionReviewWriter{
+			submitPackage: func(context.Context, uuid.UUID, uuid.UUID) error {
+				writerCalled = true
+				return nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("10101010-1010-1010-1010-101010101010"))+"/review-submissions",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("POST /api/creator/workspace/mains/:mainId/review-submissions status got %d want %d", rec.Code, http.StatusUnauthorized)
+	}
+	if writerCalled {
+		t.Fatal("SubmitPackage() called = true, want false")
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "auth_required" {
+		t.Fatalf("response.Error got %#v want auth_required", response.Error)
+	}
+}
+
+func TestCreatorWorkspaceSubmissionReviewCreateRouteMapsWriterErrors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   string
+		wantStatus int
+	}{
+		{
+			name:       "creator mode unavailable",
+			err:        submissionreview.ErrCreatorModeUnavailable,
+			wantCode:   "creator_mode_unavailable",
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "package not found",
+			err:        submissionreview.ErrSubmissionPackageNotFound,
+			wantCode:   "not_found",
+			wantStatus: http.StatusNotFound,
+		},
+		{
+			name:       "review state conflict",
+			err:        submissionreview.ErrReviewStateConflict,
+			wantCode:   "review_state_conflict",
+			wantStatus: http.StatusConflict,
+		},
+		{
+			name:       "submission not ready",
+			err:        &submissionreview.NotReadyError{Blockers: []string{"main_asset_not_ready"}},
+			wantCode:   "submission_not_ready",
+			wantStatus: http.StatusUnprocessableEntity,
+		},
+		{
+			name:       "unexpected failure",
+			err:        errors.New("boom"),
+			wantCode:   "internal_error",
+			wantStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			router := NewHandler(HandlerConfig{
+				CreatorWorkspace: stubCreatorWorkspaceReader{},
+				CreatorWorkspaceSubmissionReview: stubCreatorWorkspaceSubmissionReviewWriter{
+					submitPackage: func(context.Context, uuid.UUID, uuid.UUID) error {
+						return tt.err
+					},
+				},
+				ViewerBootstrap: viewerBootstrapReaderStub{
+					readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+						return auth.Bootstrap{
+							CurrentViewer: &auth.CurrentViewer{
+								CanAccessCreatorMode: true,
+								ID:                   uuid.MustParse("11112222-3333-4444-5555-666677778888"),
+							},
+						}, nil
+					},
+				},
+			})
+
+			req := httptest.NewRequest(
+				http.MethodPost,
+				"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("99990000-aaaa-bbbb-cccc-ddddeeeeffff"))+"/review-submissions",
+				nil,
+			)
+			req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != tt.wantStatus {
+				t.Fatalf("POST /api/creator/workspace/mains/:mainId/review-submissions status got %d want %d", rec.Code, tt.wantStatus)
+			}
+
+			var response responseEnvelope[struct{}]
+			if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+				t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+			}
+			if response.Error == nil || response.Error.Code != tt.wantCode {
+				t.Fatalf("response.Error got %#v want %q", response.Error, tt.wantCode)
+			}
+			if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_submission_review_post_") {
+				t.Fatalf("response.Meta.RequestID got %q want creator workspace submission review prefix", response.Meta.RequestID)
+			}
+		})
+	}
+}
+
+func TestHandleCreatorWorkspaceSubmissionReviewCreateReturnsInternalErrorWithoutAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/api/creator/workspace/mains/"+mainPublicID(uuid.MustParse("12121212-1212-1212-1212-121212121212"))+"/review-submissions",
+		nil,
+	)
+	ctx.Params = gin.Params{
+		{
+			Key:   "mainId",
+			Value: mainPublicID(uuid.MustParse("12121212-1212-1212-1212-121212121212")),
+		},
+	}
+
+	handleCreatorWorkspaceSubmissionReviewCreate(ctx, stubCreatorWorkspaceSubmissionReviewWriter{})
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("handleCreatorWorkspaceSubmissionReviewCreate() status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+
+	var response responseEnvelope[struct{}]
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, want nil", err)
+	}
+	if response.Error == nil || response.Error.Code != "internal_error" {
+		t.Fatalf("response.Error got %#v want internal_error", response.Error)
+	}
+	if !strings.HasPrefix(response.Meta.RequestID, "req_creator_workspace_submission_review_post_") {
+		t.Fatalf("response.Meta.RequestID got %q want creator workspace submission review prefix", response.Meta.RequestID)
 	}
 }
 

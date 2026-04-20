@@ -1,0 +1,8 @@
+DROP INDEX IF EXISTS idx_submission_review_intake_shorts_short_id;
+DROP TABLE IF EXISTS app.submission_review_intake_shorts;
+
+DROP INDEX IF EXISTS idx_submission_review_intakes_creator_user_id;
+DROP INDEX IF EXISTS idx_submission_review_intakes_canonical_main_id;
+DROP INDEX IF EXISTS uq_submission_review_intakes_previous_intake_id;
+DROP INDEX IF EXISTS uq_submission_review_intakes_pending_main;
+DROP TABLE IF EXISTS app.submission_review_intakes;
