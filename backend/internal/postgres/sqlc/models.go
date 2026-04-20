@@ -108,19 +108,21 @@ type AppCreatorRegistrationIntake struct {
 }
 
 type AppMain struct {
-	ID                  pgtype.UUID
-	CreatorUserID       pgtype.UUID
-	MediaAssetID        pgtype.UUID
-	State               string
-	ReviewReasonCode    pgtype.Text
-	PostReportState     pgtype.Text
-	PriceMinor          int64
-	CurrencyCode        string
-	OwnershipConfirmed  bool
-	ConsentConfirmed    bool
-	ApprovedForUnlockAt pgtype.Timestamptz
-	CreatedAt           pgtype.Timestamptz
-	UpdatedAt           pgtype.Timestamptz
+	ID                   pgtype.UUID
+	CreatorUserID        pgtype.UUID
+	MediaAssetID         pgtype.UUID
+	State                string
+	ReviewReasonCode     pgtype.Text
+	PostReportState      pgtype.Text
+	PriceMinor           int64
+	CurrencyCode         string
+	OwnershipConfirmed   bool
+	ConsentConfirmed     bool
+	ApprovedForUnlockAt  pgtype.Timestamptz
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+	ReviewDecisionSource pgtype.Text
+	ReviewDecisionedAt   pgtype.Timestamptz
 }
 
 type AppMainPlaybackProgress struct {
@@ -342,6 +344,8 @@ type AppShort struct {
 	CreatedAt            pgtype.Timestamptz
 	UpdatedAt            pgtype.Timestamptz
 	Caption              pgtype.Text
+	ReviewDecisionSource pgtype.Text
+	ReviewDecisionedAt   pgtype.Timestamptz
 }
 
 type AppSubmissionReviewIntake struct {
@@ -368,6 +372,26 @@ type AppSubmissionReviewIntakeShort struct {
 	CreatedAt                pgtype.Timestamptz
 }
 
+type AppSubmissionReviewMainDecision struct {
+	SubmissionReviewIntakeID pgtype.UUID
+	MainID                   pgtype.UUID
+	TargetState              string
+	ReasonCode               pgtype.Text
+	DecisionSource           string
+	DecisionedAt             pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+}
+
+type AppSubmissionReviewShortDecision struct {
+	SubmissionReviewIntakeID pgtype.UUID
+	ShortID                  pgtype.UUID
+	TargetState              string
+	ReasonCode               pgtype.Text
+	DecisionSource           string
+	DecisionedAt             pgtype.Timestamptz
+	CreatedAt                pgtype.Timestamptz
+}
+
 type AppUnlockableMain struct {
 	ID                  pgtype.UUID
 	CreatorUserID       pgtype.UUID
@@ -375,8 +399,8 @@ type AppUnlockableMain struct {
 	State               string
 	ReviewReasonCode    pgtype.Text
 	PostReportState     pgtype.Text
-	PriceMinor          pgtype.Int8
-	CurrencyCode        pgtype.Text
+	PriceMinor          int64
+	CurrencyCode        string
 	OwnershipConfirmed  bool
 	ConsentConfirmed    bool
 	ApprovedForUnlockAt pgtype.Timestamptz

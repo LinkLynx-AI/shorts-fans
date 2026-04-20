@@ -35,7 +35,7 @@ INSERT INTO app.mains (
     $9,
     $10
 )
-RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
 `
 
 type CreateMainParams struct {
@@ -79,12 +79,14 @@ func (q *Queries) CreateMain(ctx context.Context, arg CreateMainParams) (AppMain
 		&i.ApprovedForUnlockAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
 
 const getMainByID = `-- name: GetMainByID :one
-SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
 FROM app.mains
 WHERE id = $1
 LIMIT 1
@@ -107,12 +109,14 @@ func (q *Queries) GetMainByID(ctx context.Context, id pgtype.UUID) (AppMain, err
 		&i.ApprovedForUnlockAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
 
 const getMainByMediaAssetID = `-- name: GetMainByMediaAssetID :one
-SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
 FROM app.mains
 WHERE media_asset_id = $1
 LIMIT 1
@@ -135,6 +139,8 @@ func (q *Queries) GetMainByMediaAssetID(ctx context.Context, mediaAssetID pgtype
 		&i.ApprovedForUnlockAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
@@ -168,7 +174,7 @@ func (q *Queries) GetUnlockableMainByID(ctx context.Context, id pgtype.UUID) (Ap
 }
 
 const listMainsByCreatorUserID = `-- name: ListMainsByCreatorUserID :many
-SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+SELECT id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
 FROM app.mains
 WHERE creator_user_id = $1
 ORDER BY created_at DESC, id DESC
@@ -197,6 +203,8 @@ func (q *Queries) ListMainsByCreatorUserID(ctx context.Context, creatorUserID pg
 			&i.ApprovedForUnlockAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.ReviewDecisionSource,
+			&i.ReviewDecisionedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -221,7 +229,9 @@ SET
     approved_for_unlock_at = $8,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $9
-RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at
+  AND state NOT IN ('approved_for_unlock', 'revision_requested', 'rejected')
+  AND $1 NOT IN ('approved_for_unlock', 'revision_requested', 'rejected')
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
 `
 
 type UpdateMainStateParams struct {
@@ -263,6 +273,8 @@ func (q *Queries) UpdateMainState(ctx context.Context, arg UpdateMainStateParams
 		&i.ApprovedForUnlockAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }

@@ -11,6 +11,112 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const applySubmissionReviewMainDecision = `-- name: ApplySubmissionReviewMainDecision :one
+UPDATE app.mains
+SET
+    state = $1,
+    review_reason_code = $2,
+    review_decision_source = $3,
+    review_decisioned_at = $4,
+    approved_for_unlock_at = $5,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $6
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
+`
+
+type ApplySubmissionReviewMainDecisionParams struct {
+	State                string
+	ReviewReasonCode     pgtype.Text
+	ReviewDecisionSource pgtype.Text
+	ReviewDecisionedAt   pgtype.Timestamptz
+	ApprovedForUnlockAt  pgtype.Timestamptz
+	ID                   pgtype.UUID
+}
+
+func (q *Queries) ApplySubmissionReviewMainDecision(ctx context.Context, arg ApplySubmissionReviewMainDecisionParams) (AppMain, error) {
+	row := q.db.QueryRow(ctx, applySubmissionReviewMainDecision,
+		arg.State,
+		arg.ReviewReasonCode,
+		arg.ReviewDecisionSource,
+		arg.ReviewDecisionedAt,
+		arg.ApprovedForUnlockAt,
+		arg.ID,
+	)
+	var i AppMain
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.PriceMinor,
+		&i.CurrencyCode,
+		&i.OwnershipConfirmed,
+		&i.ConsentConfirmed,
+		&i.ApprovedForUnlockAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
+	)
+	return i, err
+}
+
+const applySubmissionReviewShortDecision = `-- name: ApplySubmissionReviewShortDecision :one
+UPDATE app.shorts
+SET
+    state = $1,
+    review_reason_code = $2,
+    review_decision_source = $3,
+    review_decisioned_at = $4,
+    approved_for_publish_at = $5,
+    published_at = $6,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $7
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+`
+
+type ApplySubmissionReviewShortDecisionParams struct {
+	State                string
+	ReviewReasonCode     pgtype.Text
+	ReviewDecisionSource pgtype.Text
+	ReviewDecisionedAt   pgtype.Timestamptz
+	ApprovedForPublishAt pgtype.Timestamptz
+	PublishedAt          pgtype.Timestamptz
+	ID                   pgtype.UUID
+}
+
+func (q *Queries) ApplySubmissionReviewShortDecision(ctx context.Context, arg ApplySubmissionReviewShortDecisionParams) (AppShort, error) {
+	row := q.db.QueryRow(ctx, applySubmissionReviewShortDecision,
+		arg.State,
+		arg.ReviewReasonCode,
+		arg.ReviewDecisionSource,
+		arg.ReviewDecisionedAt,
+		arg.ApprovedForPublishAt,
+		arg.PublishedAt,
+		arg.ID,
+	)
+	var i AppShort
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.CanonicalMainID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.ApprovedForPublishAt,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
+	)
+	return i, err
+}
+
 const createSubmissionReviewIntake = `-- name: CreateSubmissionReviewIntake :one
 INSERT INTO app.submission_review_intakes (
     canonical_main_id,
@@ -114,6 +220,84 @@ func (q *Queries) CreateSubmissionReviewIntakeShort(ctx context.Context, arg Cre
 	return err
 }
 
+const createSubmissionReviewMainDecision = `-- name: CreateSubmissionReviewMainDecision :exec
+INSERT INTO app.submission_review_main_decisions (
+    submission_review_intake_id,
+    main_id,
+    target_state,
+    reason_code,
+    decision_source,
+    decisioned_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+`
+
+type CreateSubmissionReviewMainDecisionParams struct {
+	SubmissionReviewIntakeID pgtype.UUID
+	MainID                   pgtype.UUID
+	TargetState              string
+	ReasonCode               pgtype.Text
+	DecisionSource           string
+	DecisionedAt             pgtype.Timestamptz
+}
+
+func (q *Queries) CreateSubmissionReviewMainDecision(ctx context.Context, arg CreateSubmissionReviewMainDecisionParams) error {
+	_, err := q.db.Exec(ctx, createSubmissionReviewMainDecision,
+		arg.SubmissionReviewIntakeID,
+		arg.MainID,
+		arg.TargetState,
+		arg.ReasonCode,
+		arg.DecisionSource,
+		arg.DecisionedAt,
+	)
+	return err
+}
+
+const createSubmissionReviewShortDecision = `-- name: CreateSubmissionReviewShortDecision :exec
+INSERT INTO app.submission_review_short_decisions (
+    submission_review_intake_id,
+    short_id,
+    target_state,
+    reason_code,
+    decision_source,
+    decisioned_at
+) VALUES (
+    $1,
+    $2,
+    $3,
+    $4,
+    $5,
+    $6
+)
+`
+
+type CreateSubmissionReviewShortDecisionParams struct {
+	SubmissionReviewIntakeID pgtype.UUID
+	ShortID                  pgtype.UUID
+	TargetState              string
+	ReasonCode               pgtype.Text
+	DecisionSource           string
+	DecisionedAt             pgtype.Timestamptz
+}
+
+func (q *Queries) CreateSubmissionReviewShortDecision(ctx context.Context, arg CreateSubmissionReviewShortDecisionParams) error {
+	_, err := q.db.Exec(ctx, createSubmissionReviewShortDecision,
+		arg.SubmissionReviewIntakeID,
+		arg.ShortID,
+		arg.TargetState,
+		arg.ReasonCode,
+		arg.DecisionSource,
+		arg.DecisionedAt,
+	)
+	return err
+}
+
 const getLatestSubmissionReviewIntakeByCanonicalMainID = `-- name: GetLatestSubmissionReviewIntakeByCanonicalMainID :one
 SELECT id, canonical_main_id, creator_user_id, status, submit_kind, previous_intake_id, main_media_asset_id, main_price_minor, ownership_confirmed, consent_confirmed, submitted_at, created_at, updated_at
 FROM app.submission_review_intakes
@@ -154,6 +338,36 @@ LIMIT 1
 
 func (q *Queries) GetPendingSubmissionReviewIntakeByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) (AppSubmissionReviewIntake, error) {
 	row := q.db.QueryRow(ctx, getPendingSubmissionReviewIntakeByCanonicalMainID, canonicalMainID)
+	var i AppSubmissionReviewIntake
+	err := row.Scan(
+		&i.ID,
+		&i.CanonicalMainID,
+		&i.CreatorUserID,
+		&i.Status,
+		&i.SubmitKind,
+		&i.PreviousIntakeID,
+		&i.MainMediaAssetID,
+		&i.MainPriceMinor,
+		&i.OwnershipConfirmed,
+		&i.ConsentConfirmed,
+		&i.SubmittedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPendingSubmissionReviewIntakeByIDForUpdate = `-- name: GetPendingSubmissionReviewIntakeByIDForUpdate :one
+SELECT i.id, i.canonical_main_id, i.creator_user_id, i.status, i.submit_kind, i.previous_intake_id, i.main_media_asset_id, i.main_price_minor, i.ownership_confirmed, i.consent_confirmed, i.submitted_at, i.created_at, i.updated_at
+FROM app.submission_review_intakes AS i
+WHERE i.id = $1
+  AND i.status = 'pending_review'
+LIMIT 1
+FOR UPDATE OF i
+`
+
+func (q *Queries) GetPendingSubmissionReviewIntakeByIDForUpdate(ctx context.Context, id pgtype.UUID) (AppSubmissionReviewIntake, error) {
+	row := q.db.QueryRow(ctx, getPendingSubmissionReviewIntakeByIDForUpdate, id)
 	var i AppSubmissionReviewIntake
 	err := row.Scan(
 		&i.ID,
@@ -236,6 +450,44 @@ func (q *Queries) GetSubmissionReviewMainByIDForUpdate(ctx context.Context, id p
 	return i, err
 }
 
+const listSubmissionReviewIntakeShortsByIntakeID = `-- name: ListSubmissionReviewIntakeShortsByIntakeID :many
+SELECT
+    submission_review_intake_id,
+    short_id,
+    media_asset_id,
+    caption,
+    created_at
+FROM app.submission_review_intake_shorts
+WHERE submission_review_intake_id = $1
+ORDER BY created_at DESC, short_id DESC
+`
+
+func (q *Queries) ListSubmissionReviewIntakeShortsByIntakeID(ctx context.Context, submissionReviewIntakeID pgtype.UUID) ([]AppSubmissionReviewIntakeShort, error) {
+	rows, err := q.db.Query(ctx, listSubmissionReviewIntakeShortsByIntakeID, submissionReviewIntakeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AppSubmissionReviewIntakeShort
+	for rows.Next() {
+		var i AppSubmissionReviewIntakeShort
+		if err := rows.Scan(
+			&i.SubmissionReviewIntakeID,
+			&i.ShortID,
+			&i.MediaAssetID,
+			&i.Caption,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSubmissionReviewShortsByCanonicalMainIDForUpdate = `-- name: ListSubmissionReviewShortsByCanonicalMainIDForUpdate :many
 SELECT
     s.id,
@@ -307,4 +559,107 @@ func (q *Queries) ListSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx conte
 		return nil, err
 	}
 	return items, nil
+}
+
+const markSubmissionReviewIntakeDecisionApplied = `-- name: MarkSubmissionReviewIntakeDecisionApplied :one
+UPDATE app.submission_review_intakes
+SET
+    status = 'decision_applied',
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+  AND status = 'pending_review'
+RETURNING id, canonical_main_id, creator_user_id, status, submit_kind, previous_intake_id, main_media_asset_id, main_price_minor, ownership_confirmed, consent_confirmed, submitted_at, created_at, updated_at
+`
+
+func (q *Queries) MarkSubmissionReviewIntakeDecisionApplied(ctx context.Context, id pgtype.UUID) (AppSubmissionReviewIntake, error) {
+	row := q.db.QueryRow(ctx, markSubmissionReviewIntakeDecisionApplied, id)
+	var i AppSubmissionReviewIntake
+	err := row.Scan(
+		&i.ID,
+		&i.CanonicalMainID,
+		&i.CreatorUserID,
+		&i.Status,
+		&i.SubmitKind,
+		&i.PreviousIntakeID,
+		&i.MainMediaAssetID,
+		&i.MainPriceMinor,
+		&i.OwnershipConfirmed,
+		&i.ConsentConfirmed,
+		&i.SubmittedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const resetSubmissionReviewMainToPending = `-- name: ResetSubmissionReviewMainToPending :one
+UPDATE app.mains
+SET
+    state = 'pending_review',
+    review_reason_code = NULL,
+    review_decision_source = NULL,
+    review_decisioned_at = NULL,
+    approved_for_unlock_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
+`
+
+func (q *Queries) ResetSubmissionReviewMainToPending(ctx context.Context, id pgtype.UUID) (AppMain, error) {
+	row := q.db.QueryRow(ctx, resetSubmissionReviewMainToPending, id)
+	var i AppMain
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.PriceMinor,
+		&i.CurrencyCode,
+		&i.OwnershipConfirmed,
+		&i.ConsentConfirmed,
+		&i.ApprovedForUnlockAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
+	)
+	return i, err
+}
+
+const resetSubmissionReviewShortToPending = `-- name: ResetSubmissionReviewShortToPending :one
+UPDATE app.shorts
+SET
+    state = 'pending_review',
+    review_reason_code = NULL,
+    review_decision_source = NULL,
+    review_decisioned_at = NULL,
+    approved_for_publish_at = NULL,
+    published_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+`
+
+func (q *Queries) ResetSubmissionReviewShortToPending(ctx context.Context, id pgtype.UUID) (AppShort, error) {
+	row := q.db.QueryRow(ctx, resetSubmissionReviewShortToPending, id)
+	var i AppShort
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.CanonicalMainID,
+		&i.MediaAssetID,
+		&i.State,
+		&i.ReviewReasonCode,
+		&i.PostReportState,
+		&i.ApprovedForPublishAt,
+		&i.PublishedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
+	)
+	return i, err
 }

@@ -87,7 +87,7 @@ type GetPublicShortDetailItemRow struct {
 	Handle             string
 	AvatarUrl          pgtype.Text
 	Bio                string
-	MainPriceMinor     pgtype.Int8
+	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
 	IsPinned           interface{}
 	IsUnlocked         interface{}
@@ -191,7 +191,7 @@ type ListFeedItemsByShortIDsRow struct {
 	Handle             string
 	AvatarUrl          pgtype.Text
 	Bio                string
-	MainPriceMinor     pgtype.Int8
+	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
 	IsPinned           bool
 	IsUnlocked         bool
@@ -630,7 +630,7 @@ type ListRecommendedPublicFeedItemsRow struct {
 	Handle             string
 	AvatarUrl          pgtype.Text
 	Bio                string
-	MainPriceMinor     pgtype.Int8
+	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
 	IsPinned           interface{}
 	IsUnlocked         interface{}

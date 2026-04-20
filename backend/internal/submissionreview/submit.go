@@ -89,15 +89,23 @@ func (e *NotReadyError) Error() string {
 }
 
 type queries interface {
+	ApplySubmissionReviewMainDecision(ctx context.Context, arg sqlc.ApplySubmissionReviewMainDecisionParams) (sqlc.AppMain, error)
+	ApplySubmissionReviewShortDecision(ctx context.Context, arg sqlc.ApplySubmissionReviewShortDecisionParams) (sqlc.AppShort, error)
+	CreateSubmissionReviewMainDecision(ctx context.Context, arg sqlc.CreateSubmissionReviewMainDecisionParams) error
 	CreateSubmissionReviewIntake(ctx context.Context, arg sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error)
 	CreateSubmissionReviewIntakeShort(ctx context.Context, arg sqlc.CreateSubmissionReviewIntakeShortParams) error
+	CreateSubmissionReviewShortDecision(ctx context.Context, arg sqlc.CreateSubmissionReviewShortDecisionParams) error
 	GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	GetLatestSubmissionReviewIntakeByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	GetPendingSubmissionReviewIntakeByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	GetPendingSubmissionReviewIntakeByIDForUpdate(ctx context.Context, id pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	GetSubmissionReviewMainByIDForUpdate(ctx context.Context, id pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error)
+	ListSubmissionReviewIntakeShortsByIntakeID(ctx context.Context, submissionReviewIntakeID pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error)
 	ListSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error)
-	UpdateMainState(ctx context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
-	UpdateShortState(ctx context.Context, arg sqlc.UpdateShortStateParams) (sqlc.AppShort, error)
+	MarkSubmissionReviewIntakeDecisionApplied(ctx context.Context, id pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	PublishShort(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
+	ResetSubmissionReviewMainToPending(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error)
+	ResetSubmissionReviewShortToPending(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
 }
 
 type transitionPlan struct {
@@ -223,13 +231,13 @@ func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 		}
 
 		if transition.UpdateMain {
-			if _, err := q.UpdateMainState(ctx, buildPendingReviewMainUpdate(mainRow)); err != nil {
+			if _, err := q.ResetSubmissionReviewMainToPending(ctx, mainRow.ID); err != nil {
 				return fmt.Errorf("submission package submit main state update main=%s user=%s: %w", mainID, viewerUserID, err)
 			}
 		}
 
 		for _, shortRow := range transition.ShortsToPending {
-			if _, err := q.UpdateShortState(ctx, buildPendingReviewShortUpdate(shortRow)); err != nil {
+			if _, err := q.ResetSubmissionReviewShortToPending(ctx, shortRow.ID); err != nil {
 				return fmt.Errorf("submission package submit short state update main=%s short=%s: %w", mainID, shortRow.ID, err)
 			}
 		}
@@ -379,30 +387,5 @@ func isAllowedMainState(state string) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func buildPendingReviewMainUpdate(row sqlc.GetSubmissionReviewMainByIDForUpdateRow) sqlc.UpdateMainStateParams {
-	return sqlc.UpdateMainStateParams{
-		State:               mainStatePendingReview,
-		ReviewReasonCode:    pgtype.Text{},
-		PostReportState:     row.PostReportState,
-		PriceMinor:          row.PriceMinor,
-		CurrencyCode:        row.CurrencyCode,
-		OwnershipConfirmed:  row.OwnershipConfirmed,
-		ConsentConfirmed:    row.ConsentConfirmed,
-		ApprovedForUnlockAt: pgtype.Timestamptz{},
-		ID:                  row.ID,
-	}
-}
-
-func buildPendingReviewShortUpdate(row sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow) sqlc.UpdateShortStateParams {
-	return sqlc.UpdateShortStateParams{
-		State:                shortStatePendingReview,
-		ReviewReasonCode:     pgtype.Text{},
-		PostReportState:      row.PostReportState,
-		ApprovedForPublishAt: pgtype.Timestamptz{},
-		PublishedAt:          pgtype.Timestamptz{},
-		ID:                   row.ID,
 	}
 }

@@ -26,7 +26,7 @@ func (q *Queries) GetCanonicalMainIDByShortID(ctx context.Context, id pgtype.UUI
 }
 
 const listShortsByCanonicalMainID = `-- name: ListShortsByCanonicalMainID :many
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 FROM app.shorts
 WHERE canonical_main_id = $1
 ORDER BY created_at DESC, id DESC
@@ -54,6 +54,8 @@ func (q *Queries) ListShortsByCanonicalMainID(ctx context.Context, canonicalMain
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Caption,
+			&i.ReviewDecisionSource,
+			&i.ReviewDecisionedAt,
 		); err != nil {
 			return nil, err
 		}

@@ -51,6 +51,14 @@ WHERE canonical_main_id = $1
 ORDER BY submitted_at DESC, id DESC
 LIMIT 1;
 
+-- name: GetPendingSubmissionReviewIntakeByIDForUpdate :one
+SELECT i.*
+FROM app.submission_review_intakes AS i
+WHERE i.id = $1
+  AND i.status = 'pending_review'
+LIMIT 1
+FOR UPDATE OF i;
+
 -- name: GetLatestSubmissionReviewIntakeByCanonicalMainID :one
 SELECT *
 FROM app.submission_review_intakes
@@ -96,3 +104,107 @@ INSERT INTO app.submission_review_intake_shorts (
     sqlc.arg(media_asset_id),
     sqlc.narg(caption)
 );
+
+-- name: ListSubmissionReviewIntakeShortsByIntakeID :many
+SELECT
+    submission_review_intake_id,
+    short_id,
+    media_asset_id,
+    caption,
+    created_at
+FROM app.submission_review_intake_shorts
+WHERE submission_review_intake_id = $1
+ORDER BY created_at DESC, short_id DESC;
+
+-- name: ResetSubmissionReviewMainToPending :one
+UPDATE app.mains
+SET
+    state = 'pending_review',
+    review_reason_code = NULL,
+    review_decision_source = NULL,
+    review_decisioned_at = NULL,
+    approved_for_unlock_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING *;
+
+-- name: ResetSubmissionReviewShortToPending :one
+UPDATE app.shorts
+SET
+    state = 'pending_review',
+    review_reason_code = NULL,
+    review_decision_source = NULL,
+    review_decisioned_at = NULL,
+    approved_for_publish_at = NULL,
+    published_at = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING *;
+
+-- name: CreateSubmissionReviewMainDecision :exec
+INSERT INTO app.submission_review_main_decisions (
+    submission_review_intake_id,
+    main_id,
+    target_state,
+    reason_code,
+    decision_source,
+    decisioned_at
+) VALUES (
+    sqlc.arg(submission_review_intake_id),
+    sqlc.arg(main_id),
+    sqlc.arg(target_state),
+    sqlc.narg(reason_code),
+    sqlc.arg(decision_source),
+    sqlc.arg(decisioned_at)
+);
+
+-- name: CreateSubmissionReviewShortDecision :exec
+INSERT INTO app.submission_review_short_decisions (
+    submission_review_intake_id,
+    short_id,
+    target_state,
+    reason_code,
+    decision_source,
+    decisioned_at
+) VALUES (
+    sqlc.arg(submission_review_intake_id),
+    sqlc.arg(short_id),
+    sqlc.arg(target_state),
+    sqlc.narg(reason_code),
+    sqlc.arg(decision_source),
+    sqlc.arg(decisioned_at)
+);
+
+-- name: ApplySubmissionReviewMainDecision :one
+UPDATE app.mains
+SET
+    state = sqlc.arg(state),
+    review_reason_code = sqlc.narg(review_reason_code),
+    review_decision_source = sqlc.arg(review_decision_source),
+    review_decisioned_at = sqlc.arg(review_decisioned_at),
+    approved_for_unlock_at = sqlc.narg(approved_for_unlock_at),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
+-- name: ApplySubmissionReviewShortDecision :one
+UPDATE app.shorts
+SET
+    state = sqlc.arg(state),
+    review_reason_code = sqlc.narg(review_reason_code),
+    review_decision_source = sqlc.arg(review_decision_source),
+    review_decisioned_at = sqlc.arg(review_decisioned_at),
+    approved_for_publish_at = sqlc.narg(approved_for_publish_at),
+    published_at = sqlc.narg(published_at),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id)
+RETURNING *;
+
+-- name: MarkSubmissionReviewIntakeDecisionApplied :one
+UPDATE app.submission_review_intakes
+SET
+    status = 'decision_applied',
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+  AND status = 'pending_review'
+RETURNING *;

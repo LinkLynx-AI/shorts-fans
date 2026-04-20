@@ -118,7 +118,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetUnlockableMainByID() error = %v, want nil", err)
 	}
-	if got := int64FromPG(main.PriceMinor); got != mainPriceMinor {
+	if got := main.PriceMinor; got != mainPriceMinor {
 		t.Fatalf("GetUnlockableMainByID() price_minor got %d want %d", got, mainPriceMinor)
 	}
 
