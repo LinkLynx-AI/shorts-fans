@@ -263,11 +263,35 @@ function buildNotificationDetail(count: number, detail: string): string {
 export function deriveCreatorWorkspaceReviewNotifications(
   packages: readonly CreatorWorkspaceReviewPackageSummary[],
 ): readonly CreatorWorkspaceReviewNotification[] {
-  const changesRequestedCount = packages.filter((item) => item.reviewStatus === "changes_requested").length;
-  const rejectedCount = packages.filter((item) => item.reviewStatus === "rejected").length;
-  const readyDraftCount = packages.filter((item) => item.reviewStatus === "draft" && item.readiness === "ready").length;
-  const blockedDraftCount = packages.filter((item) => item.reviewStatus === "draft" && item.readiness === "blocked").length;
-  const pendingReviewCount = packages.filter((item) => item.reviewStatus === "pending_review").length;
+  let changesRequestedCount = 0;
+  let rejectedCount = 0;
+  let readyDraftCount = 0;
+  let blockedDraftCount = 0;
+  let pendingReviewCount = 0;
+
+  for (const item of packages) {
+    switch (item.reviewStatus) {
+      case "changes_requested":
+        changesRequestedCount += 1;
+        break;
+      case "rejected":
+        rejectedCount += 1;
+        break;
+      case "draft":
+        switch (item.readiness) {
+          case "ready":
+            readyDraftCount += 1;
+            break;
+          case "blocked":
+            blockedDraftCount += 1;
+            break;
+        }
+        break;
+      case "pending_review":
+        pendingReviewCount += 1;
+        break;
+    }
+  }
 
   return [
     changesRequestedCount > 0 ? {
