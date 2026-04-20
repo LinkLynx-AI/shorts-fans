@@ -191,6 +191,7 @@
 
 - effective decision は object ごとに、少なくとも次を保持できる必要があります。
   - `reason code`
+  - `review note`
   - `decision source`
   - `decision timestamp`
 - `decision source` の canonical vocabulary は次とします。

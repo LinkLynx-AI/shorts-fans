@@ -496,7 +496,7 @@ type ListFollowingPublicFeedItemsRow struct {
 	Handle             string
 	AvatarUrl          pgtype.Text
 	Bio                string
-	MainPriceMinor     pgtype.Int8
+	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
 	IsPinned           interface{}
 	IsUnlocked         interface{}

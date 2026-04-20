@@ -104,6 +104,15 @@ func main() {
 		logger.Error("failed to initialize creator registration review service", "error", err)
 		os.Exit(1)
 	}
+	adminSubmissionReviewService, err := submissionreview.NewAdminReviewService(
+		submissionreview.AdminReviewServiceConfig{},
+		pool,
+		delivery,
+	)
+	if err != nil {
+		logger.Error("failed to initialize submission review admin service", "error", err)
+		os.Exit(1)
+	}
 	creatorUploadRepository := creatorupload.NewRepository(pool)
 	feedRepository := feed.NewRepository(pool)
 	recommendationRepository := recommendation.NewRepository(pool)
@@ -234,6 +243,7 @@ func main() {
 		httpserver.HandlerConfig{
 			AppEnv:                           cfg.AppEnv,
 			AdminCreatorReview:               adminCreatorReviewService,
+			AdminSubmissionReview:            adminSubmissionReviewService,
 			CreatorSearch:                    creatorRepository,
 			CreatorWorkspace:                 creatorRepository,
 			CreatorWorkspaceMainPrice:        creatorRepository,

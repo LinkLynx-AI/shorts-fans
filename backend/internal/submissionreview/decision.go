@@ -51,6 +51,7 @@ type ReviewDecisionInput struct {
 type MainReviewDecisionInput struct {
 	Decision   string
 	ReasonCode *string
+	ReviewNote *string
 }
 
 // ShortReviewDecisionInput は intake 内 short へ適用する review decision です。
@@ -58,10 +59,12 @@ type ShortReviewDecisionInput struct {
 	ShortID    uuid.UUID
 	Decision   string
 	ReasonCode *string
+	ReviewNote *string
 }
 
 type normalizedDecision struct {
 	reasonCode  *string
+	reviewNote  *string
 	targetState string
 }
 
@@ -193,6 +196,7 @@ func (s *Service) ApplyDecision(ctx context.Context, input ReviewDecisionInput) 
 				MainID:                   mainRow.ID,
 				TargetState:              mainDecision.targetState,
 				ReasonCode:               postgres.TextToPG(mainDecision.reasonCode),
+				ReviewNote:               postgres.TextToPG(mainDecision.reviewNote),
 				DecisionSource:           source,
 				DecisionedAt:             postgres.TimeToPG(&decisionedAt),
 			}); err != nil {
@@ -210,6 +214,7 @@ func (s *Service) ApplyDecision(ctx context.Context, input ReviewDecisionInput) 
 				ShortID:                  row.ID,
 				TargetState:              decision.targetState,
 				ReasonCode:               postgres.TextToPG(decision.reasonCode),
+				ReviewNote:               postgres.TextToPG(decision.reviewNote),
 				DecisionSource:           source,
 				DecisionedAt:             postgres.TimeToPG(&decisionedAt),
 			}); err != nil {
@@ -253,7 +258,7 @@ func normalizeMainReviewDecision(input *MainReviewDecisionInput) (*normalizedDec
 		return nil, nil
 	}
 
-	decision, err := normalizeDecision(input.Decision, mainStateApprovedForUnlock, input.ReasonCode)
+	decision, err := normalizeDecision(input.Decision, mainStateApprovedForUnlock, input.ReasonCode, input.ReviewNote)
 	if err != nil {
 		return nil, err
 	}
@@ -272,7 +277,7 @@ func normalizeShortReviewDecisions(inputs []ShortReviewDecisionInput) (map[uuid.
 			return nil, ErrSubmissionReviewDecisionTargetsMismatch
 		}
 
-		decision, err := normalizeDecision(input.Decision, shortStateApprovedForPublish, input.ReasonCode)
+		decision, err := normalizeDecision(input.Decision, shortStateApprovedForPublish, input.ReasonCode, input.ReviewNote)
 		if err != nil {
 			return nil, err
 		}
@@ -282,9 +287,10 @@ func normalizeShortReviewDecisions(inputs []ShortReviewDecisionInput) (map[uuid.
 	return normalized, nil
 }
 
-func normalizeDecision(raw string, approvedState string, reasonCode *string) (normalizedDecision, error) {
+func normalizeDecision(raw string, approvedState string, reasonCode *string, reviewNote *string) (normalizedDecision, error) {
 	decision := strings.TrimSpace(raw)
 	trimmedReason := trimmedOptionalString(reasonCode)
+	trimmedNote := trimmedOptionalString(reviewNote)
 
 	switch decision {
 	case reviewDecisionApproved:
@@ -293,6 +299,7 @@ func normalizeDecision(raw string, approvedState string, reasonCode *string) (no
 		}
 		return normalizedDecision{
 			reasonCode:  nil,
+			reviewNote:  trimmedNote,
 			targetState: approvedState,
 		}, nil
 	case reviewDecisionRevisionRequested, reviewDecisionRejected:
@@ -301,6 +308,7 @@ func normalizeDecision(raw string, approvedState string, reasonCode *string) (no
 		}
 		return normalizedDecision{
 			reasonCode:  trimmedReason,
+			reviewNote:  trimmedNote,
 			targetState: decision,
 		}, nil
 	default:
@@ -358,6 +366,7 @@ func buildMainDecisionUpdate(
 	params := sqlc.ApplySubmissionReviewMainDecisionParams{
 		State:                decision.targetState,
 		ReviewReasonCode:     postgres.TextToPG(decision.reasonCode),
+		ReviewNote:           postgres.TextToPG(decision.reviewNote),
 		ReviewDecisionSource: postgres.TextToPG(&source),
 		ReviewDecisionedAt:   postgres.TimeToPG(&decisionedAt),
 		ApprovedForUnlockAt:  pgtype.Timestamptz{},
@@ -379,6 +388,7 @@ func buildShortDecisionUpdate(
 	params := sqlc.ApplySubmissionReviewShortDecisionParams{
 		State:                decision.targetState,
 		ReviewReasonCode:     postgres.TextToPG(decision.reasonCode),
+		ReviewNote:           postgres.TextToPG(decision.reviewNote),
 		ReviewDecisionSource: postgres.TextToPG(&source),
 		ReviewDecisionedAt:   postgres.TimeToPG(&decisionedAt),
 		ApprovedForPublishAt: pgtype.Timestamptz{},

@@ -16,17 +16,19 @@ UPDATE app.mains
 SET
     state = $1,
     review_reason_code = $2,
-    review_decision_source = $3,
-    review_decisioned_at = $4,
-    approved_for_unlock_at = $5,
+    review_note = $3,
+    review_decision_source = $4,
+    review_decisioned_at = $5,
+    approved_for_unlock_at = $6,
     updated_at = CURRENT_TIMESTAMP
-WHERE id = $6
-RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
+WHERE id = $7
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at, review_note
 `
 
 type ApplySubmissionReviewMainDecisionParams struct {
 	State                string
 	ReviewReasonCode     pgtype.Text
+	ReviewNote           pgtype.Text
 	ReviewDecisionSource pgtype.Text
 	ReviewDecisionedAt   pgtype.Timestamptz
 	ApprovedForUnlockAt  pgtype.Timestamptz
@@ -37,6 +39,7 @@ func (q *Queries) ApplySubmissionReviewMainDecision(ctx context.Context, arg App
 	row := q.db.QueryRow(ctx, applySubmissionReviewMainDecision,
 		arg.State,
 		arg.ReviewReasonCode,
+		arg.ReviewNote,
 		arg.ReviewDecisionSource,
 		arg.ReviewDecisionedAt,
 		arg.ApprovedForUnlockAt,
@@ -59,6 +62,7 @@ func (q *Queries) ApplySubmissionReviewMainDecision(ctx context.Context, arg App
 		&i.UpdatedAt,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -68,18 +72,20 @@ UPDATE app.shorts
 SET
     state = $1,
     review_reason_code = $2,
-    review_decision_source = $3,
-    review_decisioned_at = $4,
-    approved_for_publish_at = $5,
-    published_at = $6,
+    review_note = $3,
+    review_decision_source = $4,
+    review_decisioned_at = $5,
+    approved_for_publish_at = $6,
+    published_at = $7,
     updated_at = CURRENT_TIMESTAMP
-WHERE id = $7
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+WHERE id = $8
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 type ApplySubmissionReviewShortDecisionParams struct {
 	State                string
 	ReviewReasonCode     pgtype.Text
+	ReviewNote           pgtype.Text
 	ReviewDecisionSource pgtype.Text
 	ReviewDecisionedAt   pgtype.Timestamptz
 	ApprovedForPublishAt pgtype.Timestamptz
@@ -91,6 +97,7 @@ func (q *Queries) ApplySubmissionReviewShortDecision(ctx context.Context, arg Ap
 	row := q.db.QueryRow(ctx, applySubmissionReviewShortDecision,
 		arg.State,
 		arg.ReviewReasonCode,
+		arg.ReviewNote,
 		arg.ReviewDecisionSource,
 		arg.ReviewDecisionedAt,
 		arg.ApprovedForPublishAt,
@@ -113,6 +120,7 @@ func (q *Queries) ApplySubmissionReviewShortDecision(ctx context.Context, arg Ap
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -226,6 +234,7 @@ INSERT INTO app.submission_review_main_decisions (
     main_id,
     target_state,
     reason_code,
+    review_note,
     decision_source,
     decisioned_at
 ) VALUES (
@@ -234,7 +243,8 @@ INSERT INTO app.submission_review_main_decisions (
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 `
 
@@ -243,6 +253,7 @@ type CreateSubmissionReviewMainDecisionParams struct {
 	MainID                   pgtype.UUID
 	TargetState              string
 	ReasonCode               pgtype.Text
+	ReviewNote               pgtype.Text
 	DecisionSource           string
 	DecisionedAt             pgtype.Timestamptz
 }
@@ -253,6 +264,7 @@ func (q *Queries) CreateSubmissionReviewMainDecision(ctx context.Context, arg Cr
 		arg.MainID,
 		arg.TargetState,
 		arg.ReasonCode,
+		arg.ReviewNote,
 		arg.DecisionSource,
 		arg.DecisionedAt,
 	)
@@ -265,6 +277,7 @@ INSERT INTO app.submission_review_short_decisions (
     short_id,
     target_state,
     reason_code,
+    review_note,
     decision_source,
     decisioned_at
 ) VALUES (
@@ -273,7 +286,8 @@ INSERT INTO app.submission_review_short_decisions (
     $3,
     $4,
     $5,
-    $6
+    $6,
+    $7
 )
 `
 
@@ -282,6 +296,7 @@ type CreateSubmissionReviewShortDecisionParams struct {
 	ShortID                  pgtype.UUID
 	TargetState              string
 	ReasonCode               pgtype.Text
+	ReviewNote               pgtype.Text
 	DecisionSource           string
 	DecisionedAt             pgtype.Timestamptz
 }
@@ -292,6 +307,7 @@ func (q *Queries) CreateSubmissionReviewShortDecision(ctx context.Context, arg C
 		arg.ShortID,
 		arg.TargetState,
 		arg.ReasonCode,
+		arg.ReviewNote,
 		arg.DecisionSource,
 		arg.DecisionedAt,
 	)
@@ -394,6 +410,7 @@ SELECT
     m.media_asset_id,
     m.state,
     m.review_reason_code,
+    m.review_note,
     m.post_report_state,
     m.price_minor,
     m.currency_code,
@@ -417,6 +434,7 @@ type GetSubmissionReviewMainByIDForUpdateRow struct {
 	MediaAssetID         pgtype.UUID
 	State                string
 	ReviewReasonCode     pgtype.Text
+	ReviewNote           pgtype.Text
 	PostReportState      pgtype.Text
 	PriceMinor           int64
 	CurrencyCode         string
@@ -437,6 +455,7 @@ func (q *Queries) GetSubmissionReviewMainByIDForUpdate(ctx context.Context, id p
 		&i.MediaAssetID,
 		&i.State,
 		&i.ReviewReasonCode,
+		&i.ReviewNote,
 		&i.PostReportState,
 		&i.PriceMinor,
 		&i.CurrencyCode,
@@ -496,6 +515,7 @@ SELECT
     s.media_asset_id,
     s.state,
     s.review_reason_code,
+    s.review_note,
     s.post_report_state,
     s.approved_for_publish_at,
     s.published_at,
@@ -518,6 +538,7 @@ type ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow struct {
 	MediaAssetID         pgtype.UUID
 	State                string
 	ReviewReasonCode     pgtype.Text
+	ReviewNote           pgtype.Text
 	PostReportState      pgtype.Text
 	ApprovedForPublishAt pgtype.Timestamptz
 	PublishedAt          pgtype.Timestamptz
@@ -543,6 +564,7 @@ func (q *Queries) ListSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx conte
 			&i.MediaAssetID,
 			&i.State,
 			&i.ReviewReasonCode,
+			&i.ReviewNote,
 			&i.PostReportState,
 			&i.ApprovedForPublishAt,
 			&i.PublishedAt,
@@ -597,12 +619,13 @@ UPDATE app.mains
 SET
     state = 'pending_review',
     review_reason_code = NULL,
+    review_note = NULL,
     review_decision_source = NULL,
     review_decisioned_at = NULL,
     approved_for_unlock_at = NULL,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, media_asset_id, state, review_reason_code, post_report_state, price_minor, currency_code, ownership_confirmed, consent_confirmed, approved_for_unlock_at, created_at, updated_at, review_decision_source, review_decisioned_at, review_note
 `
 
 func (q *Queries) ResetSubmissionReviewMainToPending(ctx context.Context, id pgtype.UUID) (AppMain, error) {
@@ -624,6 +647,7 @@ func (q *Queries) ResetSubmissionReviewMainToPending(ctx context.Context, id pgt
 		&i.UpdatedAt,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }
@@ -633,13 +657,14 @@ UPDATE app.shorts
 SET
     state = 'pending_review',
     review_reason_code = NULL,
+    review_note = NULL,
     review_decision_source = NULL,
     review_decisioned_at = NULL,
     approved_for_publish_at = NULL,
     published_at = NULL,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at, review_note
 `
 
 func (q *Queries) ResetSubmissionReviewShortToPending(ctx context.Context, id pgtype.UUID) (AppShort, error) {
@@ -660,6 +685,7 @@ func (q *Queries) ResetSubmissionReviewShortToPending(ctx context.Context, id pg
 		&i.Caption,
 		&i.ReviewDecisionSource,
 		&i.ReviewDecisionedAt,
+		&i.ReviewNote,
 	)
 	return i, err
 }

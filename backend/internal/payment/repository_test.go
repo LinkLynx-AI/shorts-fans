@@ -280,7 +280,7 @@ func TestNewRepositoryAndRunInTx(t *testing.T) {
 		txQueries := repositoryStubQueries{
 			acquireMainPurchaseLock: func(_ context.Context, arg sqlc.AcquireMainPurchaseLockParams) error {
 				lockCalls++
-				if arg.UserKey != userID.String() || arg.MainKey != mainID.String() {
+				if arg.UserKey.String != userID.String() || arg.MainKey.String != mainID.String() {
 					t.Fatalf("AcquireMainPurchaseLock() args got %#v", arg)
 				}
 				return nil
@@ -402,7 +402,7 @@ func TestRepositoryPurchaseAttempts(t *testing.T) {
 	if err := repo.AcquireMainPurchaseLock(context.Background(), userID, mainID); err != nil {
 		t.Fatalf("AcquireMainPurchaseLock() error = %v, want nil", err)
 	}
-	if lockArg.UserKey != userID.String() || lockArg.MainKey != mainID.String() {
+	if lockArg.UserKey.String != userID.String() || lockArg.MainKey.String != mainID.String() {
 		t.Fatalf("AcquireMainPurchaseLock() args got %#v", lockArg)
 	}
 

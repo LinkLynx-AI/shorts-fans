@@ -123,6 +123,7 @@ type AppMain struct {
 	UpdatedAt            pgtype.Timestamptz
 	ReviewDecisionSource pgtype.Text
 	ReviewDecisionedAt   pgtype.Timestamptz
+	ReviewNote           pgtype.Text
 }
 
 type AppMainPlaybackProgress struct {
@@ -346,6 +347,7 @@ type AppShort struct {
 	Caption              pgtype.Text
 	ReviewDecisionSource pgtype.Text
 	ReviewDecisionedAt   pgtype.Timestamptz
+	ReviewNote           pgtype.Text
 }
 
 type AppSubmissionReviewIntake struct {
@@ -380,6 +382,7 @@ type AppSubmissionReviewMainDecision struct {
 	DecisionSource           string
 	DecisionedAt             pgtype.Timestamptz
 	CreatedAt                pgtype.Timestamptz
+	ReviewNote               pgtype.Text
 }
 
 type AppSubmissionReviewShortDecision struct {
@@ -390,6 +393,7 @@ type AppSubmissionReviewShortDecision struct {
 	DecisionSource           string
 	DecisionedAt             pgtype.Timestamptz
 	CreatedAt                pgtype.Timestamptz
+	ReviewNote               pgtype.Text
 }
 
 type AppUnlockableMain struct {

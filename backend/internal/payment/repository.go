@@ -244,13 +244,17 @@ func (r *Repository) AcquireMainPurchaseLock(ctx context.Context, userID uuid.UU
 	}
 
 	if err := r.queries.AcquireMainPurchaseLock(ctx, sqlc.AcquireMainPurchaseLockParams{
-		UserKey: userID.String(),
-		MainKey: mainID.String(),
+		UserKey: postgres.TextToPG(ptrString(userID.String())),
+		MainKey: postgres.TextToPG(ptrString(mainID.String())),
 	}); err != nil {
 		return fmt.Errorf("main purchase lock 取得 user=%s main=%s: %w", userID, mainID, err)
 	}
 
 	return nil
+}
+
+func ptrString(value string) *string {
+	return &value
 }
 
 // ListSavedPaymentMethods は viewer の saved card 一覧を返します。

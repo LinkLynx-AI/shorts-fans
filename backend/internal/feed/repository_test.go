@@ -743,7 +743,7 @@ func makeFollowingRow(shortID uuid.UUID, publishedAt time.Time, rankScore int64)
 		Handle:             "minarei",
 		AvatarUrl:          makeText("https://cdn.example.com/avatar.jpg"),
 		Bio:                "night preview specialist",
-		MainPriceMinor:     makeInt8(1800),
+		MainPriceMinor:     1800,
 		MainDurationMs:     makeInt8(480500),
 		IsPinned:           true,
 		IsUnlocked:         false,

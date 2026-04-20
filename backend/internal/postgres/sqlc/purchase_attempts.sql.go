@@ -18,8 +18,8 @@ SELECT pg_advisory_xact_lock(
 `
 
 type AcquireMainPurchaseLockParams struct {
-	UserKey string
-	MainKey string
+	UserKey pgtype.Text
+	MainKey pgtype.Text
 }
 
 func (q *Queries) AcquireMainPurchaseLock(ctx context.Context, arg AcquireMainPurchaseLockParams) error {
