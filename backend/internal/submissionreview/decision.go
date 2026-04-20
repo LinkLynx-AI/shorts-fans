@@ -88,6 +88,11 @@ func (s *Service) ApplyDecision(ctx context.Context, input ReviewDecisionInput) 
 		return err
 	}
 
+	now := s.now
+	if now == nil {
+		now = time.Now
+	}
+
 	return postgres.RunInTx(ctx, s.beginner, func(tx pgx.Tx) error {
 		q := s.newQueries(tx)
 
@@ -180,7 +185,7 @@ func (s *Service) ApplyDecision(ctx context.Context, input ReviewDecisionInput) 
 			}
 		}
 
-		decisionedAt := s.now().UTC()
+		decisionedAt := now().UTC()
 
 		if mainDecision != nil {
 			if err := q.CreateSubmissionReviewMainDecision(ctx, sqlc.CreateSubmissionReviewMainDecisionParams{

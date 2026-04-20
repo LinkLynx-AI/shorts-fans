@@ -373,7 +373,7 @@ func TestApplyDecisionRejectsReviewStateConflict(t *testing.T) {
 	}
 }
 
-func TestApplyDecisionPublishesExistingApprovedShortsWhenMainBecomesUnlockable(t *testing.T) {
+func TestApplyDecisionLeavesExistingApprovedShortsUnpublishedWhenMainBecomesUnlockable(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 20, 10, 15, 0, 0, time.UTC)
@@ -736,6 +736,7 @@ func TestApplyDecisionDoesNotPublishShortWhenPublicGateBlocked(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1150,6 +1151,7 @@ func TestApplyDecisionRejectsSnapshotLinkedStateDrift(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -1280,6 +1282,7 @@ func TestApplyDecisionValidation(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
