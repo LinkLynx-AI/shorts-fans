@@ -5,6 +5,7 @@ import { publicShortDetailResponseSchema, type PublicShortDetail } from "./contr
 
 type GetPublicShortDetailOptions = {
   baseUrl?: string | undefined;
+  credentials?: RequestCredentials | undefined;
   fetcher?: typeof fetch | undefined;
   sessionToken?: string | undefined;
   shortId: string;
@@ -16,6 +17,7 @@ type GetPublicShortDetailOptions = {
  */
 export async function getPublicShortDetail({
   baseUrl,
+  credentials = "include",
   fetcher,
   sessionToken,
   shortId,
@@ -32,6 +34,7 @@ export async function getPublicShortDetail({
     ...(fetcher ? { fetcher } : {}),
     init: {
       cache: "no-store",
+      credentials,
       headers,
       ...(signal ? { signal } : {}),
     },

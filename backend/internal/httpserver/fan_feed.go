@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -79,6 +80,7 @@ func registerFanFeedRoutes(
 	router gin.IRouter,
 	reader FanFeedReader,
 	shortDisplayAssets ShortDisplayAssetResolver,
+	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	if router == nil || reader == nil || shortDisplayAssets == nil {
@@ -86,10 +88,10 @@ func registerFanFeedRoutes(
 	}
 
 	router.GET("/api/fan/feed", func(c *gin.Context) {
-		handleFanFeed(c, reader, shortDisplayAssets, viewerBootstrap)
+		handleFanFeed(c, reader, shortDisplayAssets, recommendationSignalExposure, viewerBootstrap)
 	})
 	router.GET("/api/fan/shorts/:shortId", func(c *gin.Context) {
-		handleFanShortDetail(c, reader, shortDisplayAssets, viewerBootstrap)
+		handleFanShortDetail(c, reader, shortDisplayAssets, recommendationSignalExposure, viewerBootstrap)
 	})
 }
 
@@ -97,6 +99,7 @@ func handleFanFeed(
 	c *gin.Context,
 	reader FanFeedReader,
 	shortDisplayAssets ShortDisplayAssetResolver,
+	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	tab := normalizeFanFeedTab(c.Query("tab"))
@@ -139,6 +142,10 @@ func handleFanFeed(
 		responseItems = append(responseItems, responseItem)
 	}
 
+	shortIDs := collectRecommendationFeedShortIDs(items)
+	creatorIDs := collectRecommendationFeedCreatorIDs(items)
+	rememberRecommendationFeedExposure(c.Request.Context(), recommendationSignalExposure, viewerUserID, shortIDs, creatorIDs)
+
 	c.JSON(http.StatusOK, responseEnvelope[fanFeedResponseData]{
 		Data: &fanFeedResponseData{
 			Items: responseItems,
@@ -159,6 +166,7 @@ func handleFanShortDetail(
 	c *gin.Context,
 	reader FanFeedReader,
 	shortDisplayAssets ShortDisplayAssetResolver,
+	recommendationSignalExposure RecommendationSignalExposureStore,
 	viewerBootstrap ViewerBootstrapReader,
 ) {
 	shortID, err := shorts.ParsePublicShortID(c.Param("shortId"))
@@ -189,6 +197,8 @@ func handleFanShortDetail(
 		writeInternalServerError(c, fanShortDetailRequestScope)
 		return
 	}
+
+	rememberRecommendationShortDetailExposure(c.Request.Context(), recommendationSignalExposure, viewerUserID, detail)
 
 	c.JSON(http.StatusOK, responseEnvelope[shortDetailResponseData]{
 		Data: &shortDetailResponseData{
@@ -277,6 +287,53 @@ func buildVideoMediaAsset(asset media.VideoDisplayAsset) mediaAsset {
 		PosterURL:       &posterURL,
 		URL:             asset.URL,
 	}
+}
+
+func rememberRecommendationFeedExposure(
+	ctx context.Context,
+	recommendationSignalExposure RecommendationSignalExposureStore,
+	viewerUserID *uuid.UUID,
+	shortIDs []uuid.UUID,
+	creatorIDs []uuid.UUID,
+) {
+	if recommendationSignalExposure == nil || viewerUserID == nil {
+		return
+	}
+
+	_ = recommendationSignalExposure.RememberShortExposures(ctx, *viewerUserID, shortIDs)
+	_ = recommendationSignalExposure.RememberCreatorExposures(ctx, *viewerUserID, creatorIDs)
+}
+
+func rememberRecommendationShortDetailExposure(
+	ctx context.Context,
+	recommendationSignalExposure RecommendationSignalExposureStore,
+	viewerUserID *uuid.UUID,
+	detail feed.Detail,
+) {
+	if recommendationSignalExposure == nil || viewerUserID == nil {
+		return
+	}
+
+	_ = recommendationSignalExposure.RememberShortExposure(ctx, *viewerUserID, detail.Item.Short.ID)
+	_ = recommendationSignalExposure.RememberCreatorExposure(ctx, *viewerUserID, detail.Item.Creator.ID)
+}
+
+func collectRecommendationFeedShortIDs(items []feed.Item) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.Short.ID)
+	}
+
+	return ids
+}
+
+func collectRecommendationFeedCreatorIDs(items []feed.Item) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, item := range items {
+		ids = append(ids, item.Creator.ID)
+	}
+
+	return ids
 }
 
 func buildUnlockCtaStatePayload(item feed.Item) unlockCtaStatePayload {

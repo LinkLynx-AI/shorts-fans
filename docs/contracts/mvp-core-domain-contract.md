@@ -33,6 +33,7 @@
 - `docs/ssot/product/creator/creator-workflow.md`
 - `docs/ssot/product/fan/consumer-state-and-profile.md`
 - `docs/ssot/product/scope/mvp-boundaries.md`
+- `docs/contracts/submission-package-review-contract.md`
 
 ## Domain Vocabulary
 
@@ -97,6 +98,7 @@
 
 - `review state` は `creator capability`、`main`、各 `short` に分けて保持します。
 - reviewer は package 全体を見て判断してよいですが、decision state は object ごとに残します。
+- `upload complete`、`submission package ready`、`review submit`、decision provenance の境界は [submission-package-review-contract.md](submission-package-review-contract.md) を canonical とします。
 
 ### post-report state
 
@@ -148,6 +150,7 @@
 ### submission と review 境界
 
 - creator-side の編集単位と review intake 単位は `submission package` です。
+- `upload complete` と `submission package ready` は pre-review boundary であり、review state transition そのものではありません。
 - ただし decision state は package-level publish state にまとめません。
 - 後続実装では、少なくとも次のような組み合わせを表現できる必要があります。
   - creator approved
@@ -201,6 +204,8 @@
 - `rejected` には `re-submit eligible`、`support review required`、`reason code` を持たせます。
 - self-serve resubmit は、eligible な fixable reject にだけ許可します。
 - 同じ onboarding case の self-serve resubmit は最大 `2` 回までとします。
+
+content review の submit / resubmit は `submission package` 単位の action とし、tables below は object-level decision state を表します。submit 境界と decision provenance は [submission-package-review-contract.md](submission-package-review-contract.md) を参照してください。
 
 ### Short state
 

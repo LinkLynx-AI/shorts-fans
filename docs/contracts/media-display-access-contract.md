@@ -22,6 +22,7 @@
 ## Canonical Sources
 
 - `docs/contracts/mvp-media-workflow-contract.md`
+- `docs/contracts/submission-package-review-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/contracts/fan-unlock-main-api-contract.md`
 - `docs/contracts/creator-workspace-owner-preview-api-contract.md`
@@ -52,6 +53,7 @@
 
 - owner preview は public short でも fan main playback でもなく、creator private workspace の別境界として扱います。
 - owner preview で返す short/main は current viewer 自身が owner であることを前提にし、public 公開状態と独立して判定して構いません。
+- owner preview は `review submit` や public publish / unlock gate と独立して扱い、delivery-ready かつ owner match を満たす限り review 承認を必須条件にしません。
 
 ## Asset Rules
 

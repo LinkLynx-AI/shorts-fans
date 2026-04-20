@@ -24,6 +24,7 @@
 
 - `docs/contracts/mvp-core-domain-contract.md`
 - `docs/contracts/mvp-media-workflow-contract.md`
+- `docs/contracts/submission-package-review-contract.md`
 - `docs/infra/dev-media-sandbox.md`
 - `docs/ssot/product/creator/creator-workflow.md`
 - `docs/ssot/product/content/short-main-linkage.md`
@@ -35,6 +36,7 @@
 - creator は `main` 1 本と `short` 1 本以上を同時に選択し、揃うまで submit できません。
 - raw upload 受理は `publishable`、`unlockable`、`review-ready` を意味しません。
 - `main` と `short` は別 asset として upload されますが、completion は package 単位で成功または失敗します。
+- completion 成功後の content は draft のままであり、review submit は別 boundary です。
 
 ## Vocabulary
 
@@ -301,7 +303,8 @@
 - draft `shorts` はすべて、同じ completion で作った draft `main` の `canonical_main_id` に紐づきます。
 - completion 成功時は `media_asset_id` ごとに durable な processing job を 1 件作成します。upload completion 直後の response では `mediaAsset.processingState = uploaded` のままとし、worker 側の claim 以降で processing state を進めます。
 - object 検証に失敗した場合は package 全体を失敗扱いにし、`main` / `shorts` / `media_assets` の新規 row は 1 件も作りません。
-- completion 成功は `submission package ready` を意味しません。processing / linkage / review は後続 boundary の責務です。
+- completion 成功は `submission package ready` や `review submit` を意味しません。processing / linkage / review は後続 boundary の責務です。
+- `review submit` の canonical contract は [submission-package-review-contract.md](submission-package-review-contract.md) を参照します。
 
 ## HTTP States
 

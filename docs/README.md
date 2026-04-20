@@ -28,6 +28,7 @@
 - [contracts/creator-workspace-owner-preview-api-contract.md](contracts/creator-workspace-owner-preview-api-contract.md): creator owner 向け short/main preview list/detail と short caption 更新契約
 - [contracts/creator-workspace-main-price-api-contract.md](contracts/creator-workspace-main-price-api-contract.md): creator owner が本編価格を変更する private mutation 契約
 - [contracts/creator-upload-api-contract.md](contracts/creator-upload-api-contract.md): creator-private な new-package upload の initiation / completion 契約
+- [contracts/submission-package-review-contract.md](contracts/submission-package-review-contract.md): submission package の review intake、review submit、object-level decision provenance を固定する契約
 - [contracts/fan-mvp-common-transport-contract.md](contracts/fan-mvp-common-transport-contract.md): fan MVP read surface 全体で共有する DTO、response envelope、state vocabulary
 - [contracts/fan-public-surface-api-contract.md](contracts/fan-public-surface-api-contract.md): `feed / short detail / creator search / creator profile` の read 契約
 - [contracts/fan-short-pin-api-contract.md](contracts/fan-short-pin-api-contract.md): `feed` からの `pin / unpin` mutation 契約

@@ -1,7 +1,9 @@
 import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
+import { CurrentViewerProvider } from "@/entities/viewer";
 import { buildCreatorProfileHref } from "@/features/creator-navigation";
+import { fireRecommendationSignal } from "@/features/recommendation-signal";
 import { getMainPlaybackSurfaceById } from "@/widgets/main-playback-surface";
 
 import { formatPlaybackTimestamp } from "../lib/format-playback-timestamp";
@@ -26,8 +28,18 @@ vi.mock("next/navigation", () => ({
   }),
 }));
 
+vi.mock("@/features/recommendation-signal", () => ({
+  createRecommendationSignalIdempotencyKey: vi.fn(() => "profile_click:creator:nonce"),
+  createRecommendationSignalNonce: vi.fn(() => "nonce"),
+  fireRecommendationSignal: vi.fn(),
+  isRecommendationPublicCreatorId: vi.fn(() => true),
+}));
+
+const mockedFireRecommendationSignal = vi.mocked(fireRecommendationSignal);
+
 describe("MainPlaybackSurface", () => {
   beforeEach(() => {
+    mockedFireRecommendationSignal.mockReset();
     pause.mockReset();
     pause.mockImplementation(() => {});
     play.mockReset();
@@ -113,6 +125,76 @@ describe("MainPlaybackSurface", () => {
       "href",
       getExpectedCreatorProfileHref(surface.creator.id, "softlight"),
     );
+  });
+
+  it("records a profile click when the creator profile action is pressed by an authenticated viewer", async () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "softlight", "unlocked");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    render(
+      <CurrentViewerProvider
+        currentViewer={{
+          activeMode: "fan",
+          canAccessCreatorMode: false,
+          id: "viewer_1",
+        }}
+      >
+        <MainPlaybackSurface
+          creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "softlight")}
+          fallbackHref="/shorts/softlight"
+          surface={surface}
+        />
+      </CurrentViewerProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("link", { name: "クリエイターのプロフィールへ" }));
+
+    expect(mockedFireRecommendationSignal).toHaveBeenCalledWith({
+      creatorId: surface.creator.id,
+      eventKind: "profile_click",
+      idempotencyKey: "profile_click:creator:nonce",
+    });
+  });
+
+  it("does not record a profile click for owner preview playback", async () => {
+    const surface = getMainPlaybackSurfaceById("main_aoi_blue_balcony", "balcony", "owner");
+
+    expect(surface).toBeDefined();
+
+    if (!surface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+
+    render(
+      <CurrentViewerProvider
+        currentViewer={{
+          activeMode: "creator",
+          canAccessCreatorMode: true,
+          id: "viewer_1",
+        }}
+      >
+        <MainPlaybackSurface
+          creatorProfileHref={getExpectedCreatorProfileHref(surface.creator.id, "balcony")}
+          fallbackHref="/shorts/balcony"
+          surface={surface}
+        />
+      </CurrentViewerProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: "More options" }));
+    await user.click(screen.getByRole("link", { name: "クリエイターのプロフィールへ" }));
+
+    expect(mockedFireRecommendationSignal).not.toHaveBeenCalled();
   });
 
   it("uses router.back when a previous history entry exists", async () => {

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/auth"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
@@ -302,5 +303,104 @@ func TestFanShortDetailRoute(t *testing.T) {
 	}
 	if response.Data.Detail.UnlockCta.State != "continue_main" {
 		t.Fatalf("response.Data.Detail.UnlockCta.State got %q want %q", response.Data.Detail.UnlockCta.State, "continue_main")
+	}
+}
+
+func TestFanFeedRecommendedRouteRemembersRecommendationExposureForAuthenticatedViewer(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	creatorID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	mainID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	mediaAssetID := uuid.MustParse("55555555-5555-5555-5555-555555555555")
+	var rememberedShorts []uuid.UUID
+	var rememberedCreators []uuid.UUID
+
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listRecommended: func(_ context.Context, gotViewerUserID *uuid.UUID, _ *feed.Cursor, _ int) ([]feed.Item, *feed.Cursor, error) {
+				if gotViewerUserID == nil || *gotViewerUserID != viewerID {
+					t.Fatalf("ListRecommended() viewerUserID got %v want %s", gotViewerUserID, viewerID)
+				}
+
+				return []feed.Item{{
+					Creator: feed.CreatorSummary{
+						DisplayName: "Mina Rei",
+						Handle:      "minarei",
+						ID:          creatorID,
+					},
+					Short: feed.ShortSummary{
+						CanonicalMainID:        mainID,
+						CreatorUserID:          creatorID,
+						ID:                     shortID,
+						MediaAssetID:           mediaAssetID,
+						PreviewDurationSeconds: 16,
+					},
+				}}, nil, nil
+			},
+		},
+		RecommendationSignalExposure: stubRecommendationSignalExposureStore{
+			hasCreatorExposure: func(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
+				return false, nil
+			},
+			hasShortExposure: func(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
+				return false, nil
+			},
+			rememberCreatorExposure: func(context.Context, uuid.UUID, uuid.UUID) error {
+				t.Fatal("RememberCreatorExposure() should not be called for feed batch exposure")
+				return nil
+			},
+			rememberCreatorExposures: func(_ context.Context, gotViewerID uuid.UUID, gotCreatorIDs []uuid.UUID) error {
+				if gotViewerID != viewerID {
+					t.Fatalf("RememberCreatorExposures() viewerID got %s want %s", gotViewerID, viewerID)
+				}
+				rememberedCreators = append([]uuid.UUID(nil), gotCreatorIDs...)
+				return nil
+			},
+			rememberShortExposure: func(context.Context, uuid.UUID, uuid.UUID) error {
+				t.Fatal("RememberShortExposure() should not be called for feed batch exposure")
+				return nil
+			},
+			rememberShortExposures: func(_ context.Context, gotViewerID uuid.UUID, gotShortIDs []uuid.UUID) error {
+				if gotViewerID != viewerID {
+					t.Fatalf("RememberShortExposures() viewerID got %s want %s", gotViewerID, viewerID)
+				}
+				rememberedShorts = append([]uuid.UUID(nil), gotShortIDs...)
+				return nil
+			},
+		},
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				return media.VideoDisplayAsset{
+					DurationSeconds: 16,
+					ID:              mediaAssetID,
+					Kind:            "video",
+					PosterURL:       "https://cdn.example.com/shorts/poster.jpg",
+					URL:             "https://cdn.example.com/shorts/playback.mp4",
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{CurrentViewer: &auth.CurrentViewer{ID: viewerID}}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=recommended", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/feed?tab=recommended status got %d want %d", rec.Code, http.StatusOK)
+	}
+	if len(rememberedShorts) != 1 || rememberedShorts[0] != shortID {
+		t.Fatalf("RememberShortExposures() shortIDs got %v want [%s]", rememberedShorts, shortID)
+	}
+	if len(rememberedCreators) != 1 || rememberedCreators[0] != creatorID {
+		t.Fatalf("RememberCreatorExposures() creatorIDs got %v want [%s]", rememberedCreators, creatorID)
 	}
 }

@@ -25,6 +25,7 @@
 ## Canonical Sources
 
 - `docs/contracts/mvp-core-domain-contract.md`
+- `docs/contracts/submission-package-review-contract.md`
 - `docs/ssot/product/content/content-model.md`
 - `docs/ssot/product/content/short-main-linkage.md`
 - `docs/ssot/product/creator/creator-workflow.md`
@@ -83,6 +84,7 @@
 | `delivery-ready` | `processing` asset | `media_asset` in `ready` | playback/render に必要な delivery ref が利用可能 |
 | `linkage validation` | `ready` な main / short asset | canonical main と short linkage が成立した object graph | 同一 creator、同一 purchase target、continuity metadata が揃う |
 | `submission package ready` | linkage 済み object graph | review intake 可能な package | `1 main + 1本以上の short` がすべて `ready` |
+| `review submit` | `submission package ready` な package | review cycle に入った object set | creator submit が成功し、review queue / decision flow に進める |
 | `publish / unlock eligibility` | review 済み object | `main unlockable` / `short public publishable` | media readiness と review/access 条件を両方満たす |
 
 ## Eligibility Contract
@@ -96,6 +98,9 @@
   - owner creator が同一
   - purchase target が同一
   - 同一作品として読める continuity metadata が揃う
+  - review intake に必要な ownership / consent input が欠けていない
+- `submission package ready` は readiness predicate であり、review state ではありません。
+- successful `review submit` の downstream boundary は [submission-package-review-contract.md](submission-package-review-contract.md) を参照します。
 
 ### `main unlockable`
 

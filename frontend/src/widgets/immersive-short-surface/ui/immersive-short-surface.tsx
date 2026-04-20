@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -12,7 +12,7 @@ import {
   useCreatorFollowToggle,
   getCreatorInitials,
 } from "@/entities/creator";
-import { getShortThemeStyle, type FeedTab } from "@/entities/short";
+import { getPublicShortDetail, getShortThemeStyle, type FeedTab } from "@/entities/short";
 import { useCurrentViewer, useHasViewerSession } from "@/entities/viewer";
 import {
   buildCreatorProfileHref,
@@ -26,6 +26,7 @@ import {
   UnlockCta,
   UnlockPaywallDialog,
 } from "@/features/unlock-entry";
+import { useShortRecommendationSignals } from "@/features/recommendation-signal";
 import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
@@ -243,6 +244,7 @@ type CreatorBlockProps = {
       }
     | undefined;
   followed?: boolean | undefined;
+  onProfileClick?: (() => void) | undefined;
   profileHref: string;
   short: FeedShortSurface["short"];
   variant?: "default" | "feed" | undefined;
@@ -377,6 +379,7 @@ function CreatorBlock({
   creator,
   followState,
   followed = false,
+  onProfileClick,
   profileHref,
   short,
   variant = "default",
@@ -411,6 +414,11 @@ function CreatorBlock({
             aria-label={creator.displayName}
             className="inline-flex min-w-0 items-center gap-2.5 text-left text-white transition hover:opacity-90"
             href={profileHref}
+            {...(onProfileClick
+              ? {
+                  onClick: onProfileClick,
+                }
+              : {})}
           >
             <FeedCreatorAvatar className="size-8 border-white/60 shadow-sm" creator={creator} />
             <span className="truncate text-[15px] font-bold text-white">{creator.handle}</span>
@@ -452,6 +460,11 @@ function CreatorBlock({
           <Link
             className="inline-flex min-w-0 items-center gap-2 text-left text-white transition hover:opacity-90"
             href={profileHref}
+            {...(onProfileClick
+              ? {
+                  onClick: onProfileClick,
+                }
+              : {})}
           >
             <FeedCreatorAvatar creator={creator} />
             <span className="truncate text-[15px] font-bold text-white">{creator.displayName}</span>
@@ -494,6 +507,7 @@ function FeedCreatorBlock({
   creator,
   hasViewerSession,
   initialIsFollowing,
+  onProfileClick,
   profileHref,
   short,
   variant = "default",
@@ -527,6 +541,7 @@ function FeedCreatorBlock({
           void toggleFollow();
         },
       }}
+      onProfileClick={onProfileClick}
       profileHref={profileHref}
       short={short}
       variant={variant}
@@ -542,13 +557,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     mediaId: props.surface.short.media.id,
     progress: 0,
   });
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const currentViewer = useCurrentViewer();
   const hasViewerSession = useHasViewerSession();
   const router = useRouter();
   const { openFanAuthDialog } = useFanAuthDialogControls();
   const { mode, surface } = props;
   const { creator, short, unlock, viewer } = surface;
+  const viewerIdentityKey = currentViewer?.id ?? null;
+  const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const [isRecommendationSurfaceReady, setIsRecommendationSurfaceReady] = useState(
+    () => viewerIdentityKey !== null || !usesApiBackedUnlockFlow,
+  );
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const detailPresentation = mode === "detail" ? props.presentation ?? "default" : "default";
   const usesFeedPresentation = mode === "feed" || detailPresentation === "feedLike";
   const detailPinState = useShortPinState({
@@ -559,9 +579,12 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const isActive = props.isActive ?? true;
   const pinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : detailPinState.errorMessage;
   const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : detailPinState.isPinned;
-  const viewerIdentityKey = currentViewer?.id ?? null;
   const feedPlaybackProgress =
     feedPlaybackProgressState.mediaId === short.media.id ? feedPlaybackProgressState.progress : 0;
+  const previousViewerIdentityKeyRef = useRef<string | null>(viewerIdentityKey);
+  const pendingRecommendationPrimeViewerIDRef = useRef<string | null>(null);
+  const pendingRecommendationMainClickAfterAuthRef = useRef(false);
+  const recommendationPrimeRequestKeyRef = useRef(0);
   const surfaceStyle = usesFeedPresentation ? feedSurfaceStyle : getShortThemeStyle(short);
   const profileHref =
     mode === "feed"
@@ -570,14 +593,74 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           tab: props.activeTab,
         })
       : buildCreatorProfileHref(creator.id, props.creatorProfileOrigin);
-  const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const {
+    handleTimeUpdate: handleRecommendationTimeUpdate,
+    handleVideoPlay: handleRecommendationVideoPlay,
+    markManualSeek,
+    recordMainClick,
+    recordProfileClick,
+  } = useShortRecommendationSignals({
+    creatorId: creator.id,
+    isActive,
+    isSurfaceReady: isRecommendationSurfaceReady,
+    shortId: short.id,
+    viewerId: currentViewer?.id ?? null,
+  });
+
+  const prepareRecommendationSurfaceAfterAuth = useCallback((nextViewerIdentityKey: string | null) => {
+    if (!usesApiBackedUnlockFlow || nextViewerIdentityKey === null) {
+      return;
+    }
+
+    pendingRecommendationPrimeViewerIDRef.current = nextViewerIdentityKey;
+    setIsRecommendationSurfaceReady(false);
+  }, [usesApiBackedUnlockFlow]);
+
+  const primeRecommendationSurfaceForViewer = useEffectEvent(async (nextViewerIdentityKey: string) => {
+    if (!usesApiBackedUnlockFlow) {
+      setIsRecommendationSurfaceReady(true);
+      return;
+    }
+
+    pendingRecommendationPrimeViewerIDRef.current = null;
+    setIsRecommendationSurfaceReady(false);
+    const requestKey = recommendationPrimeRequestKeyRef.current + 1;
+    recommendationPrimeRequestKeyRef.current = requestKey;
+
+    try {
+      await getPublicShortDetail({
+        credentials: "include",
+        shortId: short.id,
+      });
+    } catch {
+      return;
+    }
+
+    if (recommendationPrimeRequestKeyRef.current !== requestKey || currentViewer?.id !== nextViewerIdentityKey) {
+      return;
+    }
+
+    setIsRecommendationSurfaceReady(true);
+  });
+
   const openUnlockAuthDialog = ({
     onAfterAuthenticated,
   }: {
     onAfterAuthenticated?: ((restoredViewer: { id: string } | null | undefined) => Promise<void> | void) | undefined;
   }) => {
     openFanAuthDialog({
-      onAfterAuthenticated,
+      onAfterAuthenticated: onAfterAuthenticated
+        ? async (restoredViewer) => {
+            const restoredViewerIdentityKey = restoredViewer?.id ?? null;
+
+            if (restoredViewerIdentityKey !== null && viewerIdentityKey !== restoredViewerIdentityKey) {
+              prepareRecommendationSurfaceAfterAuth(restoredViewerIdentityKey);
+              pendingRecommendationMainClickAfterAuthRef.current = true;
+            }
+
+            await onAfterAuthenticated(restoredViewer);
+          }
+        : undefined,
       postAuthNavigation: "none",
     });
   };
@@ -590,7 +673,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     openFanAuthDialog({
       allowClose: false,
       initialMode: "re-auth",
-      onAfterAuthenticated,
+      onAfterAuthenticated: onAfterAuthenticated
+        ? async (restoredViewer) => {
+            const restoredViewerIdentityKey = restoredViewer?.id ?? null;
+
+            if (restoredViewerIdentityKey !== null && viewerIdentityKey !== restoredViewerIdentityKey) {
+              prepareRecommendationSurfaceAfterAuth(restoredViewerIdentityKey);
+            }
+
+            await onAfterAuthenticated(restoredViewer);
+          }
+        : undefined,
       postAuthNavigation: "none",
     });
   };
@@ -632,6 +725,13 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     viewerIdentityKey,
   });
 
+  const handleUnlockCtaClick = () => {
+    if (hasViewerSession) {
+      recordMainClick();
+    }
+
+    void handleActivateUnlock();
+  };
   const seekFeedPlayback = (nextProgress: number) => {
     if (!usesFeedPresentation) {
       return;
@@ -653,12 +753,71 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
 
     const clampedProgress = clampPlaybackProgress(nextProgress);
 
+    markManualSeek();
     video.currentTime = resolvedDuration * clampedProgress;
     setFeedPlaybackProgressState({
       mediaId: short.media.id,
       progress: clampedProgress,
     });
   };
+
+  useEffect(() => {
+    const previousViewerIdentityKey = previousViewerIdentityKeyRef.current;
+    previousViewerIdentityKeyRef.current = viewerIdentityKey;
+
+    if (viewerIdentityKey === null) {
+      recommendationPrimeRequestKeyRef.current += 1;
+      pendingRecommendationPrimeViewerIDRef.current = null;
+      pendingRecommendationMainClickAfterAuthRef.current = false;
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(false);
+      });
+      return;
+    }
+
+    if (!usesApiBackedUnlockFlow) {
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(true);
+      });
+      return;
+    }
+
+    const viewerNeedsPrime =
+      pendingRecommendationPrimeViewerIDRef.current === viewerIdentityKey
+      || previousViewerIdentityKey !== viewerIdentityKey;
+
+    if (viewerNeedsPrime) {
+      startTransition(() => {
+        setIsRecommendationSurfaceReady(false);
+      });
+    }
+
+    if (!isActive) {
+      return;
+    }
+
+    if (viewerNeedsPrime || !isRecommendationSurfaceReady) {
+      void primeRecommendationSurfaceForViewer(viewerIdentityKey);
+      return;
+    }
+
+    startTransition(() => {
+      setIsRecommendationSurfaceReady(true);
+    });
+  }, [isActive, isRecommendationSurfaceReady, usesApiBackedUnlockFlow, viewerIdentityKey]);
+
+  useEffect(() => {
+    if (!pendingRecommendationMainClickAfterAuthRef.current) {
+      return;
+    }
+
+    if (viewerIdentityKey === null || !isRecommendationSurfaceReady) {
+      return;
+    }
+
+    pendingRecommendationMainClickAfterAuthRef.current = false;
+    recordMainClick();
+  }, [isRecommendationSurfaceReady, recordMainClick, viewerIdentityKey]);
 
   useEffect(() => {
     if (!usesFeedPresentation) {
@@ -717,7 +876,6 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       });
     }
   }, [isActive, short.media.url]);
-
   const pinProps =
     mode === "feed" && props.pin
       ? {
@@ -741,6 +899,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             className="absolute inset-0 size-full object-cover"
             loop
             muted
+            onPlay={handleRecommendationVideoPlay}
+            onTimeUpdate={(event) => {
+              handleRecommendationTimeUpdate(event.currentTarget.currentTime, event.currentTarget.duration);
+            }}
             playsInline
             poster={short.media.posterUrl ?? undefined}
             preload={isActive ? "auto" : "metadata"}
@@ -771,9 +933,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             variant="feed"
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
-                  onClick: () => {
-                    void handleActivateUnlock();
-                  },
+                  onClick: handleUnlockCtaClick,
                 }
               : {})}
           />
@@ -781,6 +941,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             creator={creator}
             hasViewerSession={hasViewerSession}
             initialIsFollowing={viewer.isFollowingCreator}
+            onProfileClick={recordProfileClick}
             profileHref={profileHref}
             short={short}
             variant="feed"
@@ -825,6 +986,10 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         className="absolute inset-0 size-full object-cover"
         loop
         muted
+        onPlay={handleRecommendationVideoPlay}
+        onTimeUpdate={(event) => {
+          handleRecommendationTimeUpdate(event.currentTarget.currentTime, event.currentTarget.duration);
+        }}
         playsInline
         poster={short.media.posterUrl ?? undefined}
         preload={isActive ? "auto" : "metadata"}
@@ -866,9 +1031,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
             disabled={isBusy}
             {...(surface.mainEntryEnabled && unlockAction !== "unavailable"
               ? {
-                  onClick: () => {
-                    void handleActivateUnlock();
-                  },
+                  onClick: handleUnlockCtaClick,
                 }
               : {})}
           />
@@ -877,6 +1040,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           creator={creator}
           hasViewerSession={hasViewerSession}
           initialIsFollowing={viewer.isFollowingCreator}
+          onProfileClick={recordProfileClick}
           profileHref={profileHref}
           short={short}
         />

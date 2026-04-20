@@ -24,6 +24,7 @@
 ## Canonical Sources
 
 - `docs/contracts/media-display-access-contract.md`
+- `docs/contracts/submission-package-review-contract.md`
 - `docs/contracts/creator-workspace-api-contract.md`
 - `docs/contracts/fan-mvp-common-transport-contract.md`
 - `docs/contracts/mvp-media-workflow-contract.md`
@@ -158,6 +159,7 @@
 - caller は approved creator capability を持つ必要があります。
 - caller は preview 対象の owner 自身である必要があります。
 - list endpoint は `delivery-ready` な owner 自身の `short` / `main` を返し、public publish / unlock state とは独立に判定して構いません。
+- owner preview は private surface であり、`submission package ready` のような readiness predicate と、`pending review` / `approved for publish` / `approved for unlock` のような review submit・decision state・publish-unlock gate とは独立して扱い、review 承認を必須条件にしません。
 - owner preview では `MainAccessState.reason = owner_preview` を使い、`unlocked` と混ぜません。
 - list endpoint は poster 中心の preview card を返し、detail endpoint だけ full playback 用 `url` を返します。
 - caption mutation は request body の前後空白を trim して保存し、trim 後に空文字なら DB では `null` として扱います。
