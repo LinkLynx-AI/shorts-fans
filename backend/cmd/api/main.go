@@ -236,6 +236,7 @@ func main() {
 			AdminCreatorReview:               adminCreatorReviewService,
 			CreatorSearch:                    creatorRepository,
 			CreatorWorkspace:                 creatorRepository,
+			CreatorWorkspaceReviewSurface:    submissionReviewService,
 			CreatorWorkspaceMainPrice:        creatorRepository,
 			CreatorWorkspaceSubmissionReview: submissionReviewService,
 			CreatorWorkspaceProfile:          viewerProfileRepository,

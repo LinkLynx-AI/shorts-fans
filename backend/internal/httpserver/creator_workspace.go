@@ -20,17 +20,20 @@ import (
 )
 
 const (
-	creatorWorkspaceAuthRequiredMessage          = "creator workspace requires authentication"
-	creatorWorkspaceMainDetailRequestScope       = "creator_workspace_main_preview_detail"
-	creatorWorkspaceMainListRequestScope         = "creator_workspace_mains"
-	creatorWorkspaceRequestScope                 = "creator_workspace"
-	creatorWorkspaceProfileUpdateRequestScope    = "creator_workspace_profile_update"
-	creatorWorkspaceShortCaptionPutRequestScope  = "creator_workspace_short_caption_put"
-	creatorWorkspaceMainPriceUpdateRequestScope  = "creator_workspace_main_price_update"
-	creatorWorkspaceSubmissionReviewRequestScope = "creator_workspace_submission_review_post"
-	creatorWorkspaceShortDetailRequestScope      = "creator_workspace_short_preview_detail"
-	creatorWorkspaceShortListRequestScope        = "creator_workspace_shorts"
-	creatorWorkspaceTopPerformersScope           = "creator_workspace_top_performers"
+	creatorWorkspaceAuthRequiredMessage            = "creator workspace requires authentication"
+	creatorWorkspaceMainDetailRequestScope         = "creator_workspace_main_preview_detail"
+	creatorWorkspaceMainListRequestScope           = "creator_workspace_mains"
+	creatorWorkspaceMainReviewSurfaceRequestScope  = "creator_workspace_main_review_surface"
+	creatorWorkspaceRequestScope                   = "creator_workspace"
+	creatorWorkspaceProfileUpdateRequestScope      = "creator_workspace_profile_update"
+	creatorWorkspaceReviewSurfaceRequestScope      = "creator_workspace_review_surface"
+	creatorWorkspaceShortCaptionPutRequestScope    = "creator_workspace_short_caption_put"
+	creatorWorkspaceMainPriceUpdateRequestScope    = "creator_workspace_main_price_update"
+	creatorWorkspaceShortReviewSurfaceRequestScope = "creator_workspace_short_review_surface"
+	creatorWorkspaceSubmissionReviewRequestScope   = "creator_workspace_submission_review_post"
+	creatorWorkspaceShortDetailRequestScope        = "creator_workspace_short_preview_detail"
+	creatorWorkspaceShortListRequestScope          = "creator_workspace_shorts"
+	creatorWorkspaceTopPerformersScope             = "creator_workspace_top_performers"
 )
 
 type creatorWorkspaceResponseData struct {
@@ -69,6 +72,14 @@ type creatorWorkspacePreviewShortDetailResponseData struct {
 
 type creatorWorkspacePreviewMainDetailResponseData struct {
 	Preview creatorWorkspacePreviewMainDetailPayload `json:"preview"`
+}
+
+type creatorWorkspaceReviewSurfaceResponseData struct {
+	ReviewSurface creatorWorkspaceReviewSurfacePayload `json:"reviewSurface"`
+}
+
+type creatorWorkspaceReviewDetailResponseData struct {
+	ReviewSurface creatorWorkspaceReviewDetailPayload `json:"reviewSurface"`
 }
 
 type creatorWorkspaceShortCaptionPutRequest struct {
@@ -187,10 +198,54 @@ type creatorWorkspacePreviewCursorPayload struct {
 	ID        string `json:"id"`
 }
 
+type creatorWorkspaceReviewSurfacePayload struct {
+	Mains    []creatorWorkspaceReviewMainItemPayload  `json:"mains"`
+	Packages []creatorWorkspaceReviewPackagePayload   `json:"packages"`
+	Shorts   []creatorWorkspaceReviewShortItemPayload `json:"shorts"`
+}
+
+type creatorWorkspaceReviewDetailPayload struct {
+	Package creatorWorkspaceReviewPackagePayload     `json:"package"`
+	Review  creatorWorkspaceReviewTargetStatePayload `json:"review"`
+	Target  creatorWorkspaceReviewTargetPayload      `json:"target"`
+}
+
+type creatorWorkspaceReviewPackagePayload struct {
+	Blockers         []string `json:"blockers"`
+	CanonicalMainID  string   `json:"canonicalMainId"`
+	LinkedShortCount int      `json:"linkedShortCount"`
+	Readiness        string   `json:"readiness"`
+	ReviewStatus     string   `json:"reviewStatus"`
+	SubmitAction     string   `json:"submitAction"`
+}
+
+type creatorWorkspaceReviewMainItemPayload struct {
+	ID    string `json:"id"`
+	State string `json:"state"`
+}
+
+type creatorWorkspaceReviewShortItemPayload struct {
+	CanonicalMainID string `json:"canonicalMainId"`
+	ID              string `json:"id"`
+	State           string `json:"state"`
+}
+
+type creatorWorkspaceReviewTargetPayload struct {
+	CanonicalMainID string `json:"canonicalMainId"`
+	ID              string `json:"id"`
+	Kind            string `json:"kind"`
+}
+
+type creatorWorkspaceReviewTargetStatePayload struct {
+	ReasonCode *string `json:"reasonCode"`
+	State      string  `json:"state"`
+}
+
 // registerCreatorWorkspaceRoutes は creator private workspace summary API を router に登録します。
 func registerCreatorWorkspaceRoutes(
 	router gin.IRouter,
 	reader CreatorWorkspaceReader,
+	reviewReader CreatorWorkspaceReviewReader,
 	mainPriceWriter CreatorWorkspaceMainPriceWriter,
 	submissionReviewWriter CreatorWorkspaceSubmissionReviewWriter,
 	profileWriter CreatorWorkspaceProfileWriter,
@@ -257,6 +312,30 @@ func registerCreatorWorkspaceRoutes(
 		)
 	}
 
+	if reviewReader != nil {
+		router.GET(
+			"/api/creator/workspace/review-surface",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceReviewSurfaceRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceReviewSurface(c, reviewReader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/mains/:mainId/review-surface",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceMainReviewSurfaceRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceMainReviewSurface(c, reviewReader)
+			},
+		)
+		router.GET(
+			"/api/creator/workspace/shorts/:shortId/review-surface",
+			buildProtectedFanAuthGuard(viewerBootstrap, creatorWorkspaceShortReviewSurfaceRequestScope, creatorWorkspaceAuthRequiredMessage),
+			func(c *gin.Context) {
+				handleCreatorWorkspaceShortReviewSurface(c, reviewReader)
+			},
+		)
+	}
+
 	if submissionReviewWriter != nil {
 		router.POST(
 			"/api/creator/workspace/mains/:mainId/review-submissions",
@@ -286,6 +365,105 @@ func registerCreatorWorkspaceRoutes(
 			},
 		)
 	}
+}
+
+func handleCreatorWorkspaceReviewSurface(c *gin.Context, reader CreatorWorkspaceReviewReader) {
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceReviewSurfaceRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	surface, err := reader.GetWorkspaceReviewSurface(c.Request.Context(), viewerUserID)
+	if err != nil {
+		writeCreatorWorkspaceReviewReadError(c, creatorWorkspaceReviewSurfaceRequestScope, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceReviewSurfaceResponseData]{
+		Data: &creatorWorkspaceReviewSurfaceResponseData{
+			ReviewSurface: buildCreatorWorkspaceReviewSurfacePayload(surface),
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceReviewSurfaceRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
+func handleCreatorWorkspaceMainReviewSurface(c *gin.Context, reader CreatorWorkspaceReviewReader) {
+	mainID, err := shorts.ParsePublicMainID(c.Param("mainId"))
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainReviewSurfaceRequestScope, http.StatusNotFound, "not_found", "creator workspace review surface was not found")
+		return
+	}
+
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainReviewSurfaceRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	surface, err := reader.GetMainReviewSurface(c.Request.Context(), viewerUserID, mainID)
+	if err != nil {
+		writeCreatorWorkspaceReviewReadError(c, creatorWorkspaceMainReviewSurfaceRequestScope, err)
+		return
+	}
+
+	responsePayload, err := buildCreatorWorkspaceReviewDetailPayload(surface)
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceMainReviewSurfaceRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceReviewDetailResponseData]{
+		Data: &creatorWorkspaceReviewDetailResponseData{
+			ReviewSurface: responsePayload,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceMainReviewSurfaceRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
+}
+
+func handleCreatorWorkspaceShortReviewSurface(c *gin.Context, reader CreatorWorkspaceReviewReader) {
+	shortID, err := shorts.ParsePublicShortID(c.Param("shortId"))
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortReviewSurfaceRequestScope, http.StatusNotFound, "not_found", "creator workspace review surface was not found")
+		return
+	}
+
+	viewerUserID, ok := authenticatedViewerIDFromContext(c)
+	if !ok {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortReviewSurfaceRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	surface, err := reader.GetShortReviewSurface(c.Request.Context(), viewerUserID, shortID)
+	if err != nil {
+		writeCreatorWorkspaceReviewReadError(c, creatorWorkspaceShortReviewSurfaceRequestScope, err)
+		return
+	}
+
+	responsePayload, err := buildCreatorWorkspaceReviewDetailPayload(surface)
+	if err != nil {
+		writeCreatorWorkspaceListError(c, creatorWorkspaceShortReviewSurfaceRequestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+		return
+	}
+
+	c.JSON(http.StatusOK, responseEnvelope[creatorWorkspaceReviewDetailResponseData]{
+		Data: &creatorWorkspaceReviewDetailResponseData{
+			ReviewSurface: responsePayload,
+		},
+		Meta: responseMeta{
+			RequestID: newRequestID(creatorWorkspaceShortReviewSurfaceRequestScope),
+			Page:      nil,
+		},
+		Error: nil,
+	})
 }
 
 func handleCreatorWorkspace(c *gin.Context, reader CreatorWorkspaceReader) {
@@ -860,6 +1038,89 @@ func buildCreatorWorkspaceTopPerformersPayload(
 	}
 }
 
+func buildCreatorWorkspaceReviewSurfacePayload(
+	surface submissionreview.WorkspaceReviewSurface,
+) creatorWorkspaceReviewSurfacePayload {
+	packages := make([]creatorWorkspaceReviewPackagePayload, 0, len(surface.Packages))
+	for _, summary := range surface.Packages {
+		packages = append(packages, buildCreatorWorkspaceReviewPackagePayload(summary))
+	}
+
+	mains := make([]creatorWorkspaceReviewMainItemPayload, 0, len(surface.Mains))
+	for _, item := range surface.Mains {
+		mains = append(mains, creatorWorkspaceReviewMainItemPayload{
+			ID:    mainPublicID(item.ID),
+			State: item.State,
+		})
+	}
+
+	shorts := make([]creatorWorkspaceReviewShortItemPayload, 0, len(surface.Shorts))
+	for _, item := range surface.Shorts {
+		shorts = append(shorts, creatorWorkspaceReviewShortItemPayload{
+			CanonicalMainID: mainPublicID(item.CanonicalMainID),
+			ID:              shortPublicID(item.ID),
+			State:           item.State,
+		})
+	}
+
+	return creatorWorkspaceReviewSurfacePayload{
+		Mains:    mains,
+		Packages: packages,
+		Shorts:   shorts,
+	}
+}
+
+func buildCreatorWorkspaceReviewDetailPayload(
+	surface submissionreview.ItemReviewSurface,
+) (creatorWorkspaceReviewDetailPayload, error) {
+	target, err := buildCreatorWorkspaceReviewTargetPayload(surface.Target)
+	if err != nil {
+		return creatorWorkspaceReviewDetailPayload{}, err
+	}
+
+	return creatorWorkspaceReviewDetailPayload{
+		Package: buildCreatorWorkspaceReviewPackagePayload(surface.Package),
+		Review: creatorWorkspaceReviewTargetStatePayload{
+			ReasonCode: surface.Review.ReasonCode,
+			State:      surface.Review.State,
+		},
+		Target: target,
+	}, nil
+}
+
+func buildCreatorWorkspaceReviewPackagePayload(
+	summary submissionreview.WorkspaceReviewPackageSummary,
+) creatorWorkspaceReviewPackagePayload {
+	return creatorWorkspaceReviewPackagePayload{
+		Blockers:         summary.Blockers,
+		CanonicalMainID:  mainPublicID(summary.CanonicalMainID),
+		LinkedShortCount: summary.LinkedShortCount,
+		Readiness:        summary.Readiness,
+		ReviewStatus:     summary.ReviewStatus,
+		SubmitAction:     summary.SubmitActionKind,
+	}
+}
+
+func buildCreatorWorkspaceReviewTargetPayload(
+	target submissionreview.WorkspaceReviewTarget,
+) (creatorWorkspaceReviewTargetPayload, error) {
+	responseTarget := creatorWorkspaceReviewTargetPayload{
+		CanonicalMainID: mainPublicID(target.CanonicalMainID),
+		Kind:            target.Kind,
+	}
+
+	switch target.Kind {
+	case "main":
+		responseTarget.ID = mainPublicID(target.ID)
+	case "short":
+		responseTarget.ID = shortPublicID(target.ID)
+	default:
+		return creatorWorkspaceReviewTargetPayload{}, errors.New("unsupported creator workspace review target")
+	}
+
+	return responseTarget, nil
+}
+
 func buildCreatorWorkspacePreviewShortDetailPayload(
 	detail creator.WorkspacePreviewShortDetail,
 ) (creatorWorkspacePreviewShortDetailPayload, error) {
@@ -939,6 +1200,17 @@ func writeCreatorWorkspaceReadError(c *gin.Context, requestScope string, err err
 	}
 }
 
+func writeCreatorWorkspaceReviewReadError(c *gin.Context, requestScope string, err error) {
+	switch {
+	case errors.Is(err, submissionreview.ErrCreatorModeUnavailable):
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusForbidden, "creator_mode_unavailable", "creator mode is not available")
+	case errors.Is(err, submissionreview.ErrReviewSurfaceNotFound):
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusNotFound, "not_found", "creator workspace review surface was not found")
+	default:
+		writeCreatorWorkspaceListError(c, requestScope, http.StatusInternalServerError, "internal_error", "creator workspace could not be loaded")
+	}
+}
+
 func writeCreatorWorkspaceListError(c *gin.Context, requestScope string, status int, code string, message string) {
 	c.JSON(status, responseEnvelope[struct{}]{
 		Data: nil,
@@ -1010,6 +1282,13 @@ type CreatorWorkspaceReader interface {
 	GetWorkspaceTopPerformers(ctx context.Context, viewerUserID uuid.UUID) (creator.WorkspaceTopPerformers, error)
 	ListWorkspacePreviewMains(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewMainItem, *creator.WorkspacePreviewCursor, error)
 	ListWorkspacePreviewShorts(ctx context.Context, viewerUserID uuid.UUID, cursor *creator.WorkspacePreviewCursor, limit int) ([]creator.WorkspacePreviewShortItem, *creator.WorkspacePreviewCursor, error)
+}
+
+// CreatorWorkspaceReviewReader は creator workspace review surface 用の read 操作を表します。
+type CreatorWorkspaceReviewReader interface {
+	GetMainReviewSurface(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) (submissionreview.ItemReviewSurface, error)
+	GetShortReviewSurface(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (submissionreview.ItemReviewSurface, error)
+	GetWorkspaceReviewSurface(ctx context.Context, viewerUserID uuid.UUID) (submissionreview.WorkspaceReviewSurface, error)
 }
 
 func decodeCreatorWorkspacePreviewCursor(encoded string) *creator.WorkspacePreviewCursor {

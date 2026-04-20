@@ -20,6 +20,11 @@ import {
   getCreatorWorkspacePreviewShortDetail,
 } from "@/widgets/creator-mode-shell/api/get-creator-workspace-preview-detail";
 import {
+  getCreatorWorkspaceMainReviewSurface,
+  getCreatorWorkspaceReviewSurface,
+  getCreatorWorkspaceShortReviewSurface,
+} from "@/widgets/creator-mode-shell/api/get-creator-workspace-review-surface";
+import {
   CreatorModeShell,
   getMockCreatorModeShellState,
 } from "@/widgets/creator-mode-shell";
@@ -87,6 +92,11 @@ vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-preview-detail",
   getCreatorWorkspacePreviewMainDetail: vi.fn(),
   getCreatorWorkspacePreviewShortDetail: vi.fn(),
 }));
+vi.mock("@/widgets/creator-mode-shell/api/get-creator-workspace-review-surface", () => ({
+  getCreatorWorkspaceMainReviewSurface: vi.fn(),
+  getCreatorWorkspaceReviewSurface: vi.fn(),
+  getCreatorWorkspaceShortReviewSurface: vi.fn(),
+}));
 
 type CreatorWorkspaceSummary = Awaited<ReturnType<typeof getCreatorWorkspaceSummary>>;
 type CreatorWorkspaceTopPerformers = Awaited<ReturnType<typeof getCreatorWorkspaceTopPerformers>>;
@@ -94,6 +104,8 @@ type CreatorWorkspacePreviewShorts = Awaited<ReturnType<typeof getCreatorWorkspa
 type CreatorWorkspacePreviewMains = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMains>>;
 type CreatorWorkspacePreviewShortDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewShortDetail>>;
 type CreatorWorkspacePreviewMainDetail = Awaited<ReturnType<typeof getCreatorWorkspacePreviewMainDetail>>;
+type CreatorWorkspaceReviewSurface = Awaited<ReturnType<typeof getCreatorWorkspaceReviewSurface>>;
+type CreatorWorkspaceItemReviewSurface = Awaited<ReturnType<typeof getCreatorWorkspaceMainReviewSurface>>;
 type CreatorWorkspaceShortCaptionUpdate = Awaited<ReturnType<typeof updateCreatorWorkspaceShortCaption>>;
 
 function createDeferredPromise<TResult = void>() {
@@ -307,6 +319,44 @@ function createCreatorWorkspacePreviewMains(
   };
 }
 
+function createCreatorWorkspaceReviewSurface(
+  overrides: Partial<CreatorWorkspaceReviewSurface> = {},
+): CreatorWorkspaceReviewSurface {
+  return {
+    mains: [],
+    packages: [],
+    requestId: "req_creator_workspace_review_surface_001",
+    shorts: [],
+    ...overrides,
+  };
+}
+
+function createCreatorWorkspaceItemReviewSurface(
+  overrides: Partial<CreatorWorkspaceItemReviewSurface> = {},
+): CreatorWorkspaceItemReviewSurface {
+  return {
+    package: {
+      blockers: [],
+      canonicalMainId: "main_quiet_rooftop",
+      linkedShortCount: 1,
+      readiness: "none",
+      reviewStatus: "approved",
+      submitAction: "none",
+    },
+    requestId: "req_creator_workspace_item_review_surface_001",
+    review: {
+      reasonCode: null,
+      state: "approved_for_publish",
+    },
+    target: {
+      canonicalMainId: "main_quiet_rooftop",
+      id: "short_quiet_rooftop",
+      kind: "short",
+    },
+    ...overrides,
+  };
+}
+
 describe("CreatorPage", () => {
   beforeEach(() => {
     mockedRouter.back.mockReset();
@@ -324,12 +374,28 @@ describe("CreatorPage", () => {
     vi.mocked(getCreatorWorkspacePreviewShorts).mockReset();
     vi.mocked(getCreatorWorkspacePreviewMainDetail).mockReset();
     vi.mocked(getCreatorWorkspacePreviewShortDetail).mockReset();
+    vi.mocked(getCreatorWorkspaceReviewSurface).mockReset();
+    vi.mocked(getCreatorWorkspaceMainReviewSurface).mockReset();
+    vi.mocked(getCreatorWorkspaceShortReviewSurface).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(createCreatorWorkspaceSummary());
     vi.mocked(getCreatorWorkspaceTopPerformers).mockResolvedValue(createCreatorWorkspaceTopPerformers());
     vi.mocked(getCreatorWorkspacePreviewShorts).mockResolvedValue(createCreatorWorkspacePreviewShorts());
     vi.mocked(getCreatorWorkspacePreviewMains).mockResolvedValue(createCreatorWorkspacePreviewMains());
     vi.mocked(getCreatorWorkspacePreviewShortDetail).mockResolvedValue(createCreatorWorkspacePreviewShortDetail());
     vi.mocked(getCreatorWorkspacePreviewMainDetail).mockResolvedValue(createCreatorWorkspacePreviewMainDetail());
+    vi.mocked(getCreatorWorkspaceReviewSurface).mockResolvedValue(createCreatorWorkspaceReviewSurface());
+    vi.mocked(getCreatorWorkspaceMainReviewSurface).mockResolvedValue(createCreatorWorkspaceItemReviewSurface({
+      review: {
+        reasonCode: null,
+        state: "approved_for_unlock",
+      },
+      target: {
+        canonicalMainId: "main_quiet_rooftop",
+        id: "main_quiet_rooftop",
+        kind: "main",
+      },
+    }));
+    vi.mocked(getCreatorWorkspaceShortReviewSurface).mockResolvedValue(createCreatorWorkspaceItemReviewSurface());
     vi.mocked(updateCreatorWorkspaceShortCaption).mockResolvedValue({
       requestId: "req_creator_workspace_short_caption_put_001",
       short: {
@@ -384,6 +450,20 @@ describe("CreatorPage", () => {
         },
       }),
     );
+    vi.mocked(getCreatorWorkspaceReviewSurface).mockResolvedValue(
+      createCreatorWorkspaceReviewSurface({
+        packages: [
+          {
+            blockers: [],
+            canonicalMainId: "main_quiet_rooftop",
+            linkedShortCount: 1,
+            readiness: "ready",
+            reviewStatus: "changes_requested",
+            submitAction: "resubmit",
+          },
+        ],
+      }),
+    );
 
     render(await CreatorPage());
 
@@ -394,8 +474,8 @@ describe("CreatorPage", () => {
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
     expect(screen.getByText("contract-backed creator bio")).toBeInTheDocument();
     expect(screen.getByText("¥82,000")).toBeInTheDocument();
-    expect(screen.getByText("差し戻しが2件あります")).toBeInTheDocument();
-    expect(screen.getByText("short 1件 / main 1件を確認してください")).toBeInTheDocument();
+    expect(screen.getByText("差し戻し対応が1件あります")).toBeInTheDocument();
+    expect(screen.getByText("1件の package が対象です。detail から修正後の再申請を進めてください。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /^Top short\b/ })).toBeEnabled();
     expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
@@ -872,10 +952,13 @@ describe("CreatorPage", () => {
       <CreatorWorkspaceDetailView
         creator={state.creator}
         detailSelection={{ kind: "mock", shortId: "short_quiet_rooftop", tab: "main" }}
+        itemReviewSurfaceState={{ kind: "idle" }}
         onBack={() => {}}
         onOpenDetail={() => {}}
         onOpenMainPriceDialog={() => {}}
         onRetryPreviewDetail={() => {}}
+        onRetryReviewSurface={() => {}}
+        onSyncReviewState={() => {}}
         previewCollections={null}
         previewDetailState={{ kind: "idle" }}
         state={state}
@@ -1074,6 +1157,8 @@ describe("CreatorPage", () => {
   });
 
   it("falls back to a generic revision message when revision counts are inconsistent", async () => {
+    const deferredReviewSurface = createDeferredPromise<CreatorWorkspaceReviewSurface>();
+
     vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(
       createCreatorWorkspaceSummary({
         revisionRequestedSummary: {
@@ -1083,11 +1168,33 @@ describe("CreatorPage", () => {
         },
       }),
     );
+    vi.mocked(getCreatorWorkspaceReviewSurface).mockReturnValueOnce(deferredReviewSurface.promise);
 
     render(<CreatorModeShell state={getMockCreatorModeShellState()} />);
 
     expect(await screen.findByText("差し戻しが0件あります")).toBeInTheDocument();
     expect(screen.getByText("修正依頼内容を確認してください")).toBeInTheDocument();
+  });
+
+  it("keeps the revision notice visible when the review surface request fails", async () => {
+    vi.mocked(getCreatorWorkspaceSummary).mockResolvedValue(
+      createCreatorWorkspaceSummary({
+        revisionRequestedSummary: {
+          mainCount: 1,
+          shortCount: 1,
+          totalCount: 2,
+        },
+      }),
+    );
+    vi.mocked(getCreatorWorkspaceReviewSurface).mockRejectedValueOnce(new Error("boom"));
+
+    render(<CreatorModeShell state={getMockCreatorModeShellState()} />);
+
+    expect(await screen.findByText("差し戻しが2件あります")).toBeInTheDocument();
+    expect(screen.getByText("short 1件 / main 1件を確認してください")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "審査状況を読み込めませんでした。少し時間を置いてから再読み込みしてください。",
+    );
   });
 
   it("falls back to the unauthenticated blocked state when the summary API returns 401", async () => {

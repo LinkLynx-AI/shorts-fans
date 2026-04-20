@@ -210,6 +210,7 @@ type HandlerConfig struct {
 	AdminCreatorReview               AdminCreatorReviewService
 	CreatorSearch                    CreatorSearchReader
 	CreatorWorkspace                 CreatorWorkspaceReader
+	CreatorWorkspaceReviewSurface    CreatorWorkspaceReviewReader
 	CreatorWorkspaceMainPrice        CreatorWorkspaceMainPriceWriter
 	CreatorWorkspaceSubmissionReview CreatorWorkspaceSubmissionReviewWriter
 	CreatorWorkspaceProfile          CreatorWorkspaceProfileWriter
@@ -309,6 +310,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerCreatorWorkspaceRoutes(
 		router,
 		config.CreatorWorkspace,
+		config.CreatorWorkspaceReviewSurface,
 		config.CreatorWorkspaceMainPrice,
 		config.CreatorWorkspaceSubmissionReview,
 		config.CreatorWorkspaceProfile,

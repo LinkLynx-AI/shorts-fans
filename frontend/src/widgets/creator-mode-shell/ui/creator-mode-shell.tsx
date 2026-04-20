@@ -12,8 +12,10 @@ import type {
   CreatorModeShellReadyState,
   CreatorModeShellState,
 } from "../model/creator-mode-shell";
+import { useCreatorWorkspaceItemReviewSurface } from "../model/use-creator-workspace-item-review-surface";
 import { useCreatorWorkspacePreviewDetail } from "../model/use-creator-workspace-preview-detail";
 import { useCreatorWorkspacePreviewCollections } from "../model/use-creator-workspace-preview-collections";
+import { useCreatorWorkspaceReviewSurface } from "../model/use-creator-workspace-review-surface";
 import { useCreatorWorkspaceSummary } from "../model/use-creator-workspace-summary";
 import { useCreatorWorkspaceTopPerformers } from "../model/use-creator-workspace-top-performers";
 import { CreatorShellBlockedState, CreatorModeWorkspaceFrame } from "./creator-mode-shell-blocked-state";
@@ -40,6 +42,11 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
     retry: retryTopPerformers,
     state: topPerformersState,
   } = useCreatorWorkspaceTopPerformers();
+  const {
+    blockedState: reviewSurfaceBlockedState,
+    retry: retryReviewSurface,
+    state: reviewSurfaceState,
+  } = useCreatorWorkspaceReviewSurface();
   const [activeTab, setActiveTab] = useState<ApprovedCreatorWorkspaceManagedTab>(state.workspace.managedCollections.defaultTab);
   const [detailSelection, setDetailSelection] = useState<CreatorWorkspaceDetailViewSelection | null>(null);
   const [mainPriceDialogState, setMainPriceDialogState] = useState<{
@@ -52,8 +59,18 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
     retry: retryPreviewDetail,
     state: previewDetailState,
   } = useCreatorWorkspacePreviewDetail(previewDetailSelection);
+  const {
+    blockedState: itemReviewSurfaceBlockedState,
+    retry: retryItemReviewSurface,
+    state: itemReviewSurfaceState,
+  } = useCreatorWorkspaceItemReviewSurface(previewDetailSelection);
   const creator = summaryState.kind === "ready" ? summaryState.summary.creator : state.creator;
-  const blockedState = summaryBlockedState ?? topPerformersBlockedState ?? previewBlockedState ?? previewDetailBlockedState;
+  const blockedState = summaryBlockedState
+    ?? topPerformersBlockedState
+    ?? reviewSurfaceBlockedState
+    ?? previewBlockedState
+    ?? previewDetailBlockedState
+    ?? itemReviewSurfaceBlockedState;
 
   function handleOpenDetail(selection: CreatorWorkspaceDetailViewSelection) {
     setActiveTab(selection.tab);
@@ -83,6 +100,13 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
     });
     retryPreviewCollections();
     retryPreviewDetail();
+    retryReviewSurface();
+    retryItemReviewSurface();
+  }
+
+  function handleSyncReviewState() {
+    retryReviewSurface();
+    retryItemReviewSurface();
   }
 
   if (blockedState) {
@@ -95,12 +119,15 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
         <CreatorWorkspaceDetailView
           creator={creator}
           detailSelection={detailSelection}
+          itemReviewSurfaceState={itemReviewSurfaceState}
           onBack={() => {
             setDetailSelection(null);
           }}
           onOpenDetail={handleOpenDetail}
           onOpenMainPriceDialog={handleOpenMainPriceDialog}
           onRetryPreviewDetail={retryPreviewDetail}
+          onRetryReviewSurface={retryItemReviewSurface}
+          onSyncReviewState={handleSyncReviewState}
           previewDetailState={previewDetailState}
           previewCollections={previewCollectionsState.kind === "ready" ? previewCollectionsState.collections : null}
           state={state}
@@ -112,9 +139,11 @@ function CreatorWorkspaceReadyState({ state }: { state: CreatorModeShellReadySta
           onChangeTab={setActiveTab}
           onOpenPreviewDetail={handleOpenDetail}
           onRetryPreviewCollections={retryPreviewCollections}
+          onRetryReviewSurface={retryReviewSurface}
           onRetrySummary={retrySummary}
           onRetryTopPerformers={retryTopPerformers}
           previewCollectionsState={previewCollectionsState}
+          reviewSurfaceState={reviewSurfaceState}
           state={state}
           summaryState={summaryState}
           topPerformersState={topPerformersState}

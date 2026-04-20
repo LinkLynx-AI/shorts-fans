@@ -1,0 +1,144 @@
+{
+  "GET /api/creator/workspace/review-surface": {
+    "review_surface_populated": {
+      "status": 200,
+      "body": {
+        "data": {
+          "reviewSurface": {
+            "packages": [
+              {
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "reviewStatus": "changes_requested",
+                "readiness": "ready",
+                "submitAction": "resubmit",
+                "linkedShortCount": 2,
+                "blockers": []
+              },
+              {
+                "canonicalMainId": "main_sora_after_rain",
+                "reviewStatus": "pending_review",
+                "readiness": "none",
+                "submitAction": "none",
+                "linkedShortCount": 1,
+                "blockers": []
+              },
+              {
+                "canonicalMainId": "main_noa_city_haze",
+                "reviewStatus": "draft",
+                "readiness": "blocked",
+                "submitAction": "none",
+                "linkedShortCount": 1,
+                "blockers": [
+                  "main_price_missing",
+                  "consent_missing"
+                ]
+              }
+            ],
+            "mains": [
+              {
+                "id": "main_aoi_blue_balcony",
+                "state": "revision_requested"
+              },
+              {
+                "id": "main_sora_after_rain",
+                "state": "pending_review"
+              },
+              {
+                "id": "main_noa_city_haze",
+                "state": "draft"
+              }
+            ],
+            "shorts": [
+              {
+                "id": "short_aoi_balcony_cut",
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "state": "approved_for_publish"
+              },
+              {
+                "id": "short_aoi_balcony_close",
+                "canonicalMainId": "main_aoi_blue_balcony",
+                "state": "revision_requested"
+              },
+              {
+                "id": "short_sora_after_rain_intro",
+                "canonicalMainId": "main_sora_after_rain",
+                "state": "pending_review"
+              }
+            ]
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_review_surface_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "GET /api/creator/workspace/mains/{mainId}/review-surface": {
+    "detail_changes_requested": {
+      "status": 200,
+      "body": {
+        "data": {
+          "reviewSurface": {
+            "package": {
+              "canonicalMainId": "main_aoi_blue_balcony",
+              "reviewStatus": "changes_requested",
+              "readiness": "ready",
+              "submitAction": "resubmit",
+              "linkedShortCount": 2,
+              "blockers": []
+            },
+            "target": {
+              "id": "main_aoi_blue_balcony",
+              "kind": "main",
+              "canonicalMainId": "main_aoi_blue_balcony"
+            },
+            "review": {
+              "state": "revision_requested",
+              "reasonCode": "thumbnail_policy_adjustment"
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_main_review_surface_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  },
+  "GET /api/creator/workspace/shorts/{shortId}/review-surface": {
+    "detail_short_changes_requested": {
+      "status": 200,
+      "body": {
+        "data": {
+          "reviewSurface": {
+            "package": {
+              "canonicalMainId": "main_aoi_blue_balcony",
+              "reviewStatus": "changes_requested",
+              "readiness": "ready",
+              "submitAction": "resubmit",
+              "linkedShortCount": 2,
+              "blockers": []
+            },
+            "target": {
+              "id": "short_aoi_balcony_close",
+              "kind": "short",
+              "canonicalMainId": "main_aoi_blue_balcony"
+            },
+            "review": {
+              "state": "revision_requested",
+              "reasonCode": "caption_needs_adjustment"
+            }
+          }
+        },
+        "meta": {
+          "requestId": "req_creator_workspace_short_review_surface_001",
+          "page": null
+        },
+        "error": null
+      }
+    }
+  }
+}

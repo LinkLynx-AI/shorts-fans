@@ -21,6 +21,7 @@ import {
 
 import type { CreatorWorkspacePreviewDetailState } from "../model/use-creator-workspace-preview-detail";
 import type { CreatorModeShellReadyState } from "../model/creator-mode-shell";
+import type { CreatorWorkspaceItemReviewSurfaceState } from "../model/creator-workspace-review-surface";
 import type {
   ApprovedCreatorWorkspaceDetailMetric,
   ApprovedCreatorWorkspaceDetailSetting,
@@ -46,6 +47,7 @@ import type {
 } from "./creator-mode-shell.types";
 import { CreatorWorkspaceManagedTile } from "./creator-workspace-managed-tile";
 import { CreatorWorkspacePreviewDetailLinkedGrid } from "./creator-workspace-preview-grid";
+import { CreatorWorkspaceReviewPanel } from "./creator-workspace-review-panel";
 
 function CreatorWorkspaceActionButton({
   ariaLabel,
@@ -447,20 +449,26 @@ function resolvePreviewDetailState(
 export function CreatorWorkspaceDetailView({
   creator,
   detailSelection,
+  itemReviewSurfaceState,
   onBack,
   onOpenDetail,
   onOpenMainPriceDialog,
   onRetryPreviewDetail,
+  onRetryReviewSurface,
+  onSyncReviewState,
   previewDetailState,
   previewCollections,
   state,
 }: {
   creator: CreatorSummary;
   detailSelection: CreatorWorkspaceDetailViewSelection;
+  itemReviewSurfaceState: CreatorWorkspaceItemReviewSurfaceState;
   onBack: () => void;
   onOpenDetail: (selection: CreatorWorkspaceDetailViewSelection) => void;
   onOpenMainPriceDialog: (selection: Extract<CreatorWorkspaceDetailViewSelection, { kind: "preview-main" }>) => void;
   onRetryPreviewDetail: () => void;
+  onRetryReviewSurface: () => void;
+  onSyncReviewState: () => void;
   previewDetailState: CreatorWorkspacePreviewDetailState;
   previewCollections: CreatorWorkspaceReadyPreviewCollections | null;
   state: CreatorModeShellReadyState;
@@ -588,6 +596,14 @@ export function CreatorWorkspaceDetailView({
           </div>
         ) : null}
 
+        {detailSelection.kind !== "mock" ? (
+          <CreatorWorkspaceReviewPanel
+            onRetry={onRetryReviewSurface}
+            onSync={onSyncReviewState}
+            state={itemReviewSurfaceState}
+          />
+        ) : null}
+
         {detail.metrics.length > 0 ? <CreatorWorkspaceDetailMetrics metrics={detail.metrics} /> : null}
 
         {detail.settings.length > 0 ? (
@@ -632,6 +648,7 @@ export function CreatorWorkspaceDetailView({
           onSaved={() => {
             setIsCaptionDialogOpen(false);
             onRetryPreviewDetail();
+            onRetryReviewSurface();
           }}
           open={isCaptionDialogOpen}
           shortId={editableShortId}
