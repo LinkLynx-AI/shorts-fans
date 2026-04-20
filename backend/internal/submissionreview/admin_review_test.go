@@ -71,6 +71,16 @@ func TestAdminReviewServiceApplyDecisionDoesNotRequireCaseReload(t *testing.T) {
 	}
 }
 
+func TestAdminReviewServiceApplyDecisionRequiresInitialization(t *testing.T) {
+	t.Parallel()
+
+	var service *AdminReviewService
+
+	if err := service.ApplyDecision(context.Background(), ReviewDecisionInput{}); err == nil {
+		t.Fatal("ApplyDecision() error = nil, want initialization error")
+	}
+}
+
 type adminReviewSignerStub struct{}
 
 func (adminReviewSignerStub) PresignGetObject(context.Context, string, string, time.Duration) (string, error) {
@@ -300,6 +310,184 @@ func TestAdminReviewServiceGetCaseRejectsUnknownIntake(t *testing.T) {
 	_, err := service.GetCase(context.Background(), uuid.MustParse("11111111-1111-1111-1111-111111111111"))
 	if !errors.Is(err, ErrAdminReviewCaseNotFound) {
 		t.Fatalf("GetCase() error got %v want %v", err, ErrAdminReviewCaseNotFound)
+	}
+}
+
+func TestAdminReviewServiceGetCaseRequiresInitializationAndNonNilID(t *testing.T) {
+	t.Parallel()
+
+	var service *AdminReviewService
+
+	if _, err := service.GetCase(context.Background(), uuid.MustParse("11111111-1111-1111-1111-111111111111")); err == nil {
+		t.Fatal("GetCase() error = nil, want initialization error")
+	}
+
+	service = &AdminReviewService{queries: adminReviewQueriesStub{}}
+	if _, err := service.GetCase(context.Background(), uuid.Nil); !errors.Is(err, ErrAdminReviewCaseNotFound) {
+		t.Fatalf("GetCase() nil uuid error got %v want %v", err, ErrAdminReviewCaseNotFound)
+	}
+}
+
+func TestAdminReviewServiceGetCaseReturnsMainResolveError(t *testing.T) {
+	t.Parallel()
+
+	intakeID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	creatorUserID := uuid.MustParse("12111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainAssetID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	submittedAt := time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)
+	wantErr := errors.New("signer unavailable")
+
+	service := &AdminReviewService{
+		queries: adminReviewQueriesStub{
+			getCaseSummary: func(context.Context, pgtype.UUID) (sqlc.GetAdminSubmissionReviewCaseSummaryByIntakeIDRow, error) {
+				return sqlc.GetAdminSubmissionReviewCaseSummaryByIntakeIDRow{
+					IntakeID:         postgres.UUIDToPG(intakeID),
+					Status:           "pending_review",
+					SubmitKind:       "initial_submit",
+					CanonicalMainID:  postgres.UUIDToPG(mainID),
+					CreatorUserID:    postgres.UUIDToPG(creatorUserID),
+					MainMediaAssetID: postgres.UUIDToPG(mainAssetID),
+					MainPriceMinor:   1800,
+					SubmittedAt:      postgres.TimeToPG(&submittedAt),
+					DisplayName:      "Mina Rei",
+					Handle:           "minarei",
+					CreatorBio:       "quiet rooftop",
+				}, nil
+			},
+			getMain: func(context.Context, pgtype.UUID) (sqlc.GetAdminSubmissionReviewMainByIntakeIDRow, error) {
+				return sqlc.GetAdminSubmissionReviewMainByIntakeIDRow{
+					MainID:               postgres.UUIDToPG(mainID),
+					MediaAssetID:         postgres.UUIDToPG(mainAssetID),
+					State:                "pending_review",
+					PriceMinor:           1800,
+					CurrencyCode:         "JPY",
+					DurationMs:           postgres.Int64ToPG(ptrInt64(18000)),
+					MediaProcessingState: mediaStateReady,
+				}, nil
+			},
+			listShorts: func(context.Context, pgtype.UUID) ([]sqlc.ListAdminSubmissionReviewShortsByIntakeIDRow, error) {
+				return nil, nil
+			},
+		},
+		resolveMain: func(context.Context, media.MainDisplaySource, media.AccessBoundary, time.Duration) (media.VideoDisplayAsset, error) {
+			return media.VideoDisplayAsset{}, wantErr
+		},
+		resolveShort: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+			t.Fatal("resolveShort() called, want main resolution to fail first")
+			return media.VideoDisplayAsset{}, nil
+		},
+	}
+
+	_, err := service.GetCase(context.Background(), intakeID)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("GetCase() error got %v want wrapped %v", err, wantErr)
+	}
+}
+
+func TestBuildIntakeDecisionLogRequiresTargetSourceAndTimestamp(t *testing.T) {
+	t.Parallel()
+
+	decisionedAt := time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC)
+	reasonCode := "quality_issue"
+	reviewNote := "reframe intro"
+
+	if got := buildIntakeDecisionLog(pgtype.Text{}, pgtype.Text{}, pgtype.Text{}, pgtype.Text{}, pgtype.Timestamptz{}); got != nil {
+		t.Fatalf("buildIntakeDecisionLog() got %#v want nil", got)
+	}
+
+	got := buildIntakeDecisionLog(
+		postgres.TextToPG(ptrString("revision_requested")),
+		postgres.TextToPG(&reasonCode),
+		postgres.TextToPG(&reviewNote),
+		postgres.TextToPG(ptrString("manual")),
+		postgres.TimeToPG(&decisionedAt),
+	)
+	if got == nil {
+		t.Fatal("buildIntakeDecisionLog() = nil, want decision log")
+	}
+	if got.DecisionSource != "manual" {
+		t.Fatalf("buildIntakeDecisionLog() decision source got %q want manual", got.DecisionSource)
+	}
+	if got.TargetState != "revision_requested" {
+		t.Fatalf("buildIntakeDecisionLog() target state got %q want revision_requested", got.TargetState)
+	}
+	if got.ReasonCode == nil || *got.ReasonCode != reasonCode {
+		t.Fatalf("buildIntakeDecisionLog() reason got %#v want %q", got.ReasonCode, reasonCode)
+	}
+	if got.ReviewNote == nil || *got.ReviewNote != reviewNote {
+		t.Fatalf("buildIntakeDecisionLog() note got %#v want %q", got.ReviewNote, reviewNote)
+	}
+}
+
+func TestAdminReviewHelperOptionals(t *testing.T) {
+	t.Parallel()
+
+	value := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	if got := optionalUUID(pgtype.UUID{}); got != nil {
+		t.Fatalf("optionalUUID() got %#v want nil", got)
+	}
+	if got := optionalUUID(postgres.UUIDToPG(value)); got == nil || *got != value {
+		t.Fatalf("optionalUUID() got %#v want %s", got, value)
+	}
+
+	duration, err := requiredDurationMS(postgres.Int64ToPG(ptrInt64(18000)))
+	if err != nil {
+		t.Fatalf("requiredDurationMS() error = %v, want nil", err)
+	}
+	if duration != 18000 {
+		t.Fatalf("requiredDurationMS() got %d want 18000", duration)
+	}
+
+	if _, err := requiredDurationMS(pgtype.Int8{}); err == nil {
+		t.Fatal("requiredDurationMS() error = nil, want required error")
+	}
+	if _, err := requiredDurationMS(postgres.Int64ToPG(ptrInt64(0))); err == nil {
+		t.Fatal("requiredDurationMS() zero duration error = nil, want required error")
+	}
+}
+
+func TestAdminReviewServiceBuildAdminReviewMainAndShortReturnResolveErrors(t *testing.T) {
+	t.Parallel()
+
+	intakeID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainAssetID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	shortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	shortAssetID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	wantErr := errors.New("resolve failed")
+
+	service := &AdminReviewService{
+		resolveMain: func(context.Context, media.MainDisplaySource, media.AccessBoundary, time.Duration) (media.VideoDisplayAsset, error) {
+			return media.VideoDisplayAsset{}, wantErr
+		},
+		resolveShort: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+			return media.VideoDisplayAsset{}, wantErr
+		},
+	}
+
+	_, err := service.buildAdminReviewMain(context.Background(), intakeID, sqlc.GetAdminSubmissionReviewMainByIntakeIDRow{
+		MainID:               postgres.UUIDToPG(mainID),
+		MediaAssetID:         postgres.UUIDToPG(mainAssetID),
+		State:                "pending_review",
+		PriceMinor:           1800,
+		CurrencyCode:         "JPY",
+		DurationMs:           postgres.Int64ToPG(ptrInt64(18000)),
+		MediaProcessingState: mediaStateReady,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("buildAdminReviewMain() error got %v want wrapped %v", err, wantErr)
+	}
+
+	_, err = service.buildAdminReviewShort(intakeID, sqlc.ListAdminSubmissionReviewShortsByIntakeIDRow{
+		ShortID:              postgres.UUIDToPG(shortID),
+		MediaAssetID:         postgres.UUIDToPG(shortAssetID),
+		State:                "pending_review",
+		DurationMs:           postgres.Int64ToPG(ptrInt64(18000)),
+		MediaProcessingState: mediaStateReady,
+	})
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("buildAdminReviewShort() error got %v want wrapped %v", err, wantErr)
 	}
 }
 

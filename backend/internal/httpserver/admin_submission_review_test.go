@@ -156,6 +156,32 @@ func TestAdminSubmissionReviewCaseGetMapsNotFound(t *testing.T) {
 	}
 }
 
+func TestAdminSubmissionReviewCaseGetRejectsInvalidIntakeID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv: developmentAppEnv,
+		AdminSubmissionReview: adminSubmissionReviewServiceStub{
+			getCase: func(context.Context, uuid.UUID) (submissionreview.AdminReviewCase, error) {
+				t.Fatal("GetCase() called, want invalid request to fail first")
+				return submissionreview.AdminReviewCase{}, nil
+			},
+		},
+	})
+
+	req := newLoopbackAdminRequest(http.MethodGet, "/api/admin/submission-reviews/not-a-uuid", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/admin/submission-reviews/:intakeId status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("GET /api/admin/submission-reviews/:intakeId body got %q want invalid_request", rec.Body.String())
+	}
+}
+
 func TestAdminSubmissionReviewDecisionPostReturnsUpdatedCase(t *testing.T) {
 	t.Parallel()
 
@@ -219,6 +245,45 @@ func TestAdminSubmissionReviewDecisionPostReturnsUpdatedCase(t *testing.T) {
 	}
 	if body := strings.TrimSpace(rec.Body.String()); body != "" {
 		t.Fatalf("POST /api/admin/submission-reviews/:intakeId/decision body got %q want empty", rec.Body.String())
+	}
+}
+
+func TestAdminSubmissionReviewDecisionPostRejectsInvalidShortID(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv: developmentAppEnv,
+		AdminSubmissionReview: adminSubmissionReviewServiceStub{
+			applyDecision: func(context.Context, submissionreview.ReviewDecisionInput) error {
+				t.Fatal("ApplyDecision() called, want invalid request to fail first")
+				return nil
+			},
+		},
+	})
+
+	req := newLoopbackAdminRequest(
+		http.MethodPost,
+		"/api/admin/submission-reviews/11111111-1111-1111-1111-111111111111/decision",
+		bytes.NewBufferString(`{
+			"shortDecisions": [
+				{
+					"shortId": "not-a-uuid",
+					"decision": "revision_requested",
+					"reasonCode": "quality_issue"
+				}
+			]
+		}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/admin/submission-reviews/:intakeId/decision status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("POST /api/admin/submission-reviews/:intakeId/decision body got %q want invalid_request", rec.Body.String())
 	}
 }
 
