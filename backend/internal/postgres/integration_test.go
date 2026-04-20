@@ -477,6 +477,32 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
 }
 
+func TestAcquireMainPurchaseLockQueryLatestRevision(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
+
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		t.Fatalf("conn.Begin() error = %v, want nil", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	queries := sqlc.New(tx)
+	if err := queries.AcquireMainPurchaseLock(ctx, sqlc.AcquireMainPurchaseLockParams{
+		UserKey: "viewer-lock-key",
+		MainKey: "main-lock-key",
+	}); err != nil {
+		t.Fatalf("AcquireMainPurchaseLock() error = %v, want nil", err)
+	}
+}
+
 func TestCreatorFollowQueriesAreIdempotent(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
