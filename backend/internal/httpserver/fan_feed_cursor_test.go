@@ -46,6 +46,57 @@ func (s *fanFeedCursorRedisClientStub) Set(_ context.Context, key string, value 
 	return goredis.NewStatusResult("OK", nil)
 }
 
+func TestMemoryFanFeedCursorCodecRecommendedRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	codec := newMemoryFanFeedCursorCodec()
+	cursor := &feed.Cursor{
+		RecommendedRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("11111111-1111-1111-1111-111111111111"),
+			uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		},
+	}
+
+	encoded, err := codec.Encode(context.Background(), "recommended", "public", cursor)
+	if err != nil {
+		t.Fatalf("Encode() error = %v, want nil", err)
+	}
+	if encoded == nil {
+		t.Fatal("Encode() = nil, want token")
+	}
+	if strings.Contains(*encoded, cursor.RecommendedRemainingShortIDs[0].String()) {
+		t.Fatalf("Encode() token got %q want opaque token without raw cursor fields", *encoded)
+	}
+
+	decoded, err := codec.Decode(context.Background(), "recommended", "public", *encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v, want nil", err)
+	}
+	if decoded == nil {
+		t.Fatal("Decode() = nil, want cursor")
+	}
+	if len(decoded.RecommendedRemainingShortIDs) != len(cursor.RecommendedRemainingShortIDs) {
+		t.Fatalf(
+			"Decode() remaining short ids len got %d want %d",
+			len(decoded.RecommendedRemainingShortIDs),
+			len(cursor.RecommendedRemainingShortIDs),
+		)
+	}
+	for index, wantShortID := range cursor.RecommendedRemainingShortIDs {
+		if decoded.RecommendedRemainingShortIDs[index] != wantShortID {
+			t.Fatalf(
+				"Decode() remaining short ids[%d] got %s want %s",
+				index,
+				decoded.RecommendedRemainingShortIDs[index],
+				wantShortID,
+			)
+		}
+	}
+	if len(decoded.FollowingRemainingShortIDs) > 0 || !decoded.PublishedAt.IsZero() || decoded.ShortID != uuid.Nil {
+		t.Fatalf("Decode() got %#v want %#v", decoded, cursor)
+	}
+}
+
 func TestMemoryFanFeedCursorCodecFollowingRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -107,8 +158,9 @@ func TestMemoryFanFeedCursorCodecRejectsUnknownOrForeignTabToken(t *testing.T) {
 	}
 
 	recommendedCursor := &feed.Cursor{
-		PublishedAt: time.Unix(1710000200, 0).UTC(),
-		ShortID:     uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		RecommendedRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		},
 	}
 	encoded, err := codec.Encode(context.Background(), "recommended", "public", recommendedCursor)
 	if err != nil {
@@ -136,6 +188,34 @@ func TestMemoryFanFeedCursorCodecRejectsFollowingCursorWithMixedState(t *testing
 	}
 }
 
+func TestMemoryFanFeedCursorCodecLegacyRecommendedRoundTrip(t *testing.T) {
+	t.Parallel()
+
+	codec := newMemoryFanFeedCursorCodec()
+	cursor := &feed.Cursor{
+		PublishedAt: time.Unix(1710000200, 0).UTC(),
+		ShortID:     uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+	}
+
+	encoded, err := codec.Encode(context.Background(), "recommended", "public", cursor)
+	if err != nil {
+		t.Fatalf("Encode() error = %v, want nil", err)
+	}
+	if encoded == nil {
+		t.Fatal("Encode() = nil, want token")
+	}
+	decoded, err := codec.Decode(context.Background(), "recommended", "public", *encoded)
+	if err != nil {
+		t.Fatalf("Decode() error = %v, want nil", err)
+	}
+	if decoded == nil {
+		t.Fatal("Decode() = nil, want cursor")
+	}
+	if !decoded.PublishedAt.Equal(cursor.PublishedAt) || decoded.ShortID != cursor.ShortID {
+		t.Fatalf("Decode() got %#v want %#v", decoded, cursor)
+	}
+}
+
 func TestRedisFanFeedCursorCodecRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -145,8 +225,9 @@ func TestRedisFanFeedCursorCodecRoundTrip(t *testing.T) {
 		ttl:   defaultFanFeedCursorTTL,
 	}
 	cursor := &feed.Cursor{
-		PublishedAt: time.Unix(1710000200, 0).UTC(),
-		ShortID:     uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		RecommendedRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		},
 	}
 
 	encoded, err := codec.Encode(context.Background(), "recommended", "public", cursor)
@@ -164,7 +245,7 @@ func TestRedisFanFeedCursorCodecRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Decode() error = %v, want nil", err)
 	}
-	if decoded == nil || !decoded.PublishedAt.Equal(cursor.PublishedAt) || decoded.ShortID != cursor.ShortID {
+	if decoded == nil || len(decoded.RecommendedRemainingShortIDs) != 1 || decoded.RecommendedRemainingShortIDs[0] != cursor.RecommendedRemainingShortIDs[0] {
 		t.Fatalf("Decode() got %#v want %#v", decoded, cursor)
 	}
 }

@@ -14,10 +14,11 @@ import (
 )
 
 type stubQueries struct {
-	getDetail       func(context.Context, sqlc.GetPublicShortDetailItemParams) (sqlc.GetPublicShortDetailItemRow, error)
-	listByShortIDs  func(context.Context, sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error)
-	listFollowing   func(context.Context, sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error)
-	listRecommended func(context.Context, sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error)
+	getDetail               func(context.Context, sqlc.GetPublicShortDetailItemParams) (sqlc.GetPublicShortDetailItemRow, error)
+	listByShortIDs          func(context.Context, sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error)
+	listFollowing           func(context.Context, sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error)
+	listLegacyRecommended   func(context.Context, sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error)
+	listRecommendedShortIDs func(context.Context, sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error)
 }
 
 func (s stubQueries) GetPublicShortDetailItem(ctx context.Context, arg sqlc.GetPublicShortDetailItemParams) (sqlc.GetPublicShortDetailItemRow, error) {
@@ -32,8 +33,12 @@ func (s stubQueries) ListFollowingPublicFeedItems(ctx context.Context, arg sqlc.
 	return s.listFollowing(ctx, arg)
 }
 
-func (s stubQueries) ListRecommendedPublicFeedItems(ctx context.Context, arg sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error) {
-	return s.listRecommended(ctx, arg)
+func (s stubQueries) ListLegacyRecommendedPublicFeedItems(ctx context.Context, arg sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error) {
+	return s.listLegacyRecommended(ctx, arg)
+}
+
+func (s stubQueries) ListRecommendedPublicFeedShortIDs(ctx context.Context, arg sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error) {
+	return s.listRecommendedShortIDs(ctx, arg)
 }
 
 func TestNewRepository(t *testing.T) {
@@ -48,42 +53,50 @@ func TestNewRepository(t *testing.T) {
 	}
 }
 
-func TestBuildRecommendedPageParams(t *testing.T) {
+func TestBuildInitialRecommendedShortIDsParams(t *testing.T) {
 	t.Parallel()
 
 	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
-	publishedAt := time.Unix(1710000000, 0).UTC()
+	rankingReferenceAt := time.Unix(1710000000, 0).UTC()
 
-	params, limit := buildRecommendedPageParams(&viewerID, &Cursor{
+	params := buildInitialRecommendedShortIDsParams(&viewerID, rankingReferenceAt)
+	if got, err := postgres.UUIDFromPG(params.ViewerUserID); err != nil || got != viewerID {
+		t.Fatalf("buildInitialRecommendedShortIDsParams() viewer got %s err=%v want %s", got, err, viewerID)
+	}
+	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
+		t.Fatalf("buildInitialRecommendedShortIDsParams() ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
+	}
+
+	params = buildInitialRecommendedShortIDsParams(nil, rankingReferenceAt)
+	if params.ViewerUserID.Valid {
+		t.Fatalf("buildInitialRecommendedShortIDsParams() viewer valid got %t want false", params.ViewerUserID.Valid)
+	}
+	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
+		t.Fatalf("buildInitialRecommendedShortIDsParams() public ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
+	}
+}
+
+func TestBuildLegacyRecommendedPageParams(t *testing.T) {
+	t.Parallel()
+
+	publishedAt := time.Unix(1710000300, 0).UTC()
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	params := buildLegacyRecommendedPageParams(nil, &Cursor{
 		PublishedAt: publishedAt,
 		ShortID:     shortID,
-	}, 0)
-	if limit != DefaultPageSize {
-		t.Fatalf("buildRecommendedPageParams() limit got %d want %d", limit, DefaultPageSize)
-	}
-	if params.LimitCount != DefaultPageSize+1 {
-		t.Fatalf("buildRecommendedPageParams() limit count got %d want %d", params.LimitCount, DefaultPageSize+1)
-	}
-	if got, err := postgres.UUIDFromPG(params.ViewerUserID); err != nil || got != viewerID {
-		t.Fatalf("buildRecommendedPageParams() viewer got %s err=%v want %s", got, err, viewerID)
+	}, 10)
+	if params.ViewerUserID.Valid {
+		t.Fatalf("buildLegacyRecommendedPageParams() viewer valid got %t want false", params.ViewerUserID.Valid)
 	}
 	if got, err := postgres.RequiredTimeFromPG(params.CursorPublishedAt); err != nil || !got.Equal(publishedAt) {
-		t.Fatalf("buildRecommendedPageParams() publishedAt got %s err=%v want %s", got, err, publishedAt)
+		t.Fatalf("buildLegacyRecommendedPageParams() publishedAt got %s err=%v want %s", got, err, publishedAt)
 	}
 	if got, err := postgres.UUIDFromPG(params.CursorShortID); err != nil || got != shortID {
-		t.Fatalf("buildRecommendedPageParams() cursor short got %s err=%v want %s", got, err, shortID)
+		t.Fatalf("buildLegacyRecommendedPageParams() shortID got %s err=%v want %s", got, err, shortID)
 	}
-
-	params, limit = buildRecommendedPageParams(nil, nil, 3)
-	if limit != 3 {
-		t.Fatalf("buildRecommendedPageParams() explicit limit got %d want %d", limit, 3)
-	}
-	if params.ViewerUserID.Valid {
-		t.Fatalf("buildRecommendedPageParams() viewer valid got %t want false", params.ViewerUserID.Valid)
-	}
-	if params.CursorPublishedAt.Valid {
-		t.Fatalf("buildRecommendedPageParams() cursor published valid got %t want false", params.CursorPublishedAt.Valid)
+	if params.LimitCount != 11 {
+		t.Fatalf("buildLegacyRecommendedPageParams() limit count got %d want %d", params.LimitCount, 11)
 	}
 }
 
@@ -99,6 +112,40 @@ func TestBuildInitialFollowingPageParams(t *testing.T) {
 	}
 	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
 		t.Fatalf("buildInitialFollowingPageParams() ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
+	}
+}
+
+func TestValidateRecommendedCursor(t *testing.T) {
+	t.Parallel()
+
+	if err := validateRecommendedCursor(nil); err != nil {
+		t.Fatalf("validateRecommendedCursor(nil) error = %v, want nil", err)
+	}
+
+	validCursor := &Cursor{
+		RecommendedRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		},
+	}
+	if err := validateRecommendedCursor(validCursor); err != nil {
+		t.Fatalf("validateRecommendedCursor(valid cursor) error = %v, want nil", err)
+	}
+
+	missingRemainingShortIDs := &Cursor{}
+	if err := validateRecommendedCursor(missingRemainingShortIDs); !errors.Is(err, ErrRecommendedCursorInvalid) {
+		t.Fatalf("validateRecommendedCursor(missing remaining short ids) error got %v want %v", err, ErrRecommendedCursorInvalid)
+	}
+
+	mixedState := &Cursor{
+		RecommendedRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		},
+		FollowingRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		},
+	}
+	if err := validateRecommendedCursor(mixedState); !errors.Is(err, ErrRecommendedCursorInvalid) {
+		t.Fatalf("validateRecommendedCursor(mixed state) error got %v want %v", err, ErrRecommendedCursorInvalid)
 	}
 }
 
@@ -219,25 +266,17 @@ func TestMapFeedItemRejectsInvalidValues(t *testing.T) {
 	}
 }
 
-func TestMapRecommendedPage(t *testing.T) {
+func TestBuildRecommendedSnapshotCursor(t *testing.T) {
 	t.Parallel()
 
 	firstID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
 	secondID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
-	rows := []sqlc.ListRecommendedPublicFeedItemsRow{
-		makeRecommendedRow(firstID, time.Unix(1710000200, 0).UTC()),
-		makeRecommendedRow(secondID, time.Unix(1710000100, 0).UTC()),
+	nextCursor := buildRecommendedSnapshotCursor([]uuid.UUID{firstID, secondID})
+	if nextCursor == nil {
+		t.Fatal("buildRecommendedSnapshotCursor() = nil, want snapshot cursor")
 	}
-
-	items, nextCursor, err := mapRecommendedPage(rows, 1, "recommended")
-	if err != nil {
-		t.Fatalf("mapRecommendedPage() error = %v, want nil", err)
-	}
-	if len(items) != 1 {
-		t.Fatalf("mapRecommendedPage() items len got %d want %d", len(items), 1)
-	}
-	if nextCursor == nil || nextCursor.ShortID != firstID {
-		t.Fatalf("mapRecommendedPage() next cursor got %#v want short %s", nextCursor, firstID)
+	if len(nextCursor.RecommendedRemainingShortIDs) != 2 || nextCursor.RecommendedRemainingShortIDs[0] != firstID || nextCursor.RecommendedRemainingShortIDs[1] != secondID {
+		t.Fatalf("buildRecommendedSnapshotCursor() got %#v want [%s %s]", nextCursor, firstID, secondID)
 	}
 }
 
@@ -269,7 +308,7 @@ func TestMapInitialFollowingPageAndCursorHelpers(t *testing.T) {
 		)
 	}
 
-	emptyItems, emptyCursor, err := mapFeedPageCursor([]Item{}, []sqlc.ListRecommendedPublicFeedItemsRow{}, 1)
+	emptyItems, emptyCursor, err := mapFeedPageCursor([]Item{}, []sqlc.ListLegacyRecommendedPublicFeedItemsRow{}, 1)
 	if err != nil {
 		t.Fatalf("mapFeedPageCursor() error = %v, want nil", err)
 	}
@@ -281,8 +320,8 @@ func TestMapInitialFollowingPageAndCursorHelpers(t *testing.T) {
 		t.Fatalf("lengthOfRows(following) got %d want %d", got, 2)
 	}
 	publishedAt := time.Unix(1710000200, 0).UTC()
-	if got := lengthOfRows([]sqlc.ListRecommendedPublicFeedItemsRow{makeRecommendedRow(firstID, publishedAt)}); got != 1 {
-		t.Fatalf("lengthOfRows(recommended) got %d want %d", got, 1)
+	if got := lengthOfRows([]sqlc.ListLegacyRecommendedPublicFeedItemsRow{makeLegacyRecommendedRow(firstID, publishedAt)}); got != 1 {
+		t.Fatalf("lengthOfRows(legacy recommended) got %d want %d", got, 1)
 	}
 	if got := lengthOfRows(struct{}{}); got != 0 {
 		t.Fatalf("lengthOfRows(unknown) got %d want %d", got, 0)
@@ -292,13 +331,13 @@ func TestMapInitialFollowingPageAndCursorHelpers(t *testing.T) {
 func TestMapPageFunctionsWrapMappingErrors(t *testing.T) {
 	t.Parallel()
 
-	badRecommended := makeRecommendedRow(
+	badRecommended := makeLegacyRecommendedRow(
 		uuid.MustParse("22222222-2222-2222-2222-222222222222"),
 		time.Unix(1710000200, 0).UTC(),
 	)
 	badRecommended.Handle = " "
-	if _, _, err := mapRecommendedPage([]sqlc.ListRecommendedPublicFeedItemsRow{badRecommended}, 1, "recommended"); err == nil {
-		t.Fatal("mapRecommendedPage() error = nil, want wrapped mapping error")
+	if _, _, err := mapLegacyRecommendedPage([]sqlc.ListLegacyRecommendedPublicFeedItemsRow{badRecommended}, 1, "recommended"); err == nil {
+		t.Fatal("mapLegacyRecommendedPage() error = nil, want wrapped mapping error")
 	}
 
 	badFollowing := makeFollowingRow(
@@ -387,17 +426,34 @@ func TestRepositoryListRecommendedAndFollowing(t *testing.T) {
 
 	repo := &Repository{
 		queries: stubQueries{
-			listRecommended: func(_ context.Context, arg sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error) {
+			listRecommendedShortIDs: func(_ context.Context, arg sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error) {
 				if got, err := postgres.UUIDFromPG(arg.ViewerUserID); err != nil || got != viewerID {
-					t.Fatalf("ListRecommendedPublicFeedItems() viewer got %s err=%v want %s", got, err, viewerID)
+					t.Fatalf("ListRecommendedPublicFeedShortIDs() viewer got %s err=%v want %s", got, err, viewerID)
 				}
-				if arg.LimitCount != 2 {
-					t.Fatalf("ListRecommendedPublicFeedItems() limit count got %d want %d", arg.LimitCount, 2)
+				if !arg.RankingReferenceAt.Valid {
+					t.Fatal("ListRecommendedPublicFeedShortIDs() ranking reference valid = false, want true")
 				}
-
-				return []sqlc.ListRecommendedPublicFeedItemsRow{
-					makeRecommendedRow(shortID, publishedAt),
+				return []pgtype.UUID{
+					postgres.UUIDToPG(shortID),
 				}, nil
+			},
+			listByShortIDs: func(_ context.Context, arg sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error) {
+				if got, err := postgres.UUIDFromPG(arg.ViewerUserID); err != nil || got != viewerID {
+					t.Fatalf("ListFeedItemsByShortIDs() viewer got %s err=%v want %s", got, err, viewerID)
+				}
+				if len(arg.ShortIds) != 1 {
+					t.Fatalf("ListFeedItemsByShortIDs() short ids len got %d want %d", len(arg.ShortIds), 1)
+				}
+				if got, err := postgres.UUIDFromPG(arg.ShortIds[0]); err != nil || got != shortID {
+					t.Fatalf("ListFeedItemsByShortIDs() short got %s err=%v want %s", got, err, shortID)
+				}
+				return []sqlc.ListFeedItemsByShortIDsRow{
+					makeHydratedFollowingRow(shortID, publishedAt),
+				}, nil
+			},
+			listLegacyRecommended: func(context.Context, sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error) {
+				t.Fatal("ListLegacyRecommendedPublicFeedItems() was called unexpectedly")
+				return nil, nil
 			},
 			listFollowing: func(_ context.Context, arg sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error) {
 				if got, err := postgres.UUIDFromPG(arg.ViewerUserID); err != nil || got != viewerID {
@@ -428,6 +484,95 @@ func TestRepositoryListRecommendedAndFollowing(t *testing.T) {
 	}
 	if len(followingItems) != 1 || followingCursor != nil {
 		t.Fatalf("ListFollowing() got items=%d cursor=%#v want 1 nil", len(followingItems), followingCursor)
+	}
+}
+
+func TestRepositoryListRecommendedContinuationHydratesSnapshot(t *testing.T) {
+	t.Parallel()
+
+	firstShortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	secondShortID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	publishedAt := time.Unix(1710000300, 0).UTC()
+
+	repo := &Repository{
+		queries: stubQueries{
+			listByShortIDs: func(_ context.Context, arg sqlc.ListFeedItemsByShortIDsParams) ([]sqlc.ListFeedItemsByShortIDsRow, error) {
+				if arg.ViewerUserID.Valid {
+					t.Fatalf("ListFeedItemsByShortIDs() viewer valid got %t want false", arg.ViewerUserID.Valid)
+				}
+				if len(arg.ShortIds) != 1 {
+					t.Fatalf("ListFeedItemsByShortIDs() short ids len got %d want %d", len(arg.ShortIds), 1)
+				}
+				if got, err := postgres.UUIDFromPG(arg.ShortIds[0]); err != nil || got != firstShortID {
+					t.Fatalf("ListFeedItemsByShortIDs() first short got %s err=%v want %s", got, err, firstShortID)
+				}
+				return []sqlc.ListFeedItemsByShortIDsRow{
+					makeHydratedFollowingRow(firstShortID, publishedAt),
+				}, nil
+			},
+			listLegacyRecommended: func(context.Context, sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error) {
+				t.Fatal("ListLegacyRecommendedPublicFeedItems() was called unexpectedly")
+				return nil, nil
+			},
+		},
+	}
+
+	items, nextCursor, err := repo.ListRecommended(context.Background(), nil, &Cursor{
+		RecommendedRemainingShortIDs: []uuid.UUID{firstShortID, secondShortID},
+	}, 1)
+	if err != nil {
+		t.Fatalf("ListRecommended() error = %v, want nil", err)
+	}
+	if len(items) != 1 || items[0].Short.ID != firstShortID {
+		t.Fatalf("ListRecommended() got items=%#v want short %s", items, firstShortID)
+	}
+	if nextCursor == nil || len(nextCursor.RecommendedRemainingShortIDs) != 1 || nextCursor.RecommendedRemainingShortIDs[0] != secondShortID {
+		t.Fatalf("ListRecommended() next cursor got %#v want remaining [%s]", nextCursor, secondShortID)
+	}
+}
+
+func TestRepositoryListRecommendedSupportsLegacyCursor(t *testing.T) {
+	t.Parallel()
+
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	publishedAt := time.Unix(1710000300, 0).UTC()
+
+	repo := &Repository{
+		queries: stubQueries{
+			listRecommendedShortIDs: func(context.Context, sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error) {
+				t.Fatal("ListRecommendedPublicFeedShortIDs() was called unexpectedly")
+				return nil, nil
+			},
+			listLegacyRecommended: func(_ context.Context, arg sqlc.ListLegacyRecommendedPublicFeedItemsParams) ([]sqlc.ListLegacyRecommendedPublicFeedItemsRow, error) {
+				if got, err := postgres.RequiredTimeFromPG(arg.CursorPublishedAt); err != nil || !got.Equal(publishedAt) {
+					t.Fatalf("ListLegacyRecommendedPublicFeedItems() cursor publishedAt got %s err=%v want %s", got, err, publishedAt)
+				}
+				if got, err := postgres.UUIDFromPG(arg.CursorShortID); err != nil || got != shortID {
+					t.Fatalf("ListLegacyRecommendedPublicFeedItems() cursor shortID got %s err=%v want %s", got, err, shortID)
+				}
+				if arg.LimitCount != 2 {
+					t.Fatalf("ListLegacyRecommendedPublicFeedItems() limit count got %d want %d", arg.LimitCount, 2)
+				}
+
+				return []sqlc.ListLegacyRecommendedPublicFeedItemsRow{
+					makeLegacyRecommendedRow(shortID, publishedAt),
+				}, nil
+			},
+		},
+	}
+
+	items, nextCursor, err := repo.ListRecommended(context.Background(), nil, &Cursor{
+		PublishedAt: publishedAt,
+		ShortID:     shortID,
+	}, 1)
+	if err != nil {
+		t.Fatalf("ListRecommended() error = %v, want nil", err)
+	}
+	if len(items) != 1 || items[0].Short.ID != shortID {
+		t.Fatalf("ListRecommended() got items=%#v want short %s", items, shortID)
+	}
+	if nextCursor != nil {
+		t.Fatalf("ListRecommended() next cursor got %#v want nil", nextCursor)
 	}
 }
 
@@ -554,7 +699,7 @@ func TestRepositoryErrorWrapping(t *testing.T) {
 
 				return sqlc.GetPublicShortDetailItemRow{}, pgx.ErrNoRows
 			},
-			listRecommended: func(context.Context, sqlc.ListRecommendedPublicFeedItemsParams) ([]sqlc.ListRecommendedPublicFeedItemsRow, error) {
+			listRecommendedShortIDs: func(context.Context, sqlc.ListRecommendedPublicFeedShortIDsParams) ([]pgtype.UUID, error) {
 				return nil, queryErr
 			},
 			listFollowing: func(context.Context, sqlc.ListFollowingPublicFeedItemsParams) ([]sqlc.ListFollowingPublicFeedItemsRow, error) {
@@ -775,8 +920,8 @@ func makeHydratedFollowingRow(shortID uuid.UUID, publishedAt time.Time) sqlc.Lis
 	}
 }
 
-func makeRecommendedRow(shortID uuid.UUID, publishedAt time.Time) sqlc.ListRecommendedPublicFeedItemsRow {
-	return sqlc.ListRecommendedPublicFeedItemsRow{
+func makeLegacyRecommendedRow(shortID uuid.UUID, publishedAt time.Time) sqlc.ListLegacyRecommendedPublicFeedItemsRow {
+	return sqlc.ListLegacyRecommendedPublicFeedItemsRow{
 		ID:                 makeUUID(shortID.String()),
 		CreatorUserID:      makeUUID("11111111-1111-1111-1111-111111111111"),
 		CanonicalMainID:    makeUUID("33333333-3333-3333-3333-333333333333"),

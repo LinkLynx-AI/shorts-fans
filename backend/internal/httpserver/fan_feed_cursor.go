@@ -27,6 +27,7 @@ type fanFeedCursorState struct {
 	FollowingRemainingShortIDs []uuid.UUID `json:"followingRemainingShortIds,omitempty"`
 	OwnerBinding               string      `json:"ownerBinding"`
 	PublishedAt                *time.Time  `json:"publishedAt,omitempty"`
+	RecommendedSnapshotID      string      `json:"recommendedSnapshotId,omitempty"`
 	ShortID                    *uuid.UUID  `json:"shortId,omitempty"`
 	Tab                        string      `json:"tab"`
 	Version                    int         `json:"version"`
@@ -59,6 +60,10 @@ type memoryFanFeedCursorStore struct {
 type memoryFanFeedCursorEntry struct {
 	expiresAt time.Time
 	payload   []byte
+}
+
+type fanFeedRecommendedSnapshotState struct {
+	RemainingShortIDs []uuid.UUID `json:"remainingShortIds"`
 }
 
 // NewRedisFanFeedCursorCodec は Redis-backed な fan feed cursor codec を構築します。
@@ -110,8 +115,20 @@ func (c *fanFeedCursorCodec) Decode(ctx context.Context, tab string, ownerBindin
 	cursor := &feed.Cursor{}
 	switch tab {
 	case "recommended":
-		cursor.PublishedAt = state.PublishedAt.UTC()
-		cursor.ShortID = *state.ShortID
+		if state.RecommendedSnapshotID != "" {
+			remainingShortIDs, loadErr := c.loadRecommendedSnapshot(ctx, state.RecommendedSnapshotID)
+			if loadErr != nil {
+				if errors.Is(loadErr, errFanFeedCursorNotFound) {
+					return nil, errFanFeedCursorInvalid
+				}
+
+				return nil, loadErr
+			}
+			cursor.RecommendedRemainingShortIDs = remainingShortIDs
+		} else {
+			cursor.PublishedAt = state.PublishedAt.UTC()
+			cursor.ShortID = *state.ShortID
+		}
 	case "following":
 		cursor.FollowingRemainingShortIDs = append([]uuid.UUID(nil), state.FollowingRemainingShortIDs...)
 	default:
@@ -129,7 +146,7 @@ func (c *fanFeedCursorCodec) Encode(ctx context.Context, tab string, ownerBindin
 		return nil, errFanFeedCursorInvalid
 	}
 
-	state, err := buildFanFeedCursorState(tab, ownerBinding, cursor)
+	state, err := c.buildFanFeedCursorState(ctx, tab, ownerBinding, cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +164,12 @@ func (c *fanFeedCursorCodec) Encode(ctx context.Context, tab string, ownerBindin
 	return &token, nil
 }
 
-func buildFanFeedCursorState(tab string, ownerBinding string, cursor *feed.Cursor) (fanFeedCursorState, error) {
+func (c *fanFeedCursorCodec) buildFanFeedCursorState(
+	ctx context.Context,
+	tab string,
+	ownerBinding string,
+	cursor *feed.Cursor,
+) (fanFeedCursorState, error) {
 	state := fanFeedCursorState{
 		OwnerBinding: ownerBinding,
 		Tab:          tab,
@@ -156,13 +178,22 @@ func buildFanFeedCursorState(tab string, ownerBinding string, cursor *feed.Curso
 
 	switch tab {
 	case "recommended":
-		if len(cursor.FollowingRemainingShortIDs) > 0 || cursor.PublishedAt.IsZero() || cursor.ShortID == uuid.Nil {
-			return fanFeedCursorState{}, errFanFeedCursorInvalid
+		switch {
+		case isLegacyRecommendedFeedCursor(cursor):
+			publishedAt := cursor.PublishedAt.UTC()
+			shortID := cursor.ShortID
+			state.PublishedAt = &publishedAt
+			state.ShortID = &shortID
+		default:
+			if err := validateRecommendedFeedCursor(cursor); err != nil {
+				return fanFeedCursorState{}, errFanFeedCursorInvalid
+			}
+			snapshotID, saveErr := c.saveRecommendedSnapshot(ctx, cursor.RecommendedRemainingShortIDs)
+			if saveErr != nil {
+				return fanFeedCursorState{}, saveErr
+			}
+			state.RecommendedSnapshotID = snapshotID
 		}
-		publishedAt := cursor.PublishedAt.UTC()
-		shortID := cursor.ShortID
-		state.PublishedAt = &publishedAt
-		state.ShortID = &shortID
 	case "following":
 		if err := validateFollowingFeedCursor(cursor); err != nil {
 			return fanFeedCursorState{}, errFanFeedCursorInvalid
@@ -195,17 +226,22 @@ func validateFanFeedCursorState(tab string, ownerBinding string, state fanFeedCu
 
 	switch tab {
 	case "recommended":
-		if state.PublishedAt == nil || state.PublishedAt.IsZero() || state.ShortID == nil || *state.ShortID == uuid.Nil {
+		if len(state.FollowingRemainingShortIDs) > 0 {
 			return errFanFeedCursorInvalid
 		}
-		if len(state.FollowingRemainingShortIDs) > 0 {
+		switch {
+		case state.RecommendedSnapshotID != "":
+			if state.PublishedAt != nil || state.ShortID != nil {
+				return errFanFeedCursorInvalid
+			}
+		case state.PublishedAt == nil || state.PublishedAt.IsZero() || state.ShortID == nil || *state.ShortID == uuid.Nil:
 			return errFanFeedCursorInvalid
 		}
 	case "following":
 		if len(state.FollowingRemainingShortIDs) == 0 {
 			return errFanFeedCursorInvalid
 		}
-		if state.PublishedAt != nil || state.ShortID != nil {
+		if state.RecommendedSnapshotID != "" || state.PublishedAt != nil || state.ShortID != nil {
 			return errFanFeedCursorInvalid
 		}
 		for _, shortID := range state.FollowingRemainingShortIDs {
@@ -220,11 +256,47 @@ func validateFanFeedCursorState(tab string, ownerBinding string, state fanFeedCu
 	return nil
 }
 
+func validateRecommendedFeedCursor(cursor *feed.Cursor) error {
+	if cursor == nil {
+		return errFanFeedCursorInvalid
+	}
+	if len(cursor.RecommendedRemainingShortIDs) == 0 {
+		return errFanFeedCursorInvalid
+	}
+	if len(cursor.FollowingRemainingShortIDs) > 0 {
+		return errFanFeedCursorInvalid
+	}
+	if !cursor.PublishedAt.IsZero() || cursor.ShortID != uuid.Nil {
+		return errFanFeedCursorInvalid
+	}
+	for _, shortID := range cursor.RecommendedRemainingShortIDs {
+		if shortID == uuid.Nil {
+			return errFanFeedCursorInvalid
+		}
+	}
+
+	return nil
+}
+
+func isLegacyRecommendedFeedCursor(cursor *feed.Cursor) bool {
+	if cursor == nil {
+		return false
+	}
+
+	return len(cursor.RecommendedRemainingShortIDs) == 0 &&
+		len(cursor.FollowingRemainingShortIDs) == 0 &&
+		!cursor.PublishedAt.IsZero() &&
+		cursor.ShortID != uuid.Nil
+}
+
 func validateFollowingFeedCursor(cursor *feed.Cursor) error {
 	if cursor == nil {
 		return errFanFeedCursorInvalid
 	}
 	if len(cursor.FollowingRemainingShortIDs) == 0 {
+		return errFanFeedCursorInvalid
+	}
+	if len(cursor.RecommendedRemainingShortIDs) > 0 {
 		return errFanFeedCursorInvalid
 	}
 	if !cursor.PublishedAt.IsZero() || cursor.ShortID != uuid.Nil {
@@ -237,6 +309,57 @@ func validateFollowingFeedCursor(cursor *feed.Cursor) error {
 	}
 
 	return nil
+}
+
+func (c *fanFeedCursorCodec) saveRecommendedSnapshot(ctx context.Context, shortIDs []uuid.UUID) (string, error) {
+	if c == nil || c.store == nil {
+		return "", errFanFeedCursorInvalid
+	}
+
+	snapshotState := fanFeedRecommendedSnapshotState{
+		RemainingShortIDs: append([]uuid.UUID(nil), shortIDs...),
+	}
+	payload, err := json.Marshal(snapshotState)
+	if err != nil {
+		return "", fmt.Errorf("marshal recommended snapshot: %w", err)
+	}
+
+	snapshotID := uuid.NewString()
+	if err := c.store.Save(ctx, fanFeedRecommendedSnapshotToken(snapshotID), payload, c.ttl); err != nil {
+		return "", fmt.Errorf("save recommended snapshot snapshot_id=%s: %w", snapshotID, err)
+	}
+
+	return snapshotID, nil
+}
+
+func (c *fanFeedCursorCodec) loadRecommendedSnapshot(ctx context.Context, snapshotID string) ([]uuid.UUID, error) {
+	if c == nil || c.store == nil {
+		return nil, errFanFeedCursorInvalid
+	}
+
+	payload, err := c.store.Load(ctx, fanFeedRecommendedSnapshotToken(snapshotID))
+	if err != nil {
+		return nil, err
+	}
+
+	var snapshotState fanFeedRecommendedSnapshotState
+	if err := json.Unmarshal(payload, &snapshotState); err != nil {
+		return nil, errFanFeedCursorInvalid
+	}
+	if len(snapshotState.RemainingShortIDs) == 0 {
+		return nil, errFanFeedCursorInvalid
+	}
+	for _, shortID := range snapshotState.RemainingShortIDs {
+		if shortID == uuid.Nil {
+			return nil, errFanFeedCursorInvalid
+		}
+	}
+
+	return append([]uuid.UUID(nil), snapshotState.RemainingShortIDs...), nil
+}
+
+func fanFeedRecommendedSnapshotToken(snapshotID string) string {
+	return "recommended_snapshot:" + snapshotID
 }
 
 func (s redisFanFeedCursorStore) Load(ctx context.Context, token string) ([]byte, error) {
