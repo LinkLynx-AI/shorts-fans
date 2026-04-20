@@ -15,15 +15,51 @@ import (
 )
 
 type queriesStub struct {
+	applySubmissionReviewMainDecision                    func(context.Context, sqlc.ApplySubmissionReviewMainDecisionParams) (sqlc.AppMain, error)
+	applySubmissionReviewShortDecision                   func(context.Context, sqlc.ApplySubmissionReviewShortDecisionParams) (sqlc.AppShort, error)
+	createSubmissionReviewMainDecision                   func(context.Context, sqlc.CreateSubmissionReviewMainDecisionParams) error
 	createSubmissionReviewIntake                         func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error)
 	createSubmissionReviewIntakeShort                    func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error
+	createSubmissionReviewShortDecision                  func(context.Context, sqlc.CreateSubmissionReviewShortDecisionParams) error
 	getCreatorCapabilityByUserIDForUpdate                func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error)
 	getLatestSubmissionReviewIntakeByCanonicalMainID     func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
 	getPendingSubmissionReviewIntakeByCanonicalMainID    func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	getPendingSubmissionReviewIntakeByIDForUpdate        func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	getSubmissionReviewCreatorUserIDByIntakeID           func(context.Context, pgtype.UUID) (pgtype.UUID, error)
 	getSubmissionReviewMainByIDForUpdate                 func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error)
+	listSubmissionReviewIntakeShortsByIntakeID           func(context.Context, pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error)
 	listSubmissionReviewShortsByCanonicalMainIDForUpdate func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error)
+	markSubmissionReviewIntakeDecisionApplied            func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error)
+	publishShort                                         func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
+	resetSubmissionReviewMainToPending                   func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
+	resetSubmissionReviewShortToPending                  func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 	updateMainState                                      func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
 	updateShortState                                     func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error)
+}
+
+func unexpectedSubmitQuery(name string) {
+	panic("unexpected call: " + name)
+}
+
+func (s queriesStub) ApplySubmissionReviewMainDecision(ctx context.Context, arg sqlc.ApplySubmissionReviewMainDecisionParams) (sqlc.AppMain, error) {
+	if s.applySubmissionReviewMainDecision == nil {
+		unexpectedSubmitQuery("ApplySubmissionReviewMainDecision")
+	}
+	return s.applySubmissionReviewMainDecision(ctx, arg)
+}
+
+func (s queriesStub) ApplySubmissionReviewShortDecision(ctx context.Context, arg sqlc.ApplySubmissionReviewShortDecisionParams) (sqlc.AppShort, error) {
+	if s.applySubmissionReviewShortDecision == nil {
+		unexpectedSubmitQuery("ApplySubmissionReviewShortDecision")
+	}
+	return s.applySubmissionReviewShortDecision(ctx, arg)
+}
+
+func (s queriesStub) CreateSubmissionReviewMainDecision(ctx context.Context, arg sqlc.CreateSubmissionReviewMainDecisionParams) error {
+	if s.createSubmissionReviewMainDecision == nil {
+		unexpectedSubmitQuery("CreateSubmissionReviewMainDecision")
+	}
+	return s.createSubmissionReviewMainDecision(ctx, arg)
 }
 
 func (s queriesStub) CreateSubmissionReviewIntake(ctx context.Context, arg sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error) {
@@ -34,7 +70,17 @@ func (s queriesStub) CreateSubmissionReviewIntakeShort(ctx context.Context, arg 
 	return s.createSubmissionReviewIntakeShort(ctx, arg)
 }
 
+func (s queriesStub) CreateSubmissionReviewShortDecision(ctx context.Context, arg sqlc.CreateSubmissionReviewShortDecisionParams) error {
+	if s.createSubmissionReviewShortDecision == nil {
+		unexpectedSubmitQuery("CreateSubmissionReviewShortDecision")
+	}
+	return s.createSubmissionReviewShortDecision(ctx, arg)
+}
+
 func (s queriesStub) GetCreatorCapabilityByUserIDForUpdate(ctx context.Context, userID pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+	if s.getCreatorCapabilityByUserIDForUpdate == nil {
+		return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+	}
 	return s.getCreatorCapabilityByUserIDForUpdate(ctx, userID)
 }
 
@@ -46,20 +92,61 @@ func (s queriesStub) GetPendingSubmissionReviewIntakeByCanonicalMainID(ctx conte
 	return s.getPendingSubmissionReviewIntakeByCanonicalMainID(ctx, canonicalMainID)
 }
 
+func (s queriesStub) GetPendingSubmissionReviewIntakeByIDForUpdate(ctx context.Context, id pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+	if s.getPendingSubmissionReviewIntakeByIDForUpdate == nil {
+		unexpectedSubmitQuery("GetPendingSubmissionReviewIntakeByIDForUpdate")
+	}
+	return s.getPendingSubmissionReviewIntakeByIDForUpdate(ctx, id)
+}
+
+func (s queriesStub) GetSubmissionReviewCreatorUserIDByIntakeID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	if s.getSubmissionReviewCreatorUserIDByIntakeID == nil {
+		return pgtype.UUID{}, nil
+	}
+	return s.getSubmissionReviewCreatorUserIDByIntakeID(ctx, id)
+}
+
 func (s queriesStub) GetSubmissionReviewMainByIDForUpdate(ctx context.Context, id pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
 	return s.getSubmissionReviewMainByIDForUpdate(ctx, id)
+}
+
+func (s queriesStub) ListSubmissionReviewIntakeShortsByIntakeID(ctx context.Context, submissionReviewIntakeID pgtype.UUID) ([]sqlc.AppSubmissionReviewIntakeShort, error) {
+	if s.listSubmissionReviewIntakeShortsByIntakeID == nil {
+		unexpectedSubmitQuery("ListSubmissionReviewIntakeShortsByIntakeID")
+	}
+	return s.listSubmissionReviewIntakeShortsByIntakeID(ctx, submissionReviewIntakeID)
 }
 
 func (s queriesStub) ListSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
 	return s.listSubmissionReviewShortsByCanonicalMainIDForUpdate(ctx, canonicalMainID)
 }
 
-func (s queriesStub) UpdateMainState(ctx context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-	return s.updateMainState(ctx, arg)
+func (s queriesStub) MarkSubmissionReviewIntakeDecisionApplied(ctx context.Context, id pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+	if s.markSubmissionReviewIntakeDecisionApplied == nil {
+		unexpectedSubmitQuery("MarkSubmissionReviewIntakeDecisionApplied")
+	}
+	return s.markSubmissionReviewIntakeDecisionApplied(ctx, id)
 }
 
-func (s queriesStub) UpdateShortState(ctx context.Context, arg sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
-	return s.updateShortState(ctx, arg)
+func (s queriesStub) PublishShort(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+	if s.publishShort == nil {
+		unexpectedSubmitQuery("PublishShort")
+	}
+	return s.publishShort(ctx, id)
+}
+
+func (s queriesStub) ResetSubmissionReviewMainToPending(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
+	if s.resetSubmissionReviewMainToPending == nil {
+		unexpectedSubmitQuery("ResetSubmissionReviewMainToPending")
+	}
+	return s.resetSubmissionReviewMainToPending(ctx, id)
+}
+
+func (s queriesStub) ResetSubmissionReviewShortToPending(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
+	if s.resetSubmissionReviewShortToPending == nil {
+		unexpectedSubmitQuery("ResetSubmissionReviewShortToPending")
+	}
+	return s.resetSubmissionReviewShortToPending(ctx, id)
 }
 
 type txBeginnerStub struct {
@@ -208,25 +295,16 @@ func TestSubmitPackageInitialSuccess(t *testing.T) {
 					}
 					return nil
 				},
-				updateMainState: func(_ context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-					if arg.ID != postgres.UUIDToPG(mainID) {
-						t.Fatalf("UpdateMainState() main id got %v want %v", arg.ID, postgres.UUIDToPG(mainID))
-					}
-					if arg.State != mainStatePendingReview {
-						t.Fatalf("UpdateMainState() state got %q want %q", arg.State, mainStatePendingReview)
-					}
-					if arg.ReviewReasonCode.Valid {
-						t.Fatal("UpdateMainState() review reason code valid = true, want false")
+				resetSubmissionReviewMainToPending: func(_ context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
+					if id != postgres.UUIDToPG(mainID) {
+						t.Fatalf("ResetSubmissionReviewMainToPending() main id got %v want %v", id, postgres.UUIDToPG(mainID))
 					}
 					return sqlc.AppMain{ID: postgres.UUIDToPG(mainID), State: mainStatePendingReview}, nil
 				},
-				updateShortState: func(_ context.Context, arg sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
 					updateShorts++
-					if arg.ID != postgres.UUIDToPG(shortID) {
-						t.Fatalf("UpdateShortState() short id got %v want %v", arg.ID, postgres.UUIDToPG(shortID))
-					}
-					if arg.State != shortStatePendingReview {
-						t.Fatalf("UpdateShortState() state got %q want %q", arg.State, shortStatePendingReview)
+					if id != postgres.UUIDToPG(shortID) {
+						t.Fatalf("ResetSubmissionReviewShortToPending() short id got %v want %v", id, postgres.UUIDToPG(shortID))
 					}
 					return sqlc.AppShort{ID: postgres.UUIDToPG(shortID), State: shortStatePendingReview}, nil
 				},
@@ -289,11 +367,11 @@ func TestSubmitPackageReturnsNoOpForPendingIntake(t *testing.T) {
 					createCalled = true
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 					createCalled = true
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
 					createCalled = true
 					return sqlc.AppShort{}, nil
 				},
@@ -388,11 +466,11 @@ func TestSubmitPackageReturnsNoOpForConcurrentDuplicateSubmit(t *testing.T) {
 							mutatedAfterInsert = true
 							return nil
 						},
-						updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+						resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 							mutatedAfterInsert = true
 							return sqlc.AppMain{}, nil
 						},
-						updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+						resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
 							mutatedAfterInsert = true
 							return sqlc.AppShort{}, nil
 						},
@@ -457,12 +535,12 @@ func TestSubmitPackageReturnsNotReadyError(t *testing.T) {
 					t.Fatal("CreateSubmissionReviewIntakeShort() called for not-ready package")
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-					t.Fatal("UpdateMainState() called for not-ready package")
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+					t.Fatal("ResetSubmissionReviewMainToPending() called for not-ready package")
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
-					t.Fatal("UpdateShortState() called for not-ready package")
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+					t.Fatal("ResetSubmissionReviewShortToPending() called for not-ready package")
 					return sqlc.AppShort{}, nil
 				},
 			}
@@ -565,14 +643,14 @@ func TestSubmitPackageResubmitKeepsApprovedObjects(t *testing.T) {
 				createSubmissionReviewIntakeShort: func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error {
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 					updateMainCalled = true
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(_ context.Context, arg sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
 					updateShorts++
-					if arg.ID != postgres.UUIDToPG(shortRevisionID) {
-						t.Fatalf("UpdateShortState() short id got %v want %v", arg.ID, postgres.UUIDToPG(shortRevisionID))
+					if id != postgres.UUIDToPG(shortRevisionID) {
+						t.Fatalf("ResetSubmissionReviewShortToPending() short id got %v want %v", id, postgres.UUIDToPG(shortRevisionID))
 					}
 					return sqlc.AppShort{}, nil
 				},
@@ -637,12 +715,12 @@ func TestSubmitPackageRejectsReopenFromRejectedState(t *testing.T) {
 					t.Fatal("CreateSubmissionReviewIntakeShort() called for rejected state")
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-					t.Fatal("UpdateMainState() called for rejected state")
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+					t.Fatal("ResetSubmissionReviewMainToPending() called for rejected state")
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
-					t.Fatal("UpdateShortState() called for rejected state")
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+					t.Fatal("ResetSubmissionReviewShortToPending() called for rejected state")
 					return sqlc.AppShort{}, nil
 				},
 			}
@@ -746,11 +824,11 @@ func TestSubmitPackageRejectsMissingCreatorCapability(t *testing.T) {
 					mutated = true
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 					mutated = true
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
 					mutated = true
 					return sqlc.AppShort{}, nil
 				},
@@ -806,11 +884,11 @@ func TestSubmitPackageRejectsNonApprovedCreatorCapability(t *testing.T) {
 					mutated = true
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 					mutated = true
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
 					mutated = true
 					return sqlc.AppShort{}, nil
 				},
@@ -869,11 +947,11 @@ func TestSubmitPackageRejectsOwnerMismatch(t *testing.T) {
 					mutated = true
 					return nil
 				},
-				updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
 					mutated = true
 					return sqlc.AppMain{}, nil
 				},
-				updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
 					mutated = true
 					return sqlc.AppShort{}, nil
 				},

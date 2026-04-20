@@ -3,7 +3,6 @@ package media
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
@@ -11,170 +10,91 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type autoPublishQueriesStub struct {
-	getMainByID                 func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
-	getMediaAssetByID           func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
-	listShortsByCanonicalMainID func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
-	updateMainState             func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
-	publishShort                func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
-}
-
-func (s autoPublishQueriesStub) GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
-	return s.getMediaAssetByID(ctx, id)
-}
-func (s autoPublishQueriesStub) UpdateMediaAssetProcessingState(context.Context, sqlc.UpdateMediaAssetProcessingStateParams) (sqlc.AppMediaAsset, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) GetMediaProcessingJobByMediaAssetID(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) ClaimMediaProcessingJobByAssetID(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) ClaimNextQueuedMediaProcessingJob(context.Context) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) MarkMediaProcessingJobSucceeded(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) RequeueMediaProcessingJob(context.Context, sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) MarkMediaProcessingJobFailed(context.Context, sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) GetMainByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
-	return s.getMainByID(ctx, id)
-}
-func (s autoPublishQueriesStub) GetMainByMediaAssetID(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) GetShortByMediaAssetID(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
-	panic("unexpected call")
-}
-func (s autoPublishQueriesStub) ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error) {
-	return s.listShortsByCanonicalMainID(ctx, canonicalMainID)
-}
-func (s autoPublishQueriesStub) UpdateMainState(ctx context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-	return s.updateMainState(ctx, arg)
-}
-func (s autoPublishQueriesStub) PublishShort(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
-	return s.publishShort(ctx, id)
-}
-
-func TestAutoPublishIfReady(t *testing.T) {
+func TestMarkSucceededDoesNotAdvanceReviewState(t *testing.T) {
 	t.Parallel()
 
-	now := time.Unix(1710000000, 0).UTC()
-	mainID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	mainAssetID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
-	shortID := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
-	shortAssetID := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
+	mediaAssetID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+	jobID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+	mainID := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+	playbackURL := "https://cdn.example.com/ready.m3u8"
+	durationMS := int64(33000)
 	updateCalls := 0
-	publishCalls := 0
+	successCalls := 0
 
-	processor := &Processor{now: func() time.Time { return now }}
-	err := processor.autoPublishIfReady(context.Background(), autoPublishQueriesStub{
-		getMainByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppMain, error) {
-			if id != pgUUID(mainID) {
-				t.Fatalf("GetMainByID() id got %v want %v", id, pgUUID(mainID))
-			}
-			return sqlc.AppMain{
-				ID:                  pgUUID(mainID),
-				MediaAssetID:        pgUUID(mainAssetID),
-				State:               mainStateDraft,
-				OwnershipConfirmed:  true,
-				ConsentConfirmed:    true,
-				ApprovedForUnlockAt: pgtype.Timestamptz{},
-			}, nil
-		},
+	queries := processorQueriesStub{
 		getMediaAssetByID: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
-			switch id {
-			case pgUUID(mainAssetID):
-				return sqlc.AppMediaAsset{ID: id, ProcessingState: assetStateReady}, nil
-			case pgUUID(shortAssetID):
-				return sqlc.AppMediaAsset{ID: id, ProcessingState: assetStateReady}, nil
-			default:
-				t.Fatalf("GetMediaAssetByID() unexpected id %v", id)
-				return sqlc.AppMediaAsset{}, nil
+			if id != pgUUID(mediaAssetID) {
+				t.Fatalf("GetMediaAssetByID() id got %v want %v", id, pgUUID(mediaAssetID))
 			}
-		},
-		listShortsByCanonicalMainID: func(_ context.Context, id pgtype.UUID) ([]sqlc.AppShort, error) {
-			if id != pgUUID(mainID) {
-				t.Fatalf("ListShortsByCanonicalMainID() id got %v want %v", id, pgUUID(mainID))
-			}
-			return []sqlc.AppShort{{
-				ID:              pgUUID(shortID),
-				CanonicalMainID: pgUUID(mainID),
-				MediaAssetID:    pgUUID(shortAssetID),
-				State:           shortStateDraft,
-			}}, nil
-		},
-		updateMainState: func(_ context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
-			updateCalls++
-			if arg.State != mainStateApprovedForUnlock {
-				t.Fatalf("UpdateMainState() state got %q want %q", arg.State, mainStateApprovedForUnlock)
-			}
-			if approvedAt := postgres.OptionalTimeFromPG(arg.ApprovedForUnlockAt); approvedAt == nil || !approvedAt.Equal(now) {
-				t.Fatalf("UpdateMainState() approved at got %v want %v", approvedAt, now)
-			}
-			return sqlc.AppMain{}, nil
-		},
-		publishShort: func(_ context.Context, id pgtype.UUID) (sqlc.AppShort, error) {
-			publishCalls++
-			if id != pgUUID(shortID) {
-				t.Fatalf("PublishShort() id got %v want %v", id, pgUUID(shortID))
-			}
-			return sqlc.AppShort{}, nil
-		},
-	}, mainID)
-	if err != nil {
-		t.Fatalf("autoPublishIfReady() error = %v, want nil", err)
-	}
-	if updateCalls != 1 {
-		t.Fatalf("autoPublishIfReady() updateCalls got %d want 1", updateCalls)
-	}
-	if publishCalls != 1 {
-		t.Fatalf("autoPublishIfReady() publishCalls got %d want 1", publishCalls)
-	}
-}
 
-func TestAutoPublishIfReadySkipsWhenAssetNotReady(t *testing.T) {
-	t.Parallel()
-
-	mainID := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
-	mainAssetID := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
-	updateCalls := 0
-
-	processor := &Processor{now: time.Now}
-	err := processor.autoPublishIfReady(context.Background(), autoPublishQueriesStub{
-		getMainByID: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
-			return sqlc.AppMain{
-				ID:           pgUUID(mainID),
-				MediaAssetID: pgUUID(mainAssetID),
-				State:        mainStateDraft,
+			externalRef := "upload-1"
+			return sqlc.AppMediaAsset{
+				ID:                id,
+				ExternalUploadRef: postgres.TextToPG(&externalRef),
 			}, nil
 		},
-		getMediaAssetByID: func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error) {
-			return sqlc.AppMediaAsset{ProcessingState: assetStateWorking}, nil
-		},
-		listShortsByCanonicalMainID: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
-			t.Fatal("ListShortsByCanonicalMainID() should not be called")
-			return nil, nil
-		},
-		updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+		updateMediaAssetProcessingState: func(_ context.Context, arg sqlc.UpdateMediaAssetProcessingStateParams) (sqlc.AppMediaAsset, error) {
 			updateCalls++
-			return sqlc.AppMain{}, nil
+			if arg.ID != pgUUID(mediaAssetID) {
+				t.Fatalf("UpdateMediaAssetProcessingState() id got %v want %v", arg.ID, pgUUID(mediaAssetID))
+			}
+			if arg.ProcessingState != assetStateReady {
+				t.Fatalf("UpdateMediaAssetProcessingState() state got %q want %q", arg.ProcessingState, assetStateReady)
+			}
+			if got := postgres.OptionalTextFromPG(arg.PlaybackUrl); got == nil || *got != playbackURL {
+				t.Fatalf("UpdateMediaAssetProcessingState() playback got %v want %q", got, playbackURL)
+			}
+			if got := postgres.OptionalInt64FromPG(arg.DurationMs); got == nil || *got != durationMS {
+				t.Fatalf("UpdateMediaAssetProcessingState() duration got %v want %d", got, durationMS)
+			}
+			return sqlc.AppMediaAsset{}, nil
 		},
-		publishShort: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
-			t.Fatal("PublishShort() should not be called")
-			return sqlc.AppShort{}, nil
+		markMediaProcessingJobSucceeded: func(_ context.Context, id pgtype.UUID) (sqlc.AppMediaProcessingJob, error) {
+			successCalls++
+			if id != pgUUID(jobID) {
+				t.Fatalf("MarkMediaProcessingJobSucceeded() id got %v want %v", id, pgUUID(jobID))
+			}
+			return sqlc.AppMediaProcessingJob{}, nil
 		},
-	}, mainID)
-	if err != nil {
-		t.Fatalf("autoPublishIfReady() error = %v, want nil", err)
+		claimMediaProcessingJobByAsset:    func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error) { panic("unexpected call") },
+		claimNextQueuedMediaProcessingJob: func(context.Context) (sqlc.AppMediaProcessingJob, error) { panic("unexpected call") },
+		getMediaProcessingJobByMediaAsset: func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error) { panic("unexpected call") },
+		requeueMediaProcessingJob: func(context.Context, sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
+			panic("unexpected call")
+		},
+		markMediaProcessingJobFailed: func(context.Context, sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error) {
+			panic("unexpected call")
+		},
+		getMainByID:                 func(context.Context, pgtype.UUID) (sqlc.AppMain, error) { panic("unexpected call") },
+		getMainByMediaAssetID:       func(context.Context, pgtype.UUID) (sqlc.AppMain, error) { panic("unexpected call") },
+		getShortByMediaAssetID:      func(context.Context, pgtype.UUID) (sqlc.AppShort, error) { panic("unexpected call") },
+		listShortsByCanonicalMainID: func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) { panic("unexpected call") },
+		updateMainState:             func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) { panic("unexpected call") },
+		publishShort:                func(context.Context, pgtype.UUID) (sqlc.AppShort, error) { panic("unexpected call") },
 	}
-	if updateCalls != 0 {
-		t.Fatalf("autoPublishIfReady() updateCalls got %d want 0", updateCalls)
+
+	processor, err := newProcessor(
+		processorTxBeginnerStub{tx: &processorTxStub{}},
+		queries,
+		func(sqlc.DBTX) processorQueries { return queries },
+		stubAssetMaterializer{},
+	)
+	if err != nil {
+		t.Fatalf("newProcessor() error = %v, want nil", err)
+	}
+
+	err = processor.markSucceeded(context.Background(), claimedJob{
+		job:             sqlc.AppMediaProcessingJob{ID: pgUUID(jobID)},
+		asset:           Asset{ID: mediaAssetID},
+		canonicalMainID: mainID,
+	}, MaterializeResult{
+		PlaybackURL: playbackURL,
+		DurationMS:  durationMS,
+	})
+	if err != nil {
+		t.Fatalf("markSucceeded() error = %v, want nil", err)
+	}
+	if updateCalls != 1 || successCalls != 1 {
+		t.Fatalf("markSucceeded() calls got update=%d success=%d want 1/1", updateCalls, successCalls)
 	}
 }

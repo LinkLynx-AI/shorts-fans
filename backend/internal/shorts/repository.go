@@ -596,13 +596,6 @@ func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 	if err != nil {
 		return Main{}, fmt.Errorf("unlockable main の updated_at 変換: %w", err)
 	}
-	if !row.PriceMinor.Valid {
-		return Main{}, fmt.Errorf("unlockable main の price_minor 変換: price_minor が null です")
-	}
-	if !row.CurrencyCode.Valid {
-		return Main{}, fmt.Errorf("unlockable main の currency_code 変換: currency_code が null です")
-	}
-
 	return Main{
 		ID:                  id,
 		CreatorUserID:       creatorUserID,
@@ -610,8 +603,8 @@ func mapUnlockableMain(row sqlc.AppUnlockableMain) (Main, error) {
 		State:               row.State,
 		ReviewReasonCode:    postgres.OptionalTextFromPG(row.ReviewReasonCode),
 		PostReportState:     postgres.OptionalTextFromPG(row.PostReportState),
-		PriceMinor:          row.PriceMinor.Int64,
-		CurrencyCode:        row.CurrencyCode.String,
+		PriceMinor:          row.PriceMinor,
+		CurrencyCode:        row.CurrencyCode,
 		OwnershipConfirmed:  row.OwnershipConfirmed,
 		ConsentConfirmed:    row.ConsentConfirmed,
 		ApprovedForUnlockAt: postgres.OptionalTimeFromPG(row.ApprovedForUnlockAt),

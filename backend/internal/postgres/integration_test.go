@@ -25,7 +25,7 @@ import (
 
 const (
 	integrationPostgresDSNEnv = "POSTGRES_DSN"
-	latestMigrationVersion    = 16
+	latestMigrationVersion    = 18
 )
 
 func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
@@ -1286,6 +1286,9 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 
 	queries := sqlc.New(conn)
 	now := time.Unix(1710000000, 0).UTC()
+	unlockableAt := now.Add(time.Hour)
+	shortADecisionAt := now.Add(30 * time.Minute)
+	shortBDecisionAt := now.Add(2 * time.Hour)
 
 	creator, err := queries.CreateUser(ctx)
 	if err != nil {
@@ -1337,7 +1340,7 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 		CurrencyCode:        "JPY",
 		OwnershipConfirmed:  true,
 		ConsentConfirmed:    true,
-		ApprovedForUnlockAt: pgTime(now.Add(time.Hour)),
+		ApprovedForUnlockAt: pgTime(unlockableAt),
 	})
 	if err != nil {
 		t.Fatalf("CreateMain(unlockable) error = %v, want nil", err)
@@ -1360,8 +1363,7 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 		CanonicalMainID:      unlockableMain.ID,
 		MediaAssetID:         shortAssetA.ID,
 		State:                "approved_for_publish",
-		ApprovedForPublishAt: pgTime(now.Add(2 * time.Hour)),
-		PublishedAt:          pgTime(now.Add(3 * time.Hour)),
+		ApprovedForPublishAt: pgTime(shortADecisionAt),
 	})
 	if err != nil {
 		t.Fatalf("CreateShort(shortA) error = %v, want nil", err)
@@ -1371,8 +1373,7 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 		CanonicalMainID:      unlockableMain.ID,
 		MediaAssetID:         shortAssetB.ID,
 		State:                "approved_for_publish",
-		ApprovedForPublishAt: pgTime(now.Add(4 * time.Hour)),
-		PublishedAt:          pgTime(now.Add(5 * time.Hour)),
+		ApprovedForPublishAt: pgTime(shortBDecisionAt),
 	})
 	if err != nil {
 		t.Fatalf("CreateShort(shortB) error = %v, want nil", err)
@@ -1383,7 +1384,6 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 		MediaAssetID:         lockedShortAsset.ID,
 		State:                "approved_for_publish",
 		ApprovedForPublishAt: pgTime(now.Add(6 * time.Hour)),
-		PublishedAt:          pgTime(now.Add(7 * time.Hour)),
 	})
 	if err != nil {
 		t.Fatalf("CreateShort(lockedShort) error = %v, want nil", err)
@@ -1427,6 +1427,12 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 	if publicShorts[0].ID != shortB.ID || publicShorts[1].ID != shortA.ID {
 		t.Fatalf("ListPublicShortsByCreatorUserID() order got [%v %v] want [%v %v]", publicShorts[0].ID, publicShorts[1].ID, shortB.ID, shortA.ID)
 	}
+	if !publicShorts[0].PublishedAt.Valid || !publicShorts[0].PublishedAt.Time.Equal(shortBDecisionAt) {
+		t.Fatalf("ListPublicShortsByCreatorUserID() shortB published_at got %v want %v", publicShorts[0].PublishedAt, shortBDecisionAt)
+	}
+	if !publicShorts[1].PublishedAt.Valid || !publicShorts[1].PublishedAt.Time.Equal(unlockableAt) {
+		t.Fatalf("ListPublicShortsByCreatorUserID() shortA published_at got %v want %v", publicShorts[1].PublishedAt, unlockableAt)
+	}
 	gotPublicShort, err := queries.GetPublicShortByID(ctx, shortA.ID)
 	if err != nil {
 		t.Fatalf("GetPublicShortByID(shortA) error = %v, want nil", err)
@@ -1434,8 +1440,44 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 	if gotPublicShort.ID != shortA.ID {
 		t.Fatalf("GetPublicShortByID(shortA) id got %v want %v", gotPublicShort.ID, shortA.ID)
 	}
+	if !gotPublicShort.PublishedAt.Valid || !gotPublicShort.PublishedAt.Time.Equal(unlockableAt) {
+		t.Fatalf("GetPublicShortByID(shortA) published_at got %v want %v", gotPublicShort.PublishedAt, unlockableAt)
+	}
 	if _, err := queries.GetPublicShortByID(ctx, lockedShort.ID); !errors.Is(err, pgx.ErrNoRows) {
 		t.Fatalf("GetPublicShortByID(lockedShort) error got %v want %v", err, pgx.ErrNoRows)
+	}
+	if _, err := queries.UpdateMainState(ctx, sqlc.UpdateMainStateParams{
+		ID:                  unlockableMain.ID,
+		State:               "draft",
+		PriceMinor:          1200,
+		CurrencyCode:        "JPY",
+		OwnershipConfirmed:  false,
+		ConsentConfirmed:    false,
+		ApprovedForUnlockAt: pgtype.Timestamptz{},
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("UpdateMainState(decisioned main -> draft) error got %v want %v", err, pgx.ErrNoRows)
+	}
+	if _, err := queries.UpdateShortState(ctx, sqlc.UpdateShortStateParams{
+		ID:                   shortA.ID,
+		State:                "draft",
+		ApprovedForPublishAt: pgtype.Timestamptz{},
+		PublishedAt:          pgtype.Timestamptz{},
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("UpdateShortState(decisioned short -> draft) error got %v want %v", err, pgx.ErrNoRows)
+	}
+	unchangedMain, err := queries.GetMainByID(ctx, unlockableMain.ID)
+	if err != nil {
+		t.Fatalf("GetMainByID() after blocked rewrite error = %v, want nil", err)
+	}
+	if unchangedMain.State != "approved_for_unlock" {
+		t.Fatalf("GetMainByID() after blocked rewrite state got %q want %q", unchangedMain.State, "approved_for_unlock")
+	}
+	unchangedShort, err := queries.GetShortByID(ctx, shortA.ID)
+	if err != nil {
+		t.Fatalf("GetShortByID() after blocked rewrite error = %v, want nil", err)
+	}
+	if unchangedShort.State != "approved_for_publish" {
+		t.Fatalf("GetShortByID() after blocked rewrite state got %q want %q", unchangedShort.State, "approved_for_publish")
 	}
 
 	unlockedMainIDs, err := queries.ListUnlockedMainIDsByUserID(ctx, buyer.ID)
@@ -1486,6 +1528,174 @@ func TestCoreQueriesReflectAccessBoundaries(t *testing.T) {
 	}
 	if len(unlockedMainIDs) != 1 || unlockedMainIDs[0] != unlockableMain.ID {
 		t.Fatalf("ListUnlockedMainIDsByUserID() after purchase got %#v want [%v]", unlockedMainIDs, unlockableMain.ID)
+	}
+}
+
+func TestSubmissionReviewDecisionMigrationUpgradesLegacyApprovedVisibility(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Migrate(17); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(17) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 17)
+
+	queries := sqlc.New(conn)
+	now := time.Unix(1710003600, 0).UTC()
+	unlockableAt := now.Add(2 * time.Hour)
+	legacyPublishedAt := now.Add(4 * time.Hour)
+	derivedApprovedAt := now.Add(time.Hour)
+
+	creator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creator) error = %v, want nil", err)
+	}
+
+	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creator.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	}); err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+
+	mainAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "legacy-main")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(main) error = %v, want nil", err)
+	}
+	publishedShortAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "legacy-published-short")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(published short) error = %v, want nil", err)
+	}
+	derivedShortAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "legacy-derived-short")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(derived short) error = %v, want nil", err)
+	}
+
+	var mainID pgtype.UUID
+	if err := conn.QueryRow(
+		ctx,
+		`INSERT INTO app.mains (
+			creator_user_id,
+			media_asset_id,
+			state,
+			price_minor,
+			currency_code,
+			ownership_confirmed,
+			consent_confirmed,
+			approved_for_unlock_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id`,
+		creator.ID,
+		mainAsset.ID,
+		"approved_for_unlock",
+		int64(1200),
+		"JPY",
+		true,
+		true,
+		unlockableAt,
+	).Scan(&mainID); err != nil {
+		t.Fatalf("insert legacy main error = %v, want nil", err)
+	}
+
+	var publishedShortID pgtype.UUID
+	if err := conn.QueryRow(
+		ctx,
+		`INSERT INTO app.shorts (
+			creator_user_id,
+			canonical_main_id,
+			media_asset_id,
+			caption,
+			state,
+			approved_for_publish_at,
+			published_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`,
+		creator.ID,
+		mainID,
+		publishedShortAsset.ID,
+		"legacy published",
+		"approved_for_publish",
+		now.Add(3*time.Hour),
+		legacyPublishedAt,
+	).Scan(&publishedShortID); err != nil {
+		t.Fatalf("insert legacy published short error = %v, want nil", err)
+	}
+
+	var derivedShortID pgtype.UUID
+	if err := conn.QueryRow(
+		ctx,
+		`INSERT INTO app.shorts (
+			creator_user_id,
+			canonical_main_id,
+			media_asset_id,
+			caption,
+			state,
+			approved_for_publish_at,
+			published_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id`,
+		creator.ID,
+		mainID,
+		derivedShortAsset.ID,
+		"legacy derived",
+		"approved_for_publish",
+		derivedApprovedAt,
+		nil,
+	).Scan(&derivedShortID); err != nil {
+		t.Fatalf("insert legacy derived short error = %v, want nil", err)
+	}
+
+	publicShortsBeforeUpgrade, err := queries.ListPublicShortsByCreatorUserID(ctx, creator.ID)
+	if err != nil {
+		t.Fatalf("ListPublicShortsByCreatorUserID() before upgrade error = %v, want nil", err)
+	}
+	if len(publicShortsBeforeUpgrade) != 1 || publicShortsBeforeUpgrade[0].ID != publishedShortID {
+		t.Fatalf("ListPublicShortsByCreatorUserID() before upgrade got %#v want only %v", publicShortsBeforeUpgrade, publishedShortID)
+	}
+	if _, err := queries.GetPublicShortByID(ctx, derivedShortID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("GetPublicShortByID(derived short) before upgrade error got %v want %v", err, pgx.ErrNoRows)
+	}
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
+
+	gotUnlockableMain, err := queries.GetUnlockableMainByID(ctx, mainID)
+	if err != nil {
+		t.Fatalf("GetUnlockableMainByID() after upgrade error = %v, want nil", err)
+	}
+	if gotUnlockableMain.ID != mainID {
+		t.Fatalf("GetUnlockableMainByID() after upgrade id got %v want %v", gotUnlockableMain.ID, mainID)
+	}
+
+	publicShortsAfterUpgrade, err := queries.ListPublicShortsByCreatorUserID(ctx, creator.ID)
+	if err != nil {
+		t.Fatalf("ListPublicShortsByCreatorUserID() after upgrade error = %v, want nil", err)
+	}
+	if len(publicShortsAfterUpgrade) != 2 {
+		t.Fatalf("ListPublicShortsByCreatorUserID() after upgrade len got %d want 2", len(publicShortsAfterUpgrade))
+	}
+	if publicShortsAfterUpgrade[0].ID != publishedShortID || publicShortsAfterUpgrade[1].ID != derivedShortID {
+		t.Fatalf("ListPublicShortsByCreatorUserID() after upgrade order got [%v %v] want [%v %v]", publicShortsAfterUpgrade[0].ID, publicShortsAfterUpgrade[1].ID, publishedShortID, derivedShortID)
+	}
+	if !publicShortsAfterUpgrade[0].PublishedAt.Valid || !publicShortsAfterUpgrade[0].PublishedAt.Time.Equal(legacyPublishedAt) {
+		t.Fatalf("ListPublicShortsByCreatorUserID() legacy published_at got %v want %v", publicShortsAfterUpgrade[0].PublishedAt, legacyPublishedAt)
+	}
+	if !publicShortsAfterUpgrade[1].PublishedAt.Valid || !publicShortsAfterUpgrade[1].PublishedAt.Time.Equal(unlockableAt) {
+		t.Fatalf("ListPublicShortsByCreatorUserID() derived published_at got %v want %v", publicShortsAfterUpgrade[1].PublishedAt, unlockableAt)
+	}
+
+	derivedPublicShort, err := queries.GetPublicShortByID(ctx, derivedShortID)
+	if err != nil {
+		t.Fatalf("GetPublicShortByID(derived short) after upgrade error = %v, want nil", err)
+	}
+	if !derivedPublicShort.PublishedAt.Valid || !derivedPublicShort.PublishedAt.Time.Equal(unlockableAt) {
+		t.Fatalf("GetPublicShortByID(derived short) after upgrade published_at got %v want %v", derivedPublicShort.PublishedAt, unlockableAt)
 	}
 }
 

@@ -297,7 +297,7 @@ type mapFeedRow struct {
 	IsUnlocked         any
 	IsFollowingCreator any
 	MainDurationMs     pgtype.Int8
-	MainPriceMinor     pgtype.Int8
+	MainPriceMinor     int64
 	MediaAssetID       pgtype.UUID
 	PublishedAt        pgtype.Timestamptz
 	ShortDurationMs    pgtype.Int8
@@ -343,7 +343,7 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 	if !row.MainDurationMs.Valid || row.MainDurationMs.Int64 <= 0 {
 		return Item{}, fmt.Errorf("public short item の main duration_ms がありません")
 	}
-	if !row.MainPriceMinor.Valid || row.MainPriceMinor.Int64 <= 0 {
+	if row.MainPriceMinor <= 0 {
 		return Item{}, fmt.Errorf("public short item の main price_minor がありません")
 	}
 
@@ -385,7 +385,7 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 			IsOwner:             isOwner,
 			IsUnlocked:          isUnlocked,
 			MainDurationSeconds: (row.MainDurationMs.Int64 + 999) / 1000,
-			PriceJPY:            row.MainPriceMinor.Int64,
+			PriceJPY:            row.MainPriceMinor,
 		},
 	}
 	item.Viewer.IsFollowingCreator = isFollowingCreator

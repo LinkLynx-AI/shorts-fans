@@ -55,6 +55,8 @@ SET
     approved_for_unlock_at = sqlc.narg(approved_for_unlock_at),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id)
+  AND state NOT IN ('approved_for_unlock', 'revision_requested', 'rejected')
+  AND sqlc.arg(state) NOT IN ('approved_for_unlock', 'revision_requested', 'rejected')
 RETURNING *;
 
 -- name: GetUnlockableMainByID :one

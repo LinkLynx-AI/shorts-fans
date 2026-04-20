@@ -26,11 +26,6 @@ const (
 	jobStatusFailed     = "failed"
 	jobStatusSucceeded  = "succeeded"
 
-	mainStateDraft               = "draft"
-	mainStateApprovedForUnlock   = "approved_for_unlock"
-	shortStateDraft              = "draft"
-	shortStateApprovedForPublish = "approved_for_publish"
-
 	defaultMaxProcessingAttempts = int32(3)
 	cleanupPersistTimeout        = 15 * time.Second
 	materializationFailedCode    = "materialization_failed"
@@ -53,12 +48,8 @@ type processorQueries interface {
 	MarkMediaProcessingJobSucceeded(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
 	RequeueMediaProcessingJob(ctx context.Context, arg sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error)
 	MarkMediaProcessingJobFailed(ctx context.Context, arg sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error)
-	GetMainByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error)
 	GetMainByMediaAssetID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error)
 	GetShortByMediaAssetID(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
-	ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error)
-	UpdateMainState(ctx context.Context, arg sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
-	PublishShort(ctx context.Context, id pgtype.UUID) (sqlc.AppShort, error)
 }
 
 type assetMaterializer interface {
@@ -74,7 +65,7 @@ type claimedJob struct {
 	canonicalMainID uuid.UUID
 }
 
-// Processor は media processing job の claim / materialize / retry / auto-publish を統括します。
+// Processor は media processing job の claim / materialize / retry を統括します。
 type Processor struct {
 	beginner     postgres.TxBeginner
 	queries      processorQueries
@@ -381,10 +372,6 @@ func (p *Processor) markSucceeded(ctx context.Context, claimed claimedJob, resul
 			return fmt.Errorf("mark media processing job succeeded id=%s: %w", claimed.asset.ID, err)
 		}
 
-		if err := p.autoPublishIfReady(ctx, q, claimed.canonicalMainID); err != nil {
-			return err
-		}
-
 		return nil
 	})
 }
@@ -433,83 +420,6 @@ func (p *Processor) handleJobError(ctx context.Context, claimed claimedJob, jobE
 
 		return nil
 	})
-}
-
-func (p *Processor) autoPublishIfReady(ctx context.Context, q processorQueries, mainID uuid.UUID) error {
-	if mainID == uuid.Nil {
-		return nil
-	}
-
-	mainRow, err := q.GetMainByID(ctx, postgres.UUIDToPG(mainID))
-	if err != nil {
-		return fmt.Errorf("load canonical main id=%s: %w", mainID, err)
-	}
-	if mainRow.State != mainStateDraft && mainRow.State != mainStateApprovedForUnlock {
-		return nil
-	}
-
-	mainAssetRow, err := q.GetMediaAssetByID(ctx, mainRow.MediaAssetID)
-	if err != nil {
-		return fmt.Errorf("load canonical main asset id=%s: %w", mainID, err)
-	}
-	if mainAssetRow.ProcessingState != assetStateReady {
-		return nil
-	}
-
-	shortRows, err := q.ListShortsByCanonicalMainID(ctx, postgres.UUIDToPG(mainID))
-	if err != nil {
-		return fmt.Errorf("list canonical shorts main_id=%s: %w", mainID, err)
-	}
-	if len(shortRows) == 0 {
-		return nil
-	}
-
-	for _, shortRow := range shortRows {
-		if shortRow.State != shortStateDraft && shortRow.State != shortStateApprovedForPublish {
-			return nil
-		}
-
-		assetRow, err := q.GetMediaAssetByID(ctx, shortRow.MediaAssetID)
-		if err != nil {
-			return fmt.Errorf("load short asset main_id=%s: %w", mainID, err)
-		}
-		if assetRow.ProcessingState != assetStateReady {
-			return nil
-		}
-	}
-
-	if mainRow.State != mainStateApprovedForUnlock {
-		approvedAt := postgres.OptionalTimeFromPG(mainRow.ApprovedForUnlockAt)
-		if approvedAt == nil {
-			now := p.now().UTC()
-			approvedAt = &now
-		}
-		if _, err := q.UpdateMainState(ctx, sqlc.UpdateMainStateParams{
-			ID:                  mainRow.ID,
-			State:               mainStateApprovedForUnlock,
-			ReviewReasonCode:    mainRow.ReviewReasonCode,
-			PostReportState:     mainRow.PostReportState,
-			PriceMinor:          mainRow.PriceMinor,
-			CurrencyCode:        mainRow.CurrencyCode,
-			OwnershipConfirmed:  mainRow.OwnershipConfirmed,
-			ConsentConfirmed:    mainRow.ConsentConfirmed,
-			ApprovedForUnlockAt: postgres.TimeToPG(approvedAt),
-		}); err != nil {
-			return fmt.Errorf("approve main for unlock id=%s: %w", mainID, err)
-		}
-	}
-
-	for _, shortRow := range shortRows {
-		if _, err := q.PublishShort(ctx, shortRow.ID); err != nil {
-			shortID, parseErr := postgres.UUIDFromPG(shortRow.ID)
-			if parseErr != nil {
-				return fmt.Errorf("parse short id while publishing main=%s: %w", mainID, parseErr)
-			}
-			return fmt.Errorf("approve short for publish id=%s: %w", shortID, err)
-		}
-	}
-
-	return nil
 }
 
 func translateClaimMiss(ctx context.Context, q processorQueries, mediaAssetID uuid.UUID) error {

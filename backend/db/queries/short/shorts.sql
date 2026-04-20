@@ -50,6 +50,8 @@ SET
     published_at = sqlc.narg(published_at),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = sqlc.arg(id)
+  AND state NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
+  AND sqlc.arg(state) NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
 RETURNING *;
 
 -- name: UpdateShortCaption :one
@@ -63,11 +65,14 @@ RETURNING *;
 -- name: PublishShort :one
 UPDATE app.shorts
 SET
-    state = 'approved_for_publish',
-    approved_for_publish_at = COALESCE(approved_for_publish_at, CURRENT_TIMESTAMP),
     published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
+  AND state = 'approved_for_publish'
+  AND (
+    approved_for_publish_at IS NOT NULL
+    OR (review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
+  )
 RETURNING *;
 
 -- name: ListPublicShortsByCreatorUserID :many

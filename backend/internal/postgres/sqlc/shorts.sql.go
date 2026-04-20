@@ -46,7 +46,7 @@ INSERT INTO app.shorts (
     $8,
     $9
 )
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 `
 
 type CreateShortParams struct {
@@ -87,6 +87,8 @@ func (q *Queries) CreateShort(ctx context.Context, arg CreateShortParams) (AppSh
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
@@ -135,7 +137,7 @@ func (q *Queries) GetPublicShortByID(ctx context.Context, id pgtype.UUID) (AppPu
 }
 
 const getShortByID = `-- name: GetShortByID :one
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 FROM app.shorts
 WHERE id = $1
 LIMIT 1
@@ -157,12 +159,14 @@ func (q *Queries) GetShortByID(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
 
 const getShortByMediaAssetID = `-- name: GetShortByMediaAssetID :one
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 FROM app.shorts
 WHERE media_asset_id = $1
 LIMIT 1
@@ -184,6 +188,8 @@ func (q *Queries) GetShortByMediaAssetID(ctx context.Context, mediaAssetID pgtyp
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
@@ -304,7 +310,7 @@ func (q *Queries) ListPublicShortsByCreatorUserID(ctx context.Context, creatorUs
 }
 
 const listShortsByCreatorUserID = `-- name: ListShortsByCreatorUserID :many
-SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+SELECT id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 FROM app.shorts
 WHERE creator_user_id = $1
 ORDER BY created_at DESC, id DESC
@@ -332,6 +338,8 @@ func (q *Queries) ListShortsByCreatorUserID(ctx context.Context, creatorUserID p
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Caption,
+			&i.ReviewDecisionSource,
+			&i.ReviewDecisionedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -346,12 +354,15 @@ func (q *Queries) ListShortsByCreatorUserID(ctx context.Context, creatorUserID p
 const publishShort = `-- name: PublishShort :one
 UPDATE app.shorts
 SET
-    state = 'approved_for_publish',
-    approved_for_publish_at = COALESCE(approved_for_publish_at, CURRENT_TIMESTAMP),
     published_at = COALESCE(published_at, CURRENT_TIMESTAMP),
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+  AND state = 'approved_for_publish'
+  AND (
+    approved_for_publish_at IS NOT NULL
+    OR (review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
+  )
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 `
 
 func (q *Queries) PublishShort(ctx context.Context, id pgtype.UUID) (AppShort, error) {
@@ -370,6 +381,8 @@ func (q *Queries) PublishShort(ctx context.Context, id pgtype.UUID) (AppShort, e
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
@@ -401,7 +414,7 @@ SET
     caption = $1,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $2
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 `
 
 type UpdateShortCaptionParams struct {
@@ -425,6 +438,8 @@ func (q *Queries) UpdateShortCaption(ctx context.Context, arg UpdateShortCaption
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
@@ -439,7 +454,9 @@ SET
     published_at = $5,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $6
-RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption
+  AND state NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
+  AND $1 NOT IN ('approved_for_publish', 'revision_requested', 'rejected')
+RETURNING id, creator_user_id, canonical_main_id, media_asset_id, state, review_reason_code, post_report_state, approved_for_publish_at, published_at, created_at, updated_at, caption, review_decision_source, review_decisioned_at
 `
 
 type UpdateShortStateParams struct {
@@ -474,6 +491,8 @@ func (q *Queries) UpdateShortState(ctx context.Context, arg UpdateShortStatePara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Caption,
+		&i.ReviewDecisionSource,
+		&i.ReviewDecisionedAt,
 	)
 	return i, err
 }
