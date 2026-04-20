@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -187,7 +188,14 @@ func (s stubTransactionalPaymentRepository) RunInTx(ctx context.Context, fn func
 }
 
 type stubPurchaseGateway struct {
-	charge func(context.Context, payment.ChargeInput) (payment.ChargeResult, error)
+	charge                     func(context.Context, payment.ChargeInput) (payment.ChargeResult, error)
+	createPaymentWidgetSession func(context.Context) (payment.PaymentWidgetSession, error)
+}
+
+type stubChargeOnlyGateway struct{}
+
+func (stubChargeOnlyGateway) Charge(context.Context, payment.ChargeInput) (payment.ChargeResult, error) {
+	return payment.ChargeResult{}, nil
 }
 
 func (s stubPurchaseGateway) Charge(ctx context.Context, input payment.ChargeInput) (payment.ChargeResult, error) {
@@ -196,6 +204,14 @@ func (s stubPurchaseGateway) Charge(ctx context.Context, input payment.ChargeInp
 	}
 
 	return s.charge(ctx, input)
+}
+
+func (s stubPurchaseGateway) CreatePaymentWidgetSession(ctx context.Context) (payment.PaymentWidgetSession, error) {
+	if s.createPaymentWidgetSession == nil {
+		return payment.PaymentWidgetSession{}, nil
+	}
+
+	return s.createPaymentWidgetSession(ctx)
 }
 
 func TestGetUnlockSurfaceReturnsSetupRequiredPurchaseState(t *testing.T) {
@@ -218,6 +234,9 @@ func TestGetUnlockSurfaceReturnsSetupRequiredPurchaseState(t *testing.T) {
 	if surface.Purchase.State != "setup_required" {
 		t.Fatalf("GetUnlockSurface() purchase state got %q want %q", surface.Purchase.State, "setup_required")
 	}
+	if surface.Purchase.PaymentBypassEnabled {
+		t.Fatal("GetUnlockSurface() payment bypass flag = true, want false")
+	}
 	if !surface.Purchase.Setup.Required || !surface.Purchase.Setup.RequiresCardSetup {
 		t.Fatalf("GetUnlockSurface() setup got %#v want required card setup", surface.Purchase.Setup)
 	}
@@ -229,11 +248,564 @@ func TestGetUnlockSurfaceReturnsSetupRequiredPurchaseState(t *testing.T) {
 	}
 }
 
-func TestPurchaseMainSuccessRecordsUnlockAndTouchesSavedCard(t *testing.T) {
+func TestGetUnlockSurfaceIncludesDevelopmentPaymentBypassFlag(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	service := fixture.newService(stubPaymentRepository{
+		listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+			return []payment.SavedPaymentMethod{}, nil
+		},
+	})
+	service.EnableDevelopmentPaymentBypass()
+
+	surface, err := service.GetUnlockSurface(context.Background(), fixture.viewerID, fixture.sessionBinding, fixture.shortID)
+	if err != nil {
+		t.Fatalf("GetUnlockSurface() error = %v, want nil", err)
+	}
+	if !surface.Purchase.PaymentBypassEnabled {
+		t.Fatal("GetUnlockSurface() payment bypass flag = false, want true")
+	}
+}
+
+func TestCreateCardSetupSessionReturnsWidgetConfig(t *testing.T) {
 	t.Parallel()
 
 	fixture := newServiceFixture()
 	entryToken := fixture.entryToken(t)
+	service := fixture.newService(stubPurchaseGateway{
+		createPaymentWidgetSession: func(context.Context) (payment.PaymentWidgetSession, error) {
+			return payment.PaymentWidgetSession{
+				APIBaseURL:             "https://api.ccbill.com",
+				APIKey:                 "frontend-token",
+				ClientAccountNumber:    900100,
+				ClientSubAccountNumber: 1,
+				InitialPeriodDays:      30,
+			}, nil
+		},
+	})
+
+	result, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("CreateCardSetupSession() error = %v, want nil", err)
+	}
+	if result.APIKey != "frontend-token" || result.ClientAccount != "900100" || result.SubAccount != "1" {
+		t.Fatalf("CreateCardSetupSession() result got %#v", result)
+	}
+	if result.Currency != "JPY" || result.InitialPrice != "1800.00" || result.InitialPeriod != "30" {
+		t.Fatalf("CreateCardSetupSession() pricing got %#v", result)
+	}
+	if result.SessionToken == "" {
+		t.Fatal("CreateCardSetupSession() session token = empty, want value")
+	}
+}
+
+func TestCreateCardSetupSessionRejectsNilService(t *testing.T) {
+	t.Parallel()
+
+	var service *Service
+
+	_, err := service.CreateCardSetupSession(context.Background(), "session-binding", CardSetupSessionInput{})
+	if err == nil || !strings.Contains(err.Error(), "fanmain: nil service") {
+		t.Fatalf("CreateCardSetupSession() error got %v want nil service", err)
+	}
+}
+
+func TestIssueCardSetupTokenWrapsProviderToken(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	service := fixture.newService()
+
+	result, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+		CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+		EntryToken:            entryToken,
+		FromShortID:           fixture.shortID,
+		MainID:                fixture.mainID,
+		PaymentTokenRef:       "provider-payment-token",
+		ViewerID:              fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueCardSetupToken() error = %v, want nil", err)
+	}
+
+	providerTokenRef, err := resolveCardSetupPaymentTokenRef(
+		fixture.sessionBinding,
+		fixture.now.Add(1*time.Minute),
+		fixture.viewerID,
+		fixture.mainID,
+		fixture.shortID,
+		result.CardSetupToken,
+	)
+	if err != nil {
+		t.Fatalf("resolveCardSetupPaymentTokenRef() error = %v, want nil", err)
+	}
+	if providerTokenRef != "provider-payment-token" {
+		t.Fatalf("resolveCardSetupPaymentTokenRef() got %q want %q", providerTokenRef, "provider-payment-token")
+	}
+}
+
+func TestCreateCardSetupSessionRejectsInvalidEntryToken(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	service := fixture.newService(stubPurchaseGateway{
+		createPaymentWidgetSession: func(context.Context) (payment.PaymentWidgetSession, error) {
+			t.Fatal("CreatePaymentWidgetSession() was called unexpectedly")
+			return payment.PaymentWidgetSession{}, nil
+		},
+	})
+
+	_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  "invalid-entry-token",
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestCreateCardSetupSessionRejectsUnlockedOrOwnerAccess(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name   string
+		mutate func(*serviceFixture)
+	}{
+		{
+			name: "owner access",
+			mutate: func(fixture *serviceFixture) {
+				fixture.detail.Item.Unlock.IsOwner = true
+			},
+		},
+		{
+			name: "already unlocked",
+			mutate: func(fixture *serviceFixture) {
+				fixture.detail.Item.Unlock.IsUnlocked = true
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newServiceFixture()
+			tc.mutate(&fixture)
+			entryToken := fixture.entryToken(t)
+			service := fixture.newService(stubPurchaseGateway{
+				createPaymentWidgetSession: func(context.Context) (payment.PaymentWidgetSession, error) {
+					t.Fatal("CreatePaymentWidgetSession() was called unexpectedly")
+					return payment.PaymentWidgetSession{}, nil
+				},
+			})
+
+			_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+				EntryToken:  entryToken,
+				FromShortID: fixture.shortID,
+				MainID:      fixture.mainID,
+				ViewerID:    fixture.viewerID,
+			})
+			if !errors.Is(err, ErrMainLocked) {
+				t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
+			}
+		})
+	}
+}
+
+func TestCreateCardSetupSessionRejectsPendingPurchase(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	service := fixture.newService(
+		stubPaymentRepository{
+			getLatestInflightMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+				return payment.MainPurchaseAttempt{ID: uuid.MustParse("aaaaaaaa-1111-1111-1111-111111111111")}, nil
+			},
+		},
+		stubPurchaseGateway{
+			createPaymentWidgetSession: func(context.Context) (payment.PaymentWidgetSession, error) {
+				t.Fatal("CreatePaymentWidgetSession() was called unexpectedly")
+				return payment.PaymentWidgetSession{}, nil
+			},
+		},
+	)
+
+	_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestCreateCardSetupSessionRejectsSucceededAttemptProjectionLag(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+
+	service := fixture.newService(stubPaymentRepository{
+		getLatestSucceededMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+			return payment.MainPurchaseAttempt{
+				MainID: fixture.mainID,
+				Status: payment.PurchaseAttemptStatusSucceeded,
+			}, nil
+		},
+	})
+
+	_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestCreateCardSetupSessionRejectsUnsupportedCurrency(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	fixture.main.CurrencyCode = "USD"
+	entryToken := fixture.entryToken(t)
+	service := fixture.newService(stubPurchaseGateway{
+		createPaymentWidgetSession: func(context.Context) (payment.PaymentWidgetSession, error) {
+			t.Fatal("CreatePaymentWidgetSession() was called unexpectedly")
+			return payment.PaymentWidgetSession{}, nil
+		},
+	})
+
+	_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if err == nil || !strings.Contains(err.Error(), `unsupported widget currency "USD"`) {
+		t.Fatalf("CreateCardSetupSession() error got %v want unsupported currency", err)
+	}
+}
+
+func TestCreateCardSetupSessionRequiresWidgetSessionSource(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	service := NewService(
+		stubFeedReader{
+			getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+				return fixture.detail, nil
+			},
+		},
+		stubMainReader{
+			getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+				return fixture.main, nil
+			},
+		},
+		stubUnlockRecorder{},
+		stubPaymentRepository{},
+		stubChargeOnlyGateway{},
+	)
+	service.now = func() time.Time { return fixture.now }
+
+	_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestCreateCardSetupSessionMapsLookupErrors(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+
+	t.Run("short not found", func(t *testing.T) {
+		t.Parallel()
+
+		service := NewService(
+			stubFeedReader{
+				getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+					return feed.Detail{}, feed.ErrPublicShortNotFound
+				},
+			},
+			stubMainReader{
+				getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+					t.Fatal("GetUnlockableMain() was called unexpectedly")
+					return shorts.Main{}, nil
+				},
+			},
+			stubUnlockRecorder{},
+			stubPaymentRepository{},
+			stubPurchaseGateway{},
+		)
+		service.now = func() time.Time { return fixture.now }
+
+		_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+			EntryToken:  entryToken,
+			FromShortID: fixture.shortID,
+			MainID:      fixture.mainID,
+			ViewerID:    fixture.viewerID,
+		})
+		if !errors.Is(err, ErrPurchaseNotFound) {
+			t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrPurchaseNotFound)
+		}
+	})
+
+	t.Run("main locked", func(t *testing.T) {
+		t.Parallel()
+
+		service := NewService(
+			stubFeedReader{
+				getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+					return fixture.detail, nil
+				},
+			},
+			stubMainReader{
+				getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+					return shorts.Main{}, shorts.ErrUnlockableMainNotFound
+				},
+			},
+			stubUnlockRecorder{},
+			stubPaymentRepository{},
+			stubPurchaseGateway{},
+		)
+		service.now = func() time.Time { return fixture.now }
+
+		_, err := service.CreateCardSetupSession(context.Background(), fixture.sessionBinding, CardSetupSessionInput{
+			EntryToken:  entryToken,
+			FromShortID: fixture.shortID,
+			MainID:      fixture.mainID,
+			ViewerID:    fixture.viewerID,
+		})
+		if !errors.Is(err, ErrPurchaseNotFound) {
+			t.Fatalf("CreateCardSetupSession() error got %v want %v", err, ErrPurchaseNotFound)
+		}
+	})
+}
+
+func TestIssueCardSetupTokenRejectsInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name            string
+		entryToken      string
+		paymentTokenRef string
+		mutate          func(*serviceFixture)
+		wantErr         error
+	}{
+		{
+			name:            "invalid entry token",
+			entryToken:      "invalid-entry-token",
+			paymentTokenRef: "provider-payment-token",
+			wantErr:         ErrMainLocked,
+		},
+		{
+			name:            "empty payment token ref",
+			paymentTokenRef: "   ",
+			wantErr:         ErrInvalidCardSetupRequest,
+		},
+		{
+			name:            "owner access",
+			paymentTokenRef: "provider-payment-token",
+			mutate: func(fixture *serviceFixture) {
+				fixture.detail.Item.Unlock.IsOwner = true
+			},
+			wantErr: ErrMainLocked,
+		},
+		{
+			name:            "already unlocked",
+			paymentTokenRef: "provider-payment-token",
+			mutate: func(fixture *serviceFixture) {
+				fixture.detail.Item.Unlock.IsUnlocked = true
+			},
+			wantErr: ErrMainLocked,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			fixture := newServiceFixture()
+			if tc.mutate != nil {
+				tc.mutate(&fixture)
+			}
+
+			entryToken := tc.entryToken
+			if strings.TrimSpace(entryToken) == "" {
+				entryToken = fixture.entryToken(t)
+			}
+
+			service := fixture.newService()
+			_, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+				CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+				EntryToken:            entryToken,
+				FromShortID:           fixture.shortID,
+				MainID:                fixture.mainID,
+				PaymentTokenRef:       tc.paymentTokenRef,
+				ViewerID:              fixture.viewerID,
+			})
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("IssueCardSetupToken() error got %v want %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestIssueCardSetupTokenMapsLookupErrors(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+
+	t.Run("short not found", func(t *testing.T) {
+		t.Parallel()
+
+		service := NewService(
+			stubFeedReader{
+				getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+					return feed.Detail{}, feed.ErrPublicShortNotFound
+				},
+			},
+			stubMainReader{
+				getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+					t.Fatal("GetUnlockableMain() was called unexpectedly")
+					return shorts.Main{}, nil
+				},
+			},
+			stubUnlockRecorder{},
+			stubPaymentRepository{},
+			stubPurchaseGateway{},
+		)
+		service.now = func() time.Time { return fixture.now }
+
+		_, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+			CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+			EntryToken:            entryToken,
+			FromShortID:           fixture.shortID,
+			MainID:                fixture.mainID,
+			PaymentTokenRef:       "provider-payment-token",
+			ViewerID:              fixture.viewerID,
+		})
+		if !errors.Is(err, ErrPurchaseNotFound) {
+			t.Fatalf("IssueCardSetupToken() error got %v want %v", err, ErrPurchaseNotFound)
+		}
+	})
+
+	t.Run("main locked", func(t *testing.T) {
+		t.Parallel()
+
+		service := NewService(
+			stubFeedReader{
+				getDetail: func(context.Context, uuid.UUID, *uuid.UUID) (feed.Detail, error) {
+					return fixture.detail, nil
+				},
+			},
+			stubMainReader{
+				getUnlockableMain: func(context.Context, uuid.UUID) (shorts.Main, error) {
+					return shorts.Main{}, shorts.ErrUnlockableMainNotFound
+				},
+			},
+			stubUnlockRecorder{},
+			stubPaymentRepository{},
+			stubPurchaseGateway{},
+		)
+		service.now = func() time.Time { return fixture.now }
+
+		_, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+			CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+			EntryToken:            entryToken,
+			FromShortID:           fixture.shortID,
+			MainID:                fixture.mainID,
+			PaymentTokenRef:       "provider-payment-token",
+			ViewerID:              fixture.viewerID,
+		})
+		if !errors.Is(err, ErrPurchaseNotFound) {
+			t.Fatalf("IssueCardSetupToken() error got %v want %v", err, ErrPurchaseNotFound)
+		}
+	})
+}
+
+func TestIssueCardSetupTokenRejectsPendingPurchase(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	service := fixture.newService(stubPaymentRepository{
+		getLatestInflightMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+			return payment.MainPurchaseAttempt{ID: uuid.MustParse("bbbbbbbb-1111-1111-1111-111111111111")}, nil
+		},
+	})
+
+	_, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+		CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+		EntryToken:            entryToken,
+		FromShortID:           fixture.shortID,
+		MainID:                fixture.mainID,
+		PaymentTokenRef:       "provider-payment-token",
+		ViewerID:              fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("IssueCardSetupToken() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestIssueCardSetupTokenRejectsSucceededAttemptProjectionLag(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+
+	service := fixture.newService(stubPaymentRepository{
+		getLatestSucceededMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+			return payment.MainPurchaseAttempt{
+				MainID: fixture.mainID,
+				Status: payment.PurchaseAttemptStatusSucceeded,
+			}, nil
+		},
+	})
+
+	_, err := service.IssueCardSetupToken(context.Background(), fixture.sessionBinding, CardSetupTokenInput{
+		CardSetupSessionToken: fixture.cardSetupSessionToken(t),
+		EntryToken:            entryToken,
+		FromShortID:           fixture.shortID,
+		MainID:                fixture.mainID,
+		PaymentTokenRef:       "provider-payment-token",
+		ViewerID:              fixture.viewerID,
+	})
+	if !errors.Is(err, ErrMainLocked) {
+		t.Fatalf("IssueCardSetupToken() error got %v want %v", err, ErrMainLocked)
+	}
+}
+
+func TestPurchaseMainSuccessRecordsUnlockAndTouchesSavedCard(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryTokenAt(t, fixture.now.Add(-14*time.Minute))
 	attemptID := uuid.MustParse("77777777-7777-7777-7777-777777777777")
 	recordedUnlocks := 0
 	touchedMethods := 0
@@ -341,6 +913,15 @@ func TestPurchaseMainSuccessRecordsUnlockAndTouchesSavedCard(t *testing.T) {
 			},
 		},
 	)
+	nowCalls := 0
+	service.now = func() time.Time {
+		nowCalls++
+		if nowCalls == 1 {
+			return fixture.now
+		}
+
+		return processedAt
+	}
 
 	result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
 		EntryToken:  entryToken,
@@ -362,9 +943,10 @@ func TestPurchaseMainSuccessRecordsUnlockAndTouchesSavedCard(t *testing.T) {
 	if result.Access.Reason != "purchased" || result.Access.Status != "unlocked" {
 		t.Fatalf("PurchaseMain() access got %#v want purchased/unlocked", result.Access)
 	}
-	if result.EntryToken == nil || *result.EntryToken != entryToken {
-		t.Fatalf("PurchaseMain() entry token got %#v want %q", result.EntryToken, entryToken)
+	if result.EntryToken == nil || *result.EntryToken == entryToken {
+		t.Fatalf("PurchaseMain() entry token got %#v want refreshed token", result.EntryToken)
 	}
+	assertEntryTokenMatches(t, fixture.sessionBinding, processedAt, *result.EntryToken, fixture.viewerID, fixture.mainID, fixture.shortID)
 	if recordedUnlocks != 1 || touchedMethods != 1 || outcomes != 1 {
 		t.Fatalf("PurchaseMain() side effects got unlocks=%d touches=%d outcomes=%d", recordedUnlocks, touchedMethods, outcomes)
 	}
@@ -508,6 +1090,216 @@ func TestPurchaseMainChargeFailureReturnsContractFailure(t *testing.T) {
 	}
 	if outcomes != 1 {
 		t.Fatalf("PurchaseMain() outcomes got %d want %d", outcomes, 1)
+	}
+}
+
+func TestPurchaseMainBypassesPaymentInDevelopment(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+	attemptID := uuid.MustParse("99999999-9999-9999-9999-999999999999")
+	charges := 0
+	createdAttempts := 0
+	recordedUnlocks := 0
+	touchedMethods := 0
+	updatedAttempts := 0
+	var succeededAttempt *payment.MainPurchaseAttempt
+	service := fixture.newService(
+		stubPaymentRepository{
+			listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+				return []payment.SavedPaymentMethod{
+					{
+						PaymentMethodID:         "paymeth_saved_1",
+						ProviderPaymentTokenRef: "saved-token-should-not-be-used",
+					},
+				}, nil
+			},
+			createMainPurchaseAttempt: func(_ context.Context, input payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+				createdAttempts++
+				if input.MainID != fixture.mainID || input.UserID != fixture.viewerID {
+					t.Fatalf("CreateMainPurchaseAttempt() input got %+v", input)
+				}
+				if input.PaymentMethodMode != payment.PaymentMethodModeNewCard || input.ProviderPaymentTokenRef != "development-payment-bypass" {
+					t.Fatalf("CreateMainPurchaseAttempt() payment input got %+v", input)
+				}
+
+				return payment.MainPurchaseAttempt{
+					ID:     attemptID,
+					MainID: fixture.mainID,
+					Status: payment.PurchaseAttemptStatusProcessing,
+					UserID: fixture.viewerID,
+				}, nil
+			},
+			getLatestSucceededMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
+				if succeededAttempt == nil {
+					return payment.MainPurchaseAttempt{}, payment.ErrMainPurchaseAttemptNotFound
+				}
+
+				return *succeededAttempt, nil
+			},
+			updateMainPurchaseAttemptOutcome: func(_ context.Context, input payment.UpdateMainPurchaseAttemptOutcomeInput) (payment.MainPurchaseAttempt, error) {
+				updatedAttempts++
+				if input.ID != attemptID || input.Status != payment.PurchaseAttemptStatusSucceeded {
+					t.Fatalf("UpdateMainPurchaseAttemptOutcome() input got %+v", input)
+				}
+				if input.ProviderProcessedAt == nil || !input.ProviderProcessedAt.Equal(fixture.now) {
+					t.Fatalf("UpdateMainPurchaseAttemptOutcome() processedAt got %#v want %s", input.ProviderProcessedAt, fixture.now)
+				}
+
+				succeededAttempt = &payment.MainPurchaseAttempt{
+					ID:                  attemptID,
+					MainID:              fixture.mainID,
+					ProviderProcessedAt: input.ProviderProcessedAt,
+					Status:              input.Status,
+					UserID:              fixture.viewerID,
+				}
+
+				return *succeededAttempt, nil
+			},
+			touchSavedPaymentMethodLastUsedAt: func(context.Context, uuid.UUID, string, *time.Time) (payment.SavedPaymentMethod, error) {
+				touchedMethods++
+				return payment.SavedPaymentMethod{}, nil
+			},
+		},
+		stubPurchaseGateway{
+			charge: func(context.Context, payment.ChargeInput) (payment.ChargeResult, error) {
+				charges++
+				return payment.ChargeResult{}, errors.New("charge should not be called during development bypass")
+			},
+		},
+		stubUnlockRecorder{
+			recordMainUnlock: func(_ context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error) {
+				recordedUnlocks++
+				if input.UserID != fixture.viewerID || input.MainID != fixture.mainID {
+					t.Fatalf("RecordMainUnlock() input got %+v", input)
+				}
+				if input.PaymentProviderPurchaseRef != nil {
+					t.Fatalf("RecordMainUnlock() provider ref got %#v want nil", input.PaymentProviderPurchaseRef)
+				}
+				if input.PurchasedAt == nil || !input.PurchasedAt.Equal(fixture.now) {
+					t.Fatalf("RecordMainUnlock() purchasedAt got %#v want %s", input.PurchasedAt, fixture.now)
+				}
+
+				return unlock.MainUnlock{}, nil
+			},
+		},
+	)
+	service.EnableDevelopmentPaymentBypass()
+
+	result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+		AcceptedAge:   true,
+		AcceptedTerms: true,
+		EntryToken:    entryToken,
+		FromShortID:   fixture.shortID,
+		MainID:        fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:           payment.PaymentMethodModeNewCard,
+			CardSetupToken: "development-payment-bypass",
+		},
+		ViewerID: fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("PurchaseMain() error = %v, want nil", err)
+	}
+	if charges != 0 {
+		t.Fatalf("Charge() calls got %d want 0", charges)
+	}
+	if createdAttempts != 1 || updatedAttempts != 1 {
+		t.Fatalf("PurchaseMain() attempt writes got create=%d update=%d want 1/1", createdAttempts, updatedAttempts)
+	}
+	if recordedUnlocks != 1 {
+		t.Fatalf("RecordMainUnlock() calls got %d want 1", recordedUnlocks)
+	}
+	if touchedMethods != 0 {
+		t.Fatalf("TouchSavedPaymentMethodLastUsedAt() calls got %d want 0", touchedMethods)
+	}
+	if result.Purchase.Status != "succeeded" {
+		t.Fatalf("PurchaseMain() status got %q want %q", result.Purchase.Status, "succeeded")
+	}
+	if result.Access.Reason != "purchased" || result.Access.Status != "unlocked" {
+		t.Fatalf("PurchaseMain() access got %#v want purchased/unlocked", result.Access)
+	}
+	if result.EntryToken == nil || *result.EntryToken == "" {
+		t.Fatalf("PurchaseMain() entry token got %#v want value", result.EntryToken)
+	}
+	issued, err := service.IssueAccessEntry(context.Background(), fixture.sessionBinding, AccessEntryInput{
+		EntryToken:  *result.EntryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		ViewerID:    fixture.viewerID,
+	})
+	if err != nil {
+		t.Fatalf("IssueAccessEntry() error = %v, want nil", err)
+	}
+	if issued.GrantKind != MainPlaybackGrantKindPurchased {
+		t.Fatalf("IssueAccessEntry() grant kind got %q want %q", issued.GrantKind, MainPlaybackGrantKindPurchased)
+	}
+	if issued.GrantToken == "" {
+		t.Fatal("IssueAccessEntry() grant token = empty, want value")
+	}
+	playback, err := service.GetPlaybackSurface(
+		context.Background(),
+		fixture.viewerID,
+		fixture.sessionBinding,
+		fixture.mainID,
+		fixture.shortID,
+		issued.GrantToken,
+	)
+	if err != nil {
+		t.Fatalf("GetPlaybackSurface() error = %v, want nil", err)
+	}
+	if playback.Access.Reason != "purchased" || playback.Access.Status != "unlocked" {
+		t.Fatalf("GetPlaybackSurface() access got %#v want purchased/unlocked", playback.Access)
+	}
+	if playback.Main.ID != fixture.mainID {
+		t.Fatalf("GetPlaybackSurface() main got %s want %s", playback.Main.ID, fixture.mainID)
+	}
+	if playback.EntryShort.ID != fixture.shortID {
+		t.Fatalf("GetPlaybackSurface() entry short got %s want %s", playback.EntryShort.ID, fixture.shortID)
+	}
+}
+
+func TestPurchaseMainRejectsSavedCardInDevelopmentBypass(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	service := fixture.newService(stubPaymentRepository{
+		listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
+			return []payment.SavedPaymentMethod{
+				{
+					PaymentMethodID:         "paymeth_saved_1",
+					ProviderPaymentTokenRef: "saved-token-should-not-be-used",
+				},
+			}, nil
+		},
+		getSavedPaymentMethod: func(context.Context, uuid.UUID, string) (payment.SavedPaymentMethod, error) {
+			t.Fatal("GetSavedPaymentMethod() was called unexpectedly")
+			return payment.SavedPaymentMethod{}, nil
+		},
+		createMainPurchaseAttempt: func(context.Context, payment.CreateMainPurchaseAttemptInput) (payment.MainPurchaseAttempt, error) {
+			t.Fatal("CreateMainPurchaseAttempt() was called unexpectedly")
+			return payment.MainPurchaseAttempt{}, nil
+		},
+		touchSavedPaymentMethodLastUsedAt: func(context.Context, uuid.UUID, string, *time.Time) (payment.SavedPaymentMethod, error) {
+			t.Fatal("TouchSavedPaymentMethodLastUsedAt() was called unexpectedly")
+			return payment.SavedPaymentMethod{}, nil
+		},
+	})
+	service.EnableDevelopmentPaymentBypass()
+
+	_, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
+		EntryToken:  fixture.entryToken(t),
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:            payment.PaymentMethodModeSavedCard,
+			PaymentMethodID: "paymeth_saved_1",
+		},
+		ViewerID: fixture.viewerID,
+	})
+	if !errors.Is(err, ErrInvalidPurchaseRequest) {
+		t.Fatalf("PurchaseMain() error got %v want %v", err, ErrInvalidPurchaseRequest)
 	}
 }
 
@@ -1252,6 +2044,7 @@ func TestPurchaseMainShortCircuitsForExistingPurchaseAndOwner(t *testing.T) {
 
 		fixture := newServiceFixture()
 		fixture.detail.Item.Unlock.IsUnlocked = true
+		entryToken := fixture.entryTokenAt(t, fixture.now.Add(-14*time.Minute))
 		service := fixture.newService(
 			stubPaymentRepository{
 				listSavedPaymentMethods: func(context.Context, uuid.UUID) ([]payment.SavedPaymentMethod, error) {
@@ -1269,7 +2062,7 @@ func TestPurchaseMainShortCircuitsForExistingPurchaseAndOwner(t *testing.T) {
 		)
 
 		result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
-			EntryToken:  fixture.entryToken(t),
+			EntryToken:  entryToken,
 			FromShortID: fixture.shortID,
 			MainID:      fixture.mainID,
 			PaymentMethod: PurchasePaymentMethodInput{
@@ -1284,6 +2077,10 @@ func TestPurchaseMainShortCircuitsForExistingPurchaseAndOwner(t *testing.T) {
 		if result.Purchase.Status != "already_purchased" || result.Access.Reason != "purchased" {
 			t.Fatalf("PurchaseMain() got %#v want already_purchased/purchased", result)
 		}
+		if result.EntryToken == nil || *result.EntryToken == entryToken {
+			t.Fatalf("PurchaseMain() entry token got %#v want refreshed token", result.EntryToken)
+		}
+		assertEntryTokenMatches(t, fixture.sessionBinding, fixture.now, *result.EntryToken, fixture.viewerID, fixture.mainID, fixture.shortID)
 	})
 
 	t.Run("owner preview", func(t *testing.T) {
@@ -1291,10 +2088,11 @@ func TestPurchaseMainShortCircuitsForExistingPurchaseAndOwner(t *testing.T) {
 
 		fixture := newServiceFixture()
 		fixture.detail.Item.Unlock.IsOwner = true
+		entryToken := fixture.entryTokenAt(t, fixture.now.Add(-14*time.Minute))
 		service := fixture.newService()
 
 		result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
-			EntryToken:  fixture.entryToken(t),
+			EntryToken:  entryToken,
 			FromShortID: fixture.shortID,
 			MainID:      fixture.mainID,
 			PaymentMethod: PurchasePaymentMethodInput{
@@ -1309,6 +2107,10 @@ func TestPurchaseMainShortCircuitsForExistingPurchaseAndOwner(t *testing.T) {
 		if result.Purchase.Status != "owner_preview" || result.Access.Reason != "owner_preview" {
 			t.Fatalf("PurchaseMain() got %#v want owner_preview", result)
 		}
+		if result.EntryToken == nil || *result.EntryToken == entryToken {
+			t.Fatalf("PurchaseMain() entry token got %#v want refreshed token", result.EntryToken)
+		}
+		assertEntryTokenMatches(t, fixture.sessionBinding, fixture.now, *result.EntryToken, fixture.viewerID, fixture.mainID, fixture.shortID)
 	})
 }
 
@@ -1347,6 +2149,90 @@ func TestPurchaseHelpers(t *testing.T) {
 	alreadyPurchased := buildAlreadyPurchasedResult(mainID, "entry-token")
 	if alreadyPurchased.Purchase.Status != "already_purchased" || alreadyPurchased.Access.Reason != "purchased" {
 		t.Fatalf("buildAlreadyPurchasedResult() got %#v", alreadyPurchased)
+	}
+}
+
+func TestBuildPurchaseIdempotencyKeyUsesStableProviderTokenRefForNewCard(t *testing.T) {
+	t.Parallel()
+
+	fixture := newServiceFixture()
+	entryToken := fixture.entryToken(t)
+
+	firstToken, err := issueSignedCardSetupToken(
+		fixture.sessionBinding,
+		fixture.now,
+		defaultTokenTTL,
+		fixture.viewerID,
+		fixture.mainID,
+		fixture.shortID,
+		payment.ProviderCCBill,
+		"provider-payment-token",
+	)
+	if err != nil {
+		t.Fatalf("issueSignedCardSetupToken() error = %v, want nil", err)
+	}
+
+	secondToken, err := issueSignedCardSetupToken(
+		fixture.sessionBinding,
+		fixture.now,
+		defaultTokenTTL,
+		fixture.viewerID,
+		fixture.mainID,
+		fixture.shortID,
+		payment.ProviderCCBill,
+		"provider-payment-token",
+	)
+	if err != nil {
+		t.Fatalf("issueSignedCardSetupToken() error = %v, want nil", err)
+	}
+
+	firstProviderRef, err := resolveCardSetupPaymentTokenRef(
+		fixture.sessionBinding,
+		fixture.now,
+		fixture.viewerID,
+		fixture.mainID,
+		fixture.shortID,
+		firstToken,
+	)
+	if err != nil {
+		t.Fatalf("resolveCardSetupPaymentTokenRef() error = %v, want nil", err)
+	}
+
+	secondProviderRef, err := resolveCardSetupPaymentTokenRef(
+		fixture.sessionBinding,
+		fixture.now,
+		fixture.viewerID,
+		fixture.mainID,
+		fixture.shortID,
+		secondToken,
+	)
+	if err != nil {
+		t.Fatalf("resolveCardSetupPaymentTokenRef() error = %v, want nil", err)
+	}
+
+	firstKey := buildPurchaseIdempotencyKey(PurchaseInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:           payment.PaymentMethodModeNewCard,
+			CardSetupToken: firstToken,
+		},
+		ViewerID: fixture.viewerID,
+	}, firstProviderRef)
+	secondKey := buildPurchaseIdempotencyKey(PurchaseInput{
+		EntryToken:  entryToken,
+		FromShortID: fixture.shortID,
+		MainID:      fixture.mainID,
+		PaymentMethod: PurchasePaymentMethodInput{
+			Mode:           payment.PaymentMethodModeNewCard,
+			CardSetupToken: secondToken,
+		},
+		ViewerID: fixture.viewerID,
+	}, secondProviderRef)
+
+	if firstKey != secondKey {
+		t.Fatalf("buildPurchaseIdempotencyKey() got %q and %q want same stable key", firstKey, secondKey)
 	}
 }
 
@@ -1408,7 +2294,7 @@ func TestUnlockPurchaseStateAndCTAHelpers(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			purchaseState := buildUnlockPurchaseState(tt.preview, tt.savedMethods, tt.inflight)
+			purchaseState := buildUnlockPurchaseState(tt.preview, tt.savedMethods, tt.inflight, false)
 			if purchaseState.State != tt.wantPurchase {
 				t.Fatalf("buildUnlockPurchaseState() state got %q want %q", purchaseState.State, tt.wantPurchase)
 			}
@@ -1759,6 +2645,7 @@ func TestPurchaseMainIdempotencyAndInflightShortCircuits(t *testing.T) {
 
 		fixture := newServiceFixture()
 		cardSetupToken := fixture.cardSetupToken(t)
+		entryToken := fixture.entryTokenAt(t, fixture.now.Add(-14*time.Minute))
 		service := fixture.newService(stubPaymentRepository{
 			getLatestSucceededMainPurchaseAttempt: func(context.Context, uuid.UUID, uuid.UUID) (payment.MainPurchaseAttempt, error) {
 				return payment.MainPurchaseAttempt{
@@ -1771,7 +2658,7 @@ func TestPurchaseMainIdempotencyAndInflightShortCircuits(t *testing.T) {
 		result, err := service.PurchaseMain(context.Background(), fixture.sessionBinding, PurchaseInput{
 			AcceptedAge:   true,
 			AcceptedTerms: true,
-			EntryToken:    fixture.entryToken(t),
+			EntryToken:    entryToken,
 			FromShortID:   fixture.shortID,
 			MainID:        fixture.mainID,
 			PaymentMethod: PurchasePaymentMethodInput{
@@ -1786,6 +2673,10 @@ func TestPurchaseMainIdempotencyAndInflightShortCircuits(t *testing.T) {
 		if result.Purchase.Status != "succeeded" || result.Access.Reason != "purchased" {
 			t.Fatalf("PurchaseMain() got %#v want succeeded/purchased", result)
 		}
+		if result.EntryToken == nil || *result.EntryToken == entryToken {
+			t.Fatalf("PurchaseMain() entry token got %#v want refreshed token", result.EntryToken)
+		}
+		assertEntryTokenMatches(t, fixture.sessionBinding, fixture.now, *result.EntryToken, fixture.viewerID, fixture.mainID, fixture.shortID)
 	})
 }
 
@@ -2268,7 +3159,13 @@ func (f serviceFixture) newService(args ...any) *Service {
 func (f serviceFixture) entryToken(t *testing.T) string {
 	t.Helper()
 
-	token, err := issueSignedToken(f.sessionBinding, f.now, defaultTokenTTL, signedTokenPayload{
+	return f.entryTokenAt(t, f.now)
+}
+
+func (f serviceFixture) entryTokenAt(t *testing.T, issuedAt time.Time) string {
+	t.Helper()
+
+	token, err := issueSignedToken(f.sessionBinding, issuedAt, defaultTokenTTL, signedTokenPayload{
 		Kind:        entryTokenKind,
 		MainID:      f.mainID,
 		FromShortID: f.shortID,
@@ -2276,6 +3173,24 @@ func (f serviceFixture) entryToken(t *testing.T) string {
 	})
 	if err != nil {
 		t.Fatalf("issueSignedToken() error = %v, want nil", err)
+	}
+
+	return token
+}
+
+func (f serviceFixture) cardSetupSessionToken(t *testing.T) string {
+	t.Helper()
+
+	token, err := issueSignedCardSetupSessionToken(
+		f.sessionBinding,
+		f.now,
+		defaultTokenTTL,
+		f.viewerID,
+		f.mainID,
+		f.shortID,
+	)
+	if err != nil {
+		t.Fatalf("issueSignedCardSetupSessionToken() error = %v, want nil", err)
 	}
 
 	return token
@@ -2289,6 +3204,8 @@ func (f serviceFixture) cardSetupToken(t *testing.T) string {
 		f.now,
 		defaultTokenTTL,
 		f.viewerID,
+		f.mainID,
+		f.shortID,
 		payment.ProviderCCBill,
 		"new-card-token",
 	)
@@ -2297,4 +3214,24 @@ func (f serviceFixture) cardSetupToken(t *testing.T) string {
 	}
 
 	return token
+}
+
+func assertEntryTokenMatches(
+	t *testing.T,
+	sessionBinding string,
+	now time.Time,
+	token string,
+	viewerID uuid.UUID,
+	mainID uuid.UUID,
+	fromShortID uuid.UUID,
+) {
+	t.Helper()
+
+	payload, err := readSignedToken(sessionBinding, now, token)
+	if err != nil {
+		t.Fatalf("readSignedToken() error = %v, want nil", err)
+	}
+	if payload.Kind != entryTokenKind || payload.ViewerID != viewerID || payload.MainID != mainID || payload.FromShortID != fromShortID {
+		t.Fatalf("readSignedToken() payload got %#v", payload)
+	}
 }

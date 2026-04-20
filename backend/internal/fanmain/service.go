@@ -48,6 +48,10 @@ type unlockRecorder interface {
 	RecordMainUnlock(ctx context.Context, input unlock.RecordMainUnlockInput) (unlock.MainUnlock, error)
 }
 
+type paymentWidgetSessionProvider interface {
+	CreatePaymentWidgetSession(ctx context.Context) (payment.PaymentWidgetSession, error)
+}
+
 type unlockConversionRecorder interface {
 	RecordUnlockConversion(ctx context.Context, viewerID uuid.UUID, detail feed.Detail, idempotencyKey string) error
 }
@@ -60,14 +64,15 @@ type unlockConversionRetryStore interface {
 
 // Service は fan unlock / main playback / purchase 導線を扱います。
 type Service struct {
-	feedReader        feedReader
-	mainReader        mainReader
-	unlockRecorder    unlockRecorder
-	paymentRepository paymentRepository
-	purchaseGateway   purchaseGateway
-
-	unlockConversionRecorder unlockConversionRecorder
-	unlockConversionRetry    unlockConversionRetryStore
+	feedReader                 feedReader
+	mainReader                 mainReader
+	unlockRecorder             unlockRecorder
+	paymentRepository          paymentRepository
+	purchaseGateway            purchaseGateway
+	paymentWidgetSessionSource paymentWidgetSessionProvider
+	developmentPaymentBypass   bool
+	unlockConversionRecorder   unlockConversionRecorder
+	unlockConversionRetry      unlockConversionRetryStore
 
 	now      func() time.Time
 	tokenTTL time.Duration
@@ -168,16 +173,40 @@ func NewService(
 	paymentRepository paymentRepository,
 	purchaseGateway purchaseGateway,
 ) *Service {
-	return &Service{
-		feedReader:        feedReader,
-		mainReader:        mainReader,
-		unlockRecorder:    unlockRecorder,
-		paymentRepository: paymentRepository,
-		purchaseGateway:   purchaseGateway,
-		now:               time.Now,
-		tokenTTL:          defaultTokenTTL,
-		grantTTL:          defaultGrantTTL,
+	var paymentWidgetSessionSource paymentWidgetSessionProvider
+	if provider, ok := purchaseGateway.(paymentWidgetSessionProvider); ok {
+		paymentWidgetSessionSource = provider
 	}
+
+	return &Service{
+		feedReader:                 feedReader,
+		mainReader:                 mainReader,
+		unlockRecorder:             unlockRecorder,
+		paymentRepository:          paymentRepository,
+		purchaseGateway:            purchaseGateway,
+		paymentWidgetSessionSource: paymentWidgetSessionSource,
+		now:                        time.Now,
+		tokenTTL:                   defaultTokenTTL,
+		grantTTL:                   defaultGrantTTL,
+	}
+}
+
+// EnableDevelopmentPaymentBypass は local development 向けに決済呼び出しを一時的に迂回します。
+func (s *Service) EnableDevelopmentPaymentBypass() {
+	if s == nil {
+		return
+	}
+
+	s.developmentPaymentBypass = true
+}
+
+func (s *Service) issueEntryToken(sessionBinding string, viewerID uuid.UUID, mainID uuid.UUID, fromShortID uuid.UUID) (string, error) {
+	return issueSignedToken(sessionBinding, s.now().UTC(), s.tokenTTL, signedTokenPayload{
+		Kind:        entryTokenKind,
+		MainID:      mainID,
+		FromShortID: fromShortID,
+		ViewerID:    viewerID,
+	})
 }
 
 // WithRecommendationRecorder は unlock conversion signal recorder を注入します。
@@ -232,17 +261,12 @@ func (s *Service) GetUnlockSurface(ctx context.Context, viewerID uuid.UUID, sess
 		return UnlockSurface{}, err
 	}
 
-	entryToken, err := issueSignedToken(sessionBinding, s.now().UTC(), s.tokenTTL, signedTokenPayload{
-		Kind:        entryTokenKind,
-		MainID:      main.ID,
-		FromShortID: detail.Item.Short.ID,
-		ViewerID:    viewerID,
-	})
+	entryToken, err := s.issueEntryToken(sessionBinding, viewerID, main.ID, detail.Item.Short.ID)
 	if err != nil {
 		return UnlockSurface{}, err
 	}
 
-	purchaseState := buildUnlockPurchaseState(detail.Item.Unlock, savedMethods, inflightAttempt)
+	purchaseState := buildUnlockPurchaseState(detail.Item.Unlock, savedMethods, inflightAttempt, s.developmentPaymentBypass)
 
 	return UnlockSurface{
 		Access:          buildMainAccessState(detail.Item.Unlock, main.ID),

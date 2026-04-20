@@ -1,42 +1,40 @@
 import { viewerSessionCookieName } from "@/entities/viewer";
 import { requestJson } from "@/shared/api";
 
-import { mainAccessEntryResponseSchema } from "./contracts";
+import { cardSetupTokenResponseSchema } from "./contracts";
 
-type RequestMainAccessEntryOptions = {
-  acceptedAge?: boolean | undefined;
-  acceptedTerms?: boolean | undefined;
+type RequestCardSetupTokenOptions = {
   baseUrl?: string | undefined;
   credentials?: RequestCredentials | undefined;
   entryToken: string;
   fetcher?: typeof fetch | undefined;
   fromShortId: string;
   mainId: string;
-  routePath?: `/${string}` | undefined;
+  paymentTokenId: string;
+  cardSetupSessionToken: string;
   sessionToken?: string | undefined;
   signal?: AbortSignal | undefined;
 };
 
-function buildMainAccessEntryPath(mainId: string): `/${string}` {
-  return `/api/fan/mains/${encodeURIComponent(mainId)}/access-entry`;
+function buildCardSetupTokenPath(mainId: string): `/${string}` {
+  return `/api/fan/mains/${encodeURIComponent(mainId)}/card-setup-token`;
 }
 
 /**
- * main access entry を発行して playback href を返す。
+ * provider payment token を purchase 用 opaque token に交換する。
  */
-export async function requestMainAccessEntry({
-  acceptedAge,
-  acceptedTerms,
+export async function requestCardSetupToken({
   baseUrl,
+  cardSetupSessionToken,
   credentials = "include",
   entryToken,
   fetcher,
   fromShortId,
   mainId,
-  routePath,
+  paymentTokenId,
   sessionToken,
   signal,
-}: RequestMainAccessEntryOptions) {
+}: RequestCardSetupTokenOptions) {
   const headers = new Headers();
 
   if (sessionToken) {
@@ -50,8 +48,8 @@ export async function requestMainAccessEntry({
       body: JSON.stringify({
         entryToken,
         fromShortId,
-        ...(typeof acceptedAge === "boolean" ? { acceptedAge } : {}),
-        ...(typeof acceptedTerms === "boolean" ? { acceptedTerms } : {}),
+        paymentTokenId,
+        sessionToken: cardSetupSessionToken,
       }),
       credentials,
       headers: {
@@ -61,8 +59,8 @@ export async function requestMainAccessEntry({
       method: "POST",
       ...(signal ? { signal } : {}),
     },
-    path: routePath ?? buildMainAccessEntryPath(mainId),
-    schema: mainAccessEntryResponseSchema,
+    path: buildCardSetupTokenPath(mainId),
+    schema: cardSetupTokenResponseSchema,
   });
 
   return response.data;

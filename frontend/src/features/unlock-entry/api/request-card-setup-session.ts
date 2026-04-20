@@ -1,42 +1,36 @@
 import { viewerSessionCookieName } from "@/entities/viewer";
 import { requestJson } from "@/shared/api";
 
-import { mainAccessEntryResponseSchema } from "./contracts";
+import { cardSetupSessionResponseSchema } from "./contracts";
 
-type RequestMainAccessEntryOptions = {
-  acceptedAge?: boolean | undefined;
-  acceptedTerms?: boolean | undefined;
+type RequestCardSetupSessionOptions = {
   baseUrl?: string | undefined;
   credentials?: RequestCredentials | undefined;
   entryToken: string;
   fetcher?: typeof fetch | undefined;
   fromShortId: string;
   mainId: string;
-  routePath?: `/${string}` | undefined;
   sessionToken?: string | undefined;
   signal?: AbortSignal | undefined;
 };
 
-function buildMainAccessEntryPath(mainId: string): `/${string}` {
-  return `/api/fan/mains/${encodeURIComponent(mainId)}/access-entry`;
+function buildCardSetupSessionPath(mainId: string): `/${string}` {
+  return `/api/fan/mains/${encodeURIComponent(mainId)}/card-setup-session`;
 }
 
 /**
- * main access entry を発行して playback href を返す。
+ * new card 用の CCBill widget 初期化情報を取得する。
  */
-export async function requestMainAccessEntry({
-  acceptedAge,
-  acceptedTerms,
+export async function requestCardSetupSession({
   baseUrl,
   credentials = "include",
   entryToken,
   fetcher,
   fromShortId,
   mainId,
-  routePath,
   sessionToken,
   signal,
-}: RequestMainAccessEntryOptions) {
+}: RequestCardSetupSessionOptions) {
   const headers = new Headers();
 
   if (sessionToken) {
@@ -50,8 +44,6 @@ export async function requestMainAccessEntry({
       body: JSON.stringify({
         entryToken,
         fromShortId,
-        ...(typeof acceptedAge === "boolean" ? { acceptedAge } : {}),
-        ...(typeof acceptedTerms === "boolean" ? { acceptedTerms } : {}),
       }),
       credentials,
       headers: {
@@ -61,8 +53,8 @@ export async function requestMainAccessEntry({
       method: "POST",
       ...(signal ? { signal } : {}),
     },
-    path: routePath ?? buildMainAccessEntryPath(mainId),
-    schema: mainAccessEntryResponseSchema,
+    path: buildCardSetupSessionPath(mainId),
+    schema: cardSetupSessionResponseSchema,
   });
 
   return response.data;

@@ -22,7 +22,9 @@ const cardSetupTokenKind = "card_setup"
 
 type cardSetupTokenPayload struct {
 	ExpiresAt               int64     `json:"exp"`
+	FromShortID             uuid.UUID `json:"fromShortId"`
 	Kind                    string    `json:"kind"`
+	MainID                  uuid.UUID `json:"mainId"`
 	Provider                string    `json:"provider"`
 	ProviderPaymentTokenRef string    `json:"providerPaymentTokenRef"`
 	ViewerID                uuid.UUID `json:"viewerId"`
@@ -33,6 +35,8 @@ func issueSignedCardSetupToken(
 	issuedAt time.Time,
 	ttl time.Duration,
 	viewerID uuid.UUID,
+	mainID uuid.UUID,
+	fromShortID uuid.UUID,
 	provider string,
 	providerPaymentTokenRef string,
 ) (string, error) {
@@ -45,6 +49,12 @@ func issueSignedCardSetupToken(
 	if viewerID == uuid.Nil {
 		return "", fmt.Errorf("viewer id is required")
 	}
+	if mainID == uuid.Nil {
+		return "", fmt.Errorf("main id is required")
+	}
+	if fromShortID == uuid.Nil {
+		return "", fmt.Errorf("from short id is required")
+	}
 	if strings.TrimSpace(provider) == "" {
 		return "", fmt.Errorf("provider is required")
 	}
@@ -54,59 +64,33 @@ func issueSignedCardSetupToken(
 
 	payload := cardSetupTokenPayload{
 		ExpiresAt:               issuedAt.Add(ttl).Unix(),
+		FromShortID:             fromShortID,
 		Kind:                    cardSetupTokenKind,
+		MainID:                  mainID,
 		Provider:                strings.TrimSpace(provider),
 		ProviderPaymentTokenRef: strings.TrimSpace(providerPaymentTokenRef),
 		ViewerID:                viewerID,
 	}
 
-	encodedPayload, err := json.Marshal(payload)
+	rawPayload, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("marshal card setup token payload: %w", err)
 	}
 
-	sealedPayload, err := sealCardSetupToken(sessionBinding, encodedPayload)
-	if err != nil {
-		return "", fmt.Errorf("seal card setup token payload: %w", err)
-	}
-	signature := signToken(sessionBinding, sealedPayload)
-
-	return fmt.Sprintf(
-		"%s.%s",
-		base64.RawURLEncoding.EncodeToString(sealedPayload),
-		hex.EncodeToString(signature),
-	), nil
+	return encodeSealedSignedToken(sessionBinding, rawPayload)
 }
 
 func resolveCardSetupPaymentTokenRef(
 	sessionBinding string,
 	now time.Time,
 	viewerID uuid.UUID,
+	mainID uuid.UUID,
+	fromShortID uuid.UUID,
 	cardSetupToken string,
 ) (string, error) {
-	parts := strings.Split(strings.TrimSpace(cardSetupToken), ".")
-	if len(parts) != 2 {
-		return "", fmt.Errorf("invalid card setup token format")
-	}
-
-	sealedPayload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	rawPayload, err := decodeSealedSignedToken(sessionBinding, cardSetupToken)
 	if err != nil {
 		return "", fmt.Errorf("decode card setup token payload: %w", err)
-	}
-
-	rawSignature, err := hex.DecodeString(parts[1])
-	if err != nil {
-		return "", fmt.Errorf("decode card setup token signature: %w", err)
-	}
-
-	expectedSignature := signToken(sessionBinding, sealedPayload)
-	if subtle.ConstantTimeCompare(rawSignature, expectedSignature) != 1 {
-		return "", fmt.Errorf("invalid card setup token signature")
-	}
-
-	rawPayload, err := openCardSetupToken(sessionBinding, sealedPayload)
-	if err != nil {
-		return "", fmt.Errorf("open card setup token payload: %w", err)
 	}
 
 	var payload cardSetupTokenPayload
@@ -117,8 +101,12 @@ func resolveCardSetupPaymentTokenRef(
 	switch {
 	case payload.ExpiresAt <= now.Unix():
 		return "", fmt.Errorf("card setup token expired")
+	case payload.FromShortID != fromShortID:
+		return "", fmt.Errorf("card setup token from short mismatch")
 	case payload.Kind != cardSetupTokenKind:
 		return "", fmt.Errorf("unexpected card setup token kind %q", payload.Kind)
+	case payload.MainID != mainID:
+		return "", fmt.Errorf("card setup token main mismatch")
 	case payload.ViewerID != viewerID:
 		return "", fmt.Errorf("card setup token viewer mismatch")
 	case payload.Provider != payment.ProviderCCBill:
@@ -128,6 +116,49 @@ func resolveCardSetupPaymentTokenRef(
 	default:
 		return strings.TrimSpace(payload.ProviderPaymentTokenRef), nil
 	}
+}
+
+func encodeSealedSignedToken(sessionBinding string, rawPayload []byte) (string, error) {
+	sealedPayload, err := sealCardSetupToken(sessionBinding, rawPayload)
+	if err != nil {
+		return "", fmt.Errorf("seal payload: %w", err)
+	}
+	signature := signToken(sessionBinding, sealedPayload)
+
+	return fmt.Sprintf(
+		"%s.%s",
+		base64.RawURLEncoding.EncodeToString(sealedPayload),
+		hex.EncodeToString(signature),
+	), nil
+}
+
+func decodeSealedSignedToken(sessionBinding string, token string) ([]byte, error) {
+	parts := strings.Split(strings.TrimSpace(token), ".")
+	if len(parts) != 2 {
+		return nil, fmt.Errorf("invalid token format")
+	}
+
+	sealedPayload, err := base64.RawURLEncoding.DecodeString(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("decode token payload: %w", err)
+	}
+
+	rawSignature, err := hex.DecodeString(parts[1])
+	if err != nil {
+		return nil, fmt.Errorf("decode token signature: %w", err)
+	}
+
+	expectedSignature := signToken(sessionBinding, sealedPayload)
+	if subtle.ConstantTimeCompare(rawSignature, expectedSignature) != 1 {
+		return nil, fmt.Errorf("invalid token signature")
+	}
+
+	rawPayload, err := openCardSetupToken(sessionBinding, sealedPayload)
+	if err != nil {
+		return nil, fmt.Errorf("open token payload: %w", err)
+	}
+
+	return rawPayload, nil
 }
 
 func sealCardSetupToken(sessionBinding string, rawPayload []byte) ([]byte, error) {

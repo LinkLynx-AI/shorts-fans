@@ -96,9 +96,27 @@ describe("loadFeedShellState", () => {
           routePath: `/api/fan/mains/${apiItem.short.canonicalMainId}/access-entry`,
           token: `disabled-${apiItem.short.id}`,
         },
+        entryContext: {
+          accessEntryPath: `/api/fan/mains/${apiItem.short.canonicalMainId}/access-entry`,
+          purchasePath: `/api/fan/mains/${apiItem.short.canonicalMainId}/purchase`,
+          token: `disabled-${apiItem.short.id}`,
+        },
+        purchase: {
+          pendingReason: null,
+          savedPaymentMethods: [],
+          setup: {
+            required: false,
+            requiresAgeConfirmation: false,
+            requiresCardSetup: false,
+            requiresTermsAcceptance: false,
+          },
+          state: "purchase_ready" as const,
+          supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"] as const,
+        },
         setup: {
           required: false,
           requiresAgeConfirmation: false,
+          requiresCardSetup: false,
           requiresTermsAcceptance: false,
         },
         short: apiItem.short,

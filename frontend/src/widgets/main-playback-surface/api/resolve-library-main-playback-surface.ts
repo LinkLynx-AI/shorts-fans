@@ -83,8 +83,6 @@ export async function resolveLibraryMainPlaybackSurface(
 
   try {
     accessEntry = await requestMainAccessEntry({
-      acceptedAge: false,
-      acceptedTerms: false,
       entryToken: unlock.mainAccessEntry.token,
       fromShortId: item.entryShort.id,
       mainId: item.main.id,

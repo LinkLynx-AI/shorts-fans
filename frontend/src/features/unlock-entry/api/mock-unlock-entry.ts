@@ -6,13 +6,14 @@ import { issueMockSignedToken } from "@/shared/lib/mock-signed-token";
 import {
   buildMockMainAccessEntryContext,
   getMockMainAccessRoutePath,
+  normalizeUnlockSurface,
   type UnlockSurfaceModel,
 } from "../model/unlock-entry";
 import { unlockSurfaceSchema } from "./contracts";
 
 type RawUnlockState = {
   access: UnlockSurfaceModel["access"];
-  setup: UnlockSurfaceModel["setup"];
+  purchase: UnlockSurfaceModel["purchase"];
   unlockCta: UnlockSurfaceModel["unlockCta"];
 };
 
@@ -23,10 +24,23 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "unlock_required",
       status: "locked",
     },
-    setup: {
-      required: false,
-      requiresAgeConfirmation: false,
-      requiresTermsAcceptance: false,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [
+        {
+          brand: "visa",
+          last4: "4242",
+          paymentMethodId: "paymeth_afterrain_visa",
+        },
+      ],
+      setup: {
+        required: false,
+        requiresAgeConfirmation: false,
+        requiresCardSetup: false,
+        requiresTermsAcceptance: false,
+      },
+      state: "purchase_ready",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: 540,
@@ -41,10 +55,17 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "owner_preview",
       status: "owner",
     },
-    setup: {
-      required: false,
-      requiresAgeConfirmation: false,
-      requiresTermsAcceptance: false,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: false,
+        requiresAgeConfirmation: false,
+        requiresCardSetup: false,
+        requiresTermsAcceptance: false,
+      },
+      state: "owner_preview",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: null,
@@ -59,10 +80,17 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "unlock_required",
       status: "locked",
     },
-    setup: {
-      required: true,
-      requiresAgeConfirmation: true,
-      requiresTermsAcceptance: true,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: true,
+        requiresAgeConfirmation: true,
+        requiresCardSetup: true,
+        requiresTermsAcceptance: true,
+      },
+      state: "setup_required",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: 660,
@@ -77,10 +105,23 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "unlock_required",
       status: "locked",
     },
-    setup: {
-      required: false,
-      requiresAgeConfirmation: false,
-      requiresTermsAcceptance: false,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [
+        {
+          brand: "mastercard",
+          last4: "5555",
+          paymentMethodId: "paymeth_poolcut_mastercard",
+        },
+      ],
+      setup: {
+        required: false,
+        requiresAgeConfirmation: false,
+        requiresCardSetup: false,
+        requiresTermsAcceptance: false,
+      },
+      state: "purchase_ready",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: 480,
@@ -95,10 +136,17 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
       reason: "unlock_required",
       status: "locked",
     },
-    setup: {
-      required: true,
-      requiresAgeConfirmation: true,
-      requiresTermsAcceptance: true,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: true,
+        requiresAgeConfirmation: true,
+        requiresCardSetup: true,
+        requiresTermsAcceptance: true,
+      },
+      state: "setup_required",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: 480,
@@ -110,13 +158,20 @@ const rawUnlockStateByShortId: Readonly<Record<string, RawUnlockState>> = {
   softlight: {
     access: {
       mainId: "main_aoi_blue_balcony",
-      reason: "session_unlocked",
+      reason: "purchased",
       status: "unlocked",
     },
-    setup: {
-      required: false,
-      requiresAgeConfirmation: false,
-      requiresTermsAcceptance: false,
+    purchase: {
+      pendingReason: null,
+      savedPaymentMethods: [],
+      setup: {
+        required: false,
+        requiresAgeConfirmation: false,
+        requiresCardSetup: false,
+        requiresTermsAcceptance: false,
+      },
+      state: "already_purchased",
+      supportedCardBrands: ["visa", "mastercard", "jcb", "american_express"],
     },
     unlockCta: {
       mainDurationSeconds: null,
@@ -155,11 +210,12 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
     throw new Error(`Unknown unlock state for short: ${short.id}`);
   }
 
-  return unlockSurfaceSchema.parse({
+  return normalizeUnlockSurface(unlockSurfaceSchema.parse({
     access: rawState.access,
     creator,
-    mainAccessEntry: {
-      routePath: getMockMainAccessRoutePath(main.id),
+    entryContext: {
+      accessEntryPath: getMockMainAccessRoutePath(main.id),
+      purchasePath: `/api/fan/mains/${main.id}/purchase`,
       token: issueMockSignedToken(buildMockMainAccessEntryContext(main.id, shortId)),
     },
     main: {
@@ -167,11 +223,11 @@ export function getUnlockSurfaceByShortId(shortId: string): UnlockSurfaceModel |
       id: main.id,
       priceJpy: main.priceJpy,
     },
-    setup: rawState.setup,
+    purchase: rawState.purchase,
     short: {
       ...short,
       id: shortId,
     },
     unlockCta: rawState.unlockCta,
-  });
+  }));
 }
