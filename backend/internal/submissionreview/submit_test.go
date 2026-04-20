@@ -312,6 +312,110 @@ func TestSubmitPackageReturnsNoOpForPendingIntake(t *testing.T) {
 	}
 }
 
+func TestSubmitPackageReturnsNoOpForConcurrentDuplicateSubmit(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name           string
+		constraintName string
+	}{
+		{
+			name:           "pending main constraint",
+			constraintName: submissionReviewPendingMainUniqueConstraint,
+		},
+		{
+			name:           "previous intake constraint",
+			constraintName: submissionReviewPreviousIntakeUniqueConstraint,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			viewerID := uuid.MustParse("91919191-9191-9191-9191-919191919191")
+			mainID := uuid.MustParse("a1a1a1a1-a1a1-a1a1-a1a1-a1a1a1a1a1a1")
+			mainAssetID := uuid.MustParse("b1b1b1b1-b1b1-b1b1-b1b1-b1b1b1b1b1b1")
+			shortID := uuid.MustParse("c1c1c1c1-c1c1-c1c1-c1c1-c1c1c1c1c1c1")
+			shortAssetID := uuid.MustParse("d1d1d1d1-d1d1-d1d1-d1d1-d1d1d1d1d1d1")
+			tx := &txStub{}
+			mutatedAfterInsert := false
+
+			service := &Service{
+				beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) { return tx, nil }},
+				now:      time.Now,
+				newQueries: func(sqlc.DBTX) queries {
+					return queriesStub{
+						getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+							return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+						},
+						getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+							return sqlc.GetSubmissionReviewMainByIDForUpdateRow{
+								ID:                   postgres.UUIDToPG(mainID),
+								CreatorUserID:        postgres.UUIDToPG(viewerID),
+								MediaAssetID:         postgres.UUIDToPG(mainAssetID),
+								State:                mainStateDraft,
+								PriceMinor:           1800,
+								CurrencyCode:         "JPY",
+								OwnershipConfirmed:   true,
+								ConsentConfirmed:     true,
+								MediaProcessingState: mediaStateReady,
+							}, nil
+						},
+						getPendingSubmissionReviewIntakeByCanonicalMainID: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+							return sqlc.AppSubmissionReviewIntake{}, pgx.ErrNoRows
+						},
+						listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+							return []sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow{{
+								ID:                   postgres.UUIDToPG(shortID),
+								CreatorUserID:        postgres.UUIDToPG(viewerID),
+								CanonicalMainID:      postgres.UUIDToPG(mainID),
+								MediaAssetID:         postgres.UUIDToPG(shortAssetID),
+								State:                shortStateDraft,
+								MediaProcessingState: mediaStateReady,
+							}}, nil
+						},
+						getLatestSubmissionReviewIntakeByCanonicalMainID: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+							return sqlc.AppSubmissionReviewIntake{}, pgx.ErrNoRows
+						},
+						createSubmissionReviewIntake: func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error) {
+							return sqlc.AppSubmissionReviewIntake{}, &pgconn.PgError{
+								Code:           "23505",
+								ConstraintName: tt.constraintName,
+							}
+						},
+						createSubmissionReviewIntakeShort: func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error {
+							mutatedAfterInsert = true
+							return nil
+						},
+						updateMainState: func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error) {
+							mutatedAfterInsert = true
+							return sqlc.AppMain{}, nil
+						},
+						updateShortState: func(context.Context, sqlc.UpdateShortStateParams) (sqlc.AppShort, error) {
+							mutatedAfterInsert = true
+							return sqlc.AppShort{}, nil
+						},
+					}
+				},
+			}
+
+			if err := service.SubmitPackage(context.Background(), viewerID, mainID); err != nil {
+				t.Fatalf("SubmitPackage() error = %v, want nil", err)
+			}
+			if !tx.rolledBack {
+				t.Fatal("SubmitPackage() rolledBack = false, want true")
+			}
+			if tx.committed {
+				t.Fatal("SubmitPackage() committed = true, want false")
+			}
+			if mutatedAfterInsert {
+				t.Fatal("SubmitPackage() mutated state after duplicate submit race")
+			}
+		})
+	}
+}
+
 func TestSubmitPackageReturnsNotReadyError(t *testing.T) {
 	t.Parallel()
 

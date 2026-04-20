@@ -19,6 +19,7 @@ source:
         - 000013_add_cognito_session_foundation.up.sql
         - 000014_add_creator_registration_intake.up.sql
         - 000015_add_recommendation_foundation.up.sql
+        - 000016_add_payment_purchase_state.up.sql
         - 000017_add_submission_review_intakes.up.sql
 schemas:
     - name: app
@@ -610,6 +611,181 @@ schemas:
                 - user_id
                 - last_played_at
               definition: CREATE INDEX idx_main_playback_progress_user_last_played_at ON app.main_playback_progress USING btree (user_id, last_played_at DESC)
+        - name: main_purchase_attempts
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: main_id
+              type: uuid
+              nullable: false
+            - name: from_short_id
+              type: uuid
+              nullable: false
+            - name: provider
+              type: text
+              nullable: false
+            - name: payment_method_mode
+              type: text
+              nullable: false
+            - name: user_payment_method_id
+              type: uuid
+              nullable: true
+            - name: provider_payment_token_ref
+              type: text
+              nullable: false
+            - name: idempotency_key
+              type: text
+              nullable: false
+            - name: status
+              type: text
+              nullable: false
+            - name: failure_reason
+              type: text
+              nullable: true
+            - name: pending_reason
+              type: text
+              nullable: true
+            - name: provider_purchase_ref
+              type: text
+              nullable: true
+            - name: provider_transaction_ref
+              type: text
+              nullable: true
+            - name: provider_session_ref
+              type: text
+              nullable: true
+            - name: provider_payment_unique_ref
+              type: text
+              nullable: true
+            - name: provider_decline_code
+              type: integer
+              nullable: true
+            - name: provider_decline_text
+              type: text
+              nullable: true
+            - name: requested_price_jpy
+              type: bigint
+              nullable: false
+            - name: requested_currency_code
+              type: integer
+              nullable: false
+            - name: accepted_age
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepted_terms
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: provider_processed_at
+              type: timestamp with time zone
+              nullable: true
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: main_purchase_attempts_from_short_id_fkey
+              columns:
+                - from_short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+            - name: main_purchase_attempts_main_id_fkey
+              columns:
+                - main_id
+              references:
+                schema: app
+                table: mains
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: main_purchase_attempts_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+              on_delete: CASCADE
+            - name: main_purchase_attempts_user_payment_method_id_user_id_fkey
+              columns:
+                - user_payment_method_id
+                - user_id
+              references:
+                schema: app
+                table: user_payment_methods
+                columns:
+                    - id
+                    - user_id
+          unique_constraints:
+            - name: main_purchase_attempts_idempotency_key_key
+              columns:
+                - idempotency_key
+            - name: main_purchase_attempts_provider_purchase_ref_key
+              columns:
+                - provider_purchase_ref
+          check_constraints:
+            - name: main_purchase_attempts_check
+              expression: CHECK (status = 'failed'::text AND failure_reason IS NOT NULL OR status <> 'failed'::text AND failure_reason IS NULL)
+            - name: main_purchase_attempts_check1
+              expression: CHECK (status = 'pending'::text AND pending_reason IS NOT NULL OR status <> 'pending'::text AND pending_reason IS NULL)
+            - name: main_purchase_attempts_check2
+              expression: CHECK (status = 'processing'::text AND provider_processed_at IS NULL OR status <> 'processing'::text AND provider_processed_at IS NOT NULL)
+            - name: main_purchase_attempts_failure_reason_check
+              expression: CHECK (failure_reason IS NULL OR (failure_reason = ANY (ARRAY['card_brand_unsupported'::text, 'purchase_declined'::text, 'authentication_failed'::text])))
+            - name: main_purchase_attempts_payment_method_mode_check
+              expression: CHECK (payment_method_mode = ANY (ARRAY['saved_card'::text, 'new_card'::text]))
+            - name: main_purchase_attempts_pending_reason_check
+              expression: CHECK (pending_reason IS NULL OR pending_reason = 'provider_processing'::text)
+            - name: main_purchase_attempts_provider_check
+              expression: CHECK (provider = 'ccbill'::text)
+            - name: main_purchase_attempts_requested_currency_code_check
+              expression: CHECK (requested_currency_code >= 1 AND requested_currency_code <= 999)
+            - name: main_purchase_attempts_requested_price_jpy_check
+              expression: CHECK (requested_price_jpy > 0)
+            - name: main_purchase_attempts_status_check
+              expression: CHECK (status = ANY (ARRAY['processing'::text, 'succeeded'::text, 'pending'::text, 'failed'::text]))
+          indexes:
+            - name: idx_main_purchase_attempts_provider_purchase_ref
+              columns:
+                - provider_purchase_ref
+              predicate: (provider_purchase_ref IS NOT NULL)
+              definition: CREATE INDEX idx_main_purchase_attempts_provider_purchase_ref ON app.main_purchase_attempts USING btree (provider_purchase_ref) WHERE (provider_purchase_ref IS NOT NULL)
+            - name: idx_main_purchase_attempts_provider_transaction_ref
+              columns:
+                - provider_transaction_ref
+              unique: true
+              predicate: (provider_transaction_ref IS NOT NULL)
+              definition: CREATE UNIQUE INDEX idx_main_purchase_attempts_provider_transaction_ref ON app.main_purchase_attempts USING btree (provider_transaction_ref) WHERE (provider_transaction_ref IS NOT NULL)
+            - name: idx_main_purchase_attempts_user_main_created_at
+              columns:
+                - user_id
+                - main_id
+                - created_at
+                - id
+              definition: CREATE INDEX idx_main_purchase_attempts_user_main_created_at ON app.main_purchase_attempts USING btree (user_id, main_id, created_at DESC, id DESC)
+            - name: idx_main_purchase_attempts_user_main_inflight
+              columns:
+                - user_id
+                - main_id
+              unique: true
+              predicate: (status = ANY (ARRAY['processing'::text, 'pending'::text]))
+              definition: CREATE UNIQUE INDEX idx_main_purchase_attempts_user_main_inflight ON app.main_purchase_attempts USING btree (user_id, main_id) WHERE (status = ANY (ARRAY['processing'::text, 'pending'::text]))
         - name: main_unlocks
           columns:
             - name: user_id

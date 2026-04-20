@@ -12,6 +12,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -38,6 +39,9 @@ const (
 
 	submitKindInitial  = "initial_submit"
 	submitKindResubmit = "resubmit"
+
+	submissionReviewPendingMainUniqueConstraint    = "uq_submission_review_intakes_pending_main"
+	submissionReviewPreviousIntakeUniqueConstraint = "uq_submission_review_intakes_previous_intake_id"
 )
 
 // ErrCreatorModeUnavailable は approved creator capability がないため submit flow を使えないことを表します。
@@ -48,6 +52,8 @@ var ErrReviewStateConflict = errors.New("submission review state conflict")
 
 // ErrSubmissionPackageNotFound は submit 対象の canonical main が存在しないか owner 不一致なことを表します。
 var ErrSubmissionPackageNotFound = errors.New("submission package was not found")
+
+var errDuplicateSubmitRace = errors.New("submission review duplicate submit race")
 
 type readinessBlocker string
 
@@ -125,7 +131,7 @@ func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 		return fmt.Errorf("submission review service is not initialized")
 	}
 
-	return postgres.RunInTx(ctx, s.beginner, func(tx pgx.Tx) error {
+	err := postgres.RunInTx(ctx, s.beginner, func(tx pgx.Tx) error {
 		q := s.newQueries(tx)
 
 		capability, err := q.GetCreatorCapabilityByUserIDForUpdate(ctx, postgres.UUIDToPG(viewerUserID))
@@ -199,6 +205,9 @@ func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 			SubmittedAt:        postgres.TimeToPG(&submittedAt),
 		})
 		if err != nil {
+			if isDuplicateSubmitRaceError(err) {
+				return errDuplicateSubmitRace
+			}
 			return fmt.Errorf("submission package submit intake create main=%s user=%s: %w", mainID, viewerUserID, err)
 		}
 
@@ -227,6 +236,20 @@ func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 
 		return nil
 	})
+	if errors.Is(err, errDuplicateSubmitRace) {
+		return nil
+	}
+
+	return err
+}
+
+func isDuplicateSubmitRaceError(err error) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+
+	return pgErr.Code == "23505" && (pgErr.ConstraintName == submissionReviewPendingMainUniqueConstraint || pgErr.ConstraintName == submissionReviewPreviousIntakeUniqueConstraint)
 }
 
 func loadLatestIntake(
