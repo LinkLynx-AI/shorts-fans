@@ -227,6 +227,9 @@ func validateFollowingFeedCursor(cursor *feed.Cursor) error {
 	if len(cursor.FollowingRemainingShortIDs) == 0 {
 		return errFanFeedCursorInvalid
 	}
+	if !cursor.PublishedAt.IsZero() || cursor.ShortID != uuid.Nil {
+		return errFanFeedCursorInvalid
+	}
 	for _, shortID := range cursor.FollowingRemainingShortIDs {
 		if shortID == uuid.Nil {
 			return errFanFeedCursorInvalid

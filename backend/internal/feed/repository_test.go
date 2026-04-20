@@ -123,6 +123,17 @@ func TestValidateFollowingCursor(t *testing.T) {
 	if err := validateFollowingCursor(nilShortID); !errors.Is(err, ErrFollowingCursorInvalid) {
 		t.Fatalf("validateFollowingCursor(nil short id) error got %v want %v", err, ErrFollowingCursorInvalid)
 	}
+
+	mixedState := &Cursor{
+		FollowingRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("22222222-2222-2222-2222-222222222222"),
+		},
+		PublishedAt: time.Unix(1710000200, 0).UTC(),
+		ShortID:     uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+	}
+	if err := validateFollowingCursor(mixedState); !errors.Is(err, ErrFollowingCursorInvalid) {
+		t.Fatalf("validateFollowingCursor(mixed state) error got %v want %v", err, ErrFollowingCursorInvalid)
+	}
 }
 
 func TestMapFeedItem(t *testing.T) {
@@ -298,6 +309,29 @@ func TestMapPageFunctionsWrapMappingErrors(t *testing.T) {
 	badFollowing.Handle = " "
 	if _, _, err := mapInitialFollowingPage([]sqlc.ListFollowingPublicFeedItemsRow{badFollowing}, 1, "following"); err == nil {
 		t.Fatal("mapInitialFollowingPage() error = nil, want wrapped mapping error")
+	}
+}
+
+func TestMapInitialFollowingPageDoesNotMapHiddenRows(t *testing.T) {
+	t.Parallel()
+
+	firstID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	secondID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	rows := []sqlc.ListFollowingPublicFeedItemsRow{
+		makeFollowingRow(firstID, time.Unix(1710000200, 0).UTC(), 765432),
+		makeFollowingRow(secondID, time.Unix(1710000100, 0).UTC(), 654321),
+	}
+	rows[1].Handle = " "
+
+	items, nextCursor, err := mapInitialFollowingPage(rows, 1, "following")
+	if err != nil {
+		t.Fatalf("mapInitialFollowingPage() error = %v, want nil", err)
+	}
+	if len(items) != 1 || items[0].Short.ID != firstID {
+		t.Fatalf("mapInitialFollowingPage() items got %#v want first short %s", items, firstID)
+	}
+	if nextCursor == nil || len(nextCursor.FollowingRemainingShortIDs) != 1 || nextCursor.FollowingRemainingShortIDs[0] != secondID {
+		t.Fatalf("mapInitialFollowingPage() next cursor got %#v want remaining [%s]", nextCursor, secondID)
 	}
 }
 

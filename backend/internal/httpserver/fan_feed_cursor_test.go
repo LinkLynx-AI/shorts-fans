@@ -119,6 +119,23 @@ func TestMemoryFanFeedCursorCodecRejectsUnknownOrForeignTabToken(t *testing.T) {
 	}
 }
 
+func TestMemoryFanFeedCursorCodecRejectsFollowingCursorWithMixedState(t *testing.T) {
+	t.Parallel()
+
+	codec := newMemoryFanFeedCursorCodec()
+	cursor := &feed.Cursor{
+		FollowingRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		},
+		PublishedAt: time.Unix(1710000200, 0).UTC(),
+		ShortID:     uuid.MustParse("44444444-4444-4444-4444-444444444444"),
+	}
+
+	if _, err := codec.Encode(context.Background(), "following", "viewer:11111111-1111-1111-1111-111111111111", cursor); err == nil {
+		t.Fatal("Encode(mixed-state following cursor) error = nil, want invalid cursor error")
+	}
+}
+
 func TestRedisFanFeedCursorCodecRoundTrip(t *testing.T) {
 	t.Parallel()
 

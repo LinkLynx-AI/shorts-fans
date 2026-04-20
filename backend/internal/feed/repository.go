@@ -229,6 +229,16 @@ func mapInitialFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit 
 	items := make([]Item, 0, min(limit, len(rows)))
 	remainingShortIDs := make([]uuid.UUID, 0, max(0, len(rows)-limit))
 	for index, row := range rows {
+		if index >= limit {
+			shortID, err := postgres.UUIDFromPG(row.ID)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%s: public short item の short id 変換: %w", label, err)
+			}
+
+			remainingShortIDs = append(remainingShortIDs, shortID)
+			continue
+		}
+
 		item, err := mapFeedItem(
 			mapFeedRow{
 				AvatarUrl:          row.AvatarUrl,
@@ -254,12 +264,7 @@ func mapInitialFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit 
 			return nil, nil, fmt.Errorf("%s: %w", label, err)
 		}
 
-		if index < limit {
-			items = append(items, item)
-			continue
-		}
-
-		remainingShortIDs = append(remainingShortIDs, item.GetShortID())
+		items = append(items, item)
 	}
 
 	return items, buildFollowingSnapshotCursor(remainingShortIDs), nil
@@ -303,6 +308,12 @@ func validateFollowingCursor(cursor *Cursor) error {
 	}
 	if len(cursor.FollowingRemainingShortIDs) == 0 {
 		return fmt.Errorf("%w: remaining short ids がありません", ErrFollowingCursorInvalid)
+	}
+	if !cursor.PublishedAt.IsZero() {
+		return fmt.Errorf("%w: following cursor に published_at が含まれています", ErrFollowingCursorInvalid)
+	}
+	if cursor.ShortID != uuid.Nil {
+		return fmt.Errorf("%w: following cursor に short id が含まれています", ErrFollowingCursorInvalid)
 	}
 	for _, shortID := range cursor.FollowingRemainingShortIDs {
 		if shortID == uuid.Nil {
