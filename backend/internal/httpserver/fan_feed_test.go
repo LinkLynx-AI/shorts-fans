@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -40,6 +41,19 @@ type stubShortDisplayAssetResolver struct {
 
 func (s stubShortDisplayAssetResolver) ResolveShortDisplayAsset(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error) {
 	return s.resolve(source, boundary)
+}
+
+type stubFanFeedCursorCodec struct {
+	decode func(context.Context, string, string, string) (*feed.Cursor, error)
+	encode func(context.Context, string, string, *feed.Cursor) (*string, error)
+}
+
+func (s stubFanFeedCursorCodec) Decode(ctx context.Context, tab string, ownerBinding string, encoded string) (*feed.Cursor, error) {
+	return s.decode(ctx, tab, ownerBinding, encoded)
+}
+
+func (s stubFanFeedCursorCodec) Encode(ctx context.Context, tab string, ownerBinding string, cursor *feed.Cursor) (*string, error) {
+	return s.encode(ctx, tab, ownerBinding, cursor)
 }
 
 func TestFanFeedRecommendedRoute(t *testing.T) {
@@ -92,6 +106,7 @@ func TestFanFeedRecommendedRoute(t *testing.T) {
 				return []feed.Item{item}, nil, nil
 			},
 		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
 		ShortDisplayAssets: stubShortDisplayAssetResolver{
 			resolve: func(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error) {
 				if source.AssetID != mediaAssetID {
@@ -162,6 +177,7 @@ func TestFanFeedFollowingRouteRequiresAuth(t *testing.T) {
 				return nil, nil, nil
 			},
 		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
 		ShortDisplayAssets: stubShortDisplayAssetResolver{
 			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
 				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
@@ -197,6 +213,7 @@ func TestFanFeedRouteIsNotRegisteredWithoutShortDisplayAssets(t *testing.T) {
 				return nil, nil, nil
 			},
 		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
 	})
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=recommended", nil)
@@ -262,6 +279,7 @@ func TestFanShortDetailRoute(t *testing.T) {
 				return detail, nil
 			},
 		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
 		ShortDisplayAssets: stubShortDisplayAssetResolver{
 			resolve: func(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error) {
 				if source.ShortID != shortID {
@@ -340,6 +358,7 @@ func TestFanFeedRecommendedRouteRemembersRecommendationExposureForAuthenticatedV
 				}}, nil, nil
 			},
 		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
 		RecommendationSignalExposure: stubRecommendationSignalExposureStore{
 			hasCreatorExposure: func(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
 				return false, nil
@@ -402,5 +421,294 @@ func TestFanFeedRecommendedRouteRemembersRecommendationExposureForAuthenticatedV
 	}
 	if len(rememberedCreators) != 1 || rememberedCreators[0] != creatorID {
 		t.Fatalf("RememberCreatorExposures() creatorIDs got %v want [%s]", rememberedCreators, creatorID)
+	}
+}
+
+func TestFanFeedFollowingRoutePassesSnapshotCursorToReader(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	shortID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	mainID := uuid.MustParse("33333333-3333-3333-3333-333333333333")
+	mediaAssetID := uuid.MustParse("44444444-4444-4444-4444-444444444444")
+	publishedAt := time.Unix(1710000000, 0).UTC()
+	requestCursor := &feed.Cursor{
+		FollowingRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("55555555-5555-5555-5555-555555555555"),
+			uuid.MustParse("66666666-6666-6666-6666-666666666666"),
+		},
+	}
+	cursorCodec := newMemoryFanFeedCursorCodec()
+
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listFollowing: func(_ context.Context, gotViewerID uuid.UUID, gotCursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error) {
+				if gotViewerID != viewerID {
+					t.Fatalf("ListFollowing() viewerID got %s want %s", gotViewerID, viewerID)
+				}
+				if gotCursor == nil {
+					t.Fatal("ListFollowing() cursor = nil, want snapshot cursor")
+				}
+				if len(gotCursor.FollowingRemainingShortIDs) != len(requestCursor.FollowingRemainingShortIDs) {
+					t.Fatalf(
+						"ListFollowing() cursor remaining len got %d want %d",
+						len(gotCursor.FollowingRemainingShortIDs),
+						len(requestCursor.FollowingRemainingShortIDs),
+					)
+				}
+				for index, wantShortID := range requestCursor.FollowingRemainingShortIDs {
+					if gotCursor.FollowingRemainingShortIDs[index] != wantShortID {
+						t.Fatalf(
+							"ListFollowing() cursor remaining[%d] got %s want %s",
+							index,
+							gotCursor.FollowingRemainingShortIDs[index],
+							wantShortID,
+						)
+					}
+				}
+				if !gotCursor.PublishedAt.IsZero() || gotCursor.ShortID != uuid.Nil {
+					t.Fatalf("ListFollowing() cursor got %#v want %#v", gotCursor, requestCursor)
+				}
+				if limit != feed.DefaultPageSize {
+					t.Fatalf("ListFollowing() limit got %d want %d", limit, feed.DefaultPageSize)
+				}
+
+				return []feed.Item{{
+					Creator: feed.CreatorSummary{
+						DisplayName: "Mina Rei",
+						Handle:      "minarei",
+						ID:          viewerID,
+					},
+					Short: feed.ShortSummary{
+						CanonicalMainID:        mainID,
+						CreatorUserID:          viewerID,
+						ID:                     shortID,
+						MediaAssetID:           mediaAssetID,
+						PreviewDurationSeconds: 16,
+						PublishedAt:            publishedAt,
+					},
+					Unlock: feed.UnlockPreview{
+						MainDurationSeconds: 480,
+						PriceJPY:            1800,
+					},
+				}}, nil, nil
+			},
+		},
+		FanFeedCursorCodec: cursorCodec,
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				return media.VideoDisplayAsset{
+					DurationSeconds: 16,
+					ID:              mediaAssetID,
+					Kind:            "video",
+					PosterURL:       "https://cdn.example.com/shorts/poster.jpg",
+					URL:             "https://cdn.example.com/shorts/playback.mp4",
+				}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{CurrentViewer: &auth.CurrentViewer{ID: viewerID}}, nil
+			},
+		},
+	})
+
+	encodedCursor, err := cursorCodec.Encode(context.Background(), "following", fanFeedCursorOwnerBinding(&viewerID), requestCursor)
+	if err != nil {
+		t.Fatalf("Encode() error = %v, want nil", err)
+	}
+	if encodedCursor == nil {
+		t.Fatal("Encode() = nil, want encoded cursor")
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=following&cursor="+*encodedCursor, nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("GET /api/fan/feed?tab=following status got %d want %d", rec.Code, http.StatusOK)
+	}
+}
+
+func TestFanFeedFollowingRouteRejectsLegacyCursorPayload(t *testing.T) {
+	t.Parallel()
+
+	readerCalled := false
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listFollowing: func(context.Context, uuid.UUID, *feed.Cursor, int) ([]feed.Item, *feed.Cursor, error) {
+				readerCalled = true
+				return nil, nil, nil
+			},
+		},
+		FanFeedCursorCodec: newMemoryFanFeedCursorCodec(),
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
+				return media.VideoDisplayAsset{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{CurrentViewer: &auth.CurrentViewer{ID: uuid.MustParse("11111111-1111-1111-1111-111111111111")}}, nil
+			},
+		},
+	})
+
+	legacyCursor := base64.RawURLEncoding.EncodeToString([]byte(`{"publishedAt":"2024-03-09T16:03:20Z","shortId":"55555555-5555-5555-5555-555555555555"}`))
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=following&cursor="+legacyCursor, nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/fan/feed?tab=following legacy cursor status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if readerCalled {
+		t.Fatal("ListFollowing() was called for legacy cursor, want false")
+	}
+	if !strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("legacy cursor body got %q want invalid_request", rec.Body.String())
+	}
+}
+
+func TestFanFeedFollowingRouteRejectsCursorOwnedByAnotherViewer(t *testing.T) {
+	t.Parallel()
+
+	viewerA := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	viewerB := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	cursorCodec := newMemoryFanFeedCursorCodec()
+
+	encodedCursor, err := cursorCodec.Encode(context.Background(), "following", fanFeedCursorOwnerBinding(&viewerA), &feed.Cursor{
+		FollowingRemainingShortIDs: []uuid.UUID{
+			uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+		},
+	})
+	if err != nil {
+		t.Fatalf("Encode() error = %v, want nil", err)
+	}
+
+	readerCalled := false
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listFollowing: func(context.Context, uuid.UUID, *feed.Cursor, int) ([]feed.Item, *feed.Cursor, error) {
+				readerCalled = true
+				return nil, nil, nil
+			},
+		},
+		FanFeedCursorCodec: cursorCodec,
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
+				return media.VideoDisplayAsset{}, nil
+			},
+		},
+		ViewerBootstrap: viewerBootstrapReaderStub{
+			readCurrentViewer: func(context.Context, string) (auth.Bootstrap, error) {
+				return auth.Bootstrap{CurrentViewer: &auth.CurrentViewer{ID: viewerB}}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=following&cursor="+*encodedCursor, nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token-b"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/fan/feed?tab=following foreign cursor status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if readerCalled {
+		t.Fatal("ListFollowing() was called for foreign cursor, want false")
+	}
+}
+
+func TestFanFeedRecommendedRouteRejectsAuthenticatedCursorForPublicViewer(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	cursorCodec := newMemoryFanFeedCursorCodec()
+	encodedCursor, err := cursorCodec.Encode(context.Background(), "recommended", fanFeedCursorOwnerBinding(&viewerID), &feed.Cursor{
+		PublishedAt: time.Unix(1710000200, 0).UTC(),
+		ShortID:     uuid.MustParse("33333333-3333-3333-3333-333333333333"),
+	})
+	if err != nil {
+		t.Fatalf("Encode() error = %v, want nil", err)
+	}
+
+	readerCalled := false
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listRecommended: func(context.Context, *uuid.UUID, *feed.Cursor, int) ([]feed.Item, *feed.Cursor, error) {
+				readerCalled = true
+				return nil, nil, nil
+			},
+		},
+		FanFeedCursorCodec: cursorCodec,
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
+				return media.VideoDisplayAsset{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=recommended&cursor="+*encodedCursor, nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("GET /api/fan/feed?tab=recommended foreign auth cursor status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if readerCalled {
+		t.Fatal("ListRecommended() was called for foreign auth cursor, want false")
+	}
+}
+
+func TestFanFeedRouteReturnsInternalErrorWhenCursorStoreFails(t *testing.T) {
+	t.Parallel()
+
+	readerCalled := false
+	router := NewHandler(HandlerConfig{
+		FanFeed: stubFanFeedReader{
+			listRecommended: func(context.Context, *uuid.UUID, *feed.Cursor, int) ([]feed.Item, *feed.Cursor, error) {
+				readerCalled = true
+				return nil, nil, nil
+			},
+		},
+		FanFeedCursorCodec: stubFanFeedCursorCodec{
+			decode: func(context.Context, string, string, string) (*feed.Cursor, error) {
+				return nil, context.DeadlineExceeded
+			},
+			encode: func(context.Context, string, string, *feed.Cursor) (*string, error) {
+				return nil, nil
+			},
+		},
+		ShortDisplayAssets: stubShortDisplayAssetResolver{
+			resolve: func(media.ShortDisplaySource, media.AccessBoundary) (media.VideoDisplayAsset, error) {
+				t.Fatal("ResolveShortDisplayAsset() was called unexpectedly")
+				return media.VideoDisplayAsset{}, nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fan/feed?tab=recommended&cursor=opaque-token", nil)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("GET /api/fan/feed?tab=recommended cursor store failure status got %d want %d", rec.Code, http.StatusInternalServerError)
+	}
+	if readerCalled {
+		t.Fatal("ListRecommended() was called for cursor store failure, want false")
+	}
+	if strings.Contains(rec.Body.String(), `"code":"invalid_request"`) {
+		t.Fatalf("cursor store failure body got %q want internal error classification", rec.Body.String())
 	}
 }

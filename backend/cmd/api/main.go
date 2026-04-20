@@ -244,6 +244,7 @@ func main() {
 			CreatorProfile:                   creatorRepository,
 			CreatorProfileShorts:             creatorRepository,
 			FanFeed:                          feedRepository,
+			FanFeedCursorCodec:               httpserver.NewRedisFanFeedCursorCodec(redisClient),
 			RecommendationSignalExposure:     recommendationSignalExposureStore,
 			RecommendationSignals:            recommendationSignalService,
 			FanUnlockMain:                    fanUnlockMainService,

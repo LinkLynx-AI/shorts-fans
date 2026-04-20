@@ -76,6 +76,12 @@ type FanFeedReader interface {
 	ListRecommended(ctx context.Context, viewerUserID *uuid.UUID, cursor *feed.Cursor, limit int) ([]feed.Item, *feed.Cursor, error)
 }
 
+// FanFeedCursorCodec は fan feed pagination cursor を opaque token として扱う codec です。
+type FanFeedCursorCodec interface {
+	Decode(ctx context.Context, tab string, ownerBinding string, encoded string) (*feed.Cursor, error)
+	Encode(ctx context.Context, tab string, ownerBinding string, cursor *feed.Cursor) (*string, error)
+}
+
 // RecommendationSignalExposureStore は recommendation signal 用の recent surfaced target を表します。
 type RecommendationSignalExposureStore interface {
 	HasCreatorExposure(ctx context.Context, viewerID uuid.UUID, creatorUserID uuid.UUID) (bool, error)
@@ -212,6 +218,7 @@ type HandlerConfig struct {
 	CreatorProfile                   CreatorProfileReader
 	CreatorProfileShorts             CreatorProfileShortsReader
 	FanFeed                          FanFeedReader
+	FanFeedCursorCodec               FanFeedCursorCodec
 	RecommendationSignalExposure     RecommendationSignalExposureStore
 	RecommendationSignals            RecommendationSignalWriter
 	FanUnlockMain                    FanUnlockMainService
@@ -318,9 +325,15 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	)
 	registerCreatorUploadRoutes(router, config.CreatorUpload, config.ViewerBootstrap)
 	registerCreatorSearchRoutes(router, config.CreatorSearch)
+	fanFeedCursorCodec := config.FanFeedCursorCodec
+	if fanFeedCursorCodec == nil {
+		fanFeedCursorCodec = newMemoryFanFeedCursorCodec()
+	}
+
 	registerFanFeedRoutes(
 		router,
 		config.FanFeed,
+		fanFeedCursorCodec,
 		config.ShortDisplayAssets,
 		config.RecommendationSignalExposure,
 		config.ViewerBootstrap,
