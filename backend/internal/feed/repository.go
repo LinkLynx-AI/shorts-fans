@@ -446,7 +446,7 @@ type mapFeedRow struct {
 	IsUnlocked         any
 	IsFollowingCreator any
 	MainDurationMs     pgtype.Int8
-	MainPriceMinor     int64
+	MainPriceMinor     any
 	MediaAssetID       pgtype.UUID
 	PublishedAt        pgtype.Timestamptz
 	ShortDurationMs    pgtype.Int8
@@ -492,7 +492,11 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 	if !row.MainDurationMs.Valid || row.MainDurationMs.Int64 <= 0 {
 		return Item{}, fmt.Errorf("public short item の main duration_ms がありません")
 	}
-	if row.MainPriceMinor <= 0 {
+	mainPriceMinor, err := priceMinorFromAny(row.MainPriceMinor)
+	if err != nil {
+		return Item{}, fmt.Errorf("public short item の main price_minor 変換: %w", err)
+	}
+	if mainPriceMinor <= 0 {
 		return Item{}, fmt.Errorf("public short item の main price_minor がありません")
 	}
 
@@ -534,7 +538,7 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 			IsOwner:             isOwner,
 			IsUnlocked:          isUnlocked,
 			MainDurationSeconds: (row.MainDurationMs.Int64 + 999) / 1000,
-			PriceJPY:            row.MainPriceMinor,
+			PriceJPY:            mainPriceMinor,
 		},
 	}
 	item.Viewer.IsFollowingCreator = isFollowingCreator
@@ -619,5 +623,20 @@ func boolFromAny(value any) (bool, error) {
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected bool type %T", value)
+	}
+}
+
+func priceMinorFromAny(value any) (int64, error) {
+	switch typedValue := value.(type) {
+	case int64:
+		return typedValue, nil
+	case pgtype.Int8:
+		if !typedValue.Valid {
+			return 0, nil
+		}
+
+		return typedValue.Int64, nil
+	default:
+		return 0, fmt.Errorf("unexpected price_minor type %T", value)
 	}
 }
