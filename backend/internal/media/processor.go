@@ -232,7 +232,7 @@ func (p *Processor) processClaimedJob(ctx context.Context, claimed claimedJob) e
 					errors.Join(err, markerErr),
 				)
 			}
-			return fmt.Errorf("submit ready package for review media_asset_id=%s main_id=%s: %w", claimed.asset.ID, claimed.canonicalMainID, err)
+			return nil
 		}
 		return nil
 	}
@@ -399,7 +399,7 @@ func (p *Processor) markReviewSubmitFailed(ctx context.Context, claimed claimedJ
 		ID:               claimed.job.ID,
 		LastErrorMessage: pgTextPtr(&message),
 	}); err != nil {
-		return fmt.Errorf("mark media processing job review submit failed id=%s: %w", claimed.asset.ID, err)
+		return fmt.Errorf("mark media processing job review submit failed id=%s: %w", claimed.job.ID, err)
 	}
 
 	return nil

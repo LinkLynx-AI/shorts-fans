@@ -236,9 +236,10 @@ func (s *Service) submitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 		}
 		if requiredSubmitKind != "" && transition.SubmitKind != requiredSubmitKind {
 			return fmt.Errorf(
-				"submission package submit main=%s user=%s submit_kind=%s: %w",
+				"submission package submit main=%s user=%s required_submit_kind=%s actual_submit_kind=%s: %w",
 				mainID,
 				viewerUserID,
+				requiredSubmitKind,
 				transition.SubmitKind,
 				ErrReviewStateConflict,
 			)

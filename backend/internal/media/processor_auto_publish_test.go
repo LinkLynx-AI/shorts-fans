@@ -402,7 +402,7 @@ func TestSubmitReadyPackageForReviewSkipsMissingInputs(t *testing.T) {
 	}
 }
 
-func TestProcessClaimedJobPropagatesReviewSubmitterError(t *testing.T) {
+func TestProcessClaimedJobMarksReviewSubmitterErrorAsSoftFailure(t *testing.T) {
 	t.Parallel()
 
 	creatorUserID := uuid.MustParse("77777777-aaaa-aaaa-aaaa-777777777777")
@@ -469,11 +469,8 @@ func TestProcessClaimedJobPropagatesReviewSubmitterError(t *testing.T) {
 		mainID:          mainID,
 		canonicalMainID: mainID,
 	})
-	if !errors.Is(err, submitErr) {
-		t.Fatalf("processClaimedJob() error got %v want %v", err, submitErr)
-	}
-	if err != nil && !strings.Contains(err.Error(), "submit ready package for review") {
-		t.Fatalf("processClaimedJob() error got %q want context", err.Error())
+	if err != nil {
+		t.Fatalf("processClaimedJob() error = %v, want nil", err)
 	}
 	if markCalls != 1 {
 		t.Fatalf("MarkMediaProcessingJobReviewSubmitFailed() calls got %d want 1", markCalls)
@@ -580,8 +577,8 @@ func TestProcessAssetRetriesReviewSubmitForSucceededJob(t *testing.T) {
 		mainID:          mainID,
 		canonicalMainID: mainID,
 	})
-	if !errors.Is(err, submitErr) {
-		t.Fatalf("processClaimedJob() error got %v want %v", err, submitErr)
+	if err != nil {
+		t.Fatalf("processClaimedJob() error = %v, want nil", err)
 	}
 	if submitter.calls != 1 {
 		t.Fatalf("SubmitInitialPackageIfReady() calls after first attempt got %d want 1", submitter.calls)
@@ -812,8 +809,8 @@ func TestProcessNextQueuedRetriesSucceededShortReviewSubmitWithoutWake(t *testin
 	processor.SetReviewSubmitter(submitter)
 
 	processed, err := processor.ProcessNextQueued(context.Background())
-	if !errors.Is(err, submitErr) {
-		t.Fatalf("ProcessNextQueued() first error got %v want %v", err, submitErr)
+	if err != nil {
+		t.Fatalf("ProcessNextQueued() first error = %v, want nil", err)
 	}
 	if !processed {
 		t.Fatal("ProcessNextQueued() processed = false, want true")

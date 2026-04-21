@@ -22,10 +22,11 @@ export function CreatorWorkspaceManagedTile({
   tab: ApprovedCreatorWorkspaceManagedTab;
 }) {
   const isRejected = item.tone === "removed";
+  const statusLabel = item.tone === "approved" ? "" : ` ${item.status}`;
 
   return (
     <button
-      aria-label={`${tab === "main" ? "本編" : "ショート"}詳細を開く ${poster.shortId}`}
+      aria-label={`${tab === "main" ? "本編" : "ショート"}詳細を開く ${poster.shortId}${statusLabel}`}
       className="group min-w-0 rounded-[18px] text-left transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1082c8]/20"
       onClick={() => {
         onOpenDetail({ kind: "mock", shortId: item.shortId, tab });
