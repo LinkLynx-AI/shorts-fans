@@ -41,6 +41,9 @@ type queries interface {
 	GetPublicShortByID(ctx context.Context, id pgtype.UUID) (sqlc.AppPublicShort, error)
 	PutPinnedShort(ctx context.Context, arg sqlc.PutPinnedShortParams) error
 	DeletePinnedShort(ctx context.Context, arg sqlc.DeletePinnedShortParams) error
+	PutShortLike(ctx context.Context, arg sqlc.PutShortLikeParams) error
+	DeleteShortLike(ctx context.Context, arg sqlc.DeleteShortLikeParams) error
+	CountShortLikesByShortID(ctx context.Context, shortID pgtype.UUID) (int64, error)
 	ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error)
 	GetCanonicalMainIDByShortID(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 }

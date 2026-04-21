@@ -68,10 +68,13 @@
 | `short` | `ShortSummary` | feed 上の public short |
 | `creator` | `CreatorSummary` | creator block 表示用 |
 | `viewer.isPinned` | `boolean` | pin secondary action 表示用 |
+| `viewer.hasLiked` | `boolean` | like secondary action 表示用。未認証 viewer では `false` |
 | `viewer.isFollowingCreator` | `boolean` | current viewer の creator follow state |
+| `engagement.likeCount` | `number` | public short like count |
 | `unlockCta` | `UnlockCtaState` | 下部固定 CTA 用。price と main 長さはここから組み立てる |
 
 - short pin relation の write contract は `docs/contracts/fan-short-pin-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
+- short like relation の write contract は `docs/contracts/fan-short-like-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
 
 #### HTTP States
 
@@ -95,6 +98,7 @@
 - `data.detail`: `ShortDetail`
 - `meta.page = null`
 - short pin relation の write contract は `docs/contracts/fan-short-pin-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
+- short like relation の write contract は `docs/contracts/fan-short-like-api-contract.md` を参照します。この read surface 自体は auth optional のまま維持します。
 
 #### HTTP States
 
@@ -221,7 +225,7 @@
 
 ## Out-of-scope Guardrails
 
-- `like` と `comment` は返さない
+- `comment` は返さない
 - raw score、ranking explanation、recommendation reason、debug field は返さない
 - `main` の direct listing は返さない
 - recommendation や related creators は返さない

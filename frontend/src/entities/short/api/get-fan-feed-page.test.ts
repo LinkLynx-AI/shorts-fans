@@ -17,6 +17,9 @@ describe("getFanFeedPage", () => {
                   handle: "@minarei",
                   id: "creator_mina_rei",
                 },
+                engagement: {
+                  likeCount: 42,
+                },
                 short: {
                   caption: "quiet rooftop preview",
                   canonicalMainId: "main_33333333333333333333333333333333",
@@ -38,6 +41,7 @@ describe("getFanFeedPage", () => {
                   state: "unlock_available",
                 },
                 viewer: {
+                  hasLiked: true,
                   isFollowingCreator: true,
                   isPinned: true,
                 },
@@ -76,6 +80,9 @@ describe("getFanFeedPage", () => {
             handle: "@minarei",
             id: "creator_mina_rei",
           },
+          engagement: {
+            likeCount: 42,
+          },
           short: {
             caption: "quiet rooftop preview",
             canonicalMainId: "main_33333333333333333333333333333333",
@@ -97,6 +104,7 @@ describe("getFanFeedPage", () => {
             state: "unlock_available",
           },
           viewer: {
+            hasLiked: true,
             isFollowingCreator: true,
             isPinned: true,
           },
@@ -130,6 +138,9 @@ describe("getFanFeedPage", () => {
                   handle: "@minarei",
                   id: "creator_mina_rei",
                 },
+                engagement: {
+                  likeCount: 0,
+                },
                 short: {
                   caption: "",
                   canonicalMainId: "main_33333333333333333333333333333333",
@@ -151,6 +162,7 @@ describe("getFanFeedPage", () => {
                   state: "unlock_available",
                 },
                 viewer: {
+                  hasLiked: false,
                   isFollowingCreator: false,
                   isPinned: false,
                 },

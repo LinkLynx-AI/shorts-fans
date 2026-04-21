@@ -350,6 +350,13 @@ type AppShort struct {
 	ReviewNote           pgtype.Text
 }
 
+type AppShortLike struct {
+	UserID    pgtype.UUID
+	ShortID   pgtype.UUID
+	LikedAt   pgtype.Timestamptz
+	CreatedAt pgtype.Timestamptz
+}
+
 type AppSubmissionReviewIntake struct {
 	ID                 pgtype.UUID
 	CanonicalMainID    pgtype.UUID
