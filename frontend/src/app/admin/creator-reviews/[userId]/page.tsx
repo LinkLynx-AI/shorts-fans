@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/shared/api";
 import { assertAdminUiEnabled } from "../../_lib/admin-ui-access";
+import { AdminReviewNavigation } from "../../_ui/admin-review-navigation";
 import {
   Avatar,
   AvatarFallback,
@@ -67,9 +68,13 @@ export default async function AdminCreatorReviewCasePage({
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <AdminReviewNavigation active="creator-reviews" />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary">
-          <Link href={`/admin/creator-reviews?state=${activeState}`}>一覧へ戻る</Link>
+          <Link href={`/admin/creator-reviews?state=${activeState}`} prefetch={false}>
+            一覧へ戻る
+          </Link>
         </Button>
         <span
           className={[

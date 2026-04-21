@@ -121,6 +121,15 @@ function createReviewCase(): SubmissionReviewCase {
   };
 }
 
+function getFixtureShort(reviewCase: SubmissionReviewCase) {
+  const [short] = reviewCase.shorts;
+  if (!short) {
+    throw new Error("submission review fixture must include a short");
+  }
+
+  return short;
+}
+
 describe("AdminSubmissionReviewCasePage", () => {
   beforeEach(() => {
     notFound.mockReset();
@@ -135,6 +144,18 @@ describe("AdminSubmissionReviewCasePage", () => {
       params: Promise.resolve({ intakeId: reviewCase.intake.id }),
     }));
 
+    expect(screen.getByRole("link", { name: /Video 審査 main \/ short/i })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByRole("link", { name: /Creator 審査 登録申請/i })).toHaveAttribute(
+      "href",
+      "/admin/creator-reviews",
+    );
+    expect(screen.getByRole("link", { name: "一覧へ戻る" })).toHaveAttribute(
+      "data-prefetch",
+      "false",
+    );
     expect(screen.queryByText("manual_override")).not.toBeInTheDocument();
     expect(screen.getAllByText("manual")).toHaveLength(3);
     expect(screen.getByText("auto")).toBeInTheDocument();
@@ -146,6 +167,7 @@ describe("AdminSubmissionReviewCasePage", () => {
 
   it("renders fallback copy when provenance is not recorded", async () => {
     const reviewCase = createReviewCase();
+    const short = getFixtureShort(reviewCase);
     reviewCase.main.review = {
       decisionSource: null,
       decisionedAt: null,
@@ -153,13 +175,13 @@ describe("AdminSubmissionReviewCasePage", () => {
       reviewNote: null,
     };
     reviewCase.main.intakeDecisionLog = null;
-    reviewCase.shorts[0]!.review = {
+    short.review = {
       decisionSource: null,
       decisionedAt: null,
       reasonCode: null,
       reviewNote: null,
     };
-    reviewCase.shorts[0]!.intakeDecisionLog = null;
+    short.intakeDecisionLog = null;
     vi.mocked(getSubmissionReviewCase).mockResolvedValue(reviewCase);
 
     render(await AdminSubmissionReviewCasePage({
