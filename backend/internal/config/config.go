@@ -217,7 +217,7 @@ func (c Config) validateAPIAppEnv() error {
 	case defaultAppEnv, productionAppEnv:
 		return nil
 	default:
-		return fmt.Errorf("unsupported APP_ENV %q: must be %s or %s", c.AppEnv, defaultAppEnv, productionAppEnv)
+		return fmt.Errorf("unsupported APP_ENV %q: must be %s or %s", appEnv, defaultAppEnv, productionAppEnv)
 	}
 }
 

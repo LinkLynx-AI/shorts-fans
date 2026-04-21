@@ -199,10 +199,10 @@ func TestValidateAPIRequiresExplicitSupportedAppEnv(t *testing.T) {
 		{
 			name: "unsupported app env",
 			cfg: Config{
-				AppEnv:              "staging",
+				AppEnv:              " Staging ",
 				AppEnvExplicitlySet: true,
 			},
-			wantErr: "unsupported APP_ENV",
+			wantErr: "unsupported APP_ENV \"staging\"",
 		},
 	}
 
