@@ -144,7 +144,10 @@ function CreatorWorkspaceDetailPosterFrame({
 }) {
   const pendingLike = detail.statusTone === "pending" || detail.statusTone === "revision" || detail.statusTone === "paused";
   const mutedLike = detail.statusTone === "hidden" || detail.statusTone === "removed";
-  const hasStatus = detail.statusTone !== null && detail.statusLabel !== null;
+  const hasStatus = detail.statusTone !== null
+    && detail.statusLabel !== null
+    && detail.statusTone !== "approved"
+    && detail.statusTone !== "pending";
 
   return (
     <div className="relative overflow-hidden rounded-[32px]">
@@ -368,7 +371,7 @@ function CreatorWorkspaceDetailLinkedGrid({
   workspace: ApprovedCreatorWorkspaceState;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-[3px]">
+    <div className="grid grid-cols-2 gap-3">
       {items.flatMap((shortId) => {
         const poster = workspace.posters[shortId];
         const detail = workspace.detailsByTab[tab][shortId];

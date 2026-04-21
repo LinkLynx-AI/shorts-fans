@@ -3,15 +3,15 @@
 ## 位置づけ
 
 - この文書は `/creator` workspace 内で owner 自身が current submission package の review status を読む private read contract を固定します。
-- dashboard 通知、main / short tile badge、detail 内 submit / resubmit CTA に必要な最小 read surface だけを扱います。
+- dashboard の要対応通知、main / short tile badge、detail 内の審査状態表示に必要な最小 read surface だけを扱います。
 - actual submit / resubmit mutation は [creator-workspace-submission-review-api-contract.md](creator-workspace-submission-review-api-contract.md) を正とし、この文書では creator-facing read state と error vocabulary を固定します。
 
 ## Goals
 
-- `/creator` dashboard で current package の審査状態を notification として表示するための package summary を返す。
-- main / short tile に表示する review badge を dedicated read surface で返す。
-- main detail / short detail から submit / resubmit CTA を成立させるための target state、package state、blockers を返す。
-- short detail からでも canonical `main` anchor の package action を実行できるよう、target と package を分離して返す。
+- `/creator` dashboard で current package の要対応状態を notification として表示するための package summary を返す。
+- main / short tile に表示する要対応 review badge を dedicated read surface で返す。
+- main detail / short detail で target state、package state、blockers を表示できるように返す。
+- short detail からでも canonical `main` anchor の package 状態を説明できるよう、target と package を分離して返す。
 
 ## Non-goals
 
@@ -43,7 +43,7 @@
 
 | value | notes |
 | --- | --- |
-| `ready` | 現在の package は submit / resubmit action を実行できる |
+| `ready` | 現在の package は review intake / resubmit の readiness を満たしている |
 | `blocked` | readiness blocker が存在し action 不可 |
 | `conflict` | blocker はないが current review state から action 不可 |
 | `none` | pending intake などにより action を出さない |
@@ -65,6 +65,9 @@
 | `submit` | initial submit を出す |
 | `resubmit` | revision requested package に対する resubmit を出す |
 | `none` | CTA を表示しない |
+
+- upload 由来の initial review intake は media processing ready 後に自動投入されるため、detail UI は `submitAction = submit` を primary CTA として表示しません。
+- `submitAction` は backend の action eligibility を表す互換 field として残します。
 
 ### `WorkspaceReviewTargetKind`
 
@@ -94,7 +97,7 @@
 | `canonicalMainId` | `string` | package anchor となる canonical `main` |
 | `reviewStatus` | `WorkspaceReviewPackageStatus` | package 全体の review state |
 | `readiness` | `WorkspaceReviewPackageReadiness` | CTA 可否の基礎状態 |
-| `submitAction` | `WorkspaceReviewSubmitAction` | detail で出す action |
+| `submitAction` | `WorkspaceReviewSubmitAction` | backend が判定した action eligibility。detail UI は初回 submit CTA を表示しない |
 | `linkedShortCount` | `number` | package に含まれる linked short 数 |
 | `blockers` | `WorkspaceReviewBlockerCode[]` | readiness blocker 一覧 |
 
@@ -174,13 +177,15 @@
 - caller は authenticated viewer である必要があります。
 - caller は approved creator capability を持つ owner 自身である必要があります。
 - dashboard read surface は owner 自身の `main` / `short` と、それらから導出される package summary のみを返します。
-- detail read surface の `target.id` は current detail object を指しますが、submit / resubmit mutation の action target は常に `target.canonicalMainId` です。
+- detail read surface の `target.id` は current detail object を指します。package-level action を実行する場合の anchor は常に `target.canonicalMainId` です。
 - `reviewStatus` は package-level summary であり、public publish / unlock state を直接意味しません。
 - `target.review.state` と tile `state` は object-level source of truth であり、`reviewStatus` は UI summary 用の derived state です。
 - `reasonCode` は opaque code として返し、message localization は backend が持ちません。
 - `pending_review` package では `submitAction = none` かつ `readiness = none` を返します。
 - `blocked` package では `submitAction = none` を返し、`blockers` に readiness 未成立理由を返します。
 - `rejected` object を含む package でも read surface は返しますが、self-serve reopen action は含めません。
+- creator UI は `approved` / `pending_review` / blocker のない normal state を通常表示から抑制し、差し戻し、却下、blocker、conflict など creator action が必要な状態だけを review panel / tile badge / dashboard notification として表示します。
+- 承認済みを示す copy や badge は、正常状態の再説明になるため creator UI には表示しません。
 
 ## Success Example
 

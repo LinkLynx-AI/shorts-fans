@@ -13,6 +13,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 )
 
 type wakeQueueAdapter struct {
@@ -110,6 +111,7 @@ func main() {
 		logger.Error("failed to initialize media processor", "error", err)
 		os.Exit(1)
 	}
+	processor.SetReviewSubmitter(submissionreview.NewService(pool))
 	worker, err := media.NewWorker(media.WorkerConfig{}, wakeQueueAdapter{queue: mediaJobsQueue}, processor)
 	if err != nil {
 		logger.Error("failed to initialize media worker", "error", err)
