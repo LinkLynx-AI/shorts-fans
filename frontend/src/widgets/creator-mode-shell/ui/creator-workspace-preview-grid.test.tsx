@@ -119,7 +119,7 @@ describe("CreatorWorkspacePreviewGrid", () => {
     const tile = screen.getByTestId("creator-workspace-preview-tile");
 
     expect(tile.closest("section")).toHaveClass("grid-cols-2");
-    expect(tile).not.toHaveTextContent("却下");
+    expect(tile).not.toHaveTextContent("公開不可");
     expect(tile).not.toHaveTextContent(/\bShort\b|\bMain\b/);
     expect(screen.getByTestId("creator-workspace-rejected-marker")).toBeInTheDocument();
   });

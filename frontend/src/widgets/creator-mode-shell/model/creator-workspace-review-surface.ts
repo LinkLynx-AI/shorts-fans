@@ -155,7 +155,7 @@ function resolveCreatorWorkspaceReviewLabel(
     case "pending_review":
       return "審査中";
     case "rejected":
-      return "却下";
+      return "公開不可";
     case "draft":
       return "未申請";
   }

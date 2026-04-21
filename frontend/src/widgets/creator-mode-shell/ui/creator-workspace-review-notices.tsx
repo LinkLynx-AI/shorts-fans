@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  CircleAlert,
-  CircleX,
+  AlertCircle,
+  XCircle,
 } from "lucide-react";
 
 import { Button } from "@/shared/ui";
@@ -34,10 +34,10 @@ function CreatorWorkspaceReviewNoticeIcon({
   tone: CreatorWorkspaceReviewNotification["tone"];
 }) {
   if (tone === "removed") {
-    return <CircleX className="size-4" strokeWidth={2.1} />;
+    return <XCircle className="size-4" strokeWidth={2.1} />;
   }
 
-  return <CircleAlert className="size-4" strokeWidth={2.1} />;
+  return <AlertCircle className="size-4" strokeWidth={2.1} />;
 }
 
 function CreatorWorkspaceReviewNoticeCard({
