@@ -6,6 +6,7 @@ import { afterEach, vi } from "vitest";
 type MockedLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   children?: ReactNode;
   href: string;
+  prefetch?: boolean | null;
 };
 
 const mockedUsePathname = vi.fn(() => "/");
@@ -43,15 +44,19 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: MockedLinkProps) =>
-    createElement(
+  default: ({ children, href, prefetch, ...props }: MockedLinkProps) => {
+    void prefetch;
+
+    return createElement(
       "a",
       {
         ...props,
+        "data-prefetch": prefetch === false ? "false" : undefined,
         href,
       },
       children,
-    ),
+    );
+  },
 }));
 
 vi.stubGlobal("fetch", mockedFetch);

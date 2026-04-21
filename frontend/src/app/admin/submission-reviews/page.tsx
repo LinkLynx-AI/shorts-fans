@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { assertAdminUiEnabled } from "../_lib/admin-ui-access";
+import { AdminReviewNavigation } from "../_ui/admin-review-navigation";
 import {
   Avatar,
   AvatarFallback,
@@ -20,6 +21,8 @@ export default async function AdminSubmissionReviewsPage() {
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <AdminReviewNavigation active="submission-reviews" />
+
       <section className="grid gap-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
         <SurfacePanel className="overflow-hidden border-none bg-[linear-gradient(160deg,#352019_0%,#8a4b2d_46%,#f4dfcf_100%)] px-6 py-6 text-white shadow-[0_28px_56px_rgba(74,35,18,0.18)]">
           <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-white/72">admin submission review</p>

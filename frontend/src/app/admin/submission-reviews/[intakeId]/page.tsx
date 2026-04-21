@@ -24,6 +24,7 @@ import {
   type SubmissionReviewObjectState,
 } from "@/entities/submission-review";
 import { assertAdminUiEnabled } from "../../_lib/admin-ui-access";
+import { AdminReviewNavigation } from "../../_ui/admin-review-navigation";
 
 function getStateBadgeClass(state: SubmissionReviewObjectState | "decision_applied" | "pending_review") {
   switch (state) {
@@ -146,6 +147,8 @@ export default async function AdminSubmissionReviewCasePage({
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <AdminReviewNavigation active="submission-reviews" />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary">
           <Link href="/admin/submission-reviews">一覧へ戻る</Link>
