@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"strings"
@@ -24,7 +23,7 @@ func registerPaymentWebhookRoutes(router gin.IRouter, handler PaymentWebhookHand
 }
 
 func handleCCBillWebhook(c *gin.Context, handler PaymentWebhookHandler) {
-	body, err := io.ReadAll(c.Request.Body)
+	body, err := readLimitedRequestBody(c, webhookRequestBodyLimitBytes)
 	if err != nil {
 		writePaymentWebhookError(c, http.StatusBadRequest, "invalid_request", "webhook payload was invalid")
 		return

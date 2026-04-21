@@ -1,7 +1,6 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -295,7 +294,7 @@ func handleFanMainCardSetupSession(c *gin.Context, service FanUnlockMainService)
 	}
 
 	var request cardSetupSessionRequestPayload
-	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+	if err := decodeLimitedJSONBody(c, &request, false); err != nil {
 		writeInvalidFanMainRequest(c, fanMainCardSetupSessionRequestScope, "main card setup session request was invalid")
 		return
 	}
@@ -363,7 +362,7 @@ func handleFanMainCardSetupToken(c *gin.Context, service FanUnlockMainService) {
 	}
 
 	var request cardSetupTokenRequestPayload
-	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+	if err := decodeLimitedJSONBody(c, &request, false); err != nil {
 		writeInvalidFanMainRequest(c, fanMainCardSetupTokenRequestScope, "main card setup token request was invalid")
 		return
 	}
@@ -429,7 +428,7 @@ func handleFanMainPurchase(c *gin.Context, service FanUnlockMainService) {
 	}
 
 	var request mainPurchaseRequestPayload
-	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+	if err := decodeLimitedJSONBody(c, &request, false); err != nil {
 		writeInvalidFanMainRequest(c, fanMainPurchaseRequestScope, "main purchase request was invalid")
 		return
 	}
@@ -515,7 +514,7 @@ func handleFanMainAccessEntry(c *gin.Context, service FanUnlockMainService) {
 	}
 
 	var request mainAccessEntryRequestPayload
-	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+	if err := decodeLimitedJSONBody(c, &request, false); err != nil {
 		writeInvalidFanMainRequest(c, fanMainAccessEntryRequestScope, "main access entry request was invalid")
 		return
 	}

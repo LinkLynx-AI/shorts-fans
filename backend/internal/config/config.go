@@ -10,6 +10,7 @@ import (
 const (
 	defaultAPIAddr             = ":8080"
 	defaultAppEnv              = "development"
+	productionAppEnv           = "production"
 	defaultCCBillBaseURL       = "https://api.ccbill.com"
 	defaultCCBillCurrencyCode  = 392
 	legacySQSQueueURLEnv       = "SQS_QUEUE_URL"
@@ -76,10 +77,10 @@ func Load() Config {
 
 // LoadFromEnv は任意の lookup 関数から Config を構築します。
 func LoadFromEnv(lookup func(string) string) Config {
-	appEnv := trimmedLookup(lookup, "APP_ENV")
+	rawAppEnv := trimmedLookup(lookup, "APP_ENV")
 	cfg := Config{
-		AppEnv:                          appEnv,
-		AppEnvExplicitlySet:             appEnv != "",
+		AppEnv:                          normalizeAppEnv(rawAppEnv),
+		AppEnvExplicitlySet:             rawAppEnv != "",
 		APIAddr:                         trimmedLookup(lookup, "API_ADDR"),
 		PostgresDSN:                     trimmedLookup(lookup, "POSTGRES_DSN"),
 		RedisAddr:                       trimmedLookup(lookup, "REDIS_ADDR"),
@@ -108,9 +109,6 @@ func LoadFromEnv(lookup func(string) string) Config {
 		CreatorReviewEvidenceBucketName: trimmedLookup(lookup, reviewEvidenceBucketEnv),
 	}
 
-	if cfg.AppEnv == "" {
-		cfg.AppEnv = defaultAppEnv
-	}
 	if cfg.APIAddr == "" {
 		cfg.APIAddr = defaultAPIAddr
 	}
@@ -126,6 +124,10 @@ func LoadFromEnv(lookup func(string) string) Config {
 
 // ValidateAPI は API サーバー設定が不足なく与えられているか検証します。
 func (c Config) ValidateAPI() error {
+	if err := c.validateAPIAppEnv(); err != nil {
+		return err
+	}
+
 	var missing []string
 	if c.PostgresDSN == "" {
 		missing = append(missing, "POSTGRES_DSN")
@@ -187,13 +189,36 @@ func (c Config) PaymentBypassEnabled() bool {
 	return c.AppEnvExplicitlySet && c.resolvedAppEnv() == defaultAppEnv
 }
 
+// IsProduction は production 相当の runtime かどうかを正規化済み app env で判定します。
+func (c Config) IsProduction() bool {
+	return c.resolvedAppEnv() == productionAppEnv
+}
+
 func (c Config) resolvedAppEnv() string {
-	appEnv := strings.TrimSpace(c.AppEnv)
+	return normalizeAppEnv(c.AppEnv)
+}
+
+func normalizeAppEnv(appEnv string) string {
+	appEnv = strings.ToLower(strings.TrimSpace(appEnv))
 	if appEnv == "" {
 		return defaultAppEnv
 	}
 
 	return appEnv
+}
+
+func (c Config) validateAPIAppEnv() error {
+	appEnv := strings.ToLower(strings.TrimSpace(c.AppEnv))
+	if !c.AppEnvExplicitlySet || appEnv == "" {
+		return fmt.Errorf("APP_ENV must be explicitly set to %s or %s", defaultAppEnv, productionAppEnv)
+	}
+
+	switch appEnv {
+	case defaultAppEnv, productionAppEnv:
+		return nil
+	default:
+		return fmt.Errorf("unsupported APP_ENV %q: must be %s or %s", appEnv, defaultAppEnv, productionAppEnv)
+	}
 }
 
 func (c Config) missingPaymentEnvNames() []string {

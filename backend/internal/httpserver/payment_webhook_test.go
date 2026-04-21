@@ -117,6 +117,36 @@ func TestCCBillWebhookRouteRejectsInvalidPayload(t *testing.T) {
 	}
 }
 
+func TestCCBillWebhookRouteRejectsOversizedBodyBeforeHandler(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	router := NewHandler(HandlerConfig{
+		CCBillWebhook: stubPaymentWebhookHandler{
+			handleWebhook: func(context.Context, string, url.Values, string, []byte) error {
+				called = true
+				return nil
+			},
+		},
+	})
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/payments/ccbill/webhooks",
+		strings.NewReader(strings.Repeat("x", int(webhookRequestBodyLimitBytes)+1)),
+	)
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/payments/ccbill/webhooks status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if called {
+		t.Fatal("HandleWebhook() was called for oversized body")
+	}
+}
+
 func TestCCBillWebhookRouteReturnsInternalServerError(t *testing.T) {
 	t.Parallel()
 

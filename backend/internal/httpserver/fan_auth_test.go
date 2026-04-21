@@ -121,6 +121,33 @@ func TestSignInMapsInvalidCredentials(t *testing.T) {
 	}
 }
 
+func TestSignInRejectsOversizedBodyBeforeService(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	router := NewHandler(HandlerConfig{
+		FanAuth: fanAuthServiceStub{
+			signIn: func(context.Context, string, string) (auth.AuthenticatedSession, error) {
+				called = true
+				return auth.AuthenticatedSession{}, nil
+			},
+		},
+	})
+	body := `{"email":"fan@example.com","password":"` + strings.Repeat("a", int(jsonRequestBodyLimitBytes)+1) + `"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/fan/auth/sign-in", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("POST /api/fan/auth/sign-in status got %d want %d", rec.Code, http.StatusBadRequest)
+	}
+	if called {
+		t.Fatal("SignIn() was called for oversized body")
+	}
+}
+
 func TestSignInMapsConfirmationRequired(t *testing.T) {
 	t.Parallel()
 

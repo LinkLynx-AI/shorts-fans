@@ -1,10 +1,8 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -666,19 +664,7 @@ func decodeViewerCreatorEntryJSON[T any](
 	message string,
 	requestScope string,
 ) bool {
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		writeViewerCreatorEntryError(c, http.StatusBadRequest, code, message, requestScope)
-		return false
-	}
-
-	var extra json.RawMessage
-	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
-		writeViewerCreatorEntryError(c, http.StatusBadRequest, code, message, requestScope)
-		return false
-	}
-	if len(extra) > 0 {
+	if err := decodeLimitedJSONBody(c, target, true); err != nil {
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, code, message, requestScope)
 		return false
 	}

@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadFromEnvDefaults(t *testing.T) {
 	t.Parallel()
@@ -34,7 +37,7 @@ func TestLoadFromEnvTracksExplicitAppEnvForPaymentBypass(t *testing.T) {
 
 	cfg := LoadFromEnv(func(key string) string {
 		if key == "APP_ENV" {
-			return "development"
+			return " Development "
 		}
 
 		return ""
@@ -51,10 +54,86 @@ func TestLoadFromEnvTracksExplicitAppEnvForPaymentBypass(t *testing.T) {
 	}
 }
 
+func TestLoadFromEnvNormalizesProductionAppEnv(t *testing.T) {
+	t.Parallel()
+
+	cfg := LoadFromEnv(func(key string) string {
+		if key == "APP_ENV" {
+			return " Production "
+		}
+
+		return ""
+	})
+
+	if cfg.AppEnv != "production" {
+		t.Fatalf("LoadFromEnv() app env got %q want production", cfg.AppEnv)
+	}
+	if !cfg.AppEnvExplicitlySet {
+		t.Fatal("LoadFromEnv() AppEnvExplicitlySet = false, want true")
+	}
+	if !cfg.IsProduction() {
+		t.Fatal("IsProduction() = false, want true")
+	}
+	if cfg.PaymentBypassEnabled() {
+		t.Fatal("PaymentBypassEnabled() = true, want false")
+	}
+}
+
+func TestAppEnvRuntimeGuardsUseNormalizedValues(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name              string
+		cfg               Config
+		wantProduction    bool
+		wantPaymentBypass bool
+	}{
+		{
+			name:              "manual production with mixed case and spaces",
+			cfg:               Config{AppEnv: " Production ", AppEnvExplicitlySet: true},
+			wantProduction:    true,
+			wantPaymentBypass: false,
+		},
+		{
+			name:              "explicit development with mixed case and spaces",
+			cfg:               Config{AppEnv: " Development ", AppEnvExplicitlySet: true},
+			wantProduction:    false,
+			wantPaymentBypass: true,
+		},
+		{
+			name:              "default development does not enable payment bypass",
+			cfg:               Config{},
+			wantProduction:    false,
+			wantPaymentBypass: false,
+		},
+		{
+			name:              "explicit staging is not production or development bypass",
+			cfg:               Config{AppEnv: " Staging ", AppEnvExplicitlySet: true},
+			wantProduction:    false,
+			wantPaymentBypass: false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := tt.cfg.IsProduction(); got != tt.wantProduction {
+				t.Fatalf("IsProduction() got %t want %t", got, tt.wantProduction)
+			}
+			if got := tt.cfg.PaymentBypassEnabled(); got != tt.wantPaymentBypass {
+				t.Fatalf("PaymentBypassEnabled() got %t want %t", got, tt.wantPaymentBypass)
+			}
+		})
+	}
+}
+
 func TestValidateAPI(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                          "production",
 		AppEnvExplicitlySet:             true,
 		PostgresDSN:                     "postgres://example",
 		RedisAddr:                       "localhost:6379",
@@ -88,9 +167,58 @@ func TestValidateAPI(t *testing.T) {
 func TestValidateAPIRequiresDependencies(t *testing.T) {
 	t.Parallel()
 
-	err := (Config{}).ValidateAPI()
+	err := (Config{AppEnv: "production", AppEnvExplicitlySet: true}).ValidateAPI()
 	if err == nil {
 		t.Fatal("ValidateAPI() error = nil, want error")
+	}
+}
+
+func TestValidateAPIRequiresExplicitSupportedAppEnv(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     Config
+		wantErr string
+	}{
+		{
+			name: "missing app env",
+			cfg: Config{
+				AppEnv: "development",
+			},
+			wantErr: "APP_ENV must be explicitly set",
+		},
+		{
+			name: "blank explicit app env",
+			cfg: Config{
+				AppEnv:              " ",
+				AppEnvExplicitlySet: true,
+			},
+			wantErr: "APP_ENV must be explicitly set",
+		},
+		{
+			name: "unsupported app env",
+			cfg: Config{
+				AppEnv:              " Staging ",
+				AppEnvExplicitlySet: true,
+			},
+			wantErr: "unsupported APP_ENV \"staging\"",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.cfg.ValidateAPI()
+			if err == nil {
+				t.Fatal("ValidateAPI() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAPI() error got %q want contains %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -98,6 +226,7 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                       "production",
 		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
@@ -180,6 +309,7 @@ func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                       "production",
 		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
@@ -249,7 +379,7 @@ func TestValidateAPIRequiresExplicitDevelopmentOptInForPaymentBypass(t *testing.
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
-		t.Fatal("ValidateAPI() error = nil, want payment config error when APP_ENV was not explicit")
+		t.Fatal("ValidateAPI() error = nil, want APP_ENV error when APP_ENV was not explicit")
 	}
 	if cfg.PaymentBypassEnabled() {
 		t.Fatal("PaymentBypassEnabled() = true, want false")
