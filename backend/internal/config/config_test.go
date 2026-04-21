@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestLoadFromEnvDefaults(t *testing.T) {
 	t.Parallel()
@@ -130,6 +133,7 @@ func TestValidateAPI(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                          "production",
 		AppEnvExplicitlySet:             true,
 		PostgresDSN:                     "postgres://example",
 		RedisAddr:                       "localhost:6379",
@@ -163,9 +167,58 @@ func TestValidateAPI(t *testing.T) {
 func TestValidateAPIRequiresDependencies(t *testing.T) {
 	t.Parallel()
 
-	err := (Config{}).ValidateAPI()
+	err := (Config{AppEnv: "production", AppEnvExplicitlySet: true}).ValidateAPI()
 	if err == nil {
 		t.Fatal("ValidateAPI() error = nil, want error")
+	}
+}
+
+func TestValidateAPIRequiresExplicitSupportedAppEnv(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		cfg     Config
+		wantErr string
+	}{
+		{
+			name: "missing app env",
+			cfg: Config{
+				AppEnv: "development",
+			},
+			wantErr: "APP_ENV must be explicitly set",
+		},
+		{
+			name: "blank explicit app env",
+			cfg: Config{
+				AppEnv:              " ",
+				AppEnvExplicitlySet: true,
+			},
+			wantErr: "APP_ENV must be explicitly set",
+		},
+		{
+			name: "unsupported app env",
+			cfg: Config{
+				AppEnv:              "staging",
+				AppEnvExplicitlySet: true,
+			},
+			wantErr: "unsupported APP_ENV",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			err := tt.cfg.ValidateAPI()
+			if err == nil {
+				t.Fatal("ValidateAPI() error = nil, want error")
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("ValidateAPI() error got %q want contains %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
 }
 
@@ -173,6 +226,7 @@ func TestValidateAPIRequiresMediaSandboxConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                       "production",
 		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
@@ -255,6 +309,7 @@ func TestValidateAPIRequiresCreatorAvatarConfig(t *testing.T) {
 	t.Parallel()
 
 	cfg := Config{
+		AppEnv:                       "production",
 		AppEnvExplicitlySet:          true,
 		PostgresDSN:                  "postgres://example",
 		RedisAddr:                    "localhost:6379",
@@ -324,7 +379,7 @@ func TestValidateAPIRequiresExplicitDevelopmentOptInForPaymentBypass(t *testing.
 	}
 
 	if err := cfg.ValidateAPI(); err == nil {
-		t.Fatal("ValidateAPI() error = nil, want payment config error when APP_ENV was not explicit")
+		t.Fatal("ValidateAPI() error = nil, want APP_ENV error when APP_ENV was not explicit")
 	}
 	if cfg.PaymentBypassEnabled() {
 		t.Fatal("PaymentBypassEnabled() = true, want false")

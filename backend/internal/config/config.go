@@ -124,6 +124,10 @@ func LoadFromEnv(lookup func(string) string) Config {
 
 // ValidateAPI は API サーバー設定が不足なく与えられているか検証します。
 func (c Config) ValidateAPI() error {
+	if err := c.validateAPIAppEnv(); err != nil {
+		return err
+	}
+
 	var missing []string
 	if c.PostgresDSN == "" {
 		missing = append(missing, "POSTGRES_DSN")
@@ -201,6 +205,20 @@ func normalizeAppEnv(appEnv string) string {
 	}
 
 	return appEnv
+}
+
+func (c Config) validateAPIAppEnv() error {
+	appEnv := strings.ToLower(strings.TrimSpace(c.AppEnv))
+	if !c.AppEnvExplicitlySet || appEnv == "" {
+		return fmt.Errorf("APP_ENV must be explicitly set to %s or %s", defaultAppEnv, productionAppEnv)
+	}
+
+	switch appEnv {
+	case defaultAppEnv, productionAppEnv:
+		return nil
+	default:
+		return fmt.Errorf("unsupported APP_ENV %q: must be %s or %s", c.AppEnv, defaultAppEnv, productionAppEnv)
+	}
 }
 
 func (c Config) missingPaymentEnvNames() []string {
