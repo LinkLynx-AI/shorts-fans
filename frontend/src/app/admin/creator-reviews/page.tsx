@@ -87,6 +87,7 @@ export default async function AdminCreatorReviewsPage({
             href: `/admin/creator-reviews?state=${tab.key}`,
             key: tab.key,
             label: tab.label,
+            prefetch: false,
           }))}
         />
       </section>
@@ -110,6 +111,7 @@ export default async function AdminCreatorReviewsPage({
               className="block"
               href={`/admin/creator-reviews/${item.userId}?state=${queue.state}`}
               key={item.userId}
+              prefetch={false}
             >
               <SurfacePanel className="group px-5 py-5 text-foreground transition hover:-translate-y-0.5 hover:shadow-[0_24px_48px_rgba(15,23,42,0.1)]">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

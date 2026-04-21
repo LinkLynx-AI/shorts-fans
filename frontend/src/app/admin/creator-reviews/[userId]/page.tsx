@@ -72,7 +72,9 @@ export default async function AdminCreatorReviewCasePage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary">
-          <Link href={`/admin/creator-reviews?state=${activeState}`}>一覧へ戻る</Link>
+          <Link href={`/admin/creator-reviews?state=${activeState}`} prefetch={false}>
+            一覧へ戻る
+          </Link>
         </Button>
         <span
           className={[

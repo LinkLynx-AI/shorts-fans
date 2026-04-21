@@ -26,8 +26,27 @@ describe("AdminCreatorReviewsPage", () => {
   });
 
   it("renders review navigation to video review from the creator queue", async () => {
+    const userId = "11111111-1111-1111-1111-111111111111";
     vi.mocked(getCreatorReviewQueue).mockResolvedValue({
-      items: [],
+      items: [
+        {
+          creatorBio: "quiet rooftop",
+          legalName: "Mina Rei",
+          review: {
+            approvedAt: null,
+            rejectedAt: null,
+            submittedAt: "2026-04-20T09:00:00Z",
+            suspendedAt: null,
+          },
+          sharedProfile: {
+            avatar: null,
+            displayName: "Mina Rei",
+            handle: "@minarei",
+          },
+          state: "submitted",
+          userId,
+        },
+      ],
       state: "submitted",
     });
 
@@ -42,6 +61,14 @@ describe("AdminCreatorReviewsPage", () => {
     expect(screen.getByRole("link", { name: /Video 審査 main \/ short/i })).toHaveAttribute(
       "href",
       "/admin/submission-reviews",
+    );
+    expect(screen.getByRole("link", { name: "承認済み" })).toHaveAttribute(
+      "data-prefetch",
+      "false",
+    );
+    expect(screen.getByRole("link", { name: /Mina Rei/i })).toHaveAttribute(
+      "data-prefetch",
+      "false",
     );
   });
 });

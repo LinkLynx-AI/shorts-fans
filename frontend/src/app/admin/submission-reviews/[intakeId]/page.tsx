@@ -151,7 +151,9 @@ export default async function AdminSubmissionReviewCasePage({
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button asChild variant="secondary">
-          <Link href="/admin/submission-reviews">一覧へ戻る</Link>
+          <Link href="/admin/submission-reviews" prefetch={false}>
+            一覧へ戻る
+          </Link>
         </Button>
         <span
           className={[

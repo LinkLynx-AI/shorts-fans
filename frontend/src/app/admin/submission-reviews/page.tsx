@@ -68,6 +68,7 @@ export default async function AdminSubmissionReviewsPage() {
               className="block"
               href={`/admin/submission-reviews/${item.intakeId}`}
               key={item.intakeId}
+              prefetch={false}
             >
               <SurfacePanel className="group px-5 py-5 text-foreground transition hover:-translate-y-0.5 hover:shadow-[0_24px_48px_rgba(74,35,18,0.08)]">
                 <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">

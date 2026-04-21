@@ -152,6 +152,10 @@ describe("AdminSubmissionReviewCasePage", () => {
       "href",
       "/admin/creator-reviews",
     );
+    expect(screen.getByRole("link", { name: "一覧へ戻る" })).toHaveAttribute(
+      "data-prefetch",
+      "false",
+    );
     expect(screen.queryByText("manual_override")).not.toBeInTheDocument();
     expect(screen.getAllByText("manual")).toHaveLength(3);
     expect(screen.getByText("auto")).toBeInTheDocument();

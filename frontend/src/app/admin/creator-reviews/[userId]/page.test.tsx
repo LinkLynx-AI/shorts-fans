@@ -93,5 +93,9 @@ describe("AdminCreatorReviewCasePage", () => {
       "href",
       "/admin/submission-reviews",
     );
+    expect(screen.getByRole("link", { name: "一覧へ戻る" })).toHaveAttribute(
+      "data-prefetch",
+      "false",
+    );
   });
 });
