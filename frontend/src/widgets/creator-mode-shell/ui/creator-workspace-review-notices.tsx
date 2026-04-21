@@ -1,5 +1,10 @@
 "use client";
 
+import {
+  CircleAlert,
+  CircleX,
+} from "lucide-react";
+
 import { Button } from "@/shared/ui";
 
 import {
@@ -8,34 +13,31 @@ import {
   type CreatorWorkspaceReviewSurfaceState,
 } from "../model/creator-workspace-review-surface";
 
-function getCreatorWorkspaceReviewNoticeClassName(tone: CreatorWorkspaceReviewNotification["tone"]): string {
+function getCreatorWorkspaceReviewNoticeIconClassName(tone: CreatorWorkspaceReviewNotification["tone"]): string {
   switch (tone) {
     case "revision":
-      return "border-[rgba(244,152,45,0.18)] bg-[linear-gradient(180deg,rgba(255,248,238,0.96),rgba(252,242,224,0.92))]";
+      return "bg-[rgba(244,152,45,0.09)] text-[#a65f11]";
     case "removed":
-      return "border-[rgba(255,184,189,0.84)] bg-[linear-gradient(180deg,rgba(255,247,248,0.98),rgba(255,241,243,0.96))]";
+      return "bg-[rgba(159,36,55,0.08)] text-[#9f2437]";
     case "pending":
-      return "border-[rgba(126,190,228,0.42)] bg-[linear-gradient(180deg,rgba(245,251,255,0.98),rgba(236,247,252,0.94))]";
+      return "bg-[rgba(16,130,200,0.08)] text-[#0a5b8c]";
     case "paused":
-      return "border-[rgba(167,220,249,0.4)] bg-[linear-gradient(180deg,rgba(251,253,255,0.98),rgba(244,250,253,0.94))]";
+      return "bg-[rgba(16,130,200,0.08)] text-[#0a5b8c]";
     default:
-      return "border-[rgba(167,220,249,0.4)] bg-[linear-gradient(180deg,rgba(251,253,255,0.98),rgba(244,250,253,0.94))]";
+      return "bg-[rgba(52,168,83,0.08)] text-[#1d6f3a]";
   }
 }
 
-function getCreatorWorkspaceReviewNoticeBadgeClassName(tone: CreatorWorkspaceReviewNotification["tone"]): string {
-  switch (tone) {
-    case "revision":
-      return "bg-[rgba(244,152,45,0.14)] text-[#8e4e0a]";
-    case "removed":
-      return "bg-[rgba(217,77,77,0.12)] text-[#9f2437]";
-    case "pending":
-      return "bg-[rgba(16,130,200,0.12)] text-[#0a5b8c]";
-    case "paused":
-      return "bg-[rgba(16,130,200,0.12)] text-[#0a5b8c]";
-    default:
-      return "bg-[rgba(52,168,83,0.12)] text-[#1d6f3a]";
+function CreatorWorkspaceReviewNoticeIcon({
+  tone,
+}: {
+  tone: CreatorWorkspaceReviewNotification["tone"];
+}) {
+  if (tone === "removed") {
+    return <CircleX className="size-4" strokeWidth={2.1} />;
   }
+
+  return <CircleAlert className="size-4" strokeWidth={2.1} />;
 }
 
 function CreatorWorkspaceReviewNoticeCard({
@@ -44,14 +46,17 @@ function CreatorWorkspaceReviewNoticeCard({
   notification: CreatorWorkspaceReviewNotification;
 }) {
   return (
-    <div className={`rounded-[18px] border px-[14px] py-3 text-foreground ${getCreatorWorkspaceReviewNoticeClassName(notification.tone)}`}>
-      <div className="flex items-start gap-3">
-        <span className={`inline-flex min-h-7 items-center justify-center rounded-full px-3 text-[10px] font-bold uppercase tracking-[0.14em] ${getCreatorWorkspaceReviewNoticeBadgeClassName(notification.tone)}`}>
-          {notification.label}
+    <div className="py-3 text-foreground">
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className={`inline-flex size-8 shrink-0 items-center justify-center rounded-full ${getCreatorWorkspaceReviewNoticeIconClassName(notification.tone)}`}
+        >
+          <CreatorWorkspaceReviewNoticeIcon tone={notification.tone} />
         </span>
-        <div className="grid gap-1">
-          <b className="text-[13px] leading-[1.35] text-foreground">{notification.headline}</b>
-          <span className="text-[11px] leading-[1.55] text-muted">{notification.detail}</span>
+        <div className="min-w-0 flex-1">
+          <p className="m-0 text-[13px] font-bold leading-[1.3] text-foreground">{notification.headline}</p>
+          <p className="m-0 mt-0.5 text-[11px] leading-[1.45] text-muted">{notification.detail}</p>
         </div>
       </div>
     </div>
@@ -60,11 +65,11 @@ function CreatorWorkspaceReviewNoticeCard({
 
 function CreatorWorkspaceReviewNoticesLoading() {
   return (
-    <section className="mt-[14px] grid gap-2">
+    <section className="mt-[18px] divide-y divide-[rgba(7,19,29,0.08)] border-y border-[rgba(7,19,29,0.08)]">
       {Array.from({ length: 2 }).map((_, index) => (
         <div
           aria-hidden="true"
-          className="h-[78px] animate-pulse rounded-[18px] border border-[rgba(167,220,249,0.32)] bg-[rgba(167,220,249,0.18)]"
+          className="h-[57px] animate-pulse bg-[linear-gradient(90deg,rgba(167,220,249,0.10),rgba(167,220,249,0.18),rgba(167,220,249,0.10))]"
           key={index}
         />
       ))}
@@ -115,7 +120,7 @@ export function CreatorWorkspaceReviewNotices({
   }
 
   return (
-    <section className="mt-[14px] grid gap-2">
+    <section className="mt-[18px] divide-y divide-[rgba(7,19,29,0.08)] border-y border-[rgba(7,19,29,0.08)]">
       {notifications.map((notification) => (
         <CreatorWorkspaceReviewNoticeCard key={notification.key} notification={notification} />
       ))}

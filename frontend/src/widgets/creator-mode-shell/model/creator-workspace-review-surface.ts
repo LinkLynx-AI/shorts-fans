@@ -263,7 +263,7 @@ export function buildCreatorWorkspaceReviewPackageHeadline(
           return "修正内容を確認してください。";
       }
     case "rejected":
-      return "却下されたため、この package は self-serve で再申請できません。";
+      return "審査で公開不可となったため、この動画は再申請できません。";
     case "pending_review":
       return null;
     case "approved":
@@ -277,7 +277,7 @@ export function buildCreatorWorkspaceReviewPackageHeadline(
         case "conflict":
           return "現在の審査状態では審査投入できません。";
         case "none":
-          return "この package はまだ審査投入待ちです。";
+          return "この動画はまだ審査投入待ちです。";
       }
   }
 }
@@ -286,16 +286,11 @@ function formatCount(value: number): string {
   return value.toLocaleString("ja-JP");
 }
 
-function buildNotificationDetail(count: number, detail: string): string {
-  return `${formatCount(count)}件の package が対象です。${detail}`;
-}
-
 export function deriveCreatorWorkspaceReviewNotifications(
   packages: readonly CreatorWorkspaceReviewPackageSummary[],
 ): readonly CreatorWorkspaceReviewNotification[] {
   let changesRequestedCount = 0;
   let rejectedCount = 0;
-  let blockedDraftCount = 0;
 
   for (const item of packages) {
     switch (item.reviewStatus) {
@@ -305,35 +300,23 @@ export function deriveCreatorWorkspaceReviewNotifications(
       case "rejected":
         rejectedCount += 1;
         break;
-      case "draft":
-        if (item.readiness === "blocked") {
-          blockedDraftCount += 1;
-        }
-        break;
     }
   }
 
   return [
     changesRequestedCount > 0 ? {
-      detail: buildNotificationDetail(changesRequestedCount, "detail で差し戻し内容を確認してください。"),
-      headline: `差し戻し対応が${formatCount(changesRequestedCount)}件あります`,
+      detail: "修正内容を確認",
+      headline: `差し戻し ${formatCount(changesRequestedCount)}件`,
       key: "changes_requested",
       label: "差し戻し",
       tone: "revision",
     } : null,
     rejectedCount > 0 ? {
-      detail: buildNotificationDetail(rejectedCount, "self-serve では再申請できないため、内容確認が必要です。"),
-      headline: `却下された package が${formatCount(rejectedCount)}件あります`,
+      detail: "該当動画の確認をお願いします",
+      headline: `公開不可 ${formatCount(rejectedCount)}件`,
       key: "rejected",
-      label: "却下",
+      label: "公開不可",
       tone: "removed",
-    } : null,
-    blockedDraftCount > 0 ? {
-      detail: buildNotificationDetail(blockedDraftCount, "審査投入前に価格や processing 状態を確認してください。"),
-      headline: `審査投入前の確認が必要な package が${formatCount(blockedDraftCount)}件あります`,
-      key: "blocked_draft",
-      label: "要確認",
-      tone: "paused",
     } : null,
   ].filter((item): item is CreatorWorkspaceReviewNotification => item !== null);
 }

@@ -23,7 +23,6 @@ import {
   buildPreviewShortAriaLabel,
   createVideoPosterStyle,
   formatDurationLabel,
-  formatJpy,
 } from "../lib/creator-mode-shell-ui";
 import type { CreatorWorkspacePreviewDetailSelection } from "./creator-mode-shell.types";
 
@@ -32,12 +31,10 @@ const previewGridClassName = "grid grid-cols-2 gap-3";
 function CreatorWorkspacePreviewTileFrame({
   durationLabel,
   posterUrl,
-  priceLabel,
   statusBadge,
 }: {
   durationLabel: string;
   posterUrl: string;
-  priceLabel: string | null;
   statusBadge: CreatorWorkspaceReviewBadge | null;
 }) {
   const isRejected = statusBadge?.tone === "removed";
@@ -67,12 +64,6 @@ function CreatorWorkspacePreviewTileFrame({
           {durationLabel}
         </span>
       </span>
-
-      {priceLabel ? (
-        <span className="flex min-h-6 items-center px-0.5">
-          <span className="truncate text-[13px] font-bold text-foreground">{priceLabel}</span>
-        </span>
-      ) : null}
     </span>
   );
 }
@@ -124,7 +115,6 @@ function CreatorWorkspacePreviewShortTile({
       <CreatorWorkspacePreviewTileFrame
         durationLabel={formatDurationLabel(item.previewDurationSeconds)}
         posterUrl={item.media.posterUrl}
-        priceLabel={null}
         statusBadge={statusBadge}
       />
     </CreatorWorkspacePreviewTileButton>
@@ -157,7 +147,6 @@ function CreatorWorkspacePreviewMainTile({
       <CreatorWorkspacePreviewTileFrame
         durationLabel={formatDurationLabel(item.durationSeconds)}
         posterUrl={item.media.posterUrl}
-        priceLabel={formatJpy(item.priceJpy)}
         statusBadge={statusBadge}
       />
     </CreatorWorkspacePreviewTileButton>
@@ -166,12 +155,11 @@ function CreatorWorkspacePreviewMainTile({
 
 function CreatorWorkspacePreviewLoadingTile() {
   return (
-    <div className="grid gap-2">
+    <div>
       <div
         aria-hidden="true"
         className="aspect-[3/4] animate-pulse rounded-[18px] bg-[rgba(167,220,249,0.28)]"
       />
-      <span className="h-5 w-20 animate-pulse rounded-[8px] bg-[rgba(167,220,249,0.22)]" />
     </div>
   );
 }

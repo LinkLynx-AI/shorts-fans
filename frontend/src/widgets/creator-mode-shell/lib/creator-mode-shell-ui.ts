@@ -43,7 +43,7 @@ export function buildPreviewMainAriaLabel(
   index: number,
   statusLabel?: string | null,
 ): string {
-  return `本編詳細を開く ${index + 1}件目${statusLabel ? ` ${statusLabel}` : ""} ${formatJpy(item.priceJpy)} ${formatDurationLabel(item.durationSeconds)}`;
+  return `本編詳細を開く ${index + 1}件目${statusLabel ? ` ${statusLabel}` : ""} ${formatDurationLabel(item.durationSeconds)}`;
 }
 
 export function buildRevisionRequestedDetail({

@@ -88,6 +88,22 @@ function buildRejectedReviewSurfaceState(): CreatorWorkspaceReviewSurfaceState {
 }
 
 describe("CreatorWorkspacePreviewGrid", () => {
+  it("omits main prices from preview tiles because the detail view owns price display", () => {
+    render(
+      <CreatorWorkspacePreviewGrid
+        activeTab="main"
+        activeTabLabel="本編"
+        onOpenDetail={() => {}}
+        onRetry={() => {}}
+        reviewSurfaceState={{ kind: "loading" }}
+        state={buildPreviewCollectionsState()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" })).toBeInTheDocument();
+    expect(screen.queryByText("¥1,800")).not.toBeInTheDocument();
+  });
+
   it("marks rejected videos with an in-thumbnail icon without showing a status label outside the thumbnail", () => {
     render(
       <CreatorWorkspacePreviewGrid
