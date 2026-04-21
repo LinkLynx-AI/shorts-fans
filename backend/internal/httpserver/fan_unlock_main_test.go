@@ -324,6 +324,26 @@ func TestFanMainPurchaseRouteReturnsAcceptedForPending(t *testing.T) {
 	}
 }
 
+func TestFanMainPurchaseRouteRejectsTrailingRequestBody(t *testing.T) {
+	t.Parallel()
+
+	router := newFanUnlockMainRouter(t, stubFanUnlockMainService{})
+
+	body := `{"acceptedAge":true,"acceptedTerms":true,"entryToken":"signed-entry-token.payload","fromShortId":"short_22222222222222222222222222222222","paymentMethod":{"mode":"saved_card","paymentMethodId":"paymeth_44444444444444444444444444444444"}}{}`
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/api/fan/mains/main_33333333333333333333333333333333/purchase",
+		strings.NewReader(body),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
+	rec := httptest.NewRecorder()
+
+	router.ServeHTTP(rec, req)
+
+	assertEnvelopeErrorCode(t, rec, http.StatusBadRequest, "invalid_request")
+}
+
 func TestFanMainCardSetupSessionRoute(t *testing.T) {
 	t.Parallel()
 

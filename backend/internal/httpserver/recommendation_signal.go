@@ -2,7 +2,6 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -62,7 +61,7 @@ func handleRecommendationSignal(c *gin.Context, writer RecommendationSignalWrite
 	}
 
 	var request recommendationSignalRequestPayload
-	if err := json.NewDecoder(c.Request.Body).Decode(&request); err != nil {
+	if err := decodeLimitedJSONBody(c, &request, false); err != nil {
 		writeRecommendationSignalInvalidRequest(c, "recommendation signal request was invalid")
 		return
 	}

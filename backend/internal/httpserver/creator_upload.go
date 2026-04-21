@@ -1,9 +1,7 @@
 package httpserver
 
 import (
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -279,19 +277,7 @@ func handleCreatorUploadComplete(c *gin.Context, service CreatorUploadHandler) {
 }
 
 func decodeCreatorUploadJSON[T any](c *gin.Context, target *T, message string, requestScope string) bool {
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		writeCreatorUploadError(c, http.StatusBadRequest, "invalid_request", message, requestScope)
-		return false
-	}
-
-	var extra json.RawMessage
-	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
-		writeCreatorUploadError(c, http.StatusBadRequest, "invalid_request", message, requestScope)
-		return false
-	}
-	if len(extra) > 0 {
+	if err := decodeLimitedJSONBody(c, target, true); err != nil {
 		writeCreatorUploadError(c, http.StatusBadRequest, "invalid_request", message, requestScope)
 		return false
 	}

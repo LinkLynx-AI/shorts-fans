@@ -1254,19 +1254,7 @@ func writeCreatorWorkspaceError(c *gin.Context, status int, code string, message
 }
 
 func decodeCreatorWorkspaceJSON[T any](c *gin.Context, target *T, message string, requestScope string) bool {
-	decoder := json.NewDecoder(c.Request.Body)
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
-		return false
-	}
-
-	var extra json.RawMessage
-	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
-		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
-		return false
-	}
-	if len(extra) > 0 {
+	if err := decodeLimitedJSONBody(c, target, true); err != nil {
 		writeCreatorWorkspaceListError(c, requestScope, http.StatusBadRequest, "invalid_request", message)
 		return false
 	}

@@ -2,9 +2,7 @@ package httpserver
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
 	"time"
 
@@ -226,18 +224,7 @@ func writeAcceptedAuthStep(c *gin.Context, requestScope string, step auth.FanAut
 }
 
 func decodeAuthJSON[T any](c *gin.Context, target *T, invalidCode string, invalidMessage string, requestScope string) bool {
-	decoder := json.NewDecoder(c.Request.Body)
-	if err := decoder.Decode(target); err != nil {
-		writeAuthError(c, http.StatusBadRequest, invalidCode, invalidMessage, requestScope)
-		return false
-	}
-
-	var extra json.RawMessage
-	if err := decoder.Decode(&extra); err != nil && !errors.Is(err, io.EOF) {
-		writeAuthError(c, http.StatusBadRequest, invalidCode, invalidMessage, requestScope)
-		return false
-	}
-	if len(extra) > 0 {
+	if err := decodeLimitedJSONBody(c, target, false); err != nil {
 		writeAuthError(c, http.StatusBadRequest, invalidCode, invalidMessage, requestScope)
 		return false
 	}
