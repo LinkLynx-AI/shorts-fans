@@ -44,7 +44,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	setGinMode(cfg.AppEnv)
+	setGinMode(cfg)
 
 	pool, err := postgres.NewPool(ctx, cfg.PostgresDSN)
 	if err != nil {
@@ -270,7 +270,7 @@ func main() {
 			FanProfileFollowing:              fanProfileRepository,
 			FanProfilePinnedShorts:           fanProfileRepository,
 			FanAuth:                          authLifecycle,
-			AuthCookie:                       httpserver.AuthCookieConfig{Secure: cfg.AppEnv == "production"},
+			AuthCookie:                       authCookieConfigFor(cfg),
 			ShortDisplayAssets:               shortDisplayDelivery,
 			MainDisplayAssets:                shortDisplayDelivery,
 			ViewerActiveMode:                 modeSwitcher,
@@ -297,8 +297,12 @@ func newLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(os.Stdout, nil))
 }
 
-func setGinMode(appEnv string) {
-	if appEnv == "production" {
+func authCookieConfigFor(cfg config.Config) httpserver.AuthCookieConfig {
+	return httpserver.AuthCookieConfig{Secure: cfg.IsProduction()}
+}
+
+func setGinMode(cfg config.Config) {
+	if cfg.IsProduction() {
 		gin.SetMode(gin.ReleaseMode)
 		return
 	}
