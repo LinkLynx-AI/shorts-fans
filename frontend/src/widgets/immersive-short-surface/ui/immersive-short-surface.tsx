@@ -223,6 +223,7 @@ function LikeRail({
 }: LikeRailProps) {
   const label = hasLiked ? "Liked short" : "Like short";
   const isFeedVariant = variant === "feed";
+  const isDisabled = disabled || !onToggle;
 
   return (
     <div className="flex min-w-12 flex-col items-center gap-1.5 text-center">
@@ -232,11 +233,12 @@ function LikeRail({
         aria-pressed={hasLiked}
         className={cn(
           isFeedVariant
-            ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:cursor-wait disabled:hover:scale-100"
-            : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:cursor-wait disabled:hover:text-accent-strong/72",
+            ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:hover:scale-100"
+            : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:hover:text-accent-strong/72",
+          disabled ? "disabled:cursor-wait" : "disabled:cursor-not-allowed",
           hasLiked && (isFeedVariant ? "text-[#ff4f79]" : "text-[#e84a68]"),
         )}
-        disabled={disabled}
+        disabled={isDisabled}
         onClick={onToggle}
         type="button"
       >
@@ -966,13 +968,20 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           onToggle: detailPinState.onToggle,
         };
   const likeProps =
-    mode === "feed" && props.like
-      ? {
-          disabled: props.like.isPending,
-          hasLiked,
-          likeCount,
-          onToggle: props.like.onToggle,
-        }
+    mode === "feed"
+      ? props.like
+        ? {
+            disabled: props.like.isPending,
+            hasLiked,
+            likeCount,
+            onToggle: props.like.onToggle,
+          }
+        : {
+            disabled: true,
+            hasLiked,
+            likeCount,
+            onToggle: undefined,
+          }
       : {
           disabled: detailLikeState.isPending,
           hasLiked,

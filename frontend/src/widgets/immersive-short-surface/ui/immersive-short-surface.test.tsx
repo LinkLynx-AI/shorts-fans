@@ -2143,6 +2143,16 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.queryByRole("heading", { level: 1, name: "Short detail" })).not.toBeInTheDocument();
   });
 
+  it("disables the feed like action when feed like state is not provided", () => {
+    renderWithViewerSession(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />, {
+      hasSession: true,
+    });
+
+    expect(
+      screen.getByRole("button", { name: feedSurface.viewer.hasLiked ? "Liked short" : "Like short" }),
+    ).toBeDisabled();
+  });
+
   it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {
     if (!detailSurface) {
       throw new Error("fixture missing");
