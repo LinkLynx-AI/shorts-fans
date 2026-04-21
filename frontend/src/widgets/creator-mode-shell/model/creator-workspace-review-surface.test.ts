@@ -1,31 +1,47 @@
 import {
-  buildCreatorWorkspaceReviewActionLabel,
   buildCreatorWorkspaceReviewPackageHeadline,
   deriveCreatorWorkspaceReviewNotifications,
+  hasCreatorWorkspaceReviewIssue,
   resolveCreatorWorkspaceObjectReviewBadge,
   resolveCreatorWorkspaceReviewBlockerLabel,
+  resolveCreatorWorkspaceReviewReasonCopy,
 } from "./creator-workspace-review-surface";
 
 describe("creator workspace review surface model helpers", () => {
-  it("maps object states to tile badges", () => {
-    expect(resolveCreatorWorkspaceObjectReviewBadge("pending_review")).toEqual({
-      label: "審査中",
-      tone: "pending",
-    });
+  it("maps only problematic object states to tile badges", () => {
+    expect(resolveCreatorWorkspaceObjectReviewBadge("approved_for_publish")).toBeNull();
+    expect(resolveCreatorWorkspaceObjectReviewBadge("approved_for_unlock")).toBeNull();
+    expect(resolveCreatorWorkspaceObjectReviewBadge("pending_review")).toBeNull();
+    expect(resolveCreatorWorkspaceObjectReviewBadge("draft")).toBeNull();
+
     expect(resolveCreatorWorkspaceObjectReviewBadge("rejected")).toEqual({
       label: "却下",
       tone: "removed",
     });
-    expect(resolveCreatorWorkspaceObjectReviewBadge("draft")).toEqual({
-      label: "未申請",
-      tone: "paused",
+    expect(resolveCreatorWorkspaceObjectReviewBadge("revision_requested")).toEqual({
+      label: "差し戻し",
+      tone: "revision",
     });
   });
 
-  it("builds package headlines and submit labels", () => {
-    expect(buildCreatorWorkspaceReviewActionLabel("submit")).toBe("審査へ申請");
-    expect(buildCreatorWorkspaceReviewActionLabel("resubmit")).toBe("再申請する");
-    expect(buildCreatorWorkspaceReviewActionLabel("none")).toBeNull();
+  it("builds package headlines", () => {
+    expect(buildCreatorWorkspaceReviewPackageHeadline({
+      blockers: [],
+      canonicalMainId: "main_approved",
+      linkedShortCount: 1,
+      readiness: "none",
+      reviewStatus: "approved",
+      submitAction: "none",
+    })).toBeNull();
+
+    expect(buildCreatorWorkspaceReviewPackageHeadline({
+      blockers: [],
+      canonicalMainId: "main_pending",
+      linkedShortCount: 1,
+      readiness: "none",
+      reviewStatus: "pending_review",
+      submitAction: "none",
+    })).toBeNull();
 
     expect(buildCreatorWorkspaceReviewPackageHeadline({
       blockers: [],
@@ -34,7 +50,7 @@ describe("creator workspace review surface model helpers", () => {
       readiness: "ready",
       reviewStatus: "changes_requested",
       submitAction: "resubmit",
-    })).toBe("修正後に再申請できます。");
+    })).toBe("修正内容を確認してください。");
 
     expect(buildCreatorWorkspaceReviewPackageHeadline({
       blockers: ["main_price_missing"],
@@ -43,7 +59,7 @@ describe("creator workspace review surface model helpers", () => {
       readiness: "blocked",
       reviewStatus: "changes_requested",
       submitAction: "none",
-    })).toBe("再申請前に必要項目を満たしてください。");
+    })).toBe("再審査前に必要項目を満たしてください。");
   });
 
   it("derives dashboard notifications from package summaries", () => {
@@ -55,6 +71,14 @@ describe("creator workspace review surface model helpers", () => {
         readiness: "ready",
         reviewStatus: "changes_requested",
         submitAction: "resubmit",
+      },
+      {
+        blockers: [],
+        canonicalMainId: "main_approved",
+        linkedShortCount: 1,
+        readiness: "none",
+        reviewStatus: "approved",
+        submitAction: "none",
       },
       {
         blockers: [],
@@ -81,11 +105,51 @@ describe("creator workspace review surface model helpers", () => {
         key: "blocked_draft",
         label: "要確認",
       }),
-      expect.objectContaining({
-        key: "pending_review",
-        label: "審査中",
-      }),
     ]);
+  });
+
+  it("detects review issues only for states that need action", () => {
+    expect(hasCreatorWorkspaceReviewIssue({
+      package: {
+        blockers: [],
+        canonicalMainId: "main_approved",
+        linkedShortCount: 1,
+        readiness: "none",
+        reviewStatus: "approved",
+        submitAction: "none",
+      },
+      requestId: "req_approved",
+      review: {
+        reasonCode: null,
+        state: "approved_for_publish",
+      },
+      target: {
+        canonicalMainId: "main_approved",
+        id: "short_approved",
+        kind: "short",
+      },
+    })).toBe(false);
+
+    expect(hasCreatorWorkspaceReviewIssue({
+      package: {
+        blockers: [],
+        canonicalMainId: "main_revision",
+        linkedShortCount: 1,
+        readiness: "ready",
+        reviewStatus: "changes_requested",
+        submitAction: "resubmit",
+      },
+      requestId: "req_revision",
+      review: {
+        reasonCode: "caption_mismatch",
+        state: "revision_requested",
+      },
+      target: {
+        canonicalMainId: "main_revision",
+        id: "short_revision",
+        kind: "short",
+      },
+    })).toBe(true);
   });
 
   it("does not double-count blocked changes_requested packages as blocked drafts", () => {
@@ -109,5 +173,17 @@ describe("creator workspace review surface model helpers", () => {
   it("maps blocker codes to readable copy", () => {
     expect(resolveCreatorWorkspaceReviewBlockerLabel("main_price_missing")).toBe("本編価格が未設定です。");
     expect(resolveCreatorWorkspaceReviewBlockerLabel("linked_short_missing")).toBe("linked short がまだありません。");
+  });
+
+  it("maps reason codes to creator-facing copy without exposing raw codes", () => {
+    expect(resolveCreatorWorkspaceReviewReasonCopy("content_safety_issue")).toEqual({
+      description: "コンテンツ安全性の観点で追加対応が必要です。",
+      label: "安全性の懸念",
+    });
+    expect(resolveCreatorWorkspaceReviewReasonCopy("unknown_reason")).toEqual({
+      description: "詳細は運営からの案内を確認してください。",
+      label: "審査基準の確認が必要です",
+    });
+    expect(resolveCreatorWorkspaceReviewReasonCopy(null)).toBeNull();
   });
 });

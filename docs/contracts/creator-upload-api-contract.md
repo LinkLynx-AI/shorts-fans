@@ -11,13 +11,14 @@
 - approved creator が `main` 1 本と `short` 1 本以上をまとめて upload 開始できる transport boundary を固定する。
 - browser / client が raw bucket へ `Presigned PUT` で直接 upload できる request / response shape を固定する。
 - upload 完了後に draft `main` と draft `shorts` を永続化する completion boundary を固定する。
+- completion 後の media processing が ready になった時点で、初回 review intake が自動投入される前提を明示する。
 
 ## Non-goals
 
 - `link-short` で既存 `main` に `short` を追加する flow
 - upload page UI、route、local state
 - media processing worker、retry queue、delivery materialization
-- review submit、publish / unlock eligibility、linkage editor
+- review decision、publish / unlock eligibility、linkage editor
 - raw bucket CORS や infra 実装の詳細
 
 ## Canonical Sources
@@ -36,7 +37,7 @@
 - creator は `main` 1 本と `short` 1 本以上を同時に選択し、揃うまで submit できません。
 - raw upload 受理は `publishable`、`unlockable`、`review-ready` を意味しません。
 - `main` と `short` は別 asset として upload されますが、completion は package 単位で成功または失敗します。
-- completion 成功後の content は draft のままであり、review submit は別 boundary です。
+- completion 成功後の content は draft のままであり、media processing が package 内 asset をすべて `ready` にした後、ready 条件を満たす package だけが自動で review intake へ進みます。
 
 ## Vocabulary
 
@@ -303,8 +304,9 @@
 - draft `shorts` はすべて、同じ completion で作った draft `main` の `canonical_main_id` に紐づきます。
 - completion 成功時は `media_asset_id` ごとに durable な processing job を 1 件作成します。upload completion 直後の response では `mediaAsset.processingState = uploaded` のままとし、worker 側の claim 以降で processing state を進めます。
 - object 検証に失敗した場合は package 全体を失敗扱いにし、`main` / `shorts` / `media_assets` の新規 row は 1 件も作りません。
-- completion 成功は `submission package ready` や `review submit` を意味しません。processing / linkage / review は後続 boundary の責務です。
-- `review submit` の canonical contract は [submission-package-review-contract.md](submission-package-review-contract.md) を参照します。
+- completion 成功は `submission package ready` や review intake 済みを意味しません。processing / linkage / review intake は後続 boundary の責務です。
+- worker が package 内の media asset をすべて `ready` にし、`submission package ready` を満たした場合、system は owner creator user を actor として初回 review intake を自動投入します。
+- review intake の canonical contract は [submission-package-review-contract.md](submission-package-review-contract.md) を参照します。
 
 ## HTTP States
 

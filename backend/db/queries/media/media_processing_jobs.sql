@@ -76,6 +76,126 @@ FROM candidate
 WHERE j.id = candidate.id
 RETURNING j.*;
 
+-- name: GetInitialReviewReadyPackageByMainID :one
+SELECT
+    m.id,
+    m.creator_user_id
+FROM app.mains AS m
+JOIN app.creator_capabilities AS c
+    ON c.user_id = m.creator_user_id
+JOIN app.media_assets AS main_asset
+    ON main_asset.id = m.media_asset_id
+WHERE m.id = $1
+    AND c.state = 'approved'
+    AND m.state = 'draft'
+    AND m.price_minor > 0
+    AND m.ownership_confirmed = TRUE
+    AND m.consent_confirmed = TRUE
+    AND main_asset.processing_state = 'ready'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.submission_review_intakes AS intake
+        WHERE intake.canonical_main_id = m.id
+            AND intake.status = 'pending_review'
+    )
+    AND EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND s.state = 'draft'
+            AND short_asset.processing_state = 'ready'
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND (
+                s.state <> 'draft'
+                OR short_asset.processing_state <> 'ready'
+            )
+    )
+LIMIT 1;
+
+-- name: GetNextSucceededInitialReviewMediaProcessingJob :one
+SELECT j.*
+FROM app.media_processing_jobs AS j
+JOIN app.media_assets AS completed_asset
+    ON completed_asset.id = j.media_asset_id
+LEFT JOIN app.mains AS completed_main
+    ON j.asset_role = 'main'
+    AND completed_main.media_asset_id = j.media_asset_id
+LEFT JOIN app.shorts AS completed_short
+    ON j.asset_role = 'short'
+    AND completed_short.media_asset_id = j.media_asset_id
+JOIN app.mains AS m
+    ON m.id = COALESCE(completed_main.id, completed_short.canonical_main_id)
+JOIN app.creator_capabilities AS c
+    ON c.user_id = m.creator_user_id
+JOIN app.media_assets AS main_asset
+    ON main_asset.id = m.media_asset_id
+WHERE j.status = 'succeeded'
+    AND j.last_error_code = 'review_submit_failed'
+    AND completed_asset.processing_state = 'ready'
+    AND j.creator_user_id = m.creator_user_id
+    AND c.state = 'approved'
+    AND m.state = 'draft'
+    AND m.price_minor > 0
+    AND m.ownership_confirmed = TRUE
+    AND m.consent_confirmed = TRUE
+    AND main_asset.processing_state = 'ready'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.submission_review_intakes AS intake
+        WHERE intake.canonical_main_id = m.id
+            AND intake.status = 'pending_review'
+    )
+    AND EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND s.state = 'draft'
+            AND short_asset.processing_state = 'ready'
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND (
+                s.state <> 'draft'
+                OR short_asset.processing_state <> 'ready'
+            )
+    )
+ORDER BY j.completed_at ASC NULLS LAST, j.updated_at ASC, j.id ASC
+LIMIT 1;
+
+-- name: MarkMediaProcessingJobReviewSubmitFailed :one
+UPDATE app.media_processing_jobs
+SET
+    last_error_code = 'review_submit_failed',
+    last_error_message = sqlc.narg(last_error_message),
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id)
+    AND status = 'succeeded'
+RETURNING *;
+
+-- name: ClearMediaProcessingJobReviewSubmitFailure :exec
+UPDATE app.media_processing_jobs
+SET
+    last_error_code = NULL,
+    last_error_message = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = sqlc.arg(id)
+    AND status = 'succeeded'
+    AND last_error_code = 'review_submit_failed';
+
 -- name: MarkMediaProcessingJobSucceeded :one
 UPDATE app.media_processing_jobs
 SET

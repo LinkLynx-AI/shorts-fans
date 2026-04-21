@@ -124,7 +124,6 @@ const minaWorkspace = {
           { label: "revenue", value: "¥84K" },
         ],
         settings: [
-          { label: "レビュー", value: "承認済み" },
           { label: "価格", value: "¥1,800" },
           { label: "最終更新", value: "昨日 21:05" },
         ],
@@ -170,7 +169,6 @@ const minaWorkspace = {
           { label: "revenue", value: "¥48K" },
         ],
         settings: [
-          { label: "レビュー", value: "承認済み" },
           { label: "公開状態", value: "公開" },
           { label: "最終更新", value: "今日 12:24" },
         ],
@@ -192,7 +190,6 @@ const minaWorkspace = {
           { label: "revenue", value: "¥22K" },
         ],
         settings: [
-          { label: "レビュー", value: "承認済み" },
           { label: "公開状態", value: "公開" },
           { label: "最終更新", value: "昨日 19:12" },
         ],
