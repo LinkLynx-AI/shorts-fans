@@ -282,14 +282,16 @@ describe("MainPlaybackSurface", () => {
 
     await waitFor(() => {
       expect(play).toHaveBeenCalledTimes(2);
+      expect(video.muted).toBe(true);
     });
 
-    expect(video.muted).toBe(true);
-    expect(screen.getByRole("button", { name: "Enable audio" })).toBeInTheDocument();
+    const enableAudioButton = await screen.findByRole("button", { name: "Enable audio" });
 
-    await user.click(screen.getByRole("button", { name: "Enable audio" }));
+    await user.click(enableAudioButton);
 
-    expect(video.muted).toBe(false);
+    await waitFor(() => {
+      expect(video.muted).toBe(false);
+    });
     expect(pause).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Pause playback" })).toBeInTheDocument();
   });
