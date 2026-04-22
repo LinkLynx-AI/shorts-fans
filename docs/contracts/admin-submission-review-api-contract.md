@@ -31,17 +31,19 @@
 ## Environment Boundary
 
 - endpoint は `backend` が `development` 環境で起動しているときだけ有効です。
-- local admin 向けの暫定 surface として、現時点では auth を要求しません。
-- backend 側では `loopback remote addr` 以外からの access を `404` で遮断します。
+- local admin 向けの暫定 surface として、production auth / RBAC は要求しません。
+- backend 側では `loopback remote addr` と `X-Shorts-Fans-Admin-Token` (`ADMIN_API_TOKEN`) が一致しない request を `404` で遮断します。
+- frontend の local admin UI は `X-Shorts-Fans-Admin-UI-Token` (`ADMIN_UI_ACCESS_TOKEN`) で発行した署名済み httpOnly cookie を持つ request だけを許可します。
+- local admin UI の cookie は `POST /admin/access` から発行します。access token を URL query や cookie value へ直接保存してはいけません。
 - preview media は raw storage ref ではなく、owner preview と同じ signed display asset を返します。
 
 ## Endpoint Summary
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/admin/submission-reviews` | none | `pending_review` intake queue を返す |
-| `GET` | `/api/admin/submission-reviews/:intakeId` | none | intake 単位の review detail を返す |
-| `POST` | `/api/admin/submission-reviews/:intakeId/decision` | none | object-level decision を反映し、`204 No Content` を返す |
+| `GET` | `/api/admin/submission-reviews` | dev admin token | `pending_review` intake queue を返す |
+| `GET` | `/api/admin/submission-reviews/:intakeId` | dev admin token | intake 単位の review detail を返す |
+| `POST` | `/api/admin/submission-reviews/:intakeId/decision` | dev admin token | object-level decision を反映し、`204 No Content` を返す |
 
 ## Shared Rules
 

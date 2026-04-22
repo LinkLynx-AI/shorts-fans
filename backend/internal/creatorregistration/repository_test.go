@@ -3,6 +3,7 @@ package creatorregistration
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -224,8 +225,8 @@ func TestRepositoryGetIntakeBuildsEditableSnapshot(t *testing.T) {
 	if got := intake.SharedProfile.Handle; got != "creator.handle" {
 		t.Fatalf("GetIntake() SharedProfile.Handle got %q want %q", got, "creator.handle")
 	}
-	if len(intake.Evidences) != 2 {
-		t.Fatalf("GetIntake() evidences len got %d want 2", len(intake.Evidences))
+	if len(intake.Evidences) != 5 {
+		t.Fatalf("GetIntake() evidences len got %d want 5", len(intake.Evidences))
 	}
 }
 
@@ -477,13 +478,21 @@ func TestRepositorySaveIntakeCreatesDraftProfileAndReturnsUpdatedIntake(t *testi
 				},
 				upsertCreatorRegistrationIntake: func(_ context.Context, arg sqlc.UpsertCreatorRegistrationIntakeParams) (sqlc.AppCreatorRegistrationIntake, error) {
 					row := sqlc.AppCreatorRegistrationIntake{
-						UserID:                       arg.UserID,
-						LegalName:                    arg.LegalName,
-						BirthDate:                    arg.BirthDate,
-						PayoutRecipientType:          arg.PayoutRecipientType,
-						PayoutRecipientName:          arg.PayoutRecipientName,
-						DeclaresNoProhibitedCategory: arg.DeclaresNoProhibitedCategory,
-						AcceptsConsentResponsibility: arg.AcceptsConsentResponsibility,
+						UserID:                                  arg.UserID,
+						LegalName:                               arg.LegalName,
+						BirthDate:                               arg.BirthDate,
+						LegalAddress:                            arg.LegalAddress,
+						IdentityDocumentType:                    arg.IdentityDocumentType,
+						TargetAudienceCategory:                  arg.TargetAudienceCategory,
+						HasCoPerformers:                         arg.HasCoPerformers,
+						PayoutRecipientType:                     arg.PayoutRecipientType,
+						PayoutRecipientName:                     arg.PayoutRecipientName,
+						DeclaresNoProhibitedCategory:            arg.DeclaresNoProhibitedCategory,
+						AcceptsConsentResponsibility:            arg.AcceptsConsentResponsibility,
+						AcceptsAppearanceVerification:           arg.AcceptsAppearanceVerification,
+						AcceptsCoPerformerConsentResponsibility: arg.AcceptsCoPerformerConsentResponsibility,
+						AcceptsAdultBusinessCompliance:          arg.AcceptsAdultBusinessCompliance,
+						ConfirmsInformationMatchesDocuments:     arg.ConfirmsInformationMatchesDocuments,
 					}
 					intake = &row
 					return row, nil
@@ -496,14 +505,20 @@ func TestRepositorySaveIntakeCreatesDraftProfileAndReturnsUpdatedIntake(t *testi
 	}
 
 	got, err := repo.SaveIntake(context.Background(), SaveIntakeInput{
-		AcceptsConsentResponsibility: true,
-		BirthDate:                    " 2000-01-02 ",
-		CreatorBio:                   "  updated bio  ",
-		DeclaresNoProhibitedCategory: true,
-		LegalName:                    "  Creator Name  ",
-		PayoutRecipientName:          "  Creator Biz  ",
-		PayoutRecipientType:          PayoutRecipientTypeBusiness,
-		UserID:                       userID,
+		AcceptsAdultBusinessCompliance:      true,
+		AcceptsAppearanceVerification:       true,
+		AcceptsConsentResponsibility:        true,
+		BirthDate:                           " 2000-01-02 ",
+		ConfirmsInformationMatchesDocuments: true,
+		CreatorBio:                          "  updated bio  ",
+		DeclaresNoProhibitedCategory:        true,
+		IdentityDocumentType:                IdentityDocumentTypeDriverLicense,
+		LegalAddress:                        "  Tokyo-to Shibuya-ku 1-2-3  ",
+		LegalName:                           "  Creator Name  ",
+		PayoutRecipientName:                 "  Creator Biz  ",
+		PayoutRecipientType:                 PayoutRecipientTypeBusiness,
+		TargetAudienceCategory:              TargetAudienceCategoryGeneralAdult,
+		UserID:                              userID,
 	})
 	if err != nil {
 		t.Fatalf("SaveIntake() error = %v, want nil", err)
@@ -513,6 +528,9 @@ func TestRepositorySaveIntakeCreatesDraftProfileAndReturnsUpdatedIntake(t *testi
 	}
 	if got.PayoutRecipientType != PayoutRecipientTypeBusiness {
 		t.Fatalf("SaveIntake() PayoutRecipientType got %q want %q", got.PayoutRecipientType, PayoutRecipientTypeBusiness)
+	}
+	if got.LegalAddress != "Tokyo-to Shibuya-ku 1-2-3" {
+		t.Fatalf("SaveIntake() LegalAddress got %q want trimmed address", got.LegalAddress)
 	}
 	if !got.CanSubmit {
 		t.Fatal("SaveIntake() CanSubmit = false, want true")
@@ -574,13 +592,21 @@ func TestRepositorySaveIntakeUpdatesExistingDraftProfile(t *testing.T) {
 				},
 				upsertCreatorRegistrationIntake: func(_ context.Context, arg sqlc.UpsertCreatorRegistrationIntakeParams) (sqlc.AppCreatorRegistrationIntake, error) {
 					savedIntake = sqlc.AppCreatorRegistrationIntake{
-						UserID:                       arg.UserID,
-						LegalName:                    arg.LegalName,
-						BirthDate:                    arg.BirthDate,
-						PayoutRecipientType:          arg.PayoutRecipientType,
-						PayoutRecipientName:          arg.PayoutRecipientName,
-						DeclaresNoProhibitedCategory: arg.DeclaresNoProhibitedCategory,
-						AcceptsConsentResponsibility: arg.AcceptsConsentResponsibility,
+						UserID:                                  arg.UserID,
+						LegalName:                               arg.LegalName,
+						BirthDate:                               arg.BirthDate,
+						LegalAddress:                            arg.LegalAddress,
+						IdentityDocumentType:                    arg.IdentityDocumentType,
+						TargetAudienceCategory:                  arg.TargetAudienceCategory,
+						HasCoPerformers:                         arg.HasCoPerformers,
+						PayoutRecipientType:                     arg.PayoutRecipientType,
+						PayoutRecipientName:                     arg.PayoutRecipientName,
+						DeclaresNoProhibitedCategory:            arg.DeclaresNoProhibitedCategory,
+						AcceptsConsentResponsibility:            arg.AcceptsConsentResponsibility,
+						AcceptsAppearanceVerification:           arg.AcceptsAppearanceVerification,
+						AcceptsCoPerformerConsentResponsibility: arg.AcceptsCoPerformerConsentResponsibility,
+						AcceptsAdultBusinessCompliance:          arg.AcceptsAdultBusinessCompliance,
+						ConfirmsInformationMatchesDocuments:     arg.ConfirmsInformationMatchesDocuments,
 					}
 					return savedIntake, nil
 				},
@@ -872,14 +898,22 @@ func TestRegistrationHelpersAndNormalization(t *testing.T) {
 	}
 
 	normalizedInput, err := normalizeSaveIntakeInput(SaveIntakeInput{
-		AcceptsConsentResponsibility: true,
-		BirthDate:                    "2000-02-03",
-		CreatorBio:                   "  bio  ",
-		DeclaresNoProhibitedCategory: true,
-		LegalName:                    "  Legal Name ",
-		PayoutRecipientName:          " Recipient ",
-		PayoutRecipientType:          PayoutRecipientTypeSelf,
-		UserID:                       userID,
+		AcceptsAdultBusinessCompliance:          true,
+		AcceptsAppearanceVerification:           true,
+		AcceptsConsentResponsibility:            true,
+		AcceptsCoPerformerConsentResponsibility: true,
+		BirthDate:                               "2000-02-03",
+		ConfirmsInformationMatchesDocuments:     true,
+		CreatorBio:                              "  bio  ",
+		DeclaresNoProhibitedCategory:            true,
+		HasCoPerformers:                         true,
+		IdentityDocumentType:                    " driver_license ",
+		LegalAddress:                            " Tokyo-to Shibuya-ku 1-2-3 ",
+		LegalName:                               "  Legal Name ",
+		PayoutRecipientName:                     " Recipient ",
+		PayoutRecipientType:                     PayoutRecipientTypeSelf,
+		TargetAudienceCategory:                  " general_adult ",
+		UserID:                                  userID,
 	})
 	if err != nil {
 		t.Fatalf("normalizeSaveIntakeInput() error = %v, want nil", err)
@@ -890,11 +924,38 @@ func TestRegistrationHelpersAndNormalization(t *testing.T) {
 	if normalizedInput.birthDate == nil || normalizedInput.birthDate.Format("2006-01-02") != "2000-02-03" {
 		t.Fatalf("normalizeSaveIntakeInput() birthDate got %v want 2000-02-03", normalizedInput.birthDate)
 	}
+	if normalizedInput.legalAddress != "Tokyo-to Shibuya-ku 1-2-3" {
+		t.Fatalf("normalizeSaveIntakeInput() legalAddress got %q want trimmed address", normalizedInput.legalAddress)
+	}
+	if normalizedInput.identityDocumentType == nil || *normalizedInput.identityDocumentType != IdentityDocumentTypeDriverLicense {
+		t.Fatalf("normalizeSaveIntakeInput() identityDocumentType got %v want %s", normalizedInput.identityDocumentType, IdentityDocumentTypeDriverLicense)
+	}
+	if normalizedInput.targetAudienceCategory == nil || *normalizedInput.targetAudienceCategory != TargetAudienceCategoryGeneralAdult {
+		t.Fatalf("normalizeSaveIntakeInput() targetAudienceCategory got %v want %s", normalizedInput.targetAudienceCategory, TargetAudienceCategoryGeneralAdult)
+	}
 	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{BirthDate: "bad", UserID: userID}); !errors.Is(err, ErrInvalidBirthDate) {
 		t.Fatalf("normalizeSaveIntakeInput() bad birth date got %v want %v", err, ErrInvalidBirthDate)
 	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{BirthDate: "2020-01-01", UserID: userID}); !errors.Is(err, ErrInvalidBirthDate) {
+		t.Fatalf("normalizeSaveIntakeInput() underage birth date got %v want %v", err, ErrInvalidBirthDate)
+	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{BirthDate: "2100-01-01", UserID: userID}); !errors.Is(err, ErrInvalidBirthDate) {
+		t.Fatalf("normalizeSaveIntakeInput() future birth date got %v want %v", err, ErrInvalidBirthDate)
+	}
 	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{PayoutRecipientType: "corp", UserID: userID}); !errors.Is(err, ErrInvalidPayoutRecipientTyp) {
 		t.Fatalf("normalizeSaveIntakeInput() bad payout type got %v want %v", err, ErrInvalidPayoutRecipientTyp)
+	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{LegalAddress: "   ", UserID: userID}); !errors.Is(err, ErrInvalidLegalAddress) {
+		t.Fatalf("normalizeSaveIntakeInput() blank address got %v want %v", err, ErrInvalidLegalAddress)
+	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{LegalAddress: strings.Repeat("あ", maxLegalAddressLength+1), UserID: userID}); !errors.Is(err, ErrInvalidLegalAddress) {
+		t.Fatalf("normalizeSaveIntakeInput() long address got %v want %v", err, ErrInvalidLegalAddress)
+	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{IdentityDocumentType: "library_card", UserID: userID}); !errors.Is(err, ErrInvalidIdentityDocumentType) {
+		t.Fatalf("normalizeSaveIntakeInput() bad identity type got %v want %v", err, ErrInvalidIdentityDocumentType)
+	}
+	if _, err := normalizeSaveIntakeInput(SaveIntakeInput{TargetAudienceCategory: "unknown", UserID: userID}); !errors.Is(err, ErrInvalidTargetAudienceCategory) {
+		t.Fatalf("normalizeSaveIntakeInput() bad target category got %v want %v", err, ErrInvalidTargetAudienceCategory)
 	}
 	if _, err := parseBirthDate(" 2001-03-04 "); err != nil {
 		t.Fatalf("parseBirthDate() error = %v, want nil", err)
@@ -933,9 +994,111 @@ func TestSnapshotAndEvidenceHelpers(t *testing.T) {
 		t.Fatal("isSnapshotComplete() = false, want true")
 	}
 
-	snapshot.userProfile.Handle = ""
-	if isSnapshotComplete(snapshot) {
+	missingHandleSnapshot := snapshot
+	missingHandleSnapshot.userProfile.Handle = ""
+	if isSnapshotComplete(missingHandleSnapshot) {
 		t.Fatal("isSnapshotComplete() = true, want false when handle is empty")
+	}
+
+	underageSnapshot := snapshot
+	underageIntake := *snapshot.intake
+	underageBirthDate := dateOnly(time.Now().UTC().AddDate(-minimumCreatorAgeYears, 0, 1))
+	underageIntake.BirthDate = dateToPG(&underageBirthDate)
+	underageSnapshot.intake = &underageIntake
+	if isSnapshotComplete(underageSnapshot) {
+		t.Fatal("isSnapshotComplete() = true, want false when birth date is under 18")
+	}
+
+	incompleteCases := []struct {
+		name   string
+		mutate func(*registrationSnapshot)
+	}{
+		{
+			name: "missing legal address",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.LegalAddress = ""
+				candidate.intake = &intake
+			},
+		},
+		{
+			name: "missing identity document type",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.IdentityDocumentType = pgtype.Text{}
+				candidate.intake = &intake
+			},
+		},
+		{
+			name: "missing target audience category",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.TargetAudienceCategory = pgtype.Text{}
+				candidate.intake = &intake
+			},
+		},
+		{
+			name: "missing appearance verification consent",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.AcceptsAppearanceVerification = false
+				candidate.intake = &intake
+			},
+		},
+		{
+			name: "missing document match confirmation",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.ConfirmsInformationMatchesDocuments = false
+				candidate.intake = &intake
+			},
+		},
+		{
+			name: "business recipient missing business registration evidence",
+			mutate: func(candidate *registrationSnapshot) {
+				candidate.evidences = []sqlc.AppCreatorRegistrationEvidence{
+					testEvidenceRow(userID, EvidenceKindGovernmentID, "review-bucket", "creator-registration/evidence/government-id.png"),
+					testEvidenceRow(userID, EvidenceKindIdentitySelfie, "review-bucket", "creator-registration/evidence/identity-selfie.png"),
+					testEvidenceRow(userID, EvidenceKindAddressProof, "review-bucket", "creator-registration/evidence/address-proof.pdf"),
+					testEvidenceRow(userID, EvidenceKindPayoutProof, "review-bucket", "creator-registration/evidence/payout-proof.pdf"),
+				}
+			},
+		},
+		{
+			name: "co performers missing consent responsibility",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.HasCoPerformers = true
+				intake.AcceptsCoPerformerConsentResponsibility = false
+				candidate.intake = &intake
+				candidate.evidences = append(candidate.evidences, testEvidenceRow(userID, EvidenceKindCoPerformerConsent, "review-bucket", "creator-registration/evidence/co-performer-consent.pdf"))
+			},
+		},
+		{
+			name: "co performers missing consent evidence",
+			mutate: func(candidate *registrationSnapshot) {
+				intake := *candidate.intake
+				intake.HasCoPerformers = true
+				intake.AcceptsCoPerformerConsentResponsibility = true
+				candidate.intake = &intake
+			},
+		},
+	}
+	for _, tt := range incompleteCases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			candidate := snapshot
+			intake := *snapshot.intake
+			candidate.intake = &intake
+			candidate.evidences = append([]sqlc.AppCreatorRegistrationEvidence{}, snapshot.evidences...)
+			tt.mutate(&candidate)
+
+			if isSnapshotComplete(candidate) {
+				t.Fatalf("isSnapshotComplete() = true, want false for %s", tt.name)
+			}
+		})
 	}
 
 	uploadedAt := time.Unix(1710001800, 0).UTC()
@@ -1288,21 +1451,33 @@ func testCreatorProfile(userID uuid.UUID, bio string) sqlc.AppCreatorProfile {
 func testIntake(userID uuid.UUID) sqlc.AppCreatorRegistrationIntake {
 	birthDate := time.Date(2000, 1, 2, 0, 0, 0, 0, time.UTC)
 	payoutType := PayoutRecipientTypeBusiness
+	identityDocumentType := IdentityDocumentTypeDriverLicense
+	targetAudienceCategory := TargetAudienceCategoryGeneralAdult
 	return sqlc.AppCreatorRegistrationIntake{
-		UserID:                       postgres.UUIDToPG(userID),
-		LegalName:                    "Creator Legal",
-		BirthDate:                    dateToPG(&birthDate),
-		PayoutRecipientType:          postgres.TextToPG(&payoutType),
-		PayoutRecipientName:          "Creator Biz",
-		DeclaresNoProhibitedCategory: true,
-		AcceptsConsentResponsibility: true,
+		UserID:                              postgres.UUIDToPG(userID),
+		LegalName:                           "Creator Legal",
+		BirthDate:                           dateToPG(&birthDate),
+		LegalAddress:                        "Tokyo-to Shibuya-ku 1-2-3",
+		IdentityDocumentType:                postgres.TextToPG(&identityDocumentType),
+		TargetAudienceCategory:              postgres.TextToPG(&targetAudienceCategory),
+		HasCoPerformers:                     false,
+		PayoutRecipientType:                 postgres.TextToPG(&payoutType),
+		PayoutRecipientName:                 "Creator Biz",
+		DeclaresNoProhibitedCategory:        true,
+		AcceptsConsentResponsibility:        true,
+		AcceptsAppearanceVerification:       true,
+		AcceptsAdultBusinessCompliance:      true,
+		ConfirmsInformationMatchesDocuments: true,
 	}
 }
 
 func testEvidenceRows(userID uuid.UUID) []sqlc.AppCreatorRegistrationEvidence {
 	return []sqlc.AppCreatorRegistrationEvidence{
 		testEvidenceRow(userID, EvidenceKindGovernmentID, "review-bucket", "creator-registration/evidence/government-id.png"),
+		testEvidenceRow(userID, EvidenceKindIdentitySelfie, "review-bucket", "creator-registration/evidence/identity-selfie.png"),
+		testEvidenceRow(userID, EvidenceKindAddressProof, "review-bucket", "creator-registration/evidence/address-proof.pdf"),
 		testEvidenceRow(userID, EvidenceKindPayoutProof, "review-bucket", "creator-registration/evidence/payout-proof.pdf"),
+		testEvidenceRow(userID, EvidenceKindBusinessRegistration, "review-bucket", "creator-registration/evidence/business-registration.pdf"),
 	}
 }
 

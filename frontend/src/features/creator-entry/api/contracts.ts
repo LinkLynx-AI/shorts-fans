@@ -8,12 +8,33 @@ const creatorRegistrationHandleSchema = z.custom<`@${string}`>(
 
 export const creatorRegistrationEvidenceKinds = [
   "government_id",
+  "identity_selfie",
+  "address_proof",
   "payout_proof",
+  "business_registration",
+  "co_performer_consent",
 ] as const;
 
 export const creatorRegistrationPayoutRecipientTypes = [
   "self",
   "business",
+] as const;
+
+export const creatorRegistrationIdentityDocumentTypes = [
+  "driver_license",
+  "my_number_card",
+  "residence_card",
+  "basic_resident_register_card",
+  "passport",
+  "student_or_employee_id",
+  "disability_certificate",
+  "other_government_photo_id",
+] as const;
+
+export const creatorRegistrationTargetAudienceCategories = [
+  "all_ages",
+  "general_adult",
+  "gay_bl",
 ] as const;
 
 export const creatorRegistrationAvatarAssetSchema = z.object({
@@ -39,18 +60,26 @@ export const creatorRegistrationEvidenceSchema = z.object({
 });
 
 export const creatorRegistrationIntakeSchema = z.object({
+  acceptsAdultBusinessCompliance: z.boolean(),
+  acceptsAppearanceVerification: z.boolean(),
   acceptsConsentResponsibility: z.boolean(),
+  acceptsCoPerformerConsentResponsibility: z.boolean(),
   birthDate: z.string().min(1).nullable(),
   canSubmit: z.boolean(),
+  confirmsInformationMatchesDocuments: z.boolean(),
   creatorBio: z.string(),
   declaresNoProhibitedCategory: z.boolean(),
   evidences: z.array(creatorRegistrationEvidenceSchema),
+  hasCoPerformers: z.boolean(),
+  identityDocumentType: z.enum(creatorRegistrationIdentityDocumentTypes).nullable(),
   isReadOnly: z.boolean(),
+  legalAddress: z.string(),
   legalName: z.string(),
   payoutRecipientName: z.string(),
   payoutRecipientType: z.enum(creatorRegistrationPayoutRecipientTypes).nullable(),
   registrationState: z.string().min(1).nullable(),
   sharedProfile: creatorRegistrationSharedProfileSchema,
+  targetAudienceCategory: z.enum(creatorRegistrationTargetAudienceCategories).nullable(),
 });
 
 const creatorRegistrationActionsSchema = z.object({
@@ -155,6 +184,8 @@ export const creatorRegistrationEvidenceUploadCompleteResponseSchema = z.object(
 export type CreatorRegistrationEvidence = z.output<typeof creatorRegistrationEvidenceSchema>;
 export type CreatorRegistrationEvidenceKind = (typeof creatorRegistrationEvidenceKinds)[number];
 export type CreatorRegistrationEvidenceUploadTarget = z.output<typeof creatorRegistrationEvidenceUploadTargetSchema>;
+export type CreatorRegistrationIdentityDocumentType = (typeof creatorRegistrationIdentityDocumentTypes)[number];
 export type CreatorRegistrationIntake = z.output<typeof creatorRegistrationIntakeSchema>;
 export type CreatorRegistrationPayoutRecipientType = (typeof creatorRegistrationPayoutRecipientTypes)[number];
 export type CreatorRegistrationStatus = z.output<typeof creatorRegistrationStatusSchema>;
+export type CreatorRegistrationTargetAudienceCategory = (typeof creatorRegistrationTargetAudienceCategories)[number];

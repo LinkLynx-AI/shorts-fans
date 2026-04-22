@@ -30,16 +30,19 @@
 ## Environment Boundary
 
 - endpoint は `backend` が `development` 環境で起動しているときだけ有効です。
-- local admin 向けの暫定 surface として、現時点では auth を要求しません。
+- local admin 向けの暫定 surface として、production auth / RBAC は要求しません。
+- backend 側では `loopback remote addr` と `X-Shorts-Fans-Admin-Token` (`ADMIN_API_TOKEN`) が一致しない request を `404` で遮断します。
+- frontend の local admin UI は `X-Shorts-Fans-Admin-UI-Token` (`ADMIN_UI_ACCESS_TOKEN`) で発行した署名済み httpOnly cookie を持つ request だけを許可します。
+- local admin UI の cookie は `POST /admin/access` から発行します。access token を URL query や cookie value へ直接保存してはいけません。
 - frontend の local admin UI は `localhost:3001` で動かし、backend API は `NEXT_PUBLIC_API_BASE_URL` が指す先を利用します。
 
 ## Endpoint Summary
 
 | method | path | auth | notes |
 | --- | --- | --- | --- |
-| `GET` | `/api/admin/creator-reviews?state=submitted` | none | state ごとの review queue を返す |
-| `GET` | `/api/admin/creator-reviews/:userId` | none | user 単位の review detail を返す |
-| `POST` | `/api/admin/creator-reviews/:userId/decision` | none | review decision を反映して更新後 case を返す |
+| `GET` | `/api/admin/creator-reviews?state=submitted` | dev admin token | state ごとの review queue を返す |
+| `GET` | `/api/admin/creator-reviews/:userId` | dev admin token | user 単位の review detail を返す |
+| `POST` | `/api/admin/creator-reviews/:userId/decision` | dev admin token | review decision を反映して更新後 case を返す |
 
 ## Shared Rules
 
@@ -131,10 +134,18 @@
       "intake": {
         "legalName": "Mina Rei",
         "birthDate": "1999-04-02",
+        "legalAddress": "東京都渋谷区...",
+        "identityDocumentType": "driver_license",
+        "targetAudienceCategory": "general_adult",
+        "hasCoPerformers": false,
         "payoutRecipientType": "self",
         "payoutRecipientName": "Mina Rei",
         "declaresNoProhibitedCategory": true,
-        "acceptsConsentResponsibility": true
+        "acceptsConsentResponsibility": true,
+        "acceptsAppearanceVerification": true,
+        "acceptsCoPerformerConsentResponsibility": false,
+        "acceptsAdultBusinessCompliance": true,
+        "confirmsInformationMatchesDocuments": true
       },
       "evidences": [
         {
@@ -146,8 +157,24 @@
           "accessUrl": "https://signed.example.com/mock/government-id"
         },
         {
+          "kind": "identity_selfie",
+          "fileName": "selfie.png",
+          "mimeType": "image/png",
+          "fileSizeBytes": 102400,
+          "uploadedAt": "2026-04-17T07:46:00Z",
+          "accessUrl": "https://signed.example.com/mock/identity-selfie"
+        },
+        {
+          "kind": "address_proof",
+          "fileName": "address-proof.pdf",
+          "mimeType": "application/pdf",
+          "fileSizeBytes": 84512,
+          "uploadedAt": "2026-04-17T07:46:30Z",
+          "accessUrl": "https://signed.example.com/mock/address-proof"
+        },
+        {
           "kind": "payout_proof",
-          "fileName": "bank-proof.pdf",
+          "fileName": "payout-proof.pdf",
           "mimeType": "application/pdf",
           "fileSizeBytes": 84512,
           "uploadedAt": "2026-04-17T07:45:00Z",
@@ -177,7 +204,7 @@
 | --- | --- | --- |
 | `sharedProfile` | `ViewerProfilePreview` | shared viewer profile の current preview |
 | `creatorBio` | `string` | creator 固有 bio |
-| `intake` | `AdminCreatorReviewIntake` | submit 済み intake snapshot |
+| `intake` | `AdminCreatorReviewIntake` | submit 済み intake snapshot。銀行口座情報は含めない |
 | `evidences` | `AdminCreatorReviewEvidence[]` | signed GET URL 付き evidence summary |
 | `review` | `ReviewTimeline` | capability timestamps |
 | `rejection` | `Rejection \| null` | rejected state の metadata |
@@ -229,6 +256,7 @@
 | `400` | `review_reason_required` | `rejected` に reasonCode が不足 |
 | `400` | `review_decision_metadata_conflict` | rejected metadata が矛盾 |
 | `404` | `not_found` | 対象 user の review case が存在しない |
+| `409` | `registration_incomplete` | `approved` に必要な intake / evidence が不足 |
 | `409` | `review_state_conflict` | current state ではその decision を適用できない |
 | `500` | `internal_error` | unexpected failure |
 

@@ -5,10 +5,11 @@ import {
 
 import { getSubmissionReviewQueue } from "@/entities/submission-review";
 
+import { assertAdminUiAccess } from "../_lib/admin-ui-access";
 import AdminSubmissionReviewsPage from "./page";
 
 vi.mock("../_lib/admin-ui-access", () => ({
-  assertAdminUiEnabled: vi.fn(),
+  assertAdminUiAccess: vi.fn(),
 }));
 
 vi.mock("@/entities/submission-review", async () => {
@@ -22,6 +23,7 @@ vi.mock("@/entities/submission-review", async () => {
 
 describe("AdminSubmissionReviewsPage", () => {
   beforeEach(() => {
+    vi.mocked(assertAdminUiAccess).mockReset();
     vi.mocked(getSubmissionReviewQueue).mockReset();
   });
 
@@ -49,6 +51,9 @@ describe("AdminSubmissionReviewsPage", () => {
 
     render(await AdminSubmissionReviewsPage());
 
+    expect(getSubmissionReviewQueue).toHaveBeenCalledWith({
+      fetcher: expect.any(Function),
+    });
     expect(screen.getByRole("link", { name: /Video 審査 main \/ short/i })).toHaveAttribute(
       "aria-current",
       "page",
@@ -61,5 +66,13 @@ describe("AdminSubmissionReviewsPage", () => {
       "data-prefetch",
       "false",
     );
+  });
+
+  it("does not fetch the review queue when admin access is rejected", async () => {
+    vi.mocked(assertAdminUiAccess).mockRejectedValue(new Error("blocked"));
+
+    await expect(AdminSubmissionReviewsPage()).rejects.toThrow("blocked");
+
+    expect(getSubmissionReviewQueue).not.toHaveBeenCalled();
   });
 });

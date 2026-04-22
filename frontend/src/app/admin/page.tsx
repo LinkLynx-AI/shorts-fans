@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { assertAdminUiEnabled } from "./_lib/admin-ui-access";
+import { assertAdminUiAccess } from "./_lib/admin-ui-access";
 import { AdminReviewNavigation } from "./_ui/admin-review-navigation";
 import {
   Button,
@@ -31,8 +31,8 @@ const reviewSurfaces = [
   },
 ] as const;
 
-export default function AdminPage() {
-  assertAdminUiEnabled();
+export default async function AdminPage() {
+  await assertAdminUiAccess();
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">

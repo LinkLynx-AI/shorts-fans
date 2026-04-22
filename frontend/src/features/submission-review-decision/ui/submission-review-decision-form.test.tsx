@@ -7,7 +7,6 @@ import {
 
 import type { SubmissionReviewCase } from "@/entities/submission-review";
 
-import { applySubmissionReviewDecision } from "@/entities/submission-review";
 import { SubmissionReviewDecisionForm } from "./submission-review-decision-form";
 
 const mockedRouter = vi.hoisted(() => ({
@@ -25,15 +24,6 @@ vi.mock("next/navigation", async () => {
   return {
     ...actual,
     useRouter: () => mockedRouter,
-  };
-});
-
-vi.mock("@/entities/submission-review", async () => {
-  const actual = await vi.importActual<typeof import("@/entities/submission-review")>("@/entities/submission-review");
-
-  return {
-    ...actual,
-    applySubmissionReviewDecision: vi.fn(),
   };
 });
 
@@ -113,13 +103,12 @@ describe("SubmissionReviewDecisionForm", () => {
     mockedRouter.push.mockReset();
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
-    vi.mocked(applySubmissionReviewDecision).mockReset();
   });
 
   it("requires an explicit decision for every pending target", async () => {
     const user = userEvent.setup();
 
-    render(<SubmissionReviewDecisionForm reviewCase={createReviewCase()} />);
+    render(<SubmissionReviewDecisionForm onSubmitDecision={vi.fn()} reviewCase={createReviewCase()} />);
 
     await user.click(screen.getByRole("button", { name: "decision を反映する" }));
 
@@ -128,10 +117,9 @@ describe("SubmissionReviewDecisionForm", () => {
 
   it("submits main and short decisions with reason and notes", async () => {
     const user = userEvent.setup();
+    const onSubmitDecision = vi.fn().mockResolvedValue(undefined);
 
-    vi.mocked(applySubmissionReviewDecision).mockResolvedValue(undefined);
-
-    render(<SubmissionReviewDecisionForm reviewCase={createReviewCase()} />);
+    render(<SubmissionReviewDecisionForm onSubmitDecision={onSubmitDecision} reviewCase={createReviewCase()} />);
 
     await user.click(screen.getAllByRole("button", { name: "承認する" })[0]!);
     await user.type(screen.getByLabelText("main-review-note"), "unlock ready");
@@ -141,7 +129,7 @@ describe("SubmissionReviewDecisionForm", () => {
     await user.click(screen.getByRole("button", { name: "decision を反映する" }));
 
     await waitFor(() => {
-      expect(applySubmissionReviewDecision).toHaveBeenCalledWith({
+      expect(onSubmitDecision).toHaveBeenCalledWith({
         intakeId: "11111111-1111-1111-1111-111111111111",
         mainDecision: {
           decision: "approved",
@@ -163,15 +151,16 @@ describe("SubmissionReviewDecisionForm", () => {
 
   it("requires an explicit reason selection for rejected or revision requested decisions", async () => {
     const user = userEvent.setup();
+    const onSubmitDecision = vi.fn().mockResolvedValue(undefined);
 
-    render(<SubmissionReviewDecisionForm reviewCase={createReviewCase()} />);
+    render(<SubmissionReviewDecisionForm onSubmitDecision={onSubmitDecision} reviewCase={createReviewCase()} />);
 
     await user.click(screen.getAllByRole("button", { name: "却下する" })[0]!);
     await user.click(screen.getAllByRole("button", { name: "承認する" })[1]!);
     await user.click(screen.getByRole("button", { name: "decision を反映する" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent("本編 の reason code を選択してください。");
-    expect(applySubmissionReviewDecision).not.toHaveBeenCalled();
+    expect(onSubmitDecision).not.toHaveBeenCalled();
   });
 
   it("does not render an actionable form for a non-pending intake", () => {
@@ -180,7 +169,7 @@ describe("SubmissionReviewDecisionForm", () => {
     reviewCase.main.decisionRequired = true;
     reviewCase.shorts[0]!.decisionRequired = true;
 
-    render(<SubmissionReviewDecisionForm reviewCase={reviewCase} />);
+    render(<SubmissionReviewDecisionForm onSubmitDecision={vi.fn()} reviewCase={reviewCase} />);
 
     expect(screen.getByText("この intake では追加の admin decision はありません。")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "decision を反映する" })).not.toBeInTheDocument();

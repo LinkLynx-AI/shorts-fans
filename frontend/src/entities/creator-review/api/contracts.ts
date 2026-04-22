@@ -22,6 +22,23 @@ export const creatorReviewPayoutRecipientTypes = [
   "business",
 ] as const;
 
+export const creatorReviewIdentityDocumentTypes = [
+  "driver_license",
+  "my_number_card",
+  "residence_card",
+  "basic_resident_register_card",
+  "passport",
+  "student_or_employee_id",
+  "disability_certificate",
+  "other_government_photo_id",
+] as const;
+
+export const creatorReviewTargetAudienceCategories = [
+  "all_ages",
+  "general_adult",
+  "gay_bl",
+] as const;
+
 export const creatorReviewAvatarAssetSchema = z.object({
   durationSeconds: z.null(),
   id: z.string().min(1),
@@ -54,12 +71,20 @@ export const creatorReviewRejectionSchema = z.object({
 });
 
 export const creatorReviewIntakeSchema = z.object({
+  acceptsAdultBusinessCompliance: z.boolean(),
+  acceptsAppearanceVerification: z.boolean(),
   acceptsConsentResponsibility: z.boolean(),
+  acceptsCoPerformerConsentResponsibility: z.boolean(),
   birthDate: z.string().min(1).nullable(),
+  confirmsInformationMatchesDocuments: z.boolean(),
   declaresNoProhibitedCategory: z.boolean(),
+  hasCoPerformers: z.boolean(),
+  identityDocumentType: z.enum(creatorReviewIdentityDocumentTypes).nullable(),
+  legalAddress: z.string(),
   legalName: z.string(),
   payoutRecipientName: z.string(),
   payoutRecipientType: z.enum(creatorReviewPayoutRecipientTypes).nullable(),
+  targetAudienceCategory: z.enum(creatorReviewTargetAudienceCategories).nullable(),
 });
 
 export const creatorReviewEvidenceSchema = z.object({

@@ -16,6 +16,8 @@ import (
 	"github.com/google/uuid"
 )
 
+const testAdminAPIToken = "test-admin-token"
+
 type adminCreatorReviewServiceStub struct {
 	applyDecision func(context.Context, creatorregistration.ReviewDecisionInput) (creatorregistration.ReviewCase, error)
 	getCase       func(context.Context, uuid.UUID) (creatorregistration.ReviewCase, error)
@@ -64,7 +66,8 @@ func TestAdminCreatorReviewRoutesRejectNonLoopbackRequests(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
 				t.Fatal("ListCases() called, want loopback guard to block request first")
@@ -75,12 +78,55 @@ func TestAdminCreatorReviewRoutesRejectNonLoopbackRequests(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/creator-reviews", nil)
 	req.RemoteAddr = "203.0.113.10:4321"
+	req.Header.Set(adminAPITokenHeader, testAdminAPIToken)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("GET /api/admin/creator-reviews status got %d want %d", rec.Code, http.StatusNotFound)
+	}
+}
+
+func TestAdminCreatorReviewRoutesRejectMissingOrInvalidToken(t *testing.T) {
+	t.Parallel()
+
+	router := NewHandler(HandlerConfig{
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
+		AdminCreatorReview: adminCreatorReviewServiceStub{
+			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
+				t.Fatal("ListCases() called, want admin token guard to block request first")
+				return nil, nil
+			},
+		},
+	})
+
+	tests := []struct {
+		name  string
+		token string
+	}{
+		{name: "missing"},
+		{name: "invalid", token: "wrong-token"},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			req := httptest.NewRequest(http.MethodGet, "/api/admin/creator-reviews", nil)
+			req.RemoteAddr = "127.0.0.1:4321"
+			if tt.token != "" {
+				req.Header.Set(adminAPITokenHeader, tt.token)
+			}
+			rec := httptest.NewRecorder()
+
+			router.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("GET /api/admin/creator-reviews status got %d want %d", rec.Code, http.StatusNotFound)
+			}
+		})
 	}
 }
 
@@ -91,7 +137,8 @@ func TestAdminCreatorReviewQueueGetReturnsItems(t *testing.T) {
 	submittedAt := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			listCases: func(_ context.Context, state string) ([]creatorregistration.ReviewQueueItem, error) {
 				if state != creatorregistration.StateSubmitted {
@@ -137,7 +184,8 @@ func TestAdminCreatorReviewQueueGetMapsInvalidState(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
 				return nil, creatorregistration.ErrInvalidReviewState
@@ -162,7 +210,8 @@ func TestAdminCreatorReviewQueueGetMapsUnexpectedErrorAsInternal(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			listCases: func(context.Context, string) ([]creatorregistration.ReviewQueueItem, error) {
 				return nil, errors.New("boom")
@@ -184,7 +233,8 @@ func TestAdminCreatorReviewCaseGetMapsNotFound(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			getCase: func(context.Context, uuid.UUID) (creatorregistration.ReviewCase, error) {
 				return creatorregistration.ReviewCase{}, creatorregistration.ErrReviewCaseNotFound
@@ -210,6 +260,7 @@ func TestAdminCreatorReviewCaseGetRejectsInvalidUserID(t *testing.T) {
 
 	router := NewHandler(HandlerConfig{
 		AppEnv:             developmentAppEnv,
+		AdminAPIToken:      testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{},
 	})
 
@@ -230,7 +281,8 @@ func TestAdminCreatorReviewCaseGetMapsUnexpectedErrorAsInternal(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			getCase: func(context.Context, uuid.UUID) (creatorregistration.ReviewCase, error) {
 				return creatorregistration.ReviewCase{}, errors.New("boom")
@@ -257,7 +309,8 @@ func TestAdminCreatorReviewDecisionPostReturnsUpdatedCase(t *testing.T) {
 	var gotInput creatorregistration.ReviewDecisionInput
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			applyDecision: func(_ context.Context, input creatorregistration.ReviewDecisionInput) (creatorregistration.ReviewCase, error) {
 				gotInput = input
@@ -325,7 +378,8 @@ func TestAdminCreatorReviewDecisionPostMapsValidationErrors(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{
 			applyDecision: func(context.Context, creatorregistration.ReviewDecisionInput) (creatorregistration.ReviewCase, error) {
 				return creatorregistration.ReviewCase{}, creatorregistration.ErrReviewDecisionReasonRequired
@@ -356,6 +410,7 @@ func TestAdminCreatorReviewDecisionPostRejectsInvalidUserID(t *testing.T) {
 
 	router := NewHandler(HandlerConfig{
 		AppEnv:             developmentAppEnv,
+		AdminAPIToken:      testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{},
 	})
 
@@ -379,6 +434,7 @@ func TestAdminCreatorReviewDecisionPostRejectsInvalidJSON(t *testing.T) {
 
 	router := NewHandler(HandlerConfig{
 		AppEnv:             developmentAppEnv,
+		AdminAPIToken:      testAdminAPIToken,
 		AdminCreatorReview: adminCreatorReviewServiceStub{},
 	})
 
@@ -414,6 +470,7 @@ func TestWriteAdminCreatorReviewError(t *testing.T) {
 		{err: creatorregistration.ErrReviewDecisionReasonRequired, wantCode: "review_reason_required", wantMapped: true, wantStatus: http.StatusBadRequest},
 		{err: creatorregistration.ErrReviewDecisionMetadataConflict, wantCode: "review_decision_metadata_conflict", wantMapped: true, wantStatus: http.StatusBadRequest},
 		{err: creatorregistration.ErrRegistrationStateConflict, wantCode: "review_state_conflict", wantMapped: true, wantStatus: http.StatusConflict},
+		{err: creatorregistration.ErrRegistrationIncomplete, wantCode: "registration_incomplete", wantMapped: true, wantStatus: http.StatusConflict},
 		{err: creatorregistration.ErrReviewCaseNotFound, wantCode: "not_found", wantMapped: true, wantStatus: http.StatusNotFound},
 		{err: creatorregistration.ErrSharedProfileNotFound, wantCode: "not_found", wantMapped: true, wantStatus: http.StatusNotFound},
 		{err: errors.New("boom"), wantMapped: false},
@@ -447,5 +504,6 @@ func TestWriteAdminCreatorReviewError(t *testing.T) {
 func newLoopbackAdminRequest(method string, target string, body io.Reader) *http.Request {
 	req := httptest.NewRequest(method, target, body)
 	req.RemoteAddr = "127.0.0.1:4321"
+	req.Header.Set(adminAPITokenHeader, testAdminAPIToken)
 	return req
 }

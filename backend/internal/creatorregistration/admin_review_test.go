@@ -134,7 +134,10 @@ func TestReviewServiceGetCaseReturnsSignedEvidenceURLs(t *testing.T) {
 	submittedAt := time.Date(2026, 4, 18, 9, 0, 0, 0, time.UTC)
 	capability.SubmittedAt = postgres.TimeToPG(&submittedAt)
 	governmentURL := "https://signed.example.com/government"
+	selfieURL := "https://signed.example.com/selfie"
+	addressURL := "https://signed.example.com/address"
 	payoutURL := "https://signed.example.com/payout"
+	businessURL := "https://signed.example.com/business"
 
 	service := &ReviewService{
 		evidenceAccessTTL: 15 * time.Minute,
@@ -159,8 +162,14 @@ func TestReviewServiceGetCaseReturnsSignedEvidenceURLs(t *testing.T) {
 			switch key {
 			case "creator-registration/evidence/government-id.png":
 				return governmentURL, nil
+			case "creator-registration/evidence/identity-selfie.png":
+				return selfieURL, nil
+			case "creator-registration/evidence/address-proof.pdf":
+				return addressURL, nil
 			case "creator-registration/evidence/payout-proof.pdf":
 				return payoutURL, nil
+			case "creator-registration/evidence/business-registration.pdf":
+				return businessURL, nil
 			default:
 				return "", errors.New("unexpected key")
 			}
@@ -177,14 +186,23 @@ func TestReviewServiceGetCaseReturnsSignedEvidenceURLs(t *testing.T) {
 	if reviewCase.Intake.LegalName != "Creator Legal" {
 		t.Fatalf("GetCase() legal name got %q want %q", reviewCase.Intake.LegalName, "Creator Legal")
 	}
-	if len(reviewCase.Evidences) != 2 {
-		t.Fatalf("GetCase() evidence len got %d want 2", len(reviewCase.Evidences))
+	if len(reviewCase.Evidences) != 5 {
+		t.Fatalf("GetCase() evidence len got %d want 5", len(reviewCase.Evidences))
 	}
 	if reviewCase.Evidences[0].AccessURL != governmentURL {
 		t.Fatalf("GetCase() government access url got %q want %q", reviewCase.Evidences[0].AccessURL, governmentURL)
 	}
-	if reviewCase.Evidences[1].AccessURL != payoutURL {
-		t.Fatalf("GetCase() payout access url got %q want %q", reviewCase.Evidences[1].AccessURL, payoutURL)
+	if reviewCase.Evidences[1].AccessURL != selfieURL {
+		t.Fatalf("GetCase() selfie access url got %q want %q", reviewCase.Evidences[1].AccessURL, selfieURL)
+	}
+	if reviewCase.Evidences[2].AccessURL != addressURL {
+		t.Fatalf("GetCase() address access url got %q want %q", reviewCase.Evidences[2].AccessURL, addressURL)
+	}
+	if reviewCase.Evidences[3].AccessURL != payoutURL {
+		t.Fatalf("GetCase() payout access url got %q want %q", reviewCase.Evidences[3].AccessURL, payoutURL)
+	}
+	if reviewCase.Evidences[4].AccessURL != businessURL {
+		t.Fatalf("GetCase() business access url got %q want %q", reviewCase.Evidences[4].AccessURL, businessURL)
 	}
 }
 
@@ -316,6 +334,52 @@ func TestReviewServiceApplyDecisionHidesDraftCases(t *testing.T) {
 	})
 	if !errors.Is(err, ErrReviewCaseNotFound) {
 		t.Fatalf("ApplyDecision() error got %v want %v", err, ErrReviewCaseNotFound)
+	}
+}
+
+func TestReviewServiceApplyDecisionRequiresCompleteApprovalSnapshot(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	currentCapability := testCapability(userID, StateSubmitted)
+
+	service := &ReviewService{
+		repository: &Repository{
+			queries: repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return currentCapability, nil
+				},
+				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testCreatorProfile(userID, "quiet rooftop"), nil
+				},
+				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+					return testIntake(userID), nil
+				},
+				listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+					return []sqlc.AppCreatorRegistrationEvidence{}, nil
+				},
+			},
+			txBeginner: repositoryTxBeginnerStub{
+				begin: func(context.Context) (pgx.Tx, error) {
+					t.Fatal("Begin() called, want incomplete approval to stop before decision transaction")
+					return nil, nil
+				},
+			},
+		},
+		signEvidenceURL: func(context.Context, string, string, time.Duration) (string, error) {
+			t.Fatal("signEvidenceURL() called, want incomplete approval to stop before detail reload")
+			return "", nil
+		},
+	}
+
+	if _, err := service.ApplyDecision(context.Background(), ReviewDecisionInput{
+		Decision: StateApproved,
+		UserID:   userID,
+	}); !errors.Is(err, ErrRegistrationIncomplete) {
+		t.Fatalf("ApplyDecision() incomplete approval got %v want %v", err, ErrRegistrationIncomplete)
 	}
 }
 

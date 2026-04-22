@@ -6,12 +6,12 @@ import {
 import AdminPage from "./page";
 
 vi.mock("./_lib/admin-ui-access", () => ({
-  assertAdminUiEnabled: vi.fn(),
+  assertAdminUiAccess: vi.fn(),
 }));
 
 describe("AdminPage", () => {
-  it("renders UI links to creator and video review queues", () => {
-    render(<AdminPage />);
+  it("renders UI links to creator and video review queues", async () => {
+    render(await AdminPage());
     const reviewQueueLinks = screen
       .getAllByRole("link")
       .filter((link) => ["/admin/creator-reviews", "/admin/submission-reviews"].includes(link.getAttribute("href") ?? ""));

@@ -26,6 +26,7 @@ const (
 	avatarDeliveryBucketEnv    = "CREATOR_AVATAR_DELIVERY_BUCKET_NAME"
 	avatarBaseURLEnv           = "CREATOR_AVATAR_BASE_URL"
 	reviewEvidenceBucketEnv    = "CREATOR_REVIEW_EVIDENCE_BUCKET_NAME"
+	adminAPITokenEnv           = "ADMIN_API_TOKEN"
 	ccbillBaseURLEnv           = "CCBILL_BASE_URL"
 	ccbillBackendClientIDEnv   = "CCBILL_BACKEND_CLIENT_ID"
 	ccbillBackendSecretEnv     = "CCBILL_BACKEND_CLIENT_SECRET"
@@ -42,6 +43,7 @@ const (
 type Config struct {
 	AppEnvExplicitlySet             bool
 	AppEnv                          string
+	AdminAPIToken                   string
 	APIAddr                         string
 	PostgresDSN                     string
 	RedisAddr                       string
@@ -81,6 +83,7 @@ func LoadFromEnv(lookup func(string) string) Config {
 	cfg := Config{
 		AppEnv:                          normalizeAppEnv(rawAppEnv),
 		AppEnvExplicitlySet:             rawAppEnv != "",
+		AdminAPIToken:                   trimmedLookup(lookup, adminAPITokenEnv),
 		APIAddr:                         trimmedLookup(lookup, "API_ADDR"),
 		PostgresDSN:                     trimmedLookup(lookup, "POSTGRES_DSN"),
 		RedisAddr:                       trimmedLookup(lookup, "REDIS_ADDR"),

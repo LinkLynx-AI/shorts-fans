@@ -55,6 +55,15 @@ export function getCreatorRegistrationErrorMessage(error: unknown): string {
   if (code === "invalid_legal_name") {
     return "本人確認に使う氏名を入力してください。";
   }
+  if (code === "invalid_legal_address") {
+    return "本人確認に使う現住所を 500 文字以内で入力してください。";
+  }
+  if (code === "invalid_identity_document_type") {
+    return "本人確認書類の種類を選択してください。";
+  }
+  if (code === "invalid_target_audience_category") {
+    return "対象区分を選択してください。";
+  }
   if (code === "invalid_birth_date") {
     return "生年月日は 1999-04-02 の形で入力してください。";
   }

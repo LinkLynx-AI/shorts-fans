@@ -114,6 +114,7 @@ type adminSubmissionReviewCaseResponseData struct {
 func registerAdminSubmissionReviewRoutes(
 	router gin.IRouter,
 	appEnv string,
+	adminAPIToken string,
 	service AdminSubmissionReviewService,
 ) {
 	if appEnv != developmentAppEnv || service == nil {
@@ -121,7 +122,7 @@ func registerAdminSubmissionReviewRoutes(
 	}
 
 	adminGroup := router.Group("/api/admin")
-	adminGroup.Use(requireAdminLoopback())
+	adminGroup.Use(requireAdminLocalAccess(adminAPIToken))
 	adminGroup.GET("/submission-reviews", func(c *gin.Context) {
 		handleAdminSubmissionReviewQueueGet(c, service)
 	})

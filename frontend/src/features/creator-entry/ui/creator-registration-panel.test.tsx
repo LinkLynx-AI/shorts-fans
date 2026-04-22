@@ -85,6 +85,33 @@ describe("CreatorRegistrationPanel", () => {
     expect(screen.getByRole("link", { name: "編集する" })).toHaveAttribute("href", "/fan/settings/profile");
   });
 
+  it("shows conditional evidence fields for business payout and co-performers", async () => {
+    apiMocks.fetchCreatorRegistrationIntake.mockResolvedValue({
+      acceptsConsentResponsibility: false,
+      birthDate: null,
+      canSubmit: false,
+      creatorBio: "quiet rooftop",
+      declaresNoProhibitedCategory: false,
+      evidences: [],
+      hasCoPerformers: true,
+      isReadOnly: false,
+      legalName: "Mina Rei",
+      payoutRecipientName: "Mina LLC",
+      payoutRecipientType: "business",
+      registrationState: "draft",
+      sharedProfile: {
+        avatar: null,
+        displayName: "Mina",
+        handle: "@mina",
+      },
+    });
+
+    render(<CreatorRegistrationPanel initialRegistration={null} />);
+
+    expect(await screen.findByText("事業確認書類")).toBeInTheDocument();
+    expect(screen.getByText("共演者の同意確認書類")).toBeInTheDocument();
+  });
+
   it("saves the current draft and routes to the success page on submit", async () => {
     const user = userEvent.setup();
 
@@ -129,14 +156,30 @@ describe("CreatorRegistrationPanel", () => {
           uploadedAt: "2026-04-17T10:30:00.000Z",
         },
         {
-          fileName: "bank-proof.pdf",
+          fileName: "payout-proof.pdf",
           fileSizeBytes: 2048,
           kind: "payout_proof",
           mimeType: "application/pdf",
           uploadedAt: "2026-04-17T10:32:00.000Z",
         },
+        {
+          fileName: "selfie.png",
+          fileSizeBytes: 1024,
+          kind: "identity_selfie",
+          mimeType: "image/png",
+          uploadedAt: "2026-04-17T10:31:00.000Z",
+        },
+        {
+          fileName: "address-proof.pdf",
+          fileSizeBytes: 2048,
+          kind: "address_proof",
+          mimeType: "application/pdf",
+          uploadedAt: "2026-04-17T10:33:00.000Z",
+        },
       ],
       isReadOnly: false,
+      identityDocumentType: "driver_license",
+      legalAddress: "Tokyo-to Shibuya-ku 1-2-3",
       legalName: "Mina Rei",
       payoutRecipientName: "Mina Rei",
       payoutRecipientType: "self",
@@ -146,6 +189,7 @@ describe("CreatorRegistrationPanel", () => {
         displayName: "Mina",
         handle: "@mina",
       },
+      targetAudienceCategory: "general_adult",
     });
     apiMocks.registerCreator.mockResolvedValue(undefined);
 
@@ -156,9 +200,16 @@ describe("CreatorRegistrationPanel", () => {
     await user.type(screen.getByRole("textbox", { name: "紹介文" }), "quiet rooftop");
     await user.type(screen.getByRole("textbox", { name: "氏名" }), "Mina Rei");
     await user.type(screen.getByLabelText("生年月日"), "1999-04-02");
+    await user.type(screen.getByRole("textbox", { name: "現住所" }), "Tokyo-to Shibuya-ku 1-2-3");
+    await user.selectOptions(screen.getByRole("combobox", { name: "本人確認書類の種類" }), "driver_license");
+    await user.selectOptions(screen.getByRole("combobox", { name: "対象区分" }), "general_adult");
+    await user.click(screen.getByLabelText("いない"));
     await user.click(screen.getByLabelText("自分名義"));
     await user.type(screen.getByRole("textbox", { name: "受取名" }), "Mina Rei");
     await user.click(screen.getByRole("checkbox", { name: /禁止されている内容/ }));
+    await user.click(screen.getByRole("checkbox", { name: /提出書類と一致/ }));
+    await user.click(screen.getByRole("checkbox", { name: /本人照合用の写真/ }));
+    await user.click(screen.getByRole("checkbox", { name: /成人向け事業/ }));
     await user.click(screen.getByRole("checkbox", { name: /出演者の同意/ }));
     expect(screen.getByRole("button", { name: "申請を送る" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "下書きを保存する" }));
@@ -166,12 +217,20 @@ describe("CreatorRegistrationPanel", () => {
       expect(apiMocks.saveCreatorRegistrationIntake).toHaveBeenCalledWith(
         {
           acceptsConsentResponsibility: true,
+          acceptsCoPerformerConsentResponsibility: false,
           birthDate: "1999-04-02",
+          acceptsAdultBusinessCompliance: true,
+          acceptsAppearanceVerification: true,
+          confirmsInformationMatchesDocuments: true,
           creatorBio: "quiet rooftop",
           declaresNoProhibitedCategory: true,
+          hasCoPerformers: false,
+          identityDocumentType: "driver_license",
+          legalAddress: "Tokyo-to Shibuya-ku 1-2-3",
           legalName: "Mina Rei",
           payoutRecipientName: "Mina Rei",
           payoutRecipientType: "self",
+          targetAudienceCategory: "general_adult",
         },
       );
     });
@@ -368,11 +427,25 @@ describe("CreatorRegistrationPanel", () => {
           uploadedAt: "2026-04-17T10:30:00.000Z",
         },
         {
-          fileName: "bank-proof.pdf",
+          fileName: "payout-proof.pdf",
           fileSizeBytes: 2048,
           kind: "payout_proof",
           mimeType: "application/pdf",
           uploadedAt: "2026-04-17T10:32:00.000Z",
+        },
+        {
+          fileName: "selfie.png",
+          fileSizeBytes: 1024,
+          kind: "identity_selfie",
+          mimeType: "image/png",
+          uploadedAt: "2026-04-17T10:31:00.000Z",
+        },
+        {
+          fileName: "address-proof.pdf",
+          fileSizeBytes: 2048,
+          kind: "address_proof",
+          mimeType: "application/pdf",
+          uploadedAt: "2026-04-17T10:33:00.000Z",
         },
       ],
       isReadOnly: false,
@@ -434,7 +507,7 @@ describe("CreatorRegistrationPanel", () => {
     expect(screen.getByText("残り申請回数：1回", { exact: false })).toBeInTheDocument();
     expect(screen.queryByText("要修正")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "新しい書類をアップロード" })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "書類を差し替える" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "書類を差し替える" })).toHaveLength(4);
   });
 
   it("recovers eligible rejected detail when the server-side status fetch was unavailable", async () => {
@@ -453,7 +526,7 @@ describe("CreatorRegistrationPanel", () => {
           uploadedAt: "2026-04-17T10:30:00.000Z",
         },
         {
-          fileName: "bank-proof.pdf",
+          fileName: "payout-proof.pdf",
           fileSizeBytes: 2048,
           kind: "payout_proof",
           mimeType: "application/pdf",
@@ -559,11 +632,25 @@ describe("CreatorRegistrationPanel", () => {
             uploadedAt: "2026-04-17T10:30:00.000Z",
           },
           {
-            fileName: "bank-proof.pdf",
+            fileName: "payout-proof.pdf",
             fileSizeBytes: 2048,
             kind: "payout_proof",
             mimeType: "application/pdf",
             uploadedAt: "2026-04-17T10:32:00.000Z",
+          },
+          {
+            fileName: "selfie.png",
+            fileSizeBytes: 1024,
+            kind: "identity_selfie",
+            mimeType: "image/png",
+            uploadedAt: "2026-04-17T10:31:00.000Z",
+          },
+          {
+            fileName: "address-proof.pdf",
+            fileSizeBytes: 2048,
+            kind: "address_proof",
+            mimeType: "application/pdf",
+            uploadedAt: "2026-04-17T10:33:00.000Z",
           },
         ],
         isReadOnly: false,
@@ -592,7 +679,7 @@ describe("CreatorRegistrationPanel", () => {
             uploadedAt: "2026-04-17T10:30:00.000Z",
           },
           {
-            fileName: "bank-proof.pdf",
+            fileName: "payout-proof.pdf",
             fileSizeBytes: 2048,
             kind: "payout_proof",
             mimeType: "application/pdf",

@@ -47,6 +47,9 @@ func TestRepositoryApplyReviewDecisionApprovesSubmittedCapability(t *testing.T) 
 				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
 					return testIntake(userID), nil
 				},
+				listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+					return testEvidenceRows(userID), nil
+				},
 				updateCreatorCapabilityState: func(_ context.Context, arg sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
 					if arg.State != StateApproved {
 						t.Fatalf("UpdateCreatorCapabilityState() state got %q want %q", arg.State, StateApproved)
@@ -111,6 +114,57 @@ func TestRepositoryApplyReviewDecisionApprovesSubmittedCapability(t *testing.T) 
 	}
 	if !lockedCapabilityLoaded {
 		t.Fatal("ApplyReviewDecision() did not load capability with row lock")
+	}
+}
+
+func TestRepositoryApplyReviewDecisionRequiresCompleteSnapshotForApproval(t *testing.T) {
+	t.Parallel()
+
+	userID := uuid.MustParse("1a1a1a1a-1a1a-1a1a-1a1a-1a1a1a1a1a1a")
+	tx := &repositoryTxStub{}
+	existing := testCapability(userID, StateSubmitted)
+	updateCalled := false
+
+	repo := &Repository{
+		txBeginner: repositoryTxBeginnerStub{
+			begin: func(context.Context) (pgx.Tx, error) { return tx, nil },
+		},
+		newQueries: func(sqlc.DBTX) queries {
+			return repositoryQueriesStub{
+				getUserProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppUserProfile, error) {
+					return testUserProfile(userID), nil
+				},
+				getCreatorCapabilityByUserIDLocked: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return existing, nil
+				},
+				getCreatorProfileByUserID: func(context.Context, pgtype.UUID) (sqlc.AppCreatorProfile, error) {
+					return testCreatorProfile(userID, "approved bio"), nil
+				},
+				getCreatorRegistrationIntakeByUser: func(context.Context, pgtype.UUID) (sqlc.AppCreatorRegistrationIntake, error) {
+					return testIntake(userID), nil
+				},
+				listCreatorRegistrationEvidences: func(context.Context, pgtype.UUID) ([]sqlc.AppCreatorRegistrationEvidence, error) {
+					return []sqlc.AppCreatorRegistrationEvidence{}, nil
+				},
+				updateCreatorCapabilityState: func(context.Context, sqlc.UpdateCreatorCapabilityStateParams) (sqlc.AppCreatorCapability, error) {
+					updateCalled = true
+					return sqlc.AppCreatorCapability{}, nil
+				},
+			}
+		},
+	}
+
+	if _, err := repo.ApplyReviewDecision(context.Background(), ReviewDecisionInput{
+		Decision: StateApproved,
+		UserID:   userID,
+	}); !errors.Is(err, ErrRegistrationIncomplete) {
+		t.Fatalf("ApplyReviewDecision() incomplete approval got %v want %v", err, ErrRegistrationIncomplete)
+	}
+	if updateCalled {
+		t.Fatal("UpdateCreatorCapabilityState() called for incomplete approval")
+	}
+	if tx.committed {
+		t.Fatal("ApplyReviewDecision() committed incomplete approval")
 	}
 }
 

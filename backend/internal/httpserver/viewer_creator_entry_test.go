@@ -318,16 +318,24 @@ func TestViewerCreatorRegistrationIntakePutPassesNormalizedPayload(t *testing.T)
 			saveIntake: func(_ context.Context, input creatorregistration.SaveIntakeInput) (creatorregistration.Intake, error) {
 				gotInput = input
 				return creatorregistration.Intake{
-					AcceptsConsentResponsibility: true,
-					BirthDate:                    "1999-04-02",
-					CanSubmit:                    false,
-					CreatorBio:                   input.CreatorBio,
-					DeclaresNoProhibitedCategory: true,
-					Evidences:                    []creatorregistration.Evidence{},
-					IsReadOnly:                   false,
-					LegalName:                    input.LegalName,
-					PayoutRecipientName:          input.PayoutRecipientName,
-					PayoutRecipientType:          input.PayoutRecipientType,
+					AcceptsAdultBusinessCompliance:          input.AcceptsAdultBusinessCompliance,
+					AcceptsAppearanceVerification:           input.AcceptsAppearanceVerification,
+					AcceptsConsentResponsibility:            input.AcceptsConsentResponsibility,
+					AcceptsCoPerformerConsentResponsibility: input.AcceptsCoPerformerConsentResponsibility,
+					BirthDate:                               "1999-04-02",
+					CanSubmit:                               false,
+					ConfirmsInformationMatchesDocuments:     input.ConfirmsInformationMatchesDocuments,
+					CreatorBio:                              input.CreatorBio,
+					DeclaresNoProhibitedCategory:            input.DeclaresNoProhibitedCategory,
+					Evidences:                               []creatorregistration.Evidence{},
+					HasCoPerformers:                         input.HasCoPerformers,
+					IdentityDocumentType:                    input.IdentityDocumentType,
+					IsReadOnly:                              false,
+					LegalAddress:                            input.LegalAddress,
+					LegalName:                               input.LegalName,
+					PayoutRecipientName:                     input.PayoutRecipientName,
+					PayoutRecipientType:                     input.PayoutRecipientType,
+					TargetAudienceCategory:                  input.TargetAudienceCategory,
 					SharedProfile: creatorregistration.SharedProfilePreview{
 						DisplayName: "Mina",
 						Handle:      "mina",
@@ -341,7 +349,7 @@ func TestViewerCreatorRegistrationIntakePutPassesNormalizedPayload(t *testing.T)
 	req := httptest.NewRequest(
 		http.MethodPut,
 		"/api/viewer/creator-registration/intake",
-		bytes.NewBufferString(`{"creatorBio":"quiet rooftop","legalName":"Mina Rei","birthDate":"1999-04-02","payoutRecipientType":"self","payoutRecipientName":"Mina Rei","declaresNoProhibitedCategory":true,"acceptsConsentResponsibility":true}`),
+		bytes.NewBufferString(`{"creatorBio":"quiet rooftop","legalName":"Mina Rei","birthDate":"1999-04-02","legalAddress":"Tokyo-to Shibuya-ku 1-2-3","identityDocumentType":"driver_license","targetAudienceCategory":"general_adult","hasCoPerformers":true,"payoutRecipientType":"self","payoutRecipientName":"Mina Rei","declaresNoProhibitedCategory":true,"acceptsConsentResponsibility":true,"acceptsAppearanceVerification":true,"acceptsCoPerformerConsentResponsibility":true,"acceptsAdultBusinessCompliance":true,"confirmsInformationMatchesDocuments":true}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: "raw-session-token"})
@@ -357,6 +365,12 @@ func TestViewerCreatorRegistrationIntakePutPassesNormalizedPayload(t *testing.T)
 	}
 	if gotInput.CreatorBio != "quiet rooftop" {
 		t.Fatalf("SaveIntake() creator bio got %q want %q", gotInput.CreatorBio, "quiet rooftop")
+	}
+	if gotInput.LegalAddress != "Tokyo-to Shibuya-ku 1-2-3" {
+		t.Fatalf("SaveIntake() legal address got %q want Tokyo-to Shibuya-ku 1-2-3", gotInput.LegalAddress)
+	}
+	if !gotInput.AcceptsAppearanceVerification {
+		t.Fatal("SaveIntake() accepts appearance verification = false, want true")
 	}
 	if !strings.Contains(rec.Body.String(), `"creatorBio":"quiet rooftop"`) {
 		t.Fatalf("PUT /api/viewer/creator-registration/intake body got %q want creatorBio", rec.Body.String())

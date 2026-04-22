@@ -23,8 +23,10 @@ import {
   type SubmissionReviewDecisionLog,
   type SubmissionReviewObjectState,
 } from "@/entities/submission-review";
-import { assertAdminUiEnabled } from "../../_lib/admin-ui-access";
+import { assertAdminUiAccess } from "../../_lib/admin-ui-access";
+import { createAdminAPIFetcher } from "../../_lib/admin-api";
 import { AdminReviewNavigation } from "../../_ui/admin-review-navigation";
+import { applySubmissionReviewDecisionFromAdmin } from "./actions";
 
 function getStateBadgeClass(state: SubmissionReviewObjectState | "decision_applied" | "pending_review") {
   switch (state) {
@@ -129,7 +131,7 @@ export default async function AdminSubmissionReviewCasePage({
 }: {
   params: Promise<{ intakeId: string }>;
 }) {
-  assertAdminUiEnabled();
+  await assertAdminUiAccess();
   const { intakeId } = await params;
   if (!isSubmissionReviewIntakeId(intakeId)) {
     notFound();
@@ -137,7 +139,10 @@ export default async function AdminSubmissionReviewCasePage({
 
   let reviewCase;
   try {
-    reviewCase = await getSubmissionReviewCase({ intakeId });
+    reviewCase = await getSubmissionReviewCase({
+      fetcher: createAdminAPIFetcher(),
+      intakeId,
+    });
   } catch (error) {
     if (isNotFoundApiError(error)) {
       notFound();
@@ -271,6 +276,7 @@ export default async function AdminSubmissionReviewCasePage({
 
         <SubmissionReviewDecisionForm
           key={`${reviewCase.intake.id}:${reviewCase.intake.status}`}
+          onSubmitDecision={applySubmissionReviewDecisionFromAdmin}
           reviewCase={reviewCase}
         />
       </section>

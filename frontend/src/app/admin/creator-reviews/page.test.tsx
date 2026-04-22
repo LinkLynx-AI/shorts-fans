@@ -5,10 +5,11 @@ import {
 
 import { getCreatorReviewQueue } from "@/entities/creator-review";
 
+import { assertAdminUiAccess } from "../_lib/admin-ui-access";
 import AdminCreatorReviewsPage from "./page";
 
 vi.mock("../_lib/admin-ui-access", () => ({
-  assertAdminUiEnabled: vi.fn(),
+  assertAdminUiAccess: vi.fn(),
 }));
 
 vi.mock("@/entities/creator-review", async () => {
@@ -22,6 +23,7 @@ vi.mock("@/entities/creator-review", async () => {
 
 describe("AdminCreatorReviewsPage", () => {
   beforeEach(() => {
+    vi.mocked(assertAdminUiAccess).mockReset();
     vi.mocked(getCreatorReviewQueue).mockReset();
   });
 
@@ -54,6 +56,10 @@ describe("AdminCreatorReviewsPage", () => {
       searchParams: Promise.resolve({}),
     }));
 
+    expect(getCreatorReviewQueue).toHaveBeenCalledWith({
+      fetcher: expect.any(Function),
+      state: "submitted",
+    });
     expect(screen.getByRole("link", { name: /Creator 審査 登録申請/i })).toHaveAttribute(
       "aria-current",
       "page",
@@ -70,5 +76,15 @@ describe("AdminCreatorReviewsPage", () => {
       "data-prefetch",
       "false",
     );
+  });
+
+  it("does not fetch the review queue when admin access is rejected", async () => {
+    vi.mocked(assertAdminUiAccess).mockRejectedValue(new Error("blocked"));
+
+    await expect(AdminCreatorReviewsPage({
+      searchParams: Promise.resolve({}),
+    })).rejects.toThrow("blocked");
+
+    expect(getCreatorReviewQueue).not.toHaveBeenCalled();
   });
 });

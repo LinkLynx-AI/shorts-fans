@@ -21,6 +21,9 @@ source:
         - 000015_add_recommendation_foundation.up.sql
         - 000016_add_payment_purchase_state.up.sql
         - 000017_add_submission_review_intakes.up.sql
+        - 000018_add_submission_review_decisions.up.sql
+        - 000019_add_submission_review_notes.up.sql
+        - 000020_expand_creator_registration_review_intake.up.sql
 schemas:
     - name: app
       tables:
@@ -501,7 +504,7 @@ schemas:
             - name: creator_registration_evidences_file_size_bytes_check
               expression: CHECK (file_size_bytes > 0 AND file_size_bytes <= 10485760)
             - name: creator_registration_evidences_kind_check
-              expression: CHECK (kind = ANY (ARRAY['government_id'::text, 'payout_proof'::text]))
+              expression: CHECK (kind = ANY (ARRAY['government_id'::text, 'payout_proof'::text, 'identity_selfie'::text, 'address_proof'::text, 'business_registration'::text, 'co_performer_consent'::text]))
             - name: creator_registration_evidences_mime_type_check
               expression: CHECK (mime_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text, 'application/pdf'::text]))
           indexes:
@@ -544,6 +547,36 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: legal_address
+              type: text
+              nullable: false
+              default: '''''::text'
+            - name: identity_document_type
+              type: text
+              nullable: true
+            - name: target_audience_category
+              type: text
+              nullable: true
+            - name: has_co_performers
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_appearance_verification
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_co_performer_consent_responsibility
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_adult_business_compliance
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: confirms_information_matches_documents
+              type: boolean
+              nullable: false
+              default: "false"
           primary_key:
             - user_id
           foreign_keys:
@@ -557,8 +590,14 @@ schemas:
                     - user_id
               on_delete: CASCADE
           check_constraints:
+            - name: creator_registration_intakes_identity_document_type_check
+              expression: CHECK (identity_document_type IS NULL OR (identity_document_type = ANY (ARRAY['driver_license'::text, 'my_number_card'::text, 'residence_card'::text, 'basic_resident_register_card'::text, 'passport'::text, 'student_or_employee_id'::text, 'disability_certificate'::text, 'other_government_photo_id'::text])))
+            - name: creator_registration_intakes_legal_address_length_check
+              expression: CHECK (char_length(legal_address) <= 500)
             - name: creator_registration_intakes_payout_recipient_type_check
               expression: CHECK (payout_recipient_type IS NULL OR (payout_recipient_type = ANY (ARRAY['self'::text, 'business'::text])))
+            - name: creator_registration_intakes_target_audience_category_check
+              expression: CHECK (target_audience_category IS NULL OR (target_audience_category = ANY (ARRAY['all_ages'::text, 'general_adult'::text, 'gay_bl'::text])))
         - name: main_playback_progress
           columns:
             - name: user_id
@@ -884,6 +923,15 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: review_decision_source
+              type: text
+              nullable: true
+            - name: review_decisioned_at
+              type: timestamp with time zone
+              nullable: true
+            - name: review_note
+              type: text
+              nullable: true
           primary_key:
             - id
           foreign_keys:
@@ -924,6 +972,10 @@ schemas:
               expression: CHECK (post_report_state IS NULL OR (post_report_state = ANY (ARRAY['under_review'::text, 'temporarily_limited'::text, 'removed'::text, 'restored'::text])))
             - name: mains_price_minor_check
               expression: CHECK (price_minor > 0)
+            - name: mains_review_decision_source_check
+              expression: CHECK (review_decision_source IS NULL OR (review_decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text])))
+            - name: mains_review_decisioned_at_pair_check
+              expression: CHECK (review_decision_source IS NULL AND review_decisioned_at IS NULL OR review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
             - name: mains_state_check
               expression: CHECK (state = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved_for_unlock'::text, 'revision_requested'::text, 'rejected'::text, 'suspended'::text, 'removed'::text]))
           indexes:
@@ -1824,6 +1876,15 @@ schemas:
             - name: caption
               type: text
               nullable: true
+            - name: review_decision_source
+              type: text
+              nullable: true
+            - name: review_decisioned_at
+              type: timestamp with time zone
+              nullable: true
+            - name: review_note
+              type: text
+              nullable: true
           primary_key:
             - id
           foreign_keys:
@@ -1877,6 +1938,10 @@ schemas:
               expression: CHECK (published_at IS NULL OR published_at >= approved_for_publish_at)
             - name: shorts_post_report_state_check
               expression: CHECK (post_report_state IS NULL OR (post_report_state = ANY (ARRAY['under_review'::text, 'temporarily_limited'::text, 'removed'::text, 'restored'::text])))
+            - name: shorts_review_decision_source_check
+              expression: CHECK (review_decision_source IS NULL OR (review_decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text])))
+            - name: shorts_review_decisioned_at_pair_check
+              expression: CHECK (review_decision_source IS NULL AND review_decisioned_at IS NULL OR review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
             - name: shorts_state_check
               expression: CHECK (state = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved_for_publish'::text, 'revision_requested'::text, 'rejected'::text, 'removed'::text]))
           indexes:
@@ -2060,6 +2125,134 @@ schemas:
               unique: true
               predicate: (previous_intake_id IS NOT NULL)
               definition: CREATE UNIQUE INDEX uq_submission_review_intakes_previous_intake_id ON app.submission_review_intakes USING btree (previous_intake_id) WHERE (previous_intake_id IS NOT NULL)
+        - name: submission_review_main_decisions
+          columns:
+            - name: submission_review_intake_id
+              type: uuid
+              nullable: false
+            - name: main_id
+              type: uuid
+              nullable: false
+            - name: target_state
+              type: text
+              nullable: false
+            - name: reason_code
+              type: text
+              nullable: true
+            - name: decision_source
+              type: text
+              nullable: false
+            - name: decisioned_at
+              type: timestamp with time zone
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: review_note
+              type: text
+              nullable: true
+          primary_key:
+            - submission_review_intake_id
+            - main_id
+          foreign_keys:
+            - name: submission_review_main_decisi_submission_review_intake_id__fkey
+              columns:
+                - submission_review_intake_id
+                - main_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+                    - canonical_main_id
+              on_delete: CASCADE
+            - name: submission_review_main_decisio_submission_review_intake_id_fkey
+              columns:
+                - submission_review_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: submission_review_main_decisions_check
+              expression: CHECK (target_state = 'approved_for_unlock'::text AND reason_code IS NULL OR (target_state = ANY (ARRAY['revision_requested'::text, 'rejected'::text])) AND reason_code IS NOT NULL)
+            - name: submission_review_main_decisions_decision_source_check
+              expression: CHECK (decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text]))
+            - name: submission_review_main_decisions_target_state_check
+              expression: CHECK (target_state = ANY (ARRAY['approved_for_unlock'::text, 'revision_requested'::text, 'rejected'::text]))
+          indexes:
+            - name: idx_submission_review_main_decisions_main_id
+              columns:
+                - main_id
+                - decisioned_at
+              definition: CREATE INDEX idx_submission_review_main_decisions_main_id ON app.submission_review_main_decisions USING btree (main_id, decisioned_at DESC)
+        - name: submission_review_short_decisions
+          columns:
+            - name: submission_review_intake_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: target_state
+              type: text
+              nullable: false
+            - name: reason_code
+              type: text
+              nullable: true
+            - name: decision_source
+              type: text
+              nullable: false
+            - name: decisioned_at
+              type: timestamp with time zone
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: review_note
+              type: text
+              nullable: true
+          primary_key:
+            - submission_review_intake_id
+            - short_id
+          foreign_keys:
+            - name: submission_review_short_decis_submission_review_intake_id__fkey
+              columns:
+                - submission_review_intake_id
+                - short_id
+              references:
+                schema: app
+                table: submission_review_intake_shorts
+                columns:
+                    - submission_review_intake_id
+                    - short_id
+              on_delete: CASCADE
+            - name: submission_review_short_decisi_submission_review_intake_id_fkey
+              columns:
+                - submission_review_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: submission_review_short_decisions_check
+              expression: CHECK (target_state = 'approved_for_publish'::text AND reason_code IS NULL OR (target_state = ANY (ARRAY['revision_requested'::text, 'rejected'::text])) AND reason_code IS NOT NULL)
+            - name: submission_review_short_decisions_decision_source_check
+              expression: CHECK (decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text]))
+            - name: submission_review_short_decisions_target_state_check
+              expression: CHECK (target_state = ANY (ARRAY['approved_for_publish'::text, 'revision_requested'::text, 'rejected'::text]))
+          indexes:
+            - name: idx_submission_review_short_decisions_short_id
+              columns:
+                - short_id
+                - decisioned_at
+              definition: CREATE INDEX idx_submission_review_short_decisions_short_id ON app.submission_review_short_decisions USING btree (short_id, decisioned_at DESC)
         - name: user_payment_methods
           columns:
             - name: id
@@ -2285,13 +2478,14 @@ schemas:
                 s.review_reason_code,
                 s.post_report_state,
                 s.approved_for_publish_at,
-                s.published_at,
+                COALESCE(s.published_at, GREATEST(s.approved_for_publish_at, m.approved_for_unlock_at)) AS published_at,
                 s.created_at,
                 s.updated_at
                FROM app.shorts s
                  JOIN app.unlockable_mains m ON m.id = s.canonical_main_id
                  JOIN app.creator_capabilities c ON c.user_id = s.creator_user_id
-              WHERE c.state = 'approved'::text AND s.state = 'approved_for_publish'::text AND s.published_at IS NOT NULL AND (s.post_report_state IS NULL OR (s.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
+                 JOIN app.media_assets short_asset ON short_asset.id = s.media_asset_id
+              WHERE c.state = 'approved'::text AND short_asset.processing_state = 'ready'::text AND s.state = 'approved_for_publish'::text AND COALESCE(s.published_at, GREATEST(s.approved_for_publish_at, m.approved_for_unlock_at)) IS NOT NULL AND (s.post_report_state IS NULL OR (s.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
         - name: unlockable_mains
           columns:
             - name: id
@@ -2349,4 +2543,5 @@ schemas:
                 m.updated_at
                FROM app.mains m
                  JOIN app.creator_capabilities c ON c.user_id = m.creator_user_id
-              WHERE c.state = 'approved'::text AND m.state = 'approved_for_unlock'::text AND (m.post_report_state IS NULL OR (m.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
+                 JOIN app.media_assets main_asset ON main_asset.id = m.media_asset_id
+              WHERE c.state = 'approved'::text AND main_asset.processing_state = 'ready'::text AND m.state = 'approved_for_unlock'::text AND m.ownership_confirmed = true AND m.consent_confirmed = true AND (m.post_report_state IS NULL OR (m.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));

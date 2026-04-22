@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/postgres/sqlc"
@@ -27,25 +28,48 @@ const (
 	PayoutRecipientTypeSelf     = "self"
 	PayoutRecipientTypeBusiness = "business"
 
-	EvidenceKindGovernmentID = "government_id"
-	EvidenceKindPayoutProof  = "payout_proof"
+	IdentityDocumentTypeDriverLicense             = "driver_license"
+	IdentityDocumentTypeMyNumberCard              = "my_number_card"
+	IdentityDocumentTypeResidenceCard             = "residence_card"
+	IdentityDocumentTypeBasicResidentRegisterCard = "basic_resident_register_card"
+	IdentityDocumentTypePassport                  = "passport"
+	IdentityDocumentTypeStudentOrEmployeeID       = "student_or_employee_id"
+	IdentityDocumentTypeDisabilityCertificate     = "disability_certificate"
+	IdentityDocumentTypeOtherGovernmentPhotoID    = "other_government_photo_id"
+
+	TargetAudienceCategoryAllAges      = "all_ages"
+	TargetAudienceCategoryGeneralAdult = "general_adult"
+	TargetAudienceCategoryGayBL        = "gay_bl"
+
+	EvidenceKindGovernmentID         = "government_id"
+	EvidenceKindPayoutProof          = "payout_proof"
+	EvidenceKindIdentitySelfie       = "identity_selfie"
+	EvidenceKindAddressProof         = "address_proof"
+	EvidenceKindBusinessRegistration = "business_registration"
+	EvidenceKindCoPerformerConsent   = "co_performer_consent"
+
+	minimumCreatorAgeYears = 18
+	maxLegalAddressLength  = 500
 
 	creatorProfilesHandleUniqueConstraint = "creator_profiles_handle_unique_idx"
 )
 
 var (
-	ErrHandleAlreadyTaken        = errors.New("creator registration handle は既に使われています")
-	ErrInvalidBirthDate          = errors.New("creator registration birth date が不正です")
-	ErrInvalidDisplayName        = errors.New("creator registration display name が不正です")
-	ErrInvalidHandle             = errors.New("creator registration handle が不正です")
-	ErrInvalidLegalName          = errors.New("creator registration legal name が不正です")
-	ErrInvalidPayoutRecipient    = errors.New("creator registration payout recipient が不正です")
-	ErrInvalidPayoutRecipientTyp = errors.New("creator registration payout recipient type が不正です")
-	ErrInvalidReviewState        = errors.New("creator registration review state が不正です")
-	ErrRegistrationIncomplete    = errors.New("creator registration intake が不足しています")
-	ErrRegistrationStateConflict = errors.New("creator registration state conflict")
-	ErrReviewCaseNotFound        = errors.New("creator registration review case が見つかりません")
-	ErrSharedProfileNotFound     = errors.New("shared viewer profile が見つかりません")
+	ErrHandleAlreadyTaken            = errors.New("creator registration handle は既に使われています")
+	ErrInvalidBirthDate              = errors.New("creator registration birth date が不正です")
+	ErrInvalidDisplayName            = errors.New("creator registration display name が不正です")
+	ErrInvalidHandle                 = errors.New("creator registration handle が不正です")
+	ErrInvalidIdentityDocumentType   = errors.New("creator registration identity document type が不正です")
+	ErrInvalidLegalAddress           = errors.New("creator registration legal address が不正です")
+	ErrInvalidLegalName              = errors.New("creator registration legal name が不正です")
+	ErrInvalidPayoutRecipient        = errors.New("creator registration payout recipient が不正です")
+	ErrInvalidPayoutRecipientTyp     = errors.New("creator registration payout recipient type が不正です")
+	ErrInvalidReviewState            = errors.New("creator registration review state が不正です")
+	ErrInvalidTargetAudienceCategory = errors.New("creator registration target audience category が不正です")
+	ErrRegistrationIncomplete        = errors.New("creator registration intake が不足しています")
+	ErrRegistrationStateConflict     = errors.New("creator registration state conflict")
+	ErrReviewCaseNotFound            = errors.New("creator registration review case が見つかりません")
+	ErrSharedProfileNotFound         = errors.New("shared viewer profile が見つかりません")
 )
 
 type queries interface {
@@ -127,18 +151,26 @@ type Evidence struct {
 }
 
 type Intake struct {
-	AcceptsConsentResponsibility bool
-	BirthDate                    string
-	CanSubmit                    bool
-	CreatorBio                   string
-	DeclaresNoProhibitedCategory bool
-	Evidences                    []Evidence
-	IsReadOnly                   bool
-	LegalName                    string
-	PayoutRecipientName          string
-	PayoutRecipientType          string
-	RegistrationState            *string
-	SharedProfile                SharedProfilePreview
+	AcceptsAdultBusinessCompliance          bool
+	AcceptsAppearanceVerification           bool
+	AcceptsConsentResponsibility            bool
+	AcceptsCoPerformerConsentResponsibility bool
+	BirthDate                               string
+	CanSubmit                               bool
+	ConfirmsInformationMatchesDocuments     bool
+	CreatorBio                              string
+	DeclaresNoProhibitedCategory            bool
+	Evidences                               []Evidence
+	HasCoPerformers                         bool
+	IdentityDocumentType                    string
+	IsReadOnly                              bool
+	LegalAddress                            string
+	LegalName                               string
+	PayoutRecipientName                     string
+	PayoutRecipientType                     string
+	RegistrationState                       *string
+	SharedProfile                           SharedProfilePreview
+	TargetAudienceCategory                  string
 }
 
 type SaveEvidenceInput struct {
@@ -163,25 +195,41 @@ type SaveEvidenceResult struct {
 }
 
 type SaveIntakeInput struct {
-	AcceptsConsentResponsibility bool
-	BirthDate                    string
-	CreatorBio                   string
-	DeclaresNoProhibitedCategory bool
-	LegalName                    string
-	PayoutRecipientName          string
-	PayoutRecipientType          string
-	UserID                       uuid.UUID
+	AcceptsAdultBusinessCompliance          bool
+	AcceptsAppearanceVerification           bool
+	AcceptsConsentResponsibility            bool
+	AcceptsCoPerformerConsentResponsibility bool
+	BirthDate                               string
+	ConfirmsInformationMatchesDocuments     bool
+	CreatorBio                              string
+	DeclaresNoProhibitedCategory            bool
+	HasCoPerformers                         bool
+	IdentityDocumentType                    string
+	LegalAddress                            string
+	LegalName                               string
+	PayoutRecipientName                     string
+	PayoutRecipientType                     string
+	TargetAudienceCategory                  string
+	UserID                                  uuid.UUID
 }
 
 type normalizedSaveIntakeInput struct {
-	acceptsConsentResponsibility bool
-	birthDate                    *time.Time
-	creatorBio                   string
-	declaresNoProhibitedCategory bool
-	legalName                    string
-	payoutRecipientName          string
-	payoutRecipientType          *string
-	userID                       uuid.UUID
+	acceptsAdultBusinessCompliance          bool
+	acceptsAppearanceVerification           bool
+	acceptsConsentResponsibility            bool
+	acceptsCoPerformerConsentResponsibility bool
+	birthDate                               *time.Time
+	confirmsInformationMatchesDocuments     bool
+	creatorBio                              string
+	declaresNoProhibitedCategory            bool
+	hasCoPerformers                         bool
+	identityDocumentType                    *string
+	legalAddress                            string
+	legalName                               string
+	payoutRecipientName                     string
+	payoutRecipientType                     *string
+	targetAudienceCategory                  *string
+	userID                                  uuid.UUID
 }
 
 type registrationSnapshot struct {
@@ -349,13 +397,21 @@ func (r *Repository) SaveIntake(ctx context.Context, input SaveIntakeInput) (Int
 			return err
 		}
 		if _, err := q.UpsertCreatorRegistrationIntake(ctx, sqlc.UpsertCreatorRegistrationIntakeParams{
-			UserID:                       postgres.UUIDToPG(normalized.userID),
-			LegalName:                    normalized.legalName,
-			BirthDate:                    dateToPG(normalized.birthDate),
-			PayoutRecipientType:          postgres.TextToPG(normalized.payoutRecipientType),
-			PayoutRecipientName:          normalized.payoutRecipientName,
-			DeclaresNoProhibitedCategory: normalized.declaresNoProhibitedCategory,
-			AcceptsConsentResponsibility: normalized.acceptsConsentResponsibility,
+			UserID:                                  postgres.UUIDToPG(normalized.userID),
+			LegalName:                               normalized.legalName,
+			BirthDate:                               dateToPG(normalized.birthDate),
+			LegalAddress:                            normalized.legalAddress,
+			IdentityDocumentType:                    postgres.TextToPG(normalized.identityDocumentType),
+			TargetAudienceCategory:                  postgres.TextToPG(normalized.targetAudienceCategory),
+			HasCoPerformers:                         normalized.hasCoPerformers,
+			PayoutRecipientType:                     postgres.TextToPG(normalized.payoutRecipientType),
+			PayoutRecipientName:                     normalized.payoutRecipientName,
+			DeclaresNoProhibitedCategory:            normalized.declaresNoProhibitedCategory,
+			AcceptsConsentResponsibility:            normalized.acceptsConsentResponsibility,
+			AcceptsAppearanceVerification:           normalized.acceptsAppearanceVerification,
+			AcceptsCoPerformerConsentResponsibility: normalized.acceptsCoPerformerConsentResponsibility,
+			AcceptsAdultBusinessCompliance:          normalized.acceptsAdultBusinessCompliance,
+			ConfirmsInformationMatchesDocuments:     normalized.confirmsInformationMatchesDocuments,
 		}); err != nil {
 			return fmt.Errorf("creator registration intake 保存 user=%s: %w", normalized.userID, err)
 		}
@@ -438,15 +494,24 @@ func buildIntake(snapshot registrationSnapshot) Intake {
 	}
 
 	intake := Intake{
-		AcceptsConsentResponsibility: snapshot.intake != nil && snapshot.intake.AcceptsConsentResponsibility,
-		BirthDate:                    birthDate,
-		CreatorBio:                   creatorBioFromSnapshot(snapshot),
-		DeclaresNoProhibitedCategory: snapshot.intake != nil && snapshot.intake.DeclaresNoProhibitedCategory,
-		Evidences:                    mapEvidenceList(snapshot.evidences),
-		LegalName:                    stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalName }),
-		PayoutRecipientName:          stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.PayoutRecipientName }),
-		PayoutRecipientType:          optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.PayoutRecipientType }),
-		SharedProfile:                buildSharedProfile(snapshot.userProfile),
+		AcceptsAdultBusinessCompliance:          snapshot.intake != nil && snapshot.intake.AcceptsAdultBusinessCompliance,
+		AcceptsAppearanceVerification:           snapshot.intake != nil && snapshot.intake.AcceptsAppearanceVerification,
+		AcceptsConsentResponsibility:            snapshot.intake != nil && snapshot.intake.AcceptsConsentResponsibility,
+		AcceptsCoPerformerConsentResponsibility: snapshot.intake != nil && snapshot.intake.AcceptsCoPerformerConsentResponsibility,
+		BirthDate:                               birthDate,
+		ConfirmsInformationMatchesDocuments:     snapshot.intake != nil && snapshot.intake.ConfirmsInformationMatchesDocuments,
+		CreatorBio:                              creatorBioFromSnapshot(snapshot),
+		DeclaresNoProhibitedCategory:            snapshot.intake != nil && snapshot.intake.DeclaresNoProhibitedCategory,
+		Evidences:                               mapEvidenceList(snapshot.evidences),
+		HasCoPerformers:                         snapshot.intake != nil && snapshot.intake.HasCoPerformers,
+		IdentityDocumentType:                    optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.IdentityDocumentType }),
+		IsReadOnly:                              false,
+		LegalAddress:                            stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalAddress }),
+		LegalName:                               stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalName }),
+		PayoutRecipientName:                     stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.PayoutRecipientName }),
+		PayoutRecipientType:                     optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.PayoutRecipientType }),
+		SharedProfile:                           buildSharedProfile(snapshot.userProfile),
+		TargetAudienceCategory:                  optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.TargetAudienceCategory }),
 	}
 	if snapshot.capability != nil {
 		intake.RegistrationState = &snapshot.capability.State
@@ -643,6 +708,18 @@ func isSnapshotComplete(snapshot registrationSnapshot) bool {
 	if !snapshot.intake.BirthDate.Valid {
 		return false
 	}
+	if !isBirthDateAdult(snapshot.intake.BirthDate.Time) {
+		return false
+	}
+	if strings.TrimSpace(snapshot.intake.LegalAddress) == "" {
+		return false
+	}
+	if !snapshot.intake.IdentityDocumentType.Valid || strings.TrimSpace(snapshot.intake.IdentityDocumentType.String) == "" {
+		return false
+	}
+	if !snapshot.intake.TargetAudienceCategory.Valid || strings.TrimSpace(snapshot.intake.TargetAudienceCategory.String) == "" {
+		return false
+	}
 	if !snapshot.intake.PayoutRecipientType.Valid || strings.TrimSpace(snapshot.intake.PayoutRecipientType.String) == "" {
 		return false
 	}
@@ -652,15 +729,45 @@ func isSnapshotComplete(snapshot registrationSnapshot) bool {
 	if !snapshot.intake.DeclaresNoProhibitedCategory || !snapshot.intake.AcceptsConsentResponsibility {
 		return false
 	}
+	if !snapshot.intake.AcceptsAppearanceVerification ||
+		!snapshot.intake.AcceptsAdultBusinessCompliance ||
+		!snapshot.intake.ConfirmsInformationMatchesDocuments {
+		return false
+	}
+	if snapshot.intake.HasCoPerformers && !snapshot.intake.AcceptsCoPerformerConsentResponsibility {
+		return false
+	}
 
 	kinds := make(map[string]struct{}, len(snapshot.evidences))
 	for _, evidence := range snapshot.evidences {
 		kinds[evidence.Kind] = struct{}{}
 	}
 
-	_, hasGovernmentID := kinds[EvidenceKindGovernmentID]
-	_, hasPayoutProof := kinds[EvidenceKindPayoutProof]
-	return hasGovernmentID && hasPayoutProof
+	for _, requiredKind := range requiredEvidenceKindsForIntake(*snapshot.intake) {
+		if _, ok := kinds[requiredKind]; !ok {
+			return false
+		}
+	}
+
+	return true
+}
+
+func requiredEvidenceKindsForIntake(intake sqlc.AppCreatorRegistrationIntake) []string {
+	kinds := []string{
+		EvidenceKindAddressProof,
+		EvidenceKindGovernmentID,
+		EvidenceKindIdentitySelfie,
+		EvidenceKindPayoutProof,
+	}
+
+	if intake.PayoutRecipientType.Valid && intake.PayoutRecipientType.String == PayoutRecipientTypeBusiness {
+		kinds = append(kinds, EvidenceKindBusinessRegistration)
+	}
+	if intake.HasCoPerformers {
+		kinds = append(kinds, EvidenceKindCoPerformerConsent)
+	}
+
+	return kinds
 }
 
 func canCapabilitySelfServeResubmit(capability sqlc.AppCreatorCapability) bool {
@@ -787,6 +894,14 @@ func normalizeSaveIntakeInput(input SaveIntakeInput) (normalizedSaveIntakeInput,
 		return normalizedSaveIntakeInput{}, ErrInvalidLegalName
 	}
 
+	legalAddress := strings.TrimSpace(input.LegalAddress)
+	if input.LegalAddress != "" && legalAddress == "" {
+		return normalizedSaveIntakeInput{}, ErrInvalidLegalAddress
+	}
+	if utf8.RuneCountInString(legalAddress) > maxLegalAddressLength {
+		return normalizedSaveIntakeInput{}, ErrInvalidLegalAddress
+	}
+
 	creatorBio := strings.TrimSpace(input.CreatorBio)
 	var birthDate *time.Time
 	if strings.TrimSpace(input.BirthDate) != "" {
@@ -808,21 +923,76 @@ func normalizeSaveIntakeInput(input SaveIntakeInput) (normalizedSaveIntakeInput,
 		}
 	}
 
+	identityDocumentType, err := normalizeIdentityDocumentType(input.IdentityDocumentType)
+	if err != nil {
+		return normalizedSaveIntakeInput{}, err
+	}
+
+	targetAudienceCategory, err := normalizeTargetAudienceCategory(input.TargetAudienceCategory)
+	if err != nil {
+		return normalizedSaveIntakeInput{}, err
+	}
+
 	payoutRecipientName := strings.TrimSpace(input.PayoutRecipientName)
 	if input.PayoutRecipientName != "" && payoutRecipientName == "" {
 		return normalizedSaveIntakeInput{}, ErrInvalidPayoutRecipient
 	}
 
 	return normalizedSaveIntakeInput{
-		acceptsConsentResponsibility: input.AcceptsConsentResponsibility,
-		birthDate:                    birthDate,
-		creatorBio:                   creatorBio,
-		declaresNoProhibitedCategory: input.DeclaresNoProhibitedCategory,
-		legalName:                    legalName,
-		payoutRecipientName:          payoutRecipientName,
-		payoutRecipientType:          payoutRecipientType,
-		userID:                       input.UserID,
+		acceptsAdultBusinessCompliance:          input.AcceptsAdultBusinessCompliance,
+		acceptsAppearanceVerification:           input.AcceptsAppearanceVerification,
+		acceptsConsentResponsibility:            input.AcceptsConsentResponsibility,
+		acceptsCoPerformerConsentResponsibility: input.AcceptsCoPerformerConsentResponsibility,
+		birthDate:                               birthDate,
+		confirmsInformationMatchesDocuments:     input.ConfirmsInformationMatchesDocuments,
+		creatorBio:                              creatorBio,
+		declaresNoProhibitedCategory:            input.DeclaresNoProhibitedCategory,
+		hasCoPerformers:                         input.HasCoPerformers,
+		identityDocumentType:                    identityDocumentType,
+		legalAddress:                            legalAddress,
+		legalName:                               legalName,
+		payoutRecipientName:                     payoutRecipientName,
+		payoutRecipientType:                     payoutRecipientType,
+		targetAudienceCategory:                  targetAudienceCategory,
+		userID:                                  input.UserID,
 	}, nil
+}
+
+func normalizeIdentityDocumentType(value string) (*string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return nil, nil
+	}
+
+	switch normalized {
+	case IdentityDocumentTypeDriverLicense,
+		IdentityDocumentTypeMyNumberCard,
+		IdentityDocumentTypeResidenceCard,
+		IdentityDocumentTypeBasicResidentRegisterCard,
+		IdentityDocumentTypePassport,
+		IdentityDocumentTypeStudentOrEmployeeID,
+		IdentityDocumentTypeDisabilityCertificate,
+		IdentityDocumentTypeOtherGovernmentPhotoID:
+		return &normalized, nil
+	default:
+		return nil, ErrInvalidIdentityDocumentType
+	}
+}
+
+func normalizeTargetAudienceCategory(value string) (*string, error) {
+	normalized := strings.TrimSpace(value)
+	if normalized == "" {
+		return nil, nil
+	}
+
+	switch normalized {
+	case TargetAudienceCategoryAllAges,
+		TargetAudienceCategoryGeneralAdult,
+		TargetAudienceCategoryGayBL:
+		return &normalized, nil
+	default:
+		return nil, ErrInvalidTargetAudienceCategory
+	}
 }
 
 func parseBirthDate(value string) (time.Time, error) {
@@ -831,7 +1001,21 @@ func parseBirthDate(value string) (time.Time, error) {
 		return time.Time{}, ErrInvalidBirthDate
 	}
 
+	if !isBirthDateAdult(parsed) {
+		return time.Time{}, ErrInvalidBirthDate
+	}
+
 	return parsed.UTC(), nil
+}
+
+func isBirthDateAdult(value time.Time) bool {
+	minimumBirthDate := dateOnly(time.Now().UTC().AddDate(-minimumCreatorAgeYears, 0, 0))
+	return !dateOnly(value).After(minimumBirthDate)
+}
+
+func dateOnly(value time.Time) time.Time {
+	year, month, day := value.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func upsertDraftProfile(

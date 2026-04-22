@@ -9,27 +9,51 @@ INSERT INTO app.creator_registration_intakes (
     user_id,
     legal_name,
     birth_date,
+    legal_address,
+    identity_document_type,
+    target_audience_category,
+    has_co_performers,
     payout_recipient_type,
     payout_recipient_name,
     declares_no_prohibited_category,
-    accepts_consent_responsibility
+    accepts_consent_responsibility,
+    accepts_appearance_verification,
+    accepts_co_performer_consent_responsibility,
+    accepts_adult_business_compliance,
+    confirms_information_matches_documents
 ) VALUES (
     sqlc.arg(user_id),
     sqlc.arg(legal_name),
     sqlc.narg(birth_date),
+    sqlc.arg(legal_address),
+    sqlc.narg(identity_document_type),
+    sqlc.narg(target_audience_category),
+    sqlc.arg(has_co_performers),
     sqlc.narg(payout_recipient_type),
     sqlc.arg(payout_recipient_name),
     sqlc.arg(declares_no_prohibited_category),
-    sqlc.arg(accepts_consent_responsibility)
+    sqlc.arg(accepts_consent_responsibility),
+    sqlc.arg(accepts_appearance_verification),
+    sqlc.arg(accepts_co_performer_consent_responsibility),
+    sqlc.arg(accepts_adult_business_compliance),
+    sqlc.arg(confirms_information_matches_documents)
 )
 ON CONFLICT (user_id) DO UPDATE
 SET
     legal_name = EXCLUDED.legal_name,
     birth_date = EXCLUDED.birth_date,
+    legal_address = EXCLUDED.legal_address,
+    identity_document_type = EXCLUDED.identity_document_type,
+    target_audience_category = EXCLUDED.target_audience_category,
+    has_co_performers = EXCLUDED.has_co_performers,
     payout_recipient_type = EXCLUDED.payout_recipient_type,
     payout_recipient_name = EXCLUDED.payout_recipient_name,
     declares_no_prohibited_category = EXCLUDED.declares_no_prohibited_category,
     accepts_consent_responsibility = EXCLUDED.accepts_consent_responsibility,
+    accepts_appearance_verification = EXCLUDED.accepts_appearance_verification,
+    accepts_co_performer_consent_responsibility = EXCLUDED.accepts_co_performer_consent_responsibility,
+    accepts_adult_business_compliance = EXCLUDED.accepts_adult_business_compliance,
+    confirms_information_matches_documents = EXCLUDED.confirms_information_matches_documents,
     updated_at = CURRENT_TIMESTAMP
 RETURNING *;
 
