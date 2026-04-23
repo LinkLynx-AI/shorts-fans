@@ -74,6 +74,18 @@ func (s stubQueries) DeletePinnedShort(context.Context, sqlc.DeletePinnedShortPa
 	return nil
 }
 
+func (s stubQueries) PutShortLike(context.Context, sqlc.PutShortLikeParams) error {
+	return nil
+}
+
+func (s stubQueries) DeleteShortLike(context.Context, sqlc.DeleteShortLikeParams) error {
+	return nil
+}
+
+func (s stubQueries) CountShortLikesByShortID(context.Context, pgtype.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (s stubQueries) ListShortsByCanonicalMainID(context.Context, pgtype.UUID) ([]sqlc.AppShort, error) {
 	return nil, nil
 }

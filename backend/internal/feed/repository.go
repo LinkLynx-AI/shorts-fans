@@ -81,12 +81,19 @@ type UnlockPreview struct {
 	PriceJPY            int64
 }
 
+// Engagement は public short の公開 engagement 指標です。
+type Engagement struct {
+	LikeCount int64
+}
+
 // Item は public short feed/detail に共通の read model です。
 type Item struct {
-	Creator CreatorSummary
-	Short   ShortSummary
-	Unlock  UnlockPreview
-	Viewer  struct {
+	Creator    CreatorSummary
+	Engagement Engagement
+	Short      ShortSummary
+	Unlock     UnlockPreview
+	Viewer     struct {
+		HasLiked           bool
 		IsFollowingCreator bool
 		IsPinned           bool
 	}
@@ -164,7 +171,7 @@ func (r *Repository) ListFollowing(ctx context.Context, viewerUserID uuid.UUID, 
 		rankingReferenceAt := currentFollowingRankingReferenceAt()
 		rows, err := r.queries.ListFollowingPublicFeedItems(
 			ctx,
-			buildInitialFollowingPageParams(viewerUserID, rankingReferenceAt),
+			buildInitialFollowingPageParams(viewerUserID, rankingReferenceAt, pageLimit),
 		)
 		if err != nil {
 			return nil, nil, fmt.Errorf("public short following feed 取得 viewer=%s: %w", viewerUserID, err)
@@ -238,8 +245,13 @@ func buildLegacyRecommendedPageParams(
 	return params
 }
 
-func buildInitialFollowingPageParams(viewerUserID uuid.UUID, rankingReferenceAt time.Time) sqlc.ListFollowingPublicFeedItemsParams {
+func buildInitialFollowingPageParams(
+	viewerUserID uuid.UUID,
+	rankingReferenceAt time.Time,
+	limit int,
+) sqlc.ListFollowingPublicFeedItemsParams {
 	return sqlc.ListFollowingPublicFeedItemsParams{
+		DisplayLimitCount:  int32(limit),
 		ViewerUserID:       postgres.UUIDToPG(viewerUserID),
 		RankingReferenceAt: postgres.TimeToPG(&rankingReferenceAt),
 	}
@@ -267,9 +279,11 @@ func mapLegacyRecommendedPage(rows []sqlc.ListLegacyRecommendedPublicFeedItemsRo
 				Handle:             row.Handle,
 				ID:                 row.ID,
 				IsOwner:            row.IsOwner,
+				HasLiked:           row.HasLiked,
 				IsPinned:           row.IsPinned,
 				IsUnlocked:         row.IsUnlocked,
 				IsFollowingCreator: row.IsFollowingCreator,
+				LikeCount:          row.LikeCount,
 				MainDurationMs:     row.MainDurationMs,
 				MainPriceMinor:     row.MainPriceMinor,
 				MediaAssetID:       row.MediaAssetID,
@@ -316,9 +330,11 @@ func mapInitialFollowingPage(rows []sqlc.ListFollowingPublicFeedItemsRow, limit 
 				Handle:             row.Handle,
 				ID:                 row.ID,
 				IsOwner:            row.IsOwner,
+				HasLiked:           row.HasLiked,
 				IsPinned:           row.IsPinned,
 				IsUnlocked:         row.IsUnlocked,
 				IsFollowingCreator: row.IsFollowingCreator,
+				LikeCount:          row.LikeCount,
 				MainDurationMs:     row.MainDurationMs,
 				MainPriceMinor:     row.MainPriceMinor,
 				MediaAssetID:       row.MediaAssetID,
@@ -575,9 +591,11 @@ func (r *Repository) hydrateSnapshotItems(
 				Handle:             row.Handle,
 				ID:                 row.ID,
 				IsOwner:            row.IsOwner,
+				HasLiked:           row.HasLiked,
 				IsPinned:           row.IsPinned,
 				IsUnlocked:         row.IsUnlocked,
 				IsFollowingCreator: row.IsFollowingCreator,
+				LikeCount:          row.LikeCount,
 				MainDurationMs:     row.MainDurationMs,
 				MainPriceMinor:     row.MainPriceMinor,
 				MediaAssetID:       row.MediaAssetID,
@@ -613,10 +631,12 @@ type mapFeedRow struct {
 	DisplayName        pgtype.Text
 	Handle             string
 	ID                 pgtype.UUID
+	HasLiked           any
 	IsOwner            any
 	IsPinned           any
 	IsUnlocked         any
 	IsFollowingCreator any
+	LikeCount          any
 	MainDurationMs     pgtype.Int8
 	MainPriceMinor     any
 	MediaAssetID       pgtype.UUID
@@ -672,6 +692,18 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 		return Item{}, fmt.Errorf("public short item の main price_minor がありません")
 	}
 
+	likeCount, err := int64FromAny(row.LikeCount)
+	if err != nil {
+		return Item{}, fmt.Errorf("public short item の like_count 変換: %w", err)
+	}
+	if likeCount < 0 {
+		return Item{}, fmt.Errorf("public short item の like_count が不正です")
+	}
+
+	hasLiked, err := boolFromAny(row.HasLiked)
+	if err != nil {
+		return Item{}, fmt.Errorf("public short item の has_liked 変換: %w", err)
+	}
 	isOwner, err := boolFromAny(row.IsOwner)
 	if err != nil {
 		return Item{}, fmt.Errorf("public short item の is_owner 変換: %w", err)
@@ -697,6 +729,9 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 			Handle:      handle,
 			ID:          creatorUserID,
 		},
+		Engagement: Engagement{
+			LikeCount: likeCount,
+		},
 		Short: ShortSummary{
 			Caption:                caption,
 			CanonicalMainID:        canonicalMainID,
@@ -713,6 +748,7 @@ func mapFeedItem(row mapFeedRow) (Item, error) {
 			PriceJPY:            mainPriceMinor,
 		},
 	}
+	item.Viewer.HasLiked = hasLiked
 	item.Viewer.IsFollowingCreator = isFollowingCreator
 	item.Viewer.IsPinned = isPinned
 
@@ -730,10 +766,12 @@ func mapDetail(row sqlc.GetPublicShortDetailItemRow) (Detail, error) {
 			DisplayName:        row.DisplayName,
 			Handle:             row.Handle,
 			ID:                 row.ID,
+			HasLiked:           row.HasLiked,
 			IsOwner:            row.IsOwner,
 			IsPinned:           row.IsPinned,
 			IsUnlocked:         row.IsUnlocked,
 			IsFollowingCreator: row.IsFollowingCreator,
+			LikeCount:          row.LikeCount,
 			MainDurationMs:     row.MainDurationMs,
 			MainPriceMinor:     row.MainPriceMinor,
 			MediaAssetID:       row.MediaAssetID,
@@ -795,6 +833,27 @@ func boolFromAny(value any) (bool, error) {
 		return false, nil
 	default:
 		return false, fmt.Errorf("unexpected bool type %T", value)
+	}
+}
+
+func int64FromAny(value any) (int64, error) {
+	switch typedValue := value.(type) {
+	case int:
+		return int64(typedValue), nil
+	case int64:
+		return typedValue, nil
+	case int32:
+		return int64(typedValue), nil
+	case pgtype.Int8:
+		if !typedValue.Valid {
+			return 0, nil
+		}
+
+		return typedValue.Int64, nil
+	case nil:
+		return 0, nil
+	default:
+		return 0, fmt.Errorf("unexpected int64 type %T", value)
 	}
 }
 

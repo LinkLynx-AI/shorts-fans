@@ -107,6 +107,6 @@
 ## Schema Generation Note
 
 - `backend/db/schema.generated.yaml` は migration chain 全体から生成する snapshot です。
-- short comment migration は `000021_add_short_comments` です。`000020` は main 側の media review retry index migration として使用済みです。
+- short comment migration は `000022_add_short_comments` です。`000020` は main 側の media review retry index migration、`000021` は main 側の short like migration として使用済みです。
 - short comment migration の snapshot 更新時に、既存 migration `000018_add_submission_review_decisions` / `000019_add_submission_review_notes` が前回 snapshot から漏れていた場合、それらも generator catch-up として同じ生成差分に含まれます。
 - 上記は schema snapshot の整合化であり、この contract が submission review の挙動を変更するものではありません。

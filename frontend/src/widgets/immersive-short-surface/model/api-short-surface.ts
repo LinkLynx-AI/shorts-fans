@@ -94,11 +94,12 @@ function buildUnlockSurfaceModel({
   } satisfies RawUnlockSurfaceModel);
 }
 
-function buildShortSurfaceBase(item: Pick<FanFeedItem, "creator" | "short" | "unlockCta">) {
+function buildShortSurfaceBase(item: Pick<FanFeedItem, "creator" | "engagement" | "short" | "unlockCta">) {
   const short = buildShortPreviewMeta(item.short);
 
   return {
     creator: item.creator,
+    engagement: item.engagement,
     mainEntryEnabled: true,
     short,
     unlock: buildUnlockSurfaceModel({
@@ -116,6 +117,7 @@ export function buildFeedSurfaceFromApiItem(item: FanFeedItem): FeedShortSurface
   return {
     ...buildShortSurfaceBase(item),
     viewer: {
+      hasLiked: item.viewer.hasLiked,
       isFollowingCreator: item.viewer.isFollowingCreator,
       isPinned: item.viewer.isPinned,
     },
@@ -130,6 +132,7 @@ export function buildDetailSurfaceFromApi(detail: PublicShortDetail): DetailShor
     ...buildShortSurfaceBase(detail),
     mainEntryEnabled: false,
     viewer: {
+      hasLiked: detail.viewer.hasLiked,
       isFollowingCreator: detail.viewer.isFollowingCreator,
       isPinned: detail.viewer.isPinned,
     },

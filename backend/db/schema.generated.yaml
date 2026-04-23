@@ -24,7 +24,8 @@ source:
         - 000018_add_submission_review_decisions.up.sql
         - 000019_add_submission_review_notes.up.sql
         - 000020_add_media_review_submit_retry_index.up.sql
-        - 000021_add_short_comments.up.sql
+        - 000021_add_short_likes.up.sql
+        - 000022_add_short_comments.up.sql
 schemas:
     - name: app
       tables:
@@ -1859,6 +1860,47 @@ schemas:
                 - created_at
                 - id
               definition: CREATE INDEX idx_short_comments_short_created ON app.short_comments USING btree (short_id, created_at DESC, id DESC)
+        - name: short_likes
+          columns:
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: liked_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - user_id
+            - short_id
+          foreign_keys:
+            - name: short_likes_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+            - name: short_likes_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+          indexes:
+            - name: idx_short_likes_short_id
+              columns:
+                - short_id
+              definition: CREATE INDEX idx_short_likes_short_id ON app.short_likes USING btree (short_id)
         - name: shorts
           columns:
             - name: id

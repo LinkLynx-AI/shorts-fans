@@ -21,9 +21,16 @@ export {
   ShortCommentApiError,
 } from "./api/create-short-comment";
 export {
+  getShortLikeErrorMessage,
+} from "./api/get-short-like-error-message";
+export {
   ShortPinApiError,
   updateShortPin,
 } from "./api/update-short-pin";
+export {
+  ShortLikeApiError,
+  updateShortLike,
+} from "./api/update-short-like";
 export type {
   FanFeedItem,
   FanFeedTab,
@@ -38,6 +45,11 @@ export type {
   ShortPinApiErrorCode,
   ShortPinMutationResult,
 } from "./api/update-short-pin";
+export type {
+  ShortLikeAction,
+  ShortLikeApiErrorCode,
+  ShortLikeMutationResult,
+} from "./api/update-short-like";
 export {
   publicShortSummarySchema,
   shortVideoDisplayAssetSchema,

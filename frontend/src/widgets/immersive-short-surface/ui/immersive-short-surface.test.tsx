@@ -415,6 +415,9 @@ function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_
       handle: "@minarei",
       id: "creator_mina_rei",
     },
+    engagement: {
+      likeCount: 42,
+    },
     short: {
       caption: "quiet rooftop preview",
       canonicalMainId: "main_mina_quiet_rooftop",
@@ -436,6 +439,7 @@ function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_
       state,
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: true,
     },
@@ -455,6 +459,9 @@ function createPublicShortDetail(state: "continue_main" | "owner_preview" | "set
       handle: "@minarei",
       id: "creator_mina_rei",
     },
+    engagement: {
+      likeCount: 42,
+    },
     short: {
       caption: "quiet rooftop preview",
       canonicalMainId: "main_mina_quiet_rooftop",
@@ -476,6 +483,7 @@ function createPublicShortDetail(state: "continue_main" | "owner_preview" | "set
       state,
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: true,
     },
@@ -2232,6 +2240,16 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.queryByRole("heading", { level: 1, name: "Short detail" })).not.toBeInTheDocument();
   });
 
+  it("disables the feed like action when feed like state is not provided", () => {
+    renderWithViewerSession(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />, {
+      hasSession: true,
+    });
+
+    expect(
+      screen.getByRole("button", { name: feedSurface.viewer.hasLiked ? "Liked short" : "Like short" }),
+    ).toBeDisabled();
+  });
+
   it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {
     if (!detailSurface) {
       throw new Error("fixture missing");
@@ -2307,6 +2325,57 @@ describe("ImmersiveShortSurface", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
     });
+  });
+
+  it("updates the detail like CTA and count after an authenticated unlike succeeds", async () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            engagement: {
+              likeCount: 320,
+            },
+            viewer: {
+              hasLiked: false,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_like_delete_success_001",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Liked short" }));
+
+    await waitFor(() => {
+      expect(fetcher.mock.calls[0]?.[0].toString()).toBe("https://api.example.com/api/fan/shorts/rooftop/like");
+      expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+        credentials: "include",
+        method: "DELETE",
+      });
+      expect(screen.getByRole("button", { name: "Like short" })).toHaveAttribute("aria-pressed", "false");
+    });
+    expect(screen.getByText("320")).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when detail pin is tapped without a session", async () => {

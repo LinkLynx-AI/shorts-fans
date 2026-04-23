@@ -264,6 +264,7 @@ func main() {
 			FanShortPin:                      shortsRepository,
 			FanShortComments:                 shortCommentRepository,
 			FanShortCommentWriter:            shortCommentRepository,
+			FanShortLike:                     shortsRepository,
 			CreatorFollow:                    creatorRepository,
 			CreatorAvatarUpload:              creatorAvatarService,
 			CreatorRegistration:              creatorRegistrationRepository,

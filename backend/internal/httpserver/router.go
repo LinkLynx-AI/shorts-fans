@@ -110,6 +110,12 @@ type FanShortCommentWriter interface {
 	CreateComment(ctx context.Context, input shortcomment.CreateInput) (shortcomment.Comment, error)
 }
 
+// FanShortLikeWriter は public short like mutation を表します。
+type FanShortLikeWriter interface {
+	LikePublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.LikeMutationResult, error)
+	UnlikePublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.LikeMutationResult, error)
+}
+
 // ShortDisplayAssetResolver は short 向け display asset 解決を表します。
 type ShortDisplayAssetResolver interface {
 	ResolveShortDisplayAsset(source media.ShortDisplaySource, boundary media.AccessBoundary) (media.VideoDisplayAsset, error)
@@ -246,6 +252,7 @@ type HandlerConfig struct {
 	RecommendationSignals            RecommendationSignalWriter
 	FanUnlockMain                    FanUnlockMainService
 	FanShortPin                      FanShortPinWriter
+	FanShortLike                     FanShortLikeWriter
 	CreatorFollow                    CreatorFollowWriter
 	CreatorAvatarUpload              ViewerCreatorAvatarUploadHandler
 	CreatorRegistration              ViewerCreatorRegistrationService
@@ -374,6 +381,7 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	registerPaymentWebhookRoutes(router, config.CCBillWebhook)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
 	registerFanShortCommentRoutes(router, config.FanShortComments, config.FanShortCommentWriter, config.ViewerBootstrap)
+	registerFanShortLikeRoutes(router, config.FanShortLike, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(
 		router,

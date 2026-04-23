@@ -101,6 +101,8 @@ func TestFanFeedRecommendedRoute(t *testing.T) {
 						PriceJPY:            1800,
 					},
 				}
+				item.Engagement.LikeCount = 9
+				item.Viewer.HasLiked = true
 				item.Viewer.IsPinned = true
 
 				return []feed.Item{item}, nil, nil
@@ -151,6 +153,9 @@ func TestFanFeedRecommendedRoute(t *testing.T) {
 	}
 	if response.Data.Items[0].Short.ID != shorts.FormatPublicShortID(shortID) {
 		t.Fatalf("response.Data.Items[0].Short.ID got %q want %q", response.Data.Items[0].Short.ID, shorts.FormatPublicShortID(shortID))
+	}
+	if response.Data.Items[0].Engagement.LikeCount != 9 || !response.Data.Items[0].Viewer.HasLiked {
+		t.Fatalf("response.Data.Items[0] engagement/viewer got %#v want liked count", response.Data.Items[0])
 	}
 	if response.Data.Items[0].UnlockCta.State != "unlock_available" {
 		t.Fatalf("response.Data.Items[0].UnlockCta.State got %q want %q", response.Data.Items[0].UnlockCta.State, "unlock_available")
@@ -274,6 +279,8 @@ func TestFanShortDetailRoute(t *testing.T) {
 						},
 					},
 				}
+				detail.Item.Engagement.LikeCount = 10
+				detail.Item.Viewer.HasLiked = true
 				detail.Item.Viewer.IsPinned = true
 				detail.Viewer.IsFollowingCreator = true
 
@@ -319,6 +326,9 @@ func TestFanShortDetailRoute(t *testing.T) {
 	}
 	if !response.Data.Detail.Viewer.IsFollowingCreator {
 		t.Fatalf("response.Data.Detail.Viewer.IsFollowingCreator got %#v want true", response.Data.Detail.Viewer)
+	}
+	if response.Data.Detail.Engagement.LikeCount != 10 || !response.Data.Detail.Viewer.HasLiked {
+		t.Fatalf("response.Data.Detail engagement/viewer got %#v want liked count", response.Data.Detail)
 	}
 	if response.Data.Detail.UnlockCta.State != "continue_main" {
 		t.Fatalf("response.Data.Detail.UnlockCta.State got %q want %q", response.Data.Detail.UnlockCta.State, "continue_main")
