@@ -71,6 +71,7 @@ describe("requestMainAccessEntry", () => {
     );
 
     await requestMainAccessEntry({
+      baseUrl: "https://api.example.com",
       entryToken: "signed-entry-token",
       fetcher,
       fromShortId: "short_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

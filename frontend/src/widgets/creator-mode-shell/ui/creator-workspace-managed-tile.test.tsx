@@ -14,7 +14,7 @@ function buildManagedItem(): ApprovedCreatorWorkspaceManagedItem {
     detail: "差し戻し内容を確認してください",
     metric: "",
     shortId: "short_rejected",
-    status: "却下",
+    status: "公開不可",
     tone: "removed",
   };
 }
@@ -41,6 +41,6 @@ describe("CreatorWorkspaceManagedTile", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "ショート詳細を開く short_rejected 却下" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "ショート詳細を開く short_rejected 公開不可" })).toBeInTheDocument();
   });
 });

@@ -15,7 +15,7 @@ describe("creator workspace review surface model helpers", () => {
     expect(resolveCreatorWorkspaceObjectReviewBadge("draft")).toBeNull();
 
     expect(resolveCreatorWorkspaceObjectReviewBadge("rejected")).toEqual({
-      label: "却下",
+      label: "公開不可",
       tone: "removed",
     });
     expect(resolveCreatorWorkspaceObjectReviewBadge("revision_requested")).toEqual({
@@ -62,7 +62,7 @@ describe("creator workspace review surface model helpers", () => {
     })).toBe("再審査前に必要項目を満たしてください。");
   });
 
-  it("derives dashboard notifications from package summaries", () => {
+  it("derives dashboard notifications from review outcomes only", () => {
     expect(deriveCreatorWorkspaceReviewNotifications([
       {
         blockers: [],
@@ -100,10 +100,6 @@ describe("creator workspace review surface model helpers", () => {
       expect.objectContaining({
         key: "changes_requested",
         label: "差し戻し",
-      }),
-      expect.objectContaining({
-        key: "blocked_draft",
-        label: "要確認",
       }),
     ]);
   });

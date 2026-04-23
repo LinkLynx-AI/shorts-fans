@@ -146,16 +146,18 @@ describe("CreatorWorkspaceReviewPanel", () => {
     render(<CreatorWorkspaceReviewPanel onRetry={() => {}} onSync={() => {}} state={buildRejectedShortReviewState()} />);
 
     expect(screen.getByText("公開できません")).toBeInTheDocument();
-    expect(screen.getByText("却下")).toBeInTheDocument();
-    expect(screen.getByText("却下されたため、この package は self-serve で再申請できません。")).toBeInTheDocument();
+    expect(screen.getByText("公開不可")).toBeInTheDocument();
+    expect(screen.getByText("審査で公開不可となったため、この動画は再申請できません。")).toBeInTheDocument();
     expect(screen.getByText("対象")).toBeInTheDocument();
-    expect(screen.getByText("package / ショート")).toBeInTheDocument();
+    expect(screen.getByText("ショート")).toBeInTheDocument();
     expect(screen.getByText("理由")).toBeInTheDocument();
     expect(screen.getByText("安全性の懸念")).toBeInTheDocument();
     expect(screen.getByText("コンテンツ安全性の観点で追加対応が必要です。")).toBeInTheDocument();
     expect(screen.queryByText("content_safety_issue")).not.toBeInTheDocument();
-    expect(screen.queryByText("package 却下")).not.toBeInTheDocument();
-    expect(screen.queryByText("ショート 却下")).not.toBeInTheDocument();
+    expect(screen.queryByText("package")).not.toBeInTheDocument();
+    expect(screen.queryByText(/self-serve/)).not.toBeInTheDocument();
+    expect(screen.queryByText("package 公開不可")).not.toBeInTheDocument();
+    expect(screen.queryByText("ショート 公開不可")).not.toBeInTheDocument();
     expect(screen.queryByText("reason code")).not.toBeInTheDocument();
   });
 

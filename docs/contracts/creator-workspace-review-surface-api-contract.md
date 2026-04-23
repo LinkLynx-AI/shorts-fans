@@ -184,7 +184,7 @@
 - `pending_review` package では `submitAction = none` かつ `readiness = none` を返します。
 - `blocked` package では `submitAction = none` を返し、`blockers` に readiness 未成立理由を返します。
 - `rejected` object を含む package でも read surface は返しますが、self-serve reopen action は含めません。
-- creator UI は `approved` / `pending_review` / blocker のない normal state を通常表示から抑制し、差し戻し、却下、blocker、conflict など creator action が必要な状態だけを review panel / tile badge / dashboard notification として表示します。
+- creator UI は `approved` / `pending_review` / blocker のない normal state を通常表示から抑制し、差し戻し、公開不可、blocker、conflict など creator action が必要な状態だけを review panel / tile badge として表示します。dashboard notification は差し戻し、公開不可など review outcome に限定し、pre-submission blocker 専用通知は表示しません。
 - 承認済みを示す copy や badge は、正常状態の再説明になるため creator UI には表示しません。
 
 ## Success Example

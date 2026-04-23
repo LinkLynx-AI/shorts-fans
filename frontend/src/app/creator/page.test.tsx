@@ -518,8 +518,8 @@ describe("CreatorPage", () => {
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
     expect(screen.getByText("contract-backed creator bio")).toBeInTheDocument();
     expect(screen.getByText("¥82,000")).toBeInTheDocument();
-    expect(screen.getByText("差し戻し対応が1件あります")).toBeInTheDocument();
-    expect(screen.getByText("1件の package が対象です。detail で差し戻し内容を確認してください。")).toBeInTheDocument();
+    expect(screen.getByText("差し戻し 1件")).toBeInTheDocument();
+    expect(screen.getByText("修正内容を確認")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /^Top short\b/ })).toBeEnabled();
     expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
@@ -836,7 +836,7 @@ describe("CreatorPage", () => {
       "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
     );
 
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
 
     expect(screen.queryByText("asset_main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.getByText("¥1,800")).toBeInTheDocument();
@@ -857,11 +857,11 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "Main" }));
 
     expect(await screen.findByText("12:00")).toBeInTheDocument();
-    expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("¥1,800")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("creator-workspace-preview-tile")[0]).not.toHaveTextContent(/\bShort\b|\bMain\b/);
     expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
 
     expect(await screen.findByRole("button", { name: "本編を再生" })).toBeInTheDocument();
     expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
@@ -905,7 +905,7 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Main" }));
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
     await user.click(screen.getByRole("button", { name: "投稿操作" }));
 
     expect(screen.getByRole("button", { name: "priceの変更" })).toBeInTheDocument();

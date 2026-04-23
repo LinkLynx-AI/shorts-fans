@@ -144,21 +144,21 @@ function buildCreatorWorkspaceReviewScopeLabel({
 
   if (packageBadge && targetBadge) {
     if (packageBadge.label === targetBadge.label) {
-      return `package / ${targetLabel}`;
+      return targetLabel;
     }
 
-    return `package: ${packageBadge.label} / ${targetLabel}: ${targetBadge.label}`;
+    return `${targetLabel}: ${targetBadge.label}`;
   }
 
   if (packageBadge) {
-    return "package";
+    return targetLabel;
   }
 
   if (targetBadge) {
     return targetLabel;
   }
 
-  return "package";
+  return targetLabel;
 }
 
 function CreatorWorkspaceReviewPanelError({
