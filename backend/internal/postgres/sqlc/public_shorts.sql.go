@@ -26,6 +26,20 @@ SELECT
     creator_profile.bio,
     main_record.price_minor AS main_price_minor,
     main_media.duration_ms AS main_duration_ms,
+    (
+        SELECT COUNT(*)::bigint
+        FROM app.short_likes AS liked_count
+        WHERE liked_count.short_id = s.id
+    ) AS like_count,
+    CASE
+        WHEN $1::uuid IS NULL THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.short_likes AS liked
+            WHERE liked.user_id = $1::uuid
+                AND liked.short_id = s.id
+        )
+    END AS has_liked,
     CASE
         WHEN $1::uuid IS NULL THEN FALSE
         ELSE EXISTS (
@@ -89,6 +103,8 @@ type GetPublicShortDetailItemRow struct {
 	Bio                string
 	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
+	LikeCount          int64
+	HasLiked           interface{}
 	IsPinned           interface{}
 	IsUnlocked         interface{}
 	IsOwner            interface{}
@@ -112,6 +128,8 @@ func (q *Queries) GetPublicShortDetailItem(ctx context.Context, arg GetPublicSho
 		&i.Bio,
 		&i.MainPriceMinor,
 		&i.MainDurationMs,
+		&i.LikeCount,
+		&i.HasLiked,
 		&i.IsPinned,
 		&i.IsUnlocked,
 		&i.IsOwner,
@@ -141,6 +159,20 @@ SELECT
     creator_profile.bio,
     main_record.price_minor AS main_price_minor,
     main_media.duration_ms AS main_duration_ms,
+    (
+        SELECT COUNT(*)::bigint
+        FROM app.short_likes AS liked_count
+        WHERE liked_count.short_id = s.id
+    ) AS like_count,
+    CASE
+        WHEN $1::uuid IS NULL THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.short_likes AS liked
+            WHERE liked.user_id = $1::uuid
+                AND liked.short_id = s.id
+        )
+    END AS has_liked,
     CASE
         WHEN $1::uuid IS NULL THEN FALSE
         ELSE EXISTS (
@@ -205,6 +237,8 @@ type ListFeedItemsByShortIDsRow struct {
 	Bio                string
 	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
+	LikeCount          int64
+	HasLiked           interface{}
 	IsPinned           interface{}
 	IsUnlocked         interface{}
 	IsOwner            interface{}
@@ -234,6 +268,8 @@ func (q *Queries) ListFeedItemsByShortIDs(ctx context.Context, arg ListFeedItems
 			&i.Bio,
 			&i.MainPriceMinor,
 			&i.MainDurationMs,
+			&i.LikeCount,
+			&i.HasLiked,
 			&i.IsPinned,
 			&i.IsUnlocked,
 			&i.IsOwner,
@@ -252,7 +288,7 @@ func (q *Queries) ListFeedItemsByShortIDs(ctx context.Context, arg ListFeedItems
 const listFollowingPublicFeedItems = `-- name: ListFollowingPublicFeedItems :many
 WITH ranking_context AS (
     SELECT COALESCE(
-        $1::timestamptz,
+        $3::timestamptz,
         DATE_TRUNC('hour', CURRENT_TIMESTAMP)
     ) AS reference_at
 ),
@@ -441,7 +477,7 @@ diversified_following AS (
         ) AS main_rank_position
     FROM scored_following
 ),
-ordered_following AS (
+ranked_following AS (
     SELECT
         diversified_following.id,
         diversified_following.creator_user_id,
@@ -467,6 +503,14 @@ ordered_following AS (
         )::bigint AS rank_score
     FROM diversified_following
     CROSS JOIN ranking_weights
+),
+ordered_following AS (
+    SELECT
+        ranked_following.id, ranked_following.creator_user_id, ranked_following.canonical_main_id, ranked_following.media_asset_id, ranked_following.caption, ranked_following.published_at, ranked_following.short_duration_ms, ranked_following.display_name, ranked_following.handle, ranked_following.avatar_url, ranked_following.bio, ranked_following.main_price_minor, ranked_following.main_duration_ms, ranked_following.is_pinned, ranked_following.is_unlocked, ranked_following.is_owner, ranked_following.is_following_creator, ranked_following.rank_score,
+        ROW_NUMBER() OVER (
+            ORDER BY ranked_following.rank_score DESC, ranked_following.published_at DESC, ranked_following.id DESC
+        ) AS feed_position
+    FROM ranked_following
 )
 SELECT
     ordered_following.id,
@@ -482,6 +526,23 @@ SELECT
     ordered_following.bio,
     ordered_following.main_price_minor,
     ordered_following.main_duration_ms,
+    CASE
+        WHEN ordered_following.feed_position > $1::integer THEN 0::bigint
+        ELSE (
+            SELECT COUNT(*)::bigint
+            FROM app.short_likes AS liked_count
+            WHERE liked_count.short_id = ordered_following.id
+        )
+    END AS like_count,
+    CASE
+        WHEN ordered_following.feed_position > $1::integer THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.short_likes AS liked
+            WHERE liked.user_id = $2::uuid
+                AND liked.short_id = ordered_following.id
+        )
+    END AS has_liked,
     ordered_following.is_pinned,
     ordered_following.is_unlocked,
     ordered_following.is_owner,
@@ -492,8 +553,9 @@ ORDER BY ordered_following.rank_score DESC, ordered_following.published_at DESC,
 `
 
 type ListFollowingPublicFeedItemsParams struct {
-	RankingReferenceAt pgtype.Timestamptz
+	DisplayLimitCount  int32
 	ViewerUserID       pgtype.UUID
+	RankingReferenceAt pgtype.Timestamptz
 }
 
 type ListFollowingPublicFeedItemsRow struct {
@@ -510,6 +572,8 @@ type ListFollowingPublicFeedItemsRow struct {
 	Bio                string
 	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
+	LikeCount          interface{}
+	HasLiked           interface{}
 	IsPinned           interface{}
 	IsUnlocked         interface{}
 	IsOwner            bool
@@ -518,7 +582,7 @@ type ListFollowingPublicFeedItemsRow struct {
 }
 
 func (q *Queries) ListFollowingPublicFeedItems(ctx context.Context, arg ListFollowingPublicFeedItemsParams) ([]ListFollowingPublicFeedItemsRow, error) {
-	rows, err := q.db.Query(ctx, listFollowingPublicFeedItems, arg.RankingReferenceAt, arg.ViewerUserID)
+	rows, err := q.db.Query(ctx, listFollowingPublicFeedItems, arg.DisplayLimitCount, arg.ViewerUserID, arg.RankingReferenceAt)
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +604,8 @@ func (q *Queries) ListFollowingPublicFeedItems(ctx context.Context, arg ListFoll
 			&i.Bio,
 			&i.MainPriceMinor,
 			&i.MainDurationMs,
+			&i.LikeCount,
+			&i.HasLiked,
 			&i.IsPinned,
 			&i.IsUnlocked,
 			&i.IsOwner,
@@ -571,6 +637,20 @@ SELECT
     creator_profile.bio,
     main_record.price_minor AS main_price_minor,
     main_media.duration_ms AS main_duration_ms,
+    (
+        SELECT COUNT(*)::bigint
+        FROM app.short_likes AS liked_count
+        WHERE liked_count.short_id = s.id
+    ) AS like_count,
+    CASE
+        WHEN $1::uuid IS NULL THEN FALSE
+        ELSE EXISTS (
+            SELECT 1
+            FROM app.short_likes AS liked
+            WHERE liked.user_id = $1::uuid
+                AND liked.short_id = s.id
+        )
+    END AS has_liked,
     CASE
         WHEN $1::uuid IS NULL THEN FALSE
         ELSE EXISTS (
@@ -644,6 +724,8 @@ type ListLegacyRecommendedPublicFeedItemsRow struct {
 	Bio                string
 	MainPriceMinor     int64
 	MainDurationMs     pgtype.Int8
+	LikeCount          int64
+	HasLiked           interface{}
 	IsPinned           interface{}
 	IsUnlocked         interface{}
 	IsOwner            interface{}
@@ -678,6 +760,8 @@ func (q *Queries) ListLegacyRecommendedPublicFeedItems(ctx context.Context, arg 
 			&i.Bio,
 			&i.MainPriceMinor,
 			&i.MainDurationMs,
+			&i.LikeCount,
+			&i.HasLiked,
 			&i.IsPinned,
 			&i.IsUnlocked,
 			&i.IsOwner,

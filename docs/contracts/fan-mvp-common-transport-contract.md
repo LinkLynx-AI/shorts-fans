@@ -24,7 +24,7 @@
 ## Viewer State Boundary
 
 - fan MVP surface contract では、resource と viewer の関係からしか分からない state だけを返します。
-- `isPinned`、`isFollowingCreator`、`unlockCta` のような relation state は surface payload に含めます。
+- `isPinned`、`hasLiked`、`isFollowingCreator`、`unlockCta` のような relation state は surface payload に含めます。
 - authenticated viewer 自身の identity、active mode、creator mode 可否などは app bootstrap 時に別で確保し、surface payload に重ねて返しません。
 
 ## Canonical Sources
@@ -148,7 +148,9 @@
 | `short` | `ShortSummary` | short 本体 |
 | `creator` | `CreatorSummary` | short owner の public 情報 |
 | `viewer.isPinned` | `boolean` | private pin state |
+| `viewer.hasLiked` | `boolean` | private short like state |
 | `viewer.isFollowingCreator` | `boolean` | follow state |
+| `engagement.likeCount` | `number` | public short like count |
 | `unlockCta` | `UnlockCtaState` | short detail から見える CTA 状態 |
 
 ### `MainAccessState`

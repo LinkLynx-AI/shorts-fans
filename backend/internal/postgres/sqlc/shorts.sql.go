@@ -24,6 +24,19 @@ func (q *Queries) CountPublicShortsByCreatorUserID(ctx context.Context, creatorU
 	return column_1, err
 }
 
+const countShortLikesByShortID = `-- name: CountShortLikesByShortID :one
+SELECT COUNT(*)::bigint
+FROM app.short_likes
+WHERE short_id = $1
+`
+
+func (q *Queries) CountShortLikesByShortID(ctx context.Context, shortID pgtype.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, countShortLikesByShortID, shortID)
+	var column_1 int64
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createShort = `-- name: CreateShort :one
 INSERT INTO app.shorts (
     creator_user_id,
@@ -107,6 +120,22 @@ type DeletePinnedShortParams struct {
 
 func (q *Queries) DeletePinnedShort(ctx context.Context, arg DeletePinnedShortParams) error {
 	_, err := q.db.Exec(ctx, deletePinnedShort, arg.UserID, arg.ShortID)
+	return err
+}
+
+const deleteShortLike = `-- name: DeleteShortLike :exec
+DELETE FROM app.short_likes
+WHERE user_id = $1
+  AND short_id = $2
+`
+
+type DeleteShortLikeParams struct {
+	UserID  pgtype.UUID
+	ShortID pgtype.UUID
+}
+
+func (q *Queries) DeleteShortLike(ctx context.Context, arg DeleteShortLikeParams) error {
+	_, err := q.db.Exec(ctx, deleteShortLike, arg.UserID, arg.ShortID)
 	return err
 }
 
@@ -410,6 +439,27 @@ type PutPinnedShortParams struct {
 
 func (q *Queries) PutPinnedShort(ctx context.Context, arg PutPinnedShortParams) error {
 	_, err := q.db.Exec(ctx, putPinnedShort, arg.UserID, arg.ShortID)
+	return err
+}
+
+const putShortLike = `-- name: PutShortLike :exec
+INSERT INTO app.short_likes (
+    user_id,
+    short_id
+) VALUES (
+    $1,
+    $2
+)
+ON CONFLICT (user_id, short_id) DO NOTHING
+`
+
+type PutShortLikeParams struct {
+	UserID  pgtype.UUID
+	ShortID pgtype.UUID
+}
+
+func (q *Queries) PutShortLike(ctx context.Context, arg PutShortLikeParams) error {
+	_, err := q.db.Exec(ctx, putShortLike, arg.UserID, arg.ShortID)
 	return err
 }
 

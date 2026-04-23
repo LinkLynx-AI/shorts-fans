@@ -103,13 +103,17 @@
       },
       "viewer": {
         "isPinned": true,
-        "isFollowingCreator": true
+        "isFollowingCreator": true,
+        "hasLiked": false
       },
       "unlockCta": {
         "state": "unlock_available",
         "priceJpy": 2200,
         "mainDurationSeconds": 720,
         "resumePositionSeconds": null
+      },
+      "engagement": {
+        "likeCount": 57
       }
     },
     "mainAccessState": {

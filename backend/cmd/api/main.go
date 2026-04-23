@@ -260,6 +260,7 @@ func main() {
 			RecommendationSignals:            recommendationSignalService,
 			FanUnlockMain:                    fanUnlockMainService,
 			FanShortPin:                      shortsRepository,
+			FanShortLike:                     shortsRepository,
 			CreatorFollow:                    creatorRepository,
 			CreatorAvatarUpload:              creatorAvatarService,
 			CreatorRegistration:              creatorRegistrationRepository,

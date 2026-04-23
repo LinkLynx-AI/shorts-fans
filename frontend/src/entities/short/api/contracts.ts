@@ -4,9 +4,18 @@ import { creatorSummarySchema } from "@/entities/creator";
 
 export const fanFeedTabSchema = z.enum(["following", "recommended"]);
 export const shortPinErrorCodeSchema = z.enum(["auth_required", "internal_error", "not_found"]);
+export const shortLikeErrorCodeSchema = z.enum(["auth_required", "internal_error", "not_found"]);
 export const shortPinMutationResultSchema = z.object({
   viewer: z.object({
     isPinned: z.boolean(),
+  }),
+});
+export const shortLikeMutationResultSchema = z.object({
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
+  viewer: z.object({
+    hasLiked: z.boolean(),
   }),
 });
 
@@ -36,9 +45,13 @@ export const unlockCtaStateSchema = z.object({
 
 export const fanFeedItemSchema = z.object({
   creator: creatorSummarySchema,
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
   short: publicShortSummarySchema,
   unlockCta: unlockCtaStateSchema,
   viewer: z.object({
+    hasLiked: z.boolean(),
     isFollowingCreator: z.boolean(),
     isPinned: z.boolean(),
   }),
@@ -61,9 +74,13 @@ export const fanFeedResponseSchema = z.object({
 
 export const publicShortDetailSchema = z.object({
   creator: creatorSummarySchema,
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
   short: publicShortSummarySchema,
   unlockCta: unlockCtaStateSchema,
   viewer: z.object({
+    hasLiked: z.boolean(),
     isFollowingCreator: z.boolean(),
     isPinned: z.boolean(),
   }),

@@ -21,6 +21,7 @@ sql:
       - "db/migrations/000017_add_submission_review_intakes.up.sql"
       - "db/migrations/000018_add_submission_review_decisions.up.sql"
       - "db/migrations/000019_add_submission_review_notes.up.sql"
+      - "db/migrations/000020_add_short_likes.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

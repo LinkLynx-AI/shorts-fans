@@ -28,6 +28,9 @@ type repositoryStubQueries struct {
 	getPublicShort      func(context.Context, pgtype.UUID) (sqlc.AppPublicShort, error)
 	putPinnedShort      func(context.Context, sqlc.PutPinnedShortParams) error
 	deletePinnedShort   func(context.Context, sqlc.DeletePinnedShortParams) error
+	putShortLike        func(context.Context, sqlc.PutShortLikeParams) error
+	deleteShortLike     func(context.Context, sqlc.DeleteShortLikeParams) error
+	countShortLikes     func(context.Context, pgtype.UUID) (int64, error)
 	listCanonicalShorts func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
 	getCanonicalMainID  func(context.Context, pgtype.UUID) (pgtype.UUID, error)
 }
@@ -128,6 +131,27 @@ func (s repositoryStubQueries) DeletePinnedShort(ctx context.Context, arg sqlc.D
 		return nil
 	}
 	return s.deletePinnedShort(ctx, arg)
+}
+
+func (s repositoryStubQueries) PutShortLike(ctx context.Context, arg sqlc.PutShortLikeParams) error {
+	if s.putShortLike == nil {
+		return nil
+	}
+	return s.putShortLike(ctx, arg)
+}
+
+func (s repositoryStubQueries) DeleteShortLike(ctx context.Context, arg sqlc.DeleteShortLikeParams) error {
+	if s.deleteShortLike == nil {
+		return nil
+	}
+	return s.deleteShortLike(ctx, arg)
+}
+
+func (s repositoryStubQueries) CountShortLikesByShortID(ctx context.Context, shortID pgtype.UUID) (int64, error) {
+	if s.countShortLikes == nil {
+		return 0, nil
+	}
+	return s.countShortLikes(ctx, shortID)
 }
 
 func (s repositoryStubQueries) ListShortsByCanonicalMainID(ctx context.Context, canonicalMainID pgtype.UUID) ([]sqlc.AppShort, error) {

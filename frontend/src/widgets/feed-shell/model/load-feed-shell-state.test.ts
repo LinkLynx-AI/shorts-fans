@@ -51,6 +51,9 @@ describe("loadFeedShellState", () => {
         handle: "@minarei" as const,
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_33333333333333333333333333333333",
@@ -72,12 +75,14 @@ describe("loadFeedShellState", () => {
         state: "unlock_available" as const,
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },
     };
     const surface = {
       creator: apiItem.creator,
+      engagement: apiItem.engagement,
       mainEntryEnabled: true,
       short: apiItem.short,
       unlock: {
@@ -123,6 +128,7 @@ describe("loadFeedShellState", () => {
         unlockCta: apiItem.unlockCta,
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
 import { startTransition, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Heart } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -31,6 +31,7 @@ import { cn } from "@/shared/lib";
 import { Button } from "@/shared/ui";
 
 import type { DetailShortSurface, FeedShortSurface } from "../model/short-surface";
+import { useShortLikeState } from "../model/use-short-like-state";
 import { useShortPinState } from "../model/use-short-pin-state";
 
 const feedSurfaceStyle = {
@@ -45,10 +46,10 @@ const feedSurfaceStyle = {
 
 const sharedFanNavigationBaseInsetPx = 76;
 const feedActionRailOffsetPx = 152;
-const feedPinErrorOffsetPx = feedActionRailOffsetPx + 116;
+const feedInteractionErrorOffsetPx = feedActionRailOffsetPx + 172;
 const sharedFanNavigationInset = `calc(${sharedFanNavigationBaseInsetPx}px + env(safe-area-inset-bottom, 0px))`;
 const feedActionRailBottom = `calc(${sharedFanNavigationBaseInsetPx + feedActionRailOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
-const feedPinErrorBottom = `calc(${sharedFanNavigationBaseInsetPx + feedPinErrorOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
+const feedInteractionErrorBottom = `calc(${sharedFanNavigationBaseInsetPx + feedInteractionErrorOffsetPx}px + env(safe-area-inset-bottom, 0px))`;
 
 export function FeedLikeShortBackHeader({ backHref }: { backHref: string }) {
   return (
@@ -120,6 +121,13 @@ export type ImmersiveShortSurfaceProps =
   | {
       activeTab: FeedTab;
       isActive?: boolean;
+      like?: {
+        errorMessage: string | null;
+        hasLiked: boolean;
+        isPending: boolean;
+        likeCount: number;
+        onToggle: () => void;
+      };
       mode: "feed";
       pin?: {
         errorMessage: string | null;
@@ -190,6 +198,70 @@ type PinRailProps = {
   pinned: boolean;
   variant?: "default" | "feed";
 };
+
+type LikeRailProps = {
+  disabled?: boolean;
+  hasLiked: boolean;
+  likeCount: number;
+  onToggle?: (() => void) | undefined;
+  variant?: "default" | "feed";
+};
+
+function formatLikeCount(likeCount: number): string {
+  return likeCount.toLocaleString("ja-JP");
+}
+
+/**
+ * short の like 状態と総数を表す操作レールを表示する。
+ */
+function LikeRail({
+  disabled = false,
+  hasLiked,
+  likeCount,
+  onToggle,
+  variant = "default",
+}: LikeRailProps) {
+  const label = hasLiked ? "Liked short" : "Like short";
+  const isFeedVariant = variant === "feed";
+  const isDisabled = disabled || !onToggle;
+
+  return (
+    <div className="flex min-w-12 flex-col items-center gap-1.5 text-center">
+      <button
+        aria-label={label}
+        aria-busy={disabled || undefined}
+        aria-pressed={hasLiked}
+        className={cn(
+          isFeedVariant
+            ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110 disabled:hover:scale-100"
+            : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent disabled:hover:text-accent-strong/72",
+          disabled ? "disabled:cursor-wait" : "disabled:cursor-not-allowed",
+          hasLiked && (isFeedVariant ? "text-[#ff4f79]" : "text-[#e84a68]"),
+        )}
+        disabled={isDisabled}
+        onClick={onToggle}
+        type="button"
+      >
+        <Heart
+          aria-hidden="true"
+          className={cn("size-[22px]", isFeedVariant && "h-7 w-7")}
+          fill={hasLiked ? "currentColor" : "none"}
+          strokeWidth={2.1}
+        />
+        <span className="sr-only">{label}</span>
+      </button>
+      <span
+        aria-label={`${formatLikeCount(likeCount)} likes`}
+        className={cn(
+          "min-h-4 max-w-14 truncate text-[11px] font-bold leading-none",
+          isFeedVariant ? "text-white drop-shadow-md" : "text-white/88",
+        )}
+      >
+        {formatLikeCount(likeCount)}
+      </span>
+    </div>
+  );
+}
 
 /**
  * short の pin 状態を表す操作レールを表示する。
@@ -282,21 +354,20 @@ function FeedCreatorAvatar({
 }
 
 function FeedActionRail({
-  disabled = false,
-  onToggle,
-  pinned,
+  like,
+  pin,
 }: {
-  disabled?: boolean;
-  onToggle?: () => void;
-  pinned: boolean;
+  like: LikeRailProps;
+  pin: PinRailProps;
 }) {
   return (
     <div
-      className="absolute right-3 z-20 flex flex-col items-center space-y-6"
+      className="absolute right-3 z-20 flex flex-col items-center space-y-5"
       data-testid="feed-action-rail"
       style={{ bottom: feedActionRailBottom }}
     >
-      <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
+      <LikeRail {...like} variant="feed" />
+      <PinRail {...pin} variant="feed" />
     </div>
   );
 }
@@ -576,8 +647,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
     initialIsPinned: viewer.isPinned,
     shortId: short.id,
   });
+  const detailLikeState = useShortLikeState({
+    enabled: mode === "detail",
+    initialHasLiked: viewer.hasLiked,
+    initialLikeCount: surface.engagement.likeCount,
+    shortId: short.id,
+  });
   const isActive = props.isActive ?? true;
+  const likeErrorMessage = mode === "feed" ? props.like?.errorMessage ?? null : detailLikeState.errorMessage;
   const pinErrorMessage = mode === "feed" ? props.pin?.errorMessage ?? null : detailPinState.errorMessage;
+  const interactionErrorMessage = likeErrorMessage ?? pinErrorMessage;
+  const hasLiked = mode === "feed" ? props.like?.hasLiked ?? viewer.hasLiked : detailLikeState.hasLiked;
+  const likeCount = mode === "feed" ? props.like?.likeCount ?? surface.engagement.likeCount : detailLikeState.likeCount;
   const pinned = mode === "feed" ? props.pin?.isPinned ?? viewer.isPinned : detailPinState.isPinned;
   const feedPlaybackProgress =
     feedPlaybackProgressState.mediaId === short.media.id ? feedPlaybackProgressState.progress : 0;
@@ -886,6 +967,27 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           disabled: detailPinState.isPending,
           onToggle: detailPinState.onToggle,
         };
+  const likeProps =
+    mode === "feed"
+      ? props.like
+        ? {
+            disabled: props.like.isPending,
+            hasLiked,
+            likeCount,
+            onToggle: props.like.onToggle,
+          }
+        : {
+            disabled: true,
+            hasLiked,
+            likeCount,
+            onToggle: undefined,
+          }
+      : {
+          disabled: detailLikeState.isPending,
+          hasLiked,
+          likeCount,
+          onToggle: detailLikeState.onToggle,
+        };
 
   if (usesFeedPresentation) {
     return (
@@ -911,15 +1013,21 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         }
       >
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
-        <FeedActionRail pinned={pinned} {...pinProps} />
-        {pinErrorMessage ? (
+        <FeedActionRail
+          like={likeProps}
+          pin={{
+            pinned,
+            ...pinProps,
+          }}
+        />
+        {interactionErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: feedPinErrorBottom }}
+            style={{ bottom: feedInteractionErrorBottom }}
           >
-            {pinErrorMessage}
+            {interactionErrorMessage}
           </p>
         ) : null}
         <div
@@ -1011,17 +1119,18 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       <div className="relative h-full">
         <h1 className="sr-only">Short detail</h1>
         <ShortSurfaceHeader {...props} />
-        <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
+        <div className="absolute right-4 z-20 flex flex-col items-center gap-6" style={{ bottom: "204px" }}>
+          <LikeRail {...likeProps} />
           <PinRail pinned={pinned} {...pinProps} />
         </div>
-        {pinErrorMessage ? (
+        {interactionErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: "258px" }}
+            style={{ bottom: "330px" }}
           >
-            {pinErrorMessage}
+            {interactionErrorMessage}
           </p>
         ) : null}
         <div className="absolute inset-x-4 z-20" style={{ bottom: "152px" }}>

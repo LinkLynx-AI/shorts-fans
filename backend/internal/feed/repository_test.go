@@ -120,12 +120,15 @@ func TestBuildInitialFollowingPageParams(t *testing.T) {
 	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
 	rankingReferenceAt := time.Unix(1710003600, 0).UTC()
 
-	params := buildInitialFollowingPageParams(viewerID, rankingReferenceAt)
+	params := buildInitialFollowingPageParams(viewerID, rankingReferenceAt, 12)
 	if got, err := postgres.UUIDFromPG(params.ViewerUserID); err != nil || got != viewerID {
 		t.Fatalf("buildInitialFollowingPageParams() viewer got %s err=%v want %s", got, err, viewerID)
 	}
 	if got, err := postgres.RequiredTimeFromPG(params.RankingReferenceAt); err != nil || !got.Equal(rankingReferenceAt) {
 		t.Fatalf("buildInitialFollowingPageParams() ranking reference got %s err=%v want %s", got, err, rankingReferenceAt)
+	}
+	if params.DisplayLimitCount != 12 {
+		t.Fatalf("buildInitialFollowingPageParams() display limit got %d want %d", params.DisplayLimitCount, 12)
 	}
 }
 
@@ -221,8 +224,11 @@ func TestMapFeedItem(t *testing.T) {
 	if item.Unlock.MainDurationSeconds != 481 {
 		t.Fatalf("mapFeedItem() mainDurationSeconds got %d want %d", item.Unlock.MainDurationSeconds, 481)
 	}
-	if !item.Unlock.IsOwner || !item.Unlock.IsUnlocked || !item.Viewer.IsFollowingCreator || !item.Viewer.IsPinned {
-		t.Fatalf("mapFeedItem() booleans got owner=%t unlocked=%t following=%t pinned=%t want true/true/true/true", item.Unlock.IsOwner, item.Unlock.IsUnlocked, item.Viewer.IsFollowingCreator, item.Viewer.IsPinned)
+	if item.Engagement.LikeCount != 12 {
+		t.Fatalf("mapFeedItem() likeCount got %d want %d", item.Engagement.LikeCount, 12)
+	}
+	if !item.Unlock.IsOwner || !item.Unlock.IsUnlocked || !item.Viewer.IsFollowingCreator || !item.Viewer.IsPinned || !item.Viewer.HasLiked {
+		t.Fatalf("mapFeedItem() booleans got owner=%t unlocked=%t following=%t pinned=%t liked=%t want true/true/true/true/true", item.Unlock.IsOwner, item.Unlock.IsUnlocked, item.Viewer.IsFollowingCreator, item.Viewer.IsPinned, item.Viewer.HasLiked)
 	}
 	if !item.GetPublishedAt().Equal(row.PublishedAt.Time) {
 		t.Fatalf("item.GetPublishedAt() got %s want %s", item.GetPublishedAt(), row.PublishedAt.Time)
@@ -769,6 +775,8 @@ func TestRepositoryErrorWrapping(t *testing.T) {
 				Handle:             "minarei",
 				MainPriceMinor:     1800,
 				MainDurationMs:     makeInt8(480500),
+				LikeCount:          4,
+				HasLiked:           true,
 				IsPinned:           true,
 				IsUnlocked:         true,
 				IsOwner:            true,
@@ -805,6 +813,8 @@ func TestRepositoryGetDetailSuccess(t *testing.T) {
 					Bio:                "night preview specialist",
 					MainPriceMinor:     1800,
 					MainDurationMs:     makeInt8(480500),
+					LikeCount:          4,
+					HasLiked:           true,
 					IsPinned:           true,
 					IsUnlocked:         false,
 					IsOwner:            false,
@@ -879,11 +889,13 @@ func makeMapFeedRow() mapFeedRow {
 		CreatorUserID:      makeUUID("11111111-1111-1111-1111-111111111111"),
 		DisplayName:        makeText("Mina Rei"),
 		Handle:             "minarei",
+		HasLiked:           true,
 		ID:                 makeUUID("22222222-2222-2222-2222-222222222222"),
 		IsOwner:            true,
 		IsPinned:           true,
 		IsUnlocked:         true,
 		IsFollowingCreator: true,
+		LikeCount:          12,
 		MainDurationMs:     makeInt8(480500),
 		MainPriceMinor:     int64(1800),
 		MediaAssetID:       makeUUID("44444444-4444-4444-4444-444444444444"),
@@ -907,6 +919,8 @@ func makeFollowingRow(shortID uuid.UUID, publishedAt time.Time, rankScore int64)
 		Bio:                "night preview specialist",
 		MainPriceMinor:     1800,
 		MainDurationMs:     makeInt8(480500),
+		LikeCount:          4,
+		HasLiked:           true,
 		IsPinned:           true,
 		IsUnlocked:         false,
 		IsOwner:            false,
@@ -930,6 +944,8 @@ func makeHydratedFollowingRow(shortID uuid.UUID, publishedAt time.Time) sqlc.Lis
 		Bio:                "night preview specialist",
 		MainPriceMinor:     1800,
 		MainDurationMs:     makeInt8(480500),
+		LikeCount:          4,
+		HasLiked:           true,
 		IsPinned:           true,
 		IsUnlocked:         false,
 		IsOwner:            false,
@@ -952,6 +968,8 @@ func makeLegacyRecommendedRow(shortID uuid.UUID, publishedAt time.Time) sqlc.Lis
 		Bio:                "night preview specialist",
 		MainPriceMinor:     1800,
 		MainDurationMs:     makeInt8(480500),
+		LikeCount:          4,
+		HasLiked:           true,
 		IsPinned:           true,
 		IsUnlocked:         true,
 		IsOwner:            false,

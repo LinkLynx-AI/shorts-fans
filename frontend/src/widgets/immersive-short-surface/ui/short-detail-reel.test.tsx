@@ -36,6 +36,9 @@ function createDetailPayload(shortId: string) {
       handle: "@minarei" as const,
       id: "creator_1",
     },
+    engagement: {
+      likeCount: 7,
+    },
     short: {
       caption: `${shortId} caption`,
       canonicalMainId: `main_${shortId}`,
@@ -57,6 +60,7 @@ function createDetailPayload(shortId: string) {
       state: "unlock_available" as const,
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: false,
     },
@@ -71,6 +75,9 @@ function createInitialSurface(shortId: string): DetailShortSurface {
       displayName: "Mina Rei",
       handle: "@minarei" as const,
       id: "creator_1",
+    },
+    engagement: {
+      likeCount: 7,
     },
     mainEntryEnabled: false,
     short: {
@@ -154,6 +161,7 @@ function createInitialSurface(shortId: string): DetailShortSurface {
       },
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: false,
     },

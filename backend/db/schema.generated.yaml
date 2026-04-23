@@ -21,6 +21,7 @@ source:
         - 000015_add_recommendation_foundation.up.sql
         - 000016_add_payment_purchase_state.up.sql
         - 000017_add_submission_review_intakes.up.sql
+        - 000020_add_short_likes.up.sql
 schemas:
     - name: app
       tables:
@@ -1783,6 +1784,47 @@ schemas:
                 - creator_user_id
                 - canonical_main_id
               definition: CREATE INDEX recommendation_viewer_short_features_short_identity_idx ON app.recommendation_viewer_short_features USING btree (short_id, creator_user_id, canonical_main_id)
+        - name: short_likes
+          columns:
+            - name: user_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: liked_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - user_id
+            - short_id
+          foreign_keys:
+            - name: short_likes_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+            - name: short_likes_user_id_fkey
+              columns:
+                - user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+          indexes:
+            - name: idx_short_likes_short_id
+              columns:
+                - short_id
+              definition: CREATE INDEX idx_short_likes_short_id ON app.short_likes USING btree (short_id)
         - name: shorts
           columns:
             - name: id
