@@ -1,0 +1,86 @@
+{
+  "GET /api/fan/shorts/{shortId}/comments": {
+    "short_comments_first_page": {
+      "data": {
+        "items": [
+          {
+            "id": "comment_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "shortId": "short_44444444444444444444444444444444",
+            "body": "この short の雰囲気が好きです。",
+            "author": {
+              "displayName": "Kana Mori",
+              "handle": "@kanamori",
+              "avatar": null
+            },
+            "createdAt": "2026-04-20T12:00:00Z"
+          }
+        ]
+      },
+      "meta": {
+        "requestId": "req_short_comments_001",
+        "page": {
+          "nextCursor": "eyJjb21tZW50SWQiOiJhYWFhYWFhYS1hYWFhLWFhYWEtYWFhYS1hYWFhYWFhYWFhYWEiLCJjcmVhdGVkQXQiOiIyMDI2LTA0LTIwVDEyOjAwOjAwWiIsInNob3J0SWQiOiI0NDQ0NDQ0NC00NDQ0LTQ0NDQtNDQ0NC00NDQ0NDQ0NDQ0NDQifQ",
+          "hasNext": true
+        }
+      },
+      "error": null
+    },
+    "short_comments_empty": {
+      "data": {
+        "items": []
+      },
+      "meta": {
+        "requestId": "req_short_comments_empty_001",
+        "page": {
+          "nextCursor": null,
+          "hasNext": false
+        }
+      },
+      "error": null
+    }
+  },
+  "POST /api/fan/shorts/{shortId}/comments": {
+    "short_comment_created": {
+      "data": {
+        "comment": {
+          "id": "comment_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "shortId": "short_44444444444444444444444444444444",
+          "body": "続きも気になります。",
+          "author": {
+            "displayName": "Kana Mori",
+            "handle": "@kanamori",
+            "avatar": null
+          },
+          "createdAt": "2026-04-20T12:01:00Z"
+        }
+      },
+      "meta": {
+        "requestId": "req_short_comment_create_001",
+        "page": null
+      },
+      "error": null
+    },
+    "short_comment_auth_required": {
+      "data": null,
+      "meta": {
+        "requestId": "req_short_comment_create_auth_required_001",
+        "page": null
+      },
+      "error": {
+        "code": "auth_required",
+        "message": "short comment requires authentication"
+      }
+    },
+    "short_comment_validation_error": {
+      "data": null,
+      "meta": {
+        "requestId": "req_short_comment_create_validation_error_001",
+        "page": null
+      },
+      "error": {
+        "code": "validation_error",
+        "message": "comment body is invalid"
+      }
+    }
+  }
+}

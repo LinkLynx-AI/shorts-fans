@@ -26,6 +26,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/recommendation"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/redis"
 	medias3 "github.com/LinkLynx-AI/shorts-fans/backend/internal/s3"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shortcomment"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/sqs"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
@@ -118,6 +119,7 @@ func main() {
 	recommendationRepository := recommendation.NewRepository(pool)
 	recommendationSignalExposureStore := recommendation.NewRedisSignalExposureStore(redisClient)
 	unlockConversionRetryStore := recommendation.NewRedisUnlockConversionRetryStore(redisClient)
+	shortCommentRepository := shortcomment.NewRepository(pool)
 	shortsRepository := shorts.NewRepository(pool)
 	submissionReviewService := submissionreview.NewService(pool)
 	unlockRepository := unlock.NewRepository(pool)
@@ -260,6 +262,8 @@ func main() {
 			RecommendationSignals:            recommendationSignalService,
 			FanUnlockMain:                    fanUnlockMainService,
 			FanShortPin:                      shortsRepository,
+			FanShortComments:                 shortCommentRepository,
+			FanShortCommentWriter:            shortCommentRepository,
 			CreatorFollow:                    creatorRepository,
 			CreatorAvatarUpload:              creatorAvatarService,
 			CreatorRegistration:              creatorRegistrationRepository,

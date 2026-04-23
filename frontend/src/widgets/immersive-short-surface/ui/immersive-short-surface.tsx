@@ -2,8 +2,22 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { startTransition, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
-import { ArrowLeft } from "lucide-react";
+import {
+  memo,
+  lazy,
+  startTransition,
+  Suspense,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowLeft,
+  MessageCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -42,6 +56,14 @@ const feedSurfaceStyle = {
   "--short-tile-mid": "#4cc0eb",
   "--short-tile-top": "#d8f3ff",
 } as CSSProperties;
+
+const LazyShortCommentsSheet = lazy(async () => {
+  const commentsModule = await import("@/features/short-comments");
+
+  return {
+    default: commentsModule.ShortCommentsSheet,
+  };
+});
 
 const sharedFanNavigationBaseInsetPx = 76;
 const feedActionRailOffsetPx = 152;
@@ -233,6 +255,62 @@ function PinRail({ disabled = false, onToggle, pinned, variant = "default" }: Pi
   );
 }
 
+type CommentRailButtonProps = {
+  hasViewerSession: boolean;
+  onAuthRequired: () => void;
+  shortId: string;
+  variant?: "default" | "feed";
+};
+
+/**
+ * short comment sheet を開く action rail button を表示する。
+ */
+const CommentRailButton = memo(function CommentRailButton({
+  hasViewerSession,
+  onAuthRequired,
+  shortId,
+  variant = "default",
+}: CommentRailButtonProps) {
+  const isFeedVariant = variant === "feed";
+  const [isSheetMounted, setIsSheetMounted] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const trigger = (
+    <button
+      aria-label="Open comments"
+      className={cn(
+        isFeedVariant
+          ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110"
+          : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent",
+      )}
+      onClick={() => {
+        setIsSheetMounted(true);
+        setIsSheetOpen(true);
+      }}
+      type="button"
+    >
+      <MessageCircle aria-hidden="true" className={cn("size-[22px]", isFeedVariant && "h-7 w-7")} strokeWidth={2} />
+      <span className="sr-only">Open comments</span>
+    </button>
+  );
+
+  if (!isSheetMounted) {
+    return trigger;
+  }
+
+  return (
+    <Suspense fallback={trigger}>
+      <LazyShortCommentsSheet
+        hasViewerSession={hasViewerSession}
+        onAuthRequired={onAuthRequired}
+        onOpenChange={setIsSheetOpen}
+        open={isSheetOpen}
+        shortId={shortId}
+        trigger={trigger}
+      />
+    </Suspense>
+  );
+});
+
 type CreatorBlockProps = {
   creator: FeedShortSurface["creator"];
   followState?:
@@ -282,10 +360,12 @@ function FeedCreatorAvatar({
 }
 
 function FeedActionRail({
+  comments,
   disabled = false,
   onToggle,
   pinned,
 }: {
+  comments: CommentRailButtonProps | null;
   disabled?: boolean;
   onToggle?: () => void;
   pinned: boolean;
@@ -297,6 +377,7 @@ function FeedActionRail({
       style={{ bottom: feedActionRailBottom }}
     >
       <PinRail disabled={disabled} onToggle={onToggle} pinned={pinned} variant="feed" />
+      {comments ? <CommentRailButton {...comments} variant="feed" /> : null}
     </div>
   );
 }
@@ -565,6 +646,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { creator, short, unlock, viewer } = surface;
   const viewerIdentityKey = currentViewer?.id ?? null;
   const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const hasCommentSurface = usesApiBackedUnlockFlow;
   const [isRecommendationSurfaceReady, setIsRecommendationSurfaceReady] = useState(
     () => viewerIdentityKey !== null || !usesApiBackedUnlockFlow,
   );
@@ -687,6 +769,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       postAuthNavigation: "none",
     });
   };
+  const openCommentAuthDialog = useCallback(() => {
+    openFanAuthDialog({
+      postAuthNavigation: "none",
+    });
+  }, [openFanAuthDialog]);
 
   const {
     acceptAge,
@@ -886,6 +973,16 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           disabled: detailPinState.isPending,
           onToggle: detailPinState.onToggle,
         };
+  const commentButtonProps = useMemo<CommentRailButtonProps | null>(() => (hasCommentSurface ? {
+    hasViewerSession,
+    onAuthRequired: openCommentAuthDialog,
+    shortId: short.id,
+  } : null), [
+    hasCommentSurface,
+    hasViewerSession,
+    openCommentAuthDialog,
+    short.id,
+  ]);
 
   if (usesFeedPresentation) {
     return (
@@ -911,7 +1008,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         }
       >
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
-        <FeedActionRail pinned={pinned} {...pinProps} />
+        <FeedActionRail comments={commentButtonProps} pinned={pinned} {...pinProps} />
         {pinErrorMessage ? (
           <p
             aria-live="polite"
@@ -1012,14 +1109,17 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <h1 className="sr-only">Short detail</h1>
         <ShortSurfaceHeader {...props} />
         <div className="absolute right-4 z-20" style={{ bottom: "204px" }}>
-          <PinRail pinned={pinned} {...pinProps} />
+          <div className="flex flex-col items-center gap-6">
+            <PinRail pinned={pinned} {...pinProps} />
+            {commentButtonProps ? <CommentRailButton {...commentButtonProps} /> : null}
+          </div>
         </div>
         {pinErrorMessage ? (
           <p
             aria-live="polite"
             className="absolute right-4 z-20 max-w-[220px] rounded-[20px] border border-white/16 bg-[rgba(7,19,29,0.72)] px-3 py-2 text-[11px] leading-[1.45] text-white/92 shadow-[0_16px_28px_rgba(7,19,29,0.28)] backdrop-blur-[10px]"
             role="alert"
-            style={{ bottom: "258px" }}
+            style={{ bottom: "328px" }}
           >
             {pinErrorMessage}
           </p>

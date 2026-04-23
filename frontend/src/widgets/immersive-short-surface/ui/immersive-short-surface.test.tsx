@@ -18,6 +18,7 @@ import {
   useFanAuthDialog,
   useFanAuthDialogControls,
 } from "@/features/fan-auth";
+import { ShortCommentsSheet } from "@/features/short-comments";
 import {
   normalizeUnlockSurface,
   requestCardSetupSession,
@@ -67,6 +68,18 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
     useFanAuthDialog: vi.fn(),
   };
 });
+
+vi.mock("@/features/short-comments", () => ({
+  ShortCommentsSheet: vi.fn(({
+    trigger,
+  }: {
+    trigger: ReactElement;
+  }) => (
+    <div data-testid="short-comments-sheet">
+      {trigger}
+    </div>
+  )),
+}));
 
 vi.mock("@/features/unlock-entry", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/unlock-entry")>();
@@ -304,6 +317,7 @@ const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
 const mockedGetPublicShortDetail = vi.mocked(getPublicShortDetail);
 const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedShortCommentsSheet = vi.mocked(ShortCommentsSheet);
 const mockedRequestCardSetupSession = vi.mocked(requestCardSetupSession);
 const mockedRequestCardSetupToken = vi.mocked(requestCardSetupToken);
 const mockedRequestMainAccessEntry = vi.mocked(requestMainAccessEntry);
@@ -578,6 +592,7 @@ describe("ImmersiveShortSurface", () => {
     mockedRequestCardSetupToken.mockReset();
     mockedGetPublicShortDetail.mockReset();
     mockedUseFanAuthDialogControls.mockReset();
+    mockedShortCommentsSheet.mockReset();
     mockedRequestMainAccessEntry.mockReset();
     mockedRequestMainPurchase.mockReset();
     mockedRequestUnlockSurfaceByShortId.mockReset();
@@ -606,6 +621,15 @@ describe("ImmersiveShortSurface", () => {
       recordProfileClick: recordRecommendationProfileClick,
     });
     mockedGetPublicShortDetail.mockResolvedValue(createPublicShortDetail("unlock_available"));
+    mockedShortCommentsSheet.mockImplementation(({
+      trigger,
+    }: {
+      trigger: ReactElement;
+    }) => (
+      <div data-testid="short-comments-sheet">
+        {trigger}
+      </div>
+    ));
   });
 
   afterEach(() => {
@@ -643,6 +667,79 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+  });
+
+  it("wires the feed comment action to the current short", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    const commentButton = screen.getByRole("button", { name: "Open comments" });
+    expect(commentButton).toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
+
+    await user.click(commentButton);
+
+    await waitFor(() => {
+      expect(mockedShortCommentsSheet).toHaveBeenCalledTimes(1);
+    });
+    const commentProps = mockedShortCommentsSheet.mock.calls[0]?.[0];
+    if (!commentProps) {
+      throw new Error("ShortCommentsSheet props missing");
+    }
+    expect(commentProps.shortId).toBe(surface.short.id);
+    expect(commentProps.hasViewerSession).toBe(true);
+    expect(commentProps.onAuthRequired).toEqual(expect.any(Function));
+  });
+
+  it("wires the detail comment action to the current short", async () => {
+    const user = userEvent.setup();
+    const surface = createApiDetailSurface("unlock_available");
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: surface.short.id }}
+        mode="detail"
+        surface={surface}
+      />,
+      { hasSession: false },
+    );
+
+    const commentButton = screen.getByRole("button", { name: "Open comments" });
+    expect(commentButton).toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
+
+    await user.click(commentButton);
+
+    await waitFor(() => {
+      expect(mockedShortCommentsSheet).toHaveBeenCalledTimes(1);
+    });
+    const commentProps = mockedShortCommentsSheet.mock.calls[0]?.[0];
+    if (!commentProps) {
+      throw new Error("ShortCommentsSheet props missing");
+    }
+    expect(commentProps.shortId).toBe(surface.short.id);
+    expect(commentProps.hasViewerSession).toBe(false);
+    expect(commentProps.onAuthRequired).toEqual(expect.any(Function));
+  });
+
+  it("does not render the comment action for legacy non-API short surfaces", () => {
+    if (!detailSurface) {
+      throw new Error("detail surface missing");
+    }
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    expect(screen.queryByRole("button", { name: "Open comments" })).not.toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
   });
 
   it("updates the feed playback progress bar from video metadata and timeupdate", () => {

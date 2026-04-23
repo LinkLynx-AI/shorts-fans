@@ -87,6 +87,7 @@ describe("MainPlaybackSurface", () => {
     expect(screen.queryByText("Playing main")).not.toBeInTheDocument();
     expect(screen.queryByText("Owner preview")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Pin short" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open comments" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Aoi N/i })).not.toBeInTheDocument();
     expect(video).not.toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");

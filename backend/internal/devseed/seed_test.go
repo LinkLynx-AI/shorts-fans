@@ -102,8 +102,8 @@ func TestRunSeedsAllStatementsInOneTransaction(t *testing.T) {
 	if tx.rolledBack {
 		t.Fatal("Run() rolledBack = true, want false")
 	}
-	if len(tx.execCalls) != 23 {
-		t.Fatalf("Run() exec call count got %d want 23", len(tx.execCalls))
+	if len(tx.execCalls) != 26 {
+		t.Fatalf("Run() exec call count got %d want 26", len(tx.execCalls))
 	}
 	if summary.CreatorUserID != creatorUserID {
 		t.Fatalf("Run() creator user id got %s want %s", summary.CreatorUserID, creatorUserID)
@@ -151,10 +151,16 @@ func TestRunSeedsAllStatementsInOneTransaction(t *testing.T) {
 	if got := tx.execCalls[20].args[1]; got != shortAID {
 		t.Fatalf("Run() pinned short id arg got %v want %v", got, shortAID)
 	}
-	if got := tx.execCalls[21].args[0]; got != fanUserID {
+	if got := tx.execCalls[21].args[1]; got != shortAID {
+		t.Fatalf("Run() first short comment short id arg got %v want %v", got, shortAID)
+	}
+	if got := tx.execCalls[21].args[2]; got != fanUserID {
+		t.Fatalf("Run() first short comment author arg got %v want %v", got, fanUserID)
+	}
+	if got := tx.execCalls[24].args[0]; got != fanUserID {
 		t.Fatalf("Run() fan session user arg got %v want %v", got, fanUserID)
 	}
-	if got := tx.execCalls[22].args[0]; got != creatorUserID {
+	if got := tx.execCalls[25].args[0]; got != creatorUserID {
 		t.Fatalf("Run() creator session user arg got %v want %v", got, creatorUserID)
 	}
 }
