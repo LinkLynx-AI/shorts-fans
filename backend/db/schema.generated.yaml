@@ -23,7 +23,8 @@ source:
         - 000017_add_submission_review_intakes.up.sql
         - 000018_add_submission_review_decisions.up.sql
         - 000019_add_submission_review_notes.up.sql
-        - 000020_add_short_comments.up.sql
+        - 000020_add_media_review_submit_retry_index.up.sql
+        - 000021_add_short_comments.up.sql
 schemas:
     - name: app
       tables:
@@ -1109,6 +1110,13 @@ schemas:
               columns:
                 - creator_user_id
               definition: CREATE INDEX idx_media_processing_jobs_creator_user_id ON app.media_processing_jobs USING btree (creator_user_id)
+            - name: idx_media_processing_jobs_review_submit_retry
+              columns:
+                - completed_at
+                - updated_at
+                - id
+              predicate: ((status = 'succeeded'::text) AND (last_error_code = 'review_submit_failed'::text))
+              definition: CREATE INDEX idx_media_processing_jobs_review_submit_retry ON app.media_processing_jobs USING btree (completed_at, updated_at, id) WHERE ((status = 'succeeded'::text) AND (last_error_code = 'review_submit_failed'::text))
             - name: idx_media_processing_jobs_status
               columns:
                 - status
