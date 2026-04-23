@@ -53,20 +53,24 @@ func (tx *processorTxStub) QueryRow(context.Context, string, ...any) pgx.Row    
 func (tx *processorTxStub) Conn() *pgx.Conn                                         { return nil }
 
 type processorQueriesStub struct {
-	getMediaAssetByID                 func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
-	getMediaProcessingJobByMediaAsset func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
-	claimMediaProcessingJobByAsset    func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
-	claimNextQueuedMediaProcessingJob func(context.Context) (sqlc.AppMediaProcessingJob, error)
-	markMediaProcessingJobSucceeded   func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
-	requeueMediaProcessingJob         func(context.Context, sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error)
-	markMediaProcessingJobFailed      func(context.Context, sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error)
-	updateMediaAssetProcessingState   func(context.Context, sqlc.UpdateMediaAssetProcessingStateParams) (sqlc.AppMediaAsset, error)
-	getMainByID                       func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
-	getMainByMediaAssetID             func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
-	getShortByMediaAssetID            func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
-	listShortsByCanonicalMainID       func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
-	updateMainState                   func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
-	publishShort                      func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
+	getMediaAssetByID                               func(context.Context, pgtype.UUID) (sqlc.AppMediaAsset, error)
+	getMediaProcessingJobByMediaAsset               func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
+	claimMediaProcessingJobByAsset                  func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
+	claimNextQueuedMediaProcessingJob               func(context.Context) (sqlc.AppMediaProcessingJob, error)
+	getInitialReviewReadyPackageByMainID            func(context.Context, pgtype.UUID) (sqlc.GetInitialReviewReadyPackageByMainIDRow, error)
+	getNextSucceededInitialReviewMediaProcessingJob func(context.Context) (sqlc.AppMediaProcessingJob, error)
+	markMediaProcessingJobSucceeded                 func(context.Context, pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
+	markMediaProcessingJobReviewSubmitFailed        func(context.Context, sqlc.MarkMediaProcessingJobReviewSubmitFailedParams) (sqlc.AppMediaProcessingJob, error)
+	clearMediaProcessingJobReviewSubmitFailure      func(context.Context, pgtype.UUID) error
+	requeueMediaProcessingJob                       func(context.Context, sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error)
+	markMediaProcessingJobFailed                    func(context.Context, sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error)
+	updateMediaAssetProcessingState                 func(context.Context, sqlc.UpdateMediaAssetProcessingStateParams) (sqlc.AppMediaAsset, error)
+	getMainByID                                     func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
+	getMainByMediaAssetID                           func(context.Context, pgtype.UUID) (sqlc.AppMain, error)
+	getShortByMediaAssetID                          func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
+	listShortsByCanonicalMainID                     func(context.Context, pgtype.UUID) ([]sqlc.AppShort, error)
+	updateMainState                                 func(context.Context, sqlc.UpdateMainStateParams) (sqlc.AppMain, error)
+	publishShort                                    func(context.Context, pgtype.UUID) (sqlc.AppShort, error)
 }
 
 func (s processorQueriesStub) GetMediaAssetByID(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaAsset, error) {
@@ -84,8 +88,20 @@ func (s processorQueriesStub) ClaimMediaProcessingJobByAssetID(ctx context.Conte
 func (s processorQueriesStub) ClaimNextQueuedMediaProcessingJob(ctx context.Context) (sqlc.AppMediaProcessingJob, error) {
 	return s.claimNextQueuedMediaProcessingJob(ctx)
 }
+func (s processorQueriesStub) GetInitialReviewReadyPackageByMainID(ctx context.Context, id pgtype.UUID) (sqlc.GetInitialReviewReadyPackageByMainIDRow, error) {
+	return s.getInitialReviewReadyPackageByMainID(ctx, id)
+}
+func (s processorQueriesStub) GetNextSucceededInitialReviewMediaProcessingJob(ctx context.Context) (sqlc.AppMediaProcessingJob, error) {
+	return s.getNextSucceededInitialReviewMediaProcessingJob(ctx)
+}
 func (s processorQueriesStub) MarkMediaProcessingJobSucceeded(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaProcessingJob, error) {
 	return s.markMediaProcessingJobSucceeded(ctx, id)
+}
+func (s processorQueriesStub) MarkMediaProcessingJobReviewSubmitFailed(ctx context.Context, arg sqlc.MarkMediaProcessingJobReviewSubmitFailedParams) (sqlc.AppMediaProcessingJob, error) {
+	return s.markMediaProcessingJobReviewSubmitFailed(ctx, arg)
+}
+func (s processorQueriesStub) ClearMediaProcessingJobReviewSubmitFailure(ctx context.Context, id pgtype.UUID) error {
+	return s.clearMediaProcessingJobReviewSubmitFailure(ctx, id)
 }
 func (s processorQueriesStub) RequeueMediaProcessingJob(ctx context.Context, arg sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error) {
 	return s.requeueMediaProcessingJob(ctx, arg)

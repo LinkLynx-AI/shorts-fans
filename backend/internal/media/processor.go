@@ -30,6 +30,10 @@ const (
 	cleanupPersistTimeout        = 15 * time.Second
 	materializationFailedCode    = "materialization_failed"
 	materializationInterrupted   = "materialization_interrupted"
+	reviewSubmitFailedCode       = "review_submit_failed"
+
+	reviewMainStateDraft  = "draft"
+	reviewShortStateDraft = "draft"
 )
 
 var (
@@ -45,7 +49,11 @@ type processorQueries interface {
 	GetMediaProcessingJobByMediaAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
 	ClaimMediaProcessingJobByAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
 	ClaimNextQueuedMediaProcessingJob(ctx context.Context) (sqlc.AppMediaProcessingJob, error)
+	GetInitialReviewReadyPackageByMainID(ctx context.Context, id pgtype.UUID) (sqlc.GetInitialReviewReadyPackageByMainIDRow, error)
 	MarkMediaProcessingJobSucceeded(ctx context.Context, id pgtype.UUID) (sqlc.AppMediaProcessingJob, error)
+	MarkMediaProcessingJobReviewSubmitFailed(ctx context.Context, arg sqlc.MarkMediaProcessingJobReviewSubmitFailedParams) (sqlc.AppMediaProcessingJob, error)
+	ClearMediaProcessingJobReviewSubmitFailure(ctx context.Context, id pgtype.UUID) error
+	GetNextSucceededInitialReviewMediaProcessingJob(ctx context.Context) (sqlc.AppMediaProcessingJob, error)
 	RequeueMediaProcessingJob(ctx context.Context, arg sqlc.RequeueMediaProcessingJobParams) (sqlc.AppMediaProcessingJob, error)
 	MarkMediaProcessingJobFailed(ctx context.Context, arg sqlc.MarkMediaProcessingJobFailedParams) (sqlc.AppMediaProcessingJob, error)
 	GetMainByMediaAssetID(ctx context.Context, id pgtype.UUID) (sqlc.AppMain, error)
@@ -54,6 +62,11 @@ type processorQueries interface {
 
 type assetMaterializer interface {
 	Materialize(ctx context.Context, req MaterializeRequest) (MaterializeResult, error)
+}
+
+// ReviewSubmitter は delivery-ready になった submission package を review intake へ投入します。
+type ReviewSubmitter interface {
+	SubmitInitialPackageIfReady(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) error
 }
 
 type claimedJob struct {
@@ -71,12 +84,17 @@ type Processor struct {
 	queries      processorQueries
 	newQueries   func(sqlc.DBTX) processorQueries
 	materializer assetMaterializer
+	submitter    ReviewSubmitter
 	now          func() time.Time
 	maxAttempts  int32
 }
 
 // NewProcessor は pgxpool ベースの media processor を構築します。
 func NewProcessor(pool *pgxpool.Pool, materializer assetMaterializer) (*Processor, error) {
+	if pool == nil {
+		return nil, fmt.Errorf("postgres pool is required")
+	}
+
 	return newProcessor(
 		pool,
 		sqlc.New(pool),
@@ -107,12 +125,21 @@ func newProcessor(beginner postgres.TxBeginner, q processorQueries, newQueries f
 	}, nil
 }
 
+// SetReviewSubmitter は media asset ready 後の review intake 自動投入先を設定します。
+func (p *Processor) SetReviewSubmitter(submitter ReviewSubmitter) {
+	if p == nil {
+		return
+	}
+
+	p.submitter = submitter
+}
+
 // ProcessAsset は指定 media asset の queued job を 1 件 claim して処理します。
 func (p *Processor) ProcessAsset(ctx context.Context, mediaAssetID uuid.UUID) error {
 	claimed, err := p.claimByAssetID(ctx, mediaAssetID)
 	if err != nil {
 		if errors.Is(err, ErrNoQueuedProcessingJob) {
-			return nil
+			return p.retryReviewSubmitForSucceededAsset(ctx, mediaAssetID)
 		}
 		return err
 	}
@@ -125,7 +152,7 @@ func (p *Processor) ProcessNextQueued(ctx context.Context) (bool, error) {
 	claimed, err := p.claimNextQueued(ctx)
 	if err != nil {
 		if errors.Is(err, ErrNoQueuedProcessingJob) {
-			return false, nil
+			return p.retryNextSucceededInitialReviewSubmit(ctx)
 		}
 		return false, err
 	}
@@ -193,7 +220,21 @@ func (p *Processor) processClaimedJob(ctx context.Context, claimed claimedJob) e
 	resultCtx, cancel := detachProcessingContext(ctx)
 	defer cancel()
 	if err == nil {
-		return p.markSucceeded(resultCtx, claimed, result)
+		if err := p.markSucceeded(resultCtx, claimed, result); err != nil {
+			return err
+		}
+		if err := p.submitReadyPackageForReview(resultCtx, claimed); err != nil {
+			if markerErr := p.markReviewSubmitFailed(resultCtx, claimed, err); markerErr != nil {
+				return fmt.Errorf(
+					"submit ready package for review media_asset_id=%s main_id=%s: %w",
+					claimed.asset.ID,
+					claimed.canonicalMainID,
+					errors.Join(err, markerErr),
+				)
+			}
+			return nil
+		}
+		return nil
 	}
 
 	jobErr := materializationJobError(err)
@@ -202,6 +243,174 @@ func (p *Processor) processClaimedJob(ctx context.Context, claimed claimedJob) e
 	}
 
 	return nil
+}
+
+func (p *Processor) submitReadyPackageForReview(ctx context.Context, claimed claimedJob) error {
+	if p == nil || p.submitter == nil || claimed.asset.CreatorUserID == uuid.Nil || claimed.canonicalMainID == uuid.Nil {
+		return nil
+	}
+
+	ready, err := p.isInitialPackageReadyForReview(ctx, claimed.asset.CreatorUserID, claimed.canonicalMainID)
+	if err != nil {
+		return err
+	}
+	if !ready {
+		return nil
+	}
+
+	return p.submitter.SubmitInitialPackageIfReady(ctx, claimed.asset.CreatorUserID, claimed.canonicalMainID)
+}
+
+func (p *Processor) retryReviewSubmitForSucceededAsset(ctx context.Context, mediaAssetID uuid.UUID) error {
+	if p == nil || p.submitter == nil {
+		return nil
+	}
+
+	claimed, ok, err := p.loadSucceededClaimForReview(ctx, mediaAssetID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+	if !hasReviewSubmitFailedMarker(claimed.job) {
+		return nil
+	}
+
+	if err := p.submitReadyPackageForReview(ctx, claimed); err != nil {
+		return fmt.Errorf("retry ready package review submit media_asset_id=%s main_id=%s: %w", mediaAssetID, claimed.canonicalMainID, err)
+	}
+	if err := p.clearReviewSubmitFailure(ctx, claimed); err != nil {
+		return fmt.Errorf("clear review submit failure media_asset_id=%s main_id=%s: %w", mediaAssetID, claimed.canonicalMainID, err)
+	}
+
+	return nil
+}
+
+func (p *Processor) retryNextSucceededInitialReviewSubmit(ctx context.Context) (bool, error) {
+	if p == nil || p.submitter == nil {
+		return false, nil
+	}
+
+	job, err := p.queries.GetNextSucceededInitialReviewMediaProcessingJob(ctx)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, fmt.Errorf("load succeeded initial review retry candidate: %w", err)
+	}
+
+	mediaAssetID, err := postgres.UUIDFromPG(job.MediaAssetID)
+	if err != nil {
+		return false, fmt.Errorf("parse review retry media asset id: %w", err)
+	}
+	claimed, ok, err := p.loadSucceededClaimForReview(ctx, mediaAssetID)
+	if err != nil {
+		return true, err
+	}
+	if !ok {
+		return false, nil
+	}
+	if !hasReviewSubmitFailedMarker(claimed.job) {
+		return false, nil
+	}
+
+	if err := p.submitReadyPackageForReview(ctx, claimed); err != nil {
+		return true, fmt.Errorf("retry ready package review submit media_asset_id=%s main_id=%s: %w", mediaAssetID, claimed.canonicalMainID, err)
+	}
+	if err := p.clearReviewSubmitFailure(ctx, claimed); err != nil {
+		return true, fmt.Errorf("clear review submit failure media_asset_id=%s main_id=%s: %w", mediaAssetID, claimed.canonicalMainID, err)
+	}
+
+	return true, nil
+}
+
+func (p *Processor) loadSucceededClaimForReview(ctx context.Context, mediaAssetID uuid.UUID) (claimedJob, bool, error) {
+	var claimed claimedJob
+	found := false
+	err := postgres.RunInTx(ctx, p.beginner, func(tx pgx.Tx) error {
+		q := p.newQueries(tx)
+
+		job, err := q.GetMediaProcessingJobByMediaAssetID(ctx, postgres.UUIDToPG(mediaAssetID))
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrProcessingJobNotFound
+			}
+			return fmt.Errorf("load processing job media_asset_id=%s: %w", mediaAssetID, err)
+		}
+		if job.Status != jobStatusSucceeded {
+			return nil
+		}
+
+		assetRow, err := q.GetMediaAssetByID(ctx, postgres.UUIDToPG(mediaAssetID))
+		if err != nil {
+			return fmt.Errorf("load succeeded media asset media_asset_id=%s: %w", mediaAssetID, err)
+		}
+		asset, err := mapAsset(assetRow)
+		if err != nil {
+			return fmt.Errorf("map succeeded media asset media_asset_id=%s: %w", mediaAssetID, err)
+		}
+
+		target, err := resolveClaimedTarget(ctx, q, job)
+		if err != nil {
+			return err
+		}
+		target.job = job
+		target.asset = asset
+		claimed = target
+		found = true
+		return nil
+	})
+	if err != nil {
+		return claimedJob{}, false, err
+	}
+
+	return claimed, found, nil
+}
+
+func (p *Processor) isInitialPackageReadyForReview(ctx context.Context, creatorUserID uuid.UUID, mainID uuid.UUID) (bool, error) {
+	row, err := p.queries.GetInitialReviewReadyPackageByMainID(ctx, postgres.UUIDToPG(mainID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	readyCreatorUserID, err := postgres.UUIDFromPG(row.CreatorUserID)
+	if err != nil {
+		return false, fmt.Errorf("parse ready package creator id main_id=%s: %w", mainID, err)
+	}
+
+	return readyCreatorUserID == creatorUserID, nil
+}
+
+func hasReviewSubmitFailedMarker(job sqlc.AppMediaProcessingJob) bool {
+	return job.LastErrorCode.Valid && job.LastErrorCode.String == reviewSubmitFailedCode
+}
+
+func (p *Processor) markReviewSubmitFailed(ctx context.Context, claimed claimedJob, cause error) error {
+	if p == nil || p.queries == nil || cause == nil {
+		return nil
+	}
+
+	message := cause.Error()
+	if _, err := p.queries.MarkMediaProcessingJobReviewSubmitFailed(ctx, sqlc.MarkMediaProcessingJobReviewSubmitFailedParams{
+		ID:               claimed.job.ID,
+		LastErrorMessage: pgTextPtr(&message),
+	}); err != nil {
+		return fmt.Errorf("mark media processing job review submit failed id=%s: %w", claimed.job.ID, err)
+	}
+
+	return nil
+}
+
+func (p *Processor) clearReviewSubmitFailure(ctx context.Context, claimed claimedJob) error {
+	if p == nil || p.queries == nil || !hasReviewSubmitFailedMarker(claimed.job) {
+		return nil
+	}
+
+	return p.queries.ClearMediaProcessingJobReviewSubmitFailure(ctx, claimed.job.ID)
 }
 
 func (p *Processor) claimByAssetID(ctx context.Context, mediaAssetID uuid.UUID) (claimedJob, error) {

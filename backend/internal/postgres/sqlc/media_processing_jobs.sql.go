@@ -103,6 +103,22 @@ func (q *Queries) ClaimNextQueuedMediaProcessingJob(ctx context.Context) (AppMed
 	return i, err
 }
 
+const clearMediaProcessingJobReviewSubmitFailure = `-- name: ClearMediaProcessingJobReviewSubmitFailure :exec
+UPDATE app.media_processing_jobs
+SET
+    last_error_code = NULL,
+    last_error_message = NULL,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+    AND status = 'succeeded'
+    AND last_error_code = 'review_submit_failed'
+`
+
+func (q *Queries) ClearMediaProcessingJobReviewSubmitFailure(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, clearMediaProcessingJobReviewSubmitFailure, id)
+	return err
+}
+
 const createMediaProcessingJob = `-- name: CreateMediaProcessingJob :one
 INSERT INTO app.media_processing_jobs (
     creator_user_id,
@@ -176,6 +192,63 @@ func (q *Queries) CreateMediaProcessingJob(ctx context.Context, arg CreateMediaP
 	return i, err
 }
 
+const getInitialReviewReadyPackageByMainID = `-- name: GetInitialReviewReadyPackageByMainID :one
+SELECT
+    m.id,
+    m.creator_user_id
+FROM app.mains AS m
+JOIN app.creator_capabilities AS c
+    ON c.user_id = m.creator_user_id
+JOIN app.media_assets AS main_asset
+    ON main_asset.id = m.media_asset_id
+WHERE m.id = $1
+    AND c.state = 'approved'
+    AND m.state = 'draft'
+    AND m.price_minor > 0
+    AND m.ownership_confirmed = TRUE
+    AND m.consent_confirmed = TRUE
+    AND main_asset.processing_state = 'ready'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.submission_review_intakes AS intake
+        WHERE intake.canonical_main_id = m.id
+            AND intake.status = 'pending_review'
+    )
+    AND EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND s.state = 'draft'
+            AND short_asset.processing_state = 'ready'
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND (
+                s.state <> 'draft'
+                OR short_asset.processing_state <> 'ready'
+            )
+    )
+LIMIT 1
+`
+
+type GetInitialReviewReadyPackageByMainIDRow struct {
+	ID            pgtype.UUID
+	CreatorUserID pgtype.UUID
+}
+
+func (q *Queries) GetInitialReviewReadyPackageByMainID(ctx context.Context, id pgtype.UUID) (GetInitialReviewReadyPackageByMainIDRow, error) {
+	row := q.db.QueryRow(ctx, getInitialReviewReadyPackageByMainID, id)
+	var i GetInitialReviewReadyPackageByMainIDRow
+	err := row.Scan(&i.ID, &i.CreatorUserID)
+	return i, err
+}
+
 const getMediaProcessingJobByMediaAssetID = `-- name: GetMediaProcessingJobByMediaAssetID :one
 SELECT id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
 FROM app.media_processing_jobs
@@ -185,6 +258,85 @@ LIMIT 1
 
 func (q *Queries) GetMediaProcessingJobByMediaAssetID(ctx context.Context, mediaAssetID pgtype.UUID) (AppMediaProcessingJob, error) {
 	row := q.db.QueryRow(ctx, getMediaProcessingJobByMediaAssetID, mediaAssetID)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getNextSucceededInitialReviewMediaProcessingJob = `-- name: GetNextSucceededInitialReviewMediaProcessingJob :one
+SELECT j.id, j.creator_user_id, j.media_asset_id, j.asset_role, j.status, j.attempt_count, j.last_error_code, j.last_error_message, j.queued_at, j.started_at, j.completed_at, j.failed_at, j.created_at, j.updated_at
+FROM app.media_processing_jobs AS j
+JOIN app.media_assets AS completed_asset
+    ON completed_asset.id = j.media_asset_id
+LEFT JOIN app.mains AS completed_main
+    ON j.asset_role = 'main'
+    AND completed_main.media_asset_id = j.media_asset_id
+LEFT JOIN app.shorts AS completed_short
+    ON j.asset_role = 'short'
+    AND completed_short.media_asset_id = j.media_asset_id
+JOIN app.mains AS m
+    ON m.id = COALESCE(completed_main.id, completed_short.canonical_main_id)
+JOIN app.creator_capabilities AS c
+    ON c.user_id = m.creator_user_id
+JOIN app.media_assets AS main_asset
+    ON main_asset.id = m.media_asset_id
+WHERE j.status = 'succeeded'
+    AND j.last_error_code = 'review_submit_failed'
+    AND completed_asset.processing_state = 'ready'
+    AND j.creator_user_id = m.creator_user_id
+    AND c.state = 'approved'
+    AND m.state = 'draft'
+    AND m.price_minor > 0
+    AND m.ownership_confirmed = TRUE
+    AND m.consent_confirmed = TRUE
+    AND main_asset.processing_state = 'ready'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.submission_review_intakes AS intake
+        WHERE intake.canonical_main_id = m.id
+            AND intake.status = 'pending_review'
+    )
+    AND EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND s.state = 'draft'
+            AND short_asset.processing_state = 'ready'
+    )
+    AND NOT EXISTS (
+        SELECT 1
+        FROM app.shorts AS s
+        JOIN app.media_assets AS short_asset
+            ON short_asset.id = s.media_asset_id
+        WHERE s.canonical_main_id = m.id
+            AND (
+                s.state <> 'draft'
+                OR short_asset.processing_state <> 'ready'
+            )
+    )
+ORDER BY j.completed_at ASC NULLS LAST, j.updated_at ASC, j.id ASC
+LIMIT 1
+`
+
+func (q *Queries) GetNextSucceededInitialReviewMediaProcessingJob(ctx context.Context) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, getNextSucceededInitialReviewMediaProcessingJob)
 	var i AppMediaProcessingJob
 	err := row.Scan(
 		&i.ID,
@@ -225,6 +377,44 @@ type MarkMediaProcessingJobFailedParams struct {
 
 func (q *Queries) MarkMediaProcessingJobFailed(ctx context.Context, arg MarkMediaProcessingJobFailedParams) (AppMediaProcessingJob, error) {
 	row := q.db.QueryRow(ctx, markMediaProcessingJobFailed, arg.LastErrorCode, arg.LastErrorMessage, arg.ID)
+	var i AppMediaProcessingJob
+	err := row.Scan(
+		&i.ID,
+		&i.CreatorUserID,
+		&i.MediaAssetID,
+		&i.AssetRole,
+		&i.Status,
+		&i.AttemptCount,
+		&i.LastErrorCode,
+		&i.LastErrorMessage,
+		&i.QueuedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.FailedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const markMediaProcessingJobReviewSubmitFailed = `-- name: MarkMediaProcessingJobReviewSubmitFailed :one
+UPDATE app.media_processing_jobs
+SET
+    last_error_code = 'review_submit_failed',
+    last_error_message = $1,
+    updated_at = CURRENT_TIMESTAMP
+WHERE id = $2
+    AND status = 'succeeded'
+RETURNING id, creator_user_id, media_asset_id, asset_role, status, attempt_count, last_error_code, last_error_message, queued_at, started_at, completed_at, failed_at, created_at, updated_at
+`
+
+type MarkMediaProcessingJobReviewSubmitFailedParams struct {
+	LastErrorMessage pgtype.Text
+	ID               pgtype.UUID
+}
+
+func (q *Queries) MarkMediaProcessingJobReviewSubmitFailed(ctx context.Context, arg MarkMediaProcessingJobReviewSubmitFailedParams) (AppMediaProcessingJob, error) {
+	row := q.db.QueryRow(ctx, markMediaProcessingJobReviewSubmitFailed, arg.LastErrorMessage, arg.ID)
 	var i AppMediaProcessingJob
 	err := row.Scan(
 		&i.ID,

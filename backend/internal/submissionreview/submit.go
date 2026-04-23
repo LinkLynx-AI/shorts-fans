@@ -141,8 +141,36 @@ func NewService(pool *pgxpool.Pool) *Service {
 	}
 }
 
+// SubmitPackageIfReady は initial package が現在 submit 可能な場合だけ review intake に投入します。
+// media worker からの自動投入用なので、ready 未成立や現在 state 上の非対象は no-op として扱います。
+func (s *Service) SubmitPackageIfReady(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) error {
+	return s.SubmitInitialPackageIfReady(ctx, viewerUserID, mainID)
+}
+
+// SubmitInitialPackageIfReady は upload 完了後の自動審査投入用に initial submit だけを作成します。
+func (s *Service) SubmitInitialPackageIfReady(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) error {
+	err := s.submitPackage(ctx, viewerUserID, mainID, submitKindInitial)
+	if err == nil {
+		return nil
+	}
+
+	var notReadyErr *NotReadyError
+	if errors.As(err, &notReadyErr) ||
+		errors.Is(err, ErrReviewStateConflict) ||
+		errors.Is(err, ErrCreatorModeUnavailable) ||
+		errors.Is(err, ErrSubmissionPackageNotFound) {
+		return nil
+	}
+
+	return err
+}
+
 // SubmitPackage は current package を initial submit または resubmit します。
 func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID) error {
+	return s.submitPackage(ctx, viewerUserID, mainID, "")
+}
+
+func (s *Service) submitPackage(ctx context.Context, viewerUserID uuid.UUID, mainID uuid.UUID, requiredSubmitKind string) error {
 	if s == nil || s.beginner == nil || s.newQueries == nil {
 		return fmt.Errorf("submission review service is not initialized")
 	}
@@ -205,6 +233,16 @@ func (s *Service) SubmitPackage(ctx context.Context, viewerUserID uuid.UUID, mai
 		transition, err := determineTransition(mainRow, shortRows, latestExists, latestIntake)
 		if err != nil {
 			return fmt.Errorf("submission package submit state transition main=%s user=%s: %w", mainID, viewerUserID, err)
+		}
+		if requiredSubmitKind != "" && transition.SubmitKind != requiredSubmitKind {
+			return fmt.Errorf(
+				"submission package submit main=%s user=%s required_submit_kind=%s actual_submit_kind=%s: %w",
+				mainID,
+				viewerUserID,
+				requiredSubmitKind,
+				transition.SubmitKind,
+				ErrReviewStateConflict,
+			)
 		}
 
 		submittedAt := s.now().UTC()

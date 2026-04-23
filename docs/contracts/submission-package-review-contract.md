@@ -3,13 +3,14 @@
 ## 位置づけ
 
 - この文書は `SHO-193 submission package review の契約と状態境界を更新する` の成果物です。
-- `upload complete`、`submission package ready`、`review submit`、object-level decision state、manual-first review provenance の境界を固定します。
+- `upload complete`、`submission package ready`、ready 後の自動 review intake、object-level decision state、manual-first review provenance の境界を固定します。
 - `docs/ssot/`、[mvp-core-domain-contract.md](mvp-core-domain-contract.md)、[mvp-media-workflow-contract.md](mvp-media-workflow-contract.md) を補助し、後続の submit / decision 実装が追加の product 判断なしで進められる状態にします。
 
 ## Goals
 
 - `upload package` と `submission package` を分離し、`upload complete` が review ready や publish / unlock eligibility を意味しないことを固定する。
-- `submission package ready` を review intake 可能条件として固定し、`review submit` を package-level action として明示する。
+- `submission package ready` を review intake 可能条件として固定し、upload 由来の initial review intake は ready 成立後に自動投入する。
+- manual submit / resubmit mutation を残す場合も、review intake は package-level action として扱う。
 - review decision は package ではなく `main` と各 `short` に保持する前提を固定する。
 - MVP の正式経路が manual review であり、将来 auto review を追加しても manual fallback / override を残す前提を固定する。
 - reason code、decision source、decision timestamp を保持できる provenance 前提を固定する。
@@ -49,7 +50,7 @@
   - continuity metadata
   - review 判断に必要な creator / ownership / consent 情報
 - `submission package` は consumer 向けの独立 object ではなく、review intake boundary です。
-- `review submit` / `resubmit` の target は、canonical `main` を anchor に submit 時点の linked `short` set と metadata を解決した current package snapshot です。
+- initial review intake / resubmit の target は、canonical `main` を anchor に intake 時点の linked `short` set と metadata を解決した current package snapshot です。
 - `packageToken` は upload completion のための一時 token であり、durable な `submission package` identity と同一視してはいけません。
 
 ### `upload complete`
@@ -57,16 +58,17 @@
 - `upload complete` の成功は、draft content persistence が完了したことだけを意味します。
 - `upload complete` は次を意味しません。
   - `submission package ready`
-  - `review submit` 済み
+  - review intake 済み
   - `pending review`
   - `approved for publish`
   - `approved for unlock`
   - `short public publishable`
   - `main unlockable`
+- `upload complete` 後に作成された media processing job が package 内 asset をすべて `ready` にし、かつ package readiness を満たした時点で、system は owner creator user を actor として initial review intake を自動投入します。
 
 ### `submission package ready`
 
-- `submission package ready` は review submit 前提を満たした package readiness です。
+- `submission package ready` は review intake 前提を満たした package readiness です。
 - 次をすべて満たしたときだけ成立します。
   - canonical `main` が存在する
   - linked `short` が 1 本以上ある
@@ -78,13 +80,14 @@
 - `submission package ready` は readiness predicate であり、review state ではありません。
 - `submission package ready` だけでは publish / unlock eligibility に進みません。
 
-### `review submit`
+### review intake / submit
 
-- `review submit` は `submission package` 単位の intake action です。
-- caller は authenticated viewer であり、かつ approved creator capability を持つ package owner 自身に限ります。
-- creator は `submission package ready` を満たした package だけを submit / resubmit できます。
-- successful `review submit` は review cycle の開始を意味しますが、承認を意味しません。
-- MVP では `main` だけ、または一部 `short` だけを切り出した独立 submit path は canonical にしません。submit / resubmit action は package 単位で扱います。
+- review intake は `submission package` 単位の action です。
+- upload 由来の initial review intake は、media worker が最後の package asset を `ready` にした後に自動で試行します。
+- system-triggered intake でも、package owner が approved creator capability を持つこと、owner 一致、`submission package ready` を満たすことを必須にします。
+- manual submit / resubmit mutation を使う場合の caller は authenticated viewer であり、かつ approved creator capability を持つ package owner 自身に限ります。
+- successful review intake は review cycle の開始を意味しますが、承認を意味しません。
+- MVP では `main` だけ、または一部 `short` だけを切り出した独立 submit path は canonical にしません。initial intake / resubmit action は package 単位で扱います。
 
 ## Decision State Contract
 
@@ -111,7 +114,7 @@
 
 | state | meaning | review cycle rule |
 | --- | --- | --- |
-| `draft` | review submit 前 | ready package の `review submit` で `pending review` に入れる |
+| `draft` | review intake 前 | ready package の initial intake で `pending review` に入れる |
 | `pending review` | main review 待ち | `approved for unlock` / `revision requested` / `rejected` に遷移できる |
 | `approved for unlock` | paid continuation として承認済み | `main unlockable` の review 条件を満たす |
 | `revision requested` | 修正して再 submit が必要 | ready package の再 submit で再度 `pending review` に戻せる |
@@ -121,7 +124,7 @@
 
 | state | meaning | review cycle rule |
 | --- | --- | --- |
-| `draft` | review submit 前 | ready package の `review submit` で `pending review` に入れる |
+| `draft` | review intake 前 | ready package の initial intake で `pending review` に入れる |
 | `pending review` | short review 待ち | `approved for publish` / `revision requested` / `rejected` に遷移できる |
 | `approved for publish` | public surface 用に承認済み | `short public publishable` の review 条件を満たす |
 | `revision requested` | 修正して再 submit が必要 | ready package の再 submit で再度 `pending review` に戻せる |
@@ -167,7 +170,7 @@
 
 ### Owner preview
 
-- owner preview は `submission package ready`、`review submit`、public publish / unlock gate と独立した private boundary です。
+- owner preview は `submission package ready`、review intake、public publish / unlock gate と独立した private boundary です。
 - owner preview は review 承認の代替ではなく、creator owner が自分の delivery-ready asset を preview / QA する経路です。
 - owner preview access を purchase や publish approval と混ぜてはいけません。
 
@@ -203,6 +206,6 @@
 
 ## Downstream Guidance
 
-- 後続の submit / decision transport は、この文書を基準に `upload complete` と `review submit` を分離すること。
+- 後続の submit / decision transport は、この文書を基準に `upload complete` と ready 後の review intake を分離すること。
 - review intake が package 単位でも、decision state と approval gate は object-level に保つこと。
 - public short / main unlock / owner preview の access boundary は、この文書単体で再定義せず既存 access contract と整合させること。
