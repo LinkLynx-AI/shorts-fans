@@ -69,6 +69,9 @@ describe("ShortDetailPage", () => {
         handle: "@minarei",
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_mina_quiet_rooftop",
@@ -90,6 +93,7 @@ describe("ShortDetailPage", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },
@@ -137,6 +141,9 @@ describe("ShortDetailPage", () => {
         handle: "@minarei",
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_mina_quiet_rooftop",
@@ -158,6 +165,7 @@ describe("ShortDetailPage", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },
@@ -203,6 +211,9 @@ describe("ShortDetailPage", () => {
         handle: "@minarei",
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_mina_quiet_rooftop",
@@ -224,6 +235,7 @@ describe("ShortDetailPage", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },
@@ -266,6 +278,9 @@ describe("ShortDetailPage", () => {
         handle: "@minarei",
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_mina_quiet_rooftop",
@@ -287,6 +302,7 @@ describe("ShortDetailPage", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: true,
         isPinned: true,
       },

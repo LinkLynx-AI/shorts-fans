@@ -16,21 +16,30 @@ import type {
 } from "./short-surface";
 
 const feedViewerStateByShortId: Record<string, FeedSurfaceViewerState> = {
-  afterrain: { isFollowingCreator: true, isPinned: true },
-  balcony: { isFollowingCreator: true, isPinned: true },
-  mirror: { isFollowingCreator: true, isPinned: false },
-  poolcut: { isFollowingCreator: true, isPinned: false },
-  rooftop: { isFollowingCreator: false, isPinned: true },
-  softlight: { isFollowingCreator: true, isPinned: false },
+  afterrain: { hasLiked: true, isFollowingCreator: true, isPinned: true },
+  balcony: { hasLiked: true, isFollowingCreator: true, isPinned: true },
+  mirror: { hasLiked: false, isFollowingCreator: true, isPinned: false },
+  poolcut: { hasLiked: false, isFollowingCreator: true, isPinned: false },
+  rooftop: { hasLiked: true, isFollowingCreator: false, isPinned: true },
+  softlight: { hasLiked: false, isFollowingCreator: true, isPinned: false },
 };
 
 const detailViewerStateByShortId: Record<string, DetailSurfaceViewerState> = {
-  afterrain: { isFollowingCreator: true, isPinned: true },
-  balcony: { isFollowingCreator: true, isPinned: true },
-  mirror: { isFollowingCreator: true, isPinned: false },
-  poolcut: { isFollowingCreator: true, isPinned: false },
-  rooftop: { isFollowingCreator: true, isPinned: true },
-  softlight: { isFollowingCreator: true, isPinned: false },
+  afterrain: { hasLiked: true, isFollowingCreator: true, isPinned: true },
+  balcony: { hasLiked: true, isFollowingCreator: true, isPinned: true },
+  mirror: { hasLiked: false, isFollowingCreator: true, isPinned: false },
+  poolcut: { hasLiked: false, isFollowingCreator: true, isPinned: false },
+  rooftop: { hasLiked: true, isFollowingCreator: true, isPinned: true },
+  softlight: { hasLiked: false, isFollowingCreator: true, isPinned: false },
+};
+
+const engagementStateByShortId: Record<string, ShortSurfaceBase["engagement"]> = {
+  afterrain: { likeCount: 284 },
+  balcony: { likeCount: 196 },
+  mirror: { likeCount: 88 },
+  poolcut: { likeCount: 143 },
+  rooftop: { likeCount: 321 },
+  softlight: { likeCount: 57 },
 };
 
 function buildShortSurfaceBase(shortId: ShortId): ShortSurfaceBase | undefined {
@@ -54,6 +63,7 @@ function buildShortSurfaceBase(shortId: ShortId): ShortSurfaceBase | undefined {
 
   return {
     creator,
+    engagement: engagementStateByShortId[short.id] ?? { likeCount: 0 },
     mainEntryEnabled: true,
     short,
     unlock,

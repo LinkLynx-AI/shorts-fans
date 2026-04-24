@@ -25,10 +25,11 @@ type fanFeedResponseData struct {
 }
 
 type fanFeedItemPayload struct {
-	Creator   creatorSummary        `json:"creator"`
-	Short     feedShortSummary      `json:"short"`
-	UnlockCta unlockCtaStatePayload `json:"unlockCta"`
-	Viewer    feedViewerPayload     `json:"viewer"`
+	Creator    creatorSummary         `json:"creator"`
+	Engagement shortEngagementPayload `json:"engagement"`
+	Short      feedShortSummary       `json:"short"`
+	UnlockCta  unlockCtaStatePayload  `json:"unlockCta"`
+	Viewer     feedViewerPayload      `json:"viewer"`
 }
 
 type shortDetailResponseData struct {
@@ -36,10 +37,15 @@ type shortDetailResponseData struct {
 }
 
 type shortDetailPayload struct {
-	Creator   creatorSummary        `json:"creator"`
-	Short     feedShortSummary      `json:"short"`
-	UnlockCta unlockCtaStatePayload `json:"unlockCta"`
-	Viewer    shortDetailViewer     `json:"viewer"`
+	Creator    creatorSummary         `json:"creator"`
+	Engagement shortEngagementPayload `json:"engagement"`
+	Short      feedShortSummary       `json:"short"`
+	UnlockCta  unlockCtaStatePayload  `json:"unlockCta"`
+	Viewer     shortDetailViewer      `json:"viewer"`
+}
+
+type shortEngagementPayload struct {
+	LikeCount int64 `json:"likeCount"`
 }
 
 type feedShortSummary struct {
@@ -52,11 +58,13 @@ type feedShortSummary struct {
 }
 
 type feedViewerPayload struct {
+	HasLiked           bool `json:"hasLiked"`
 	IsFollowingCreator bool `json:"isFollowingCreator"`
 	IsPinned           bool `json:"isPinned"`
 }
 
 type shortDetailViewer struct {
+	HasLiked           bool `json:"hasLiked"`
 	IsFollowingCreator bool `json:"isFollowingCreator"`
 	IsPinned           bool `json:"isPinned"`
 }
@@ -232,10 +240,14 @@ func buildFanFeedItemPayload(item feed.Item, shortDisplayAssets ShortDisplayAsse
 	}
 
 	return fanFeedItemPayload{
-		Creator:   creator,
+		Creator: creator,
+		Engagement: shortEngagementPayload{
+			LikeCount: item.Engagement.LikeCount,
+		},
 		Short:     short,
 		UnlockCta: buildUnlockCtaStatePayload(item),
 		Viewer: feedViewerPayload{
+			HasLiked:           item.Viewer.HasLiked,
 			IsFollowingCreator: item.Viewer.IsFollowingCreator,
 			IsPinned:           item.Viewer.IsPinned,
 		},
@@ -253,10 +265,14 @@ func buildShortDetailPayload(detail feed.Detail, shortDisplayAssets ShortDisplay
 	}
 
 	return shortDetailPayload{
-		Creator:   creator,
+		Creator: creator,
+		Engagement: shortEngagementPayload{
+			LikeCount: detail.Item.Engagement.LikeCount,
+		},
 		Short:     short,
 		UnlockCta: buildUnlockCtaStatePayload(detail.Item),
 		Viewer: shortDetailViewer{
+			HasLiked:           detail.Item.Viewer.HasLiked,
 			IsFollowingCreator: detail.Viewer.IsFollowingCreator,
 			IsPinned:           detail.Item.Viewer.IsPinned,
 		},

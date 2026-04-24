@@ -18,6 +18,7 @@ import {
   useFanAuthDialog,
   useFanAuthDialogControls,
 } from "@/features/fan-auth";
+import { ShortCommentsSheet } from "@/features/short-comments";
 import {
   normalizeUnlockSurface,
   requestCardSetupSession,
@@ -67,6 +68,18 @@ vi.mock("@/features/fan-auth", async (importOriginal) => {
     useFanAuthDialog: vi.fn(),
   };
 });
+
+vi.mock("@/features/short-comments", () => ({
+  ShortCommentsSheet: vi.fn(({
+    trigger,
+  }: {
+    trigger: ReactElement;
+  }) => (
+    <div data-testid="short-comments-sheet">
+      {trigger}
+    </div>
+  )),
+}));
 
 vi.mock("@/features/unlock-entry", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/features/unlock-entry")>();
@@ -304,6 +317,7 @@ const mockedUpdateCreatorFollow = vi.mocked(updateCreatorFollow);
 const mockedGetPublicShortDetail = vi.mocked(getPublicShortDetail);
 const mockedUseFanAuthDialogControls = vi.mocked(useFanAuthDialogControls);
 const mockedUseFanAuthDialog = vi.mocked(useFanAuthDialog);
+const mockedShortCommentsSheet = vi.mocked(ShortCommentsSheet);
 const mockedRequestCardSetupSession = vi.mocked(requestCardSetupSession);
 const mockedRequestCardSetupToken = vi.mocked(requestCardSetupToken);
 const mockedRequestMainAccessEntry = vi.mocked(requestMainAccessEntry);
@@ -401,6 +415,9 @@ function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_
       handle: "@minarei",
       id: "creator_mina_rei",
     },
+    engagement: {
+      likeCount: 42,
+    },
     short: {
       caption: "quiet rooftop preview",
       canonicalMainId: "main_mina_quiet_rooftop",
@@ -422,6 +439,7 @@ function createApiFeedSurface(state: "continue_main" | "owner_preview" | "setup_
       state,
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: true,
     },
@@ -441,6 +459,9 @@ function createPublicShortDetail(state: "continue_main" | "owner_preview" | "set
       handle: "@minarei",
       id: "creator_mina_rei",
     },
+    engagement: {
+      likeCount: 42,
+    },
     short: {
       caption: "quiet rooftop preview",
       canonicalMainId: "main_mina_quiet_rooftop",
@@ -462,6 +483,7 @@ function createPublicShortDetail(state: "continue_main" | "owner_preview" | "set
       state,
     },
     viewer: {
+      hasLiked: false,
       isFollowingCreator: false,
       isPinned: true,
     },
@@ -578,6 +600,7 @@ describe("ImmersiveShortSurface", () => {
     mockedRequestCardSetupToken.mockReset();
     mockedGetPublicShortDetail.mockReset();
     mockedUseFanAuthDialogControls.mockReset();
+    mockedShortCommentsSheet.mockReset();
     mockedRequestMainAccessEntry.mockReset();
     mockedRequestMainPurchase.mockReset();
     mockedRequestUnlockSurfaceByShortId.mockReset();
@@ -606,6 +629,15 @@ describe("ImmersiveShortSurface", () => {
       recordProfileClick: recordRecommendationProfileClick,
     });
     mockedGetPublicShortDetail.mockResolvedValue(createPublicShortDetail("unlock_available"));
+    mockedShortCommentsSheet.mockImplementation(({
+      trigger,
+    }: {
+      trigger: ReactElement;
+    }) => (
+      <div data-testid="short-comments-sheet">
+        {trigger}
+      </div>
+    ));
   });
 
   afterEach(() => {
@@ -643,6 +675,79 @@ describe("ImmersiveShortSurface", () => {
     await user.click(screen.getByRole("button", { name: /Unlock/i }));
 
     expect(await screen.findByRole("dialog", { name: feedDialogTitle })).toBeInTheDocument();
+  });
+
+  it("wires the feed comment action to the current short", async () => {
+    const user = userEvent.setup();
+    const surface = createApiFeedSurface("unlock_available");
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface activeTab="recommended" mode="feed" surface={surface} />,
+      { hasSession: true },
+    );
+
+    const commentButton = screen.getByRole("button", { name: "Open comments" });
+    expect(commentButton).toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
+
+    await user.click(commentButton);
+
+    await waitFor(() => {
+      expect(mockedShortCommentsSheet).toHaveBeenCalledTimes(1);
+    });
+    const commentProps = mockedShortCommentsSheet.mock.calls[0]?.[0];
+    if (!commentProps) {
+      throw new Error("ShortCommentsSheet props missing");
+    }
+    expect(commentProps.shortId).toBe(surface.short.id);
+    expect(commentProps.hasViewerSession).toBe(true);
+    expect(commentProps.onAuthRequired).toEqual(expect.any(Function));
+  });
+
+  it("wires the detail comment action to the current short", async () => {
+    const user = userEvent.setup();
+    const surface = createApiDetailSurface("unlock_available");
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface
+        backHref="/"
+        creatorProfileOrigin={{ from: "short", shortId: surface.short.id }}
+        mode="detail"
+        surface={surface}
+      />,
+      { hasSession: false },
+    );
+
+    const commentButton = screen.getByRole("button", { name: "Open comments" });
+    expect(commentButton).toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
+
+    await user.click(commentButton);
+
+    await waitFor(() => {
+      expect(mockedShortCommentsSheet).toHaveBeenCalledTimes(1);
+    });
+    const commentProps = mockedShortCommentsSheet.mock.calls[0]?.[0];
+    if (!commentProps) {
+      throw new Error("ShortCommentsSheet props missing");
+    }
+    expect(commentProps.shortId).toBe(surface.short.id);
+    expect(commentProps.hasViewerSession).toBe(false);
+    expect(commentProps.onAuthRequired).toEqual(expect.any(Function));
+  });
+
+  it("does not render the comment action for legacy non-API short surfaces", () => {
+    if (!detailSurface) {
+      throw new Error("detail surface missing");
+    }
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    expect(screen.queryByRole("button", { name: "Open comments" })).not.toBeInTheDocument();
+    expect(mockedShortCommentsSheet).not.toHaveBeenCalled();
   });
 
   it("updates the feed playback progress bar from video metadata and timeupdate", () => {
@@ -2135,6 +2240,16 @@ describe("ImmersiveShortSurface", () => {
     expect(screen.queryByRole("heading", { level: 1, name: "Short detail" })).not.toBeInTheDocument();
   });
 
+  it("disables the feed like action when feed like state is not provided", () => {
+    renderWithViewerSession(<ImmersiveShortSurface activeTab="recommended" mode="feed" surface={feedSurface} />, {
+      hasSession: true,
+    });
+
+    expect(
+      screen.getByRole("button", { name: feedSurface.viewer.hasLiked ? "Liked short" : "Like short" }),
+    ).toBeDisabled();
+  });
+
   it("updates the detail follow CTA after an authenticated unfollow succeeds", async () => {
     if (!detailSurface) {
       throw new Error("fixture missing");
@@ -2210,6 +2325,57 @@ describe("ImmersiveShortSurface", () => {
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Pin short" })).toHaveAttribute("aria-pressed", "false");
     });
+  });
+
+  it("updates the detail like CTA and count after an authenticated unlike succeeds", async () => {
+    if (!detailSurface) {
+      throw new Error("fixture missing");
+    }
+
+    const user = userEvent.setup();
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            engagement: {
+              likeCount: 320,
+            },
+            viewer: {
+              hasLiked: false,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_like_delete_success_001",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderWithViewerSession(
+      <ImmersiveShortSurface backHref="/" creatorProfileOrigin={pinnedDetailOrigin} mode="detail" surface={detailSurface} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Liked short" }));
+
+    await waitFor(() => {
+      expect(fetcher.mock.calls[0]?.[0].toString()).toBe("https://api.example.com/api/fan/shorts/rooftop/like");
+      expect(fetcher.mock.calls[0]?.[1]).toMatchObject({
+        credentials: "include",
+        method: "DELETE",
+      });
+      expect(screen.getByRole("button", { name: "Like short" })).toHaveAttribute("aria-pressed", "false");
+    });
+    expect(screen.getByText("320")).toBeInTheDocument();
   });
 
   it("opens the shared auth dialog when detail pin is tapped without a session", async () => {

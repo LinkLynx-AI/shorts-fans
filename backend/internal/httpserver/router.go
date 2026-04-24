@@ -20,6 +20,7 @@ import (
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/fanprofile"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/feed"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/media"
+	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shortcomment"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/shorts"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/submissionreview"
 	"github.com/LinkLynx-AI/shorts-fans/backend/internal/viewerprofile"
@@ -97,6 +98,22 @@ type RecommendationSignalExposureStore interface {
 type FanShortPinWriter interface {
 	PinPublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.PinMutationResult, error)
 	UnpinPublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.PinMutationResult, error)
+}
+
+// FanShortCommentReader は public short comment list 用の read 操作を表します。
+type FanShortCommentReader interface {
+	ListComments(ctx context.Context, shortID uuid.UUID, cursor *shortcomment.Cursor, limit int) ([]shortcomment.Comment, *shortcomment.Cursor, error)
+}
+
+// FanShortCommentWriter は public short comment create mutation を表します。
+type FanShortCommentWriter interface {
+	CreateComment(ctx context.Context, input shortcomment.CreateInput) (shortcomment.Comment, error)
+}
+
+// FanShortLikeWriter は public short like mutation を表します。
+type FanShortLikeWriter interface {
+	LikePublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.LikeMutationResult, error)
+	UnlikePublicShort(ctx context.Context, viewerUserID uuid.UUID, shortID uuid.UUID) (shorts.LikeMutationResult, error)
 }
 
 // ShortDisplayAssetResolver は short 向け display asset 解決を表します。
@@ -230,10 +247,13 @@ type HandlerConfig struct {
 	CreatorProfileShorts             CreatorProfileShortsReader
 	FanFeed                          FanFeedReader
 	FanFeedCursorCodec               FanFeedCursorCodec
+	FanShortComments                 FanShortCommentReader
+	FanShortCommentWriter            FanShortCommentWriter
 	RecommendationSignalExposure     RecommendationSignalExposureStore
 	RecommendationSignals            RecommendationSignalWriter
 	FanUnlockMain                    FanUnlockMainService
 	FanShortPin                      FanShortPinWriter
+	FanShortLike                     FanShortLikeWriter
 	CreatorFollow                    CreatorFollowWriter
 	CreatorAvatarUpload              ViewerCreatorAvatarUploadHandler
 	CreatorRegistration              ViewerCreatorRegistrationService
@@ -361,6 +381,8 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 	)
 	registerPaymentWebhookRoutes(router, config.CCBillWebhook)
 	registerFanShortPinRoutes(router, config.FanShortPin, config.ViewerBootstrap)
+	registerFanShortCommentRoutes(router, config.FanShortComments, config.FanShortCommentWriter, config.ViewerBootstrap)
+	registerFanShortLikeRoutes(router, config.FanShortLike, config.ViewerBootstrap)
 	registerCreatorProfileRoutes(router, config.CreatorProfile, config.CreatorProfileShorts, config.CreatorFollow, config.ShortDisplayAssets, config.ViewerBootstrap)
 	registerViewerCreatorEntryRoutes(
 		router,

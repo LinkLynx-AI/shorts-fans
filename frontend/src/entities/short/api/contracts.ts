@@ -3,10 +3,27 @@ import { z } from "zod";
 import { creatorSummarySchema } from "@/entities/creator";
 
 export const fanFeedTabSchema = z.enum(["following", "recommended"]);
+const shortCommentHandleSchema = z.custom<`@${string}`>((value) => typeof value === "string" && value.startsWith("@"));
+export const shortCommentErrorCodeSchema = z.enum([
+  "auth_required",
+  "internal_error",
+  "invalid_request",
+  "not_found",
+  "validation_error",
+]);
 export const shortPinErrorCodeSchema = z.enum(["auth_required", "internal_error", "not_found"]);
+export const shortLikeErrorCodeSchema = z.enum(["auth_required", "internal_error", "not_found"]);
 export const shortPinMutationResultSchema = z.object({
   viewer: z.object({
     isPinned: z.boolean(),
+  }),
+});
+export const shortLikeMutationResultSchema = z.object({
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
+  viewer: z.object({
+    hasLiked: z.boolean(),
   }),
 });
 
@@ -16,6 +33,26 @@ export const shortVideoDisplayAssetSchema = z.object({
   kind: z.literal("video"),
   posterUrl: z.string().min(1).nullable(),
   url: z.string().min(1),
+});
+
+export const shortCommentAuthorAvatarSchema = z.object({
+  durationSeconds: z.null(),
+  id: z.string().min(1),
+  kind: z.literal("image"),
+  posterUrl: z.null(),
+  url: z.string().min(1),
+});
+
+export const shortCommentSchema = z.object({
+  author: z.object({
+    avatar: shortCommentAuthorAvatarSchema.nullable(),
+    displayName: z.string().min(1),
+    handle: shortCommentHandleSchema,
+  }),
+  body: z.string().min(1),
+  createdAt: z.string().datetime(),
+  id: z.string().min(1),
+  shortId: z.string().min(1),
 });
 
 export const publicShortSummarySchema = z.object({
@@ -36,9 +73,13 @@ export const unlockCtaStateSchema = z.object({
 
 export const fanFeedItemSchema = z.object({
   creator: creatorSummarySchema,
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
   short: publicShortSummarySchema,
   unlockCta: unlockCtaStateSchema,
   viewer: z.object({
+    hasLiked: z.boolean(),
     isFollowingCreator: z.boolean(),
     isPinned: z.boolean(),
   }),
@@ -59,11 +100,52 @@ export const fanFeedResponseSchema = z.object({
   }),
 });
 
+export const shortCommentsResponseSchema = z.object({
+  data: z.object({
+    items: z.array(shortCommentSchema),
+  }),
+  error: z.null(),
+  meta: z.object({
+    page: z.object({
+      hasNext: z.boolean(),
+      nextCursor: z.string().min(1).nullable(),
+    }),
+    requestId: z.string().min(1),
+  }),
+});
+
+export const shortCommentCreateResponseSchema = z.object({
+  data: z.object({
+    comment: shortCommentSchema,
+  }),
+  error: z.null(),
+  meta: z.object({
+    page: z.null(),
+    requestId: z.string().min(1),
+  }),
+});
+
+export const shortCommentErrorResponseSchema = z.object({
+  data: z.null(),
+  error: z.object({
+    code: shortCommentErrorCodeSchema,
+    message: z.string().min(1),
+  }),
+  meta: z.object({
+    page: z.null(),
+    requestId: z.string().min(1),
+  }),
+});
+
 export const publicShortDetailSchema = z.object({
   creator: creatorSummarySchema,
+  engagement: z.object({
+    likeCount: z.number().int().nonnegative(),
+  }),
   short: publicShortSummarySchema,
   unlockCta: unlockCtaStateSchema,
   viewer: z.object({
+    hasLiked: z.boolean(),
     isFollowingCreator: z.boolean(),
     isPinned: z.boolean(),
   }),
@@ -83,3 +165,4 @@ export const publicShortDetailResponseSchema = z.object({
 export type FanFeedItem = z.output<typeof fanFeedItemSchema>;
 export type FanFeedTab = z.output<typeof fanFeedTabSchema>;
 export type PublicShortDetail = z.output<typeof publicShortDetailSchema>;
+export type ShortComment = z.output<typeof shortCommentSchema>;

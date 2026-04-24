@@ -87,6 +87,7 @@ describe("MainPlaybackSurface", () => {
     expect(screen.queryByText("Playing main")).not.toBeInTheDocument();
     expect(screen.queryByText("Owner preview")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Pin short" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open comments" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Aoi N/i })).not.toBeInTheDocument();
     expect(video).not.toHaveAttribute("controls");
     expect(video).toHaveAttribute("playsinline");
@@ -282,14 +283,16 @@ describe("MainPlaybackSurface", () => {
 
     await waitFor(() => {
       expect(play).toHaveBeenCalledTimes(2);
+      expect(video.muted).toBe(true);
     });
 
-    expect(video.muted).toBe(true);
-    expect(screen.getByRole("button", { name: "Enable audio" })).toBeInTheDocument();
+    const enableAudioButton = await screen.findByRole("button", { name: "Enable audio" });
 
-    await user.click(screen.getByRole("button", { name: "Enable audio" }));
+    await user.click(enableAudioButton);
 
-    expect(video.muted).toBe(false);
+    await waitFor(() => {
+      expect(video.muted).toBe(false);
+    });
     expect(pause).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Pause playback" })).toBeInTheDocument();
   });

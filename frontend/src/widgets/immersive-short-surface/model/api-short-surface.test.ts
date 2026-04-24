@@ -13,6 +13,9 @@ describe("api short surface builders", () => {
         handle: "@minarei",
         id: "creator_mina_rei",
       },
+      engagement: {
+        likeCount: 42,
+      },
       short: {
         caption: "quiet rooftop preview",
         canonicalMainId: "main_33333333333333333333333333333333",
@@ -34,6 +37,7 @@ describe("api short surface builders", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: true,
         isFollowingCreator: false,
         isPinned: true,
       },
@@ -56,7 +60,11 @@ describe("api short surface builders", () => {
       token: "disabled-short_22222222222222222222222222222222",
     });
     expect(surface.unlock.purchase.state).toBe("purchase_ready");
+    expect(surface.engagement).toEqual({
+      likeCount: 42,
+    });
     expect(surface.viewer).toEqual({
+      hasLiked: true,
       isFollowingCreator: false,
       isPinned: true,
     });
@@ -70,6 +78,9 @@ describe("api short surface builders", () => {
         displayName: "Mina Rei",
         handle: "@minarei",
         id: "creator_mina_rei",
+      },
+      engagement: {
+        likeCount: 7,
       },
       short: {
         caption: "quiet rooftop preview",
@@ -92,6 +103,7 @@ describe("api short surface builders", () => {
         state: "continue_main",
       },
       viewer: {
+        hasLiked: false,
         isFollowingCreator: true,
         isPinned: false,
       },
@@ -106,7 +118,11 @@ describe("api short surface builders", () => {
     expect(surface.unlock.main.durationSeconds).toBe(16);
     expect(surface.unlock.purchase.state).toBe("already_purchased");
     expect(surface.mainEntryEnabled).toBe(false);
+    expect(surface.engagement).toEqual({
+      likeCount: 7,
+    });
     expect(surface.viewer).toEqual({
+      hasLiked: false,
       isFollowingCreator: true,
       isPinned: false,
     });
@@ -120,6 +136,9 @@ describe("api short surface builders", () => {
         displayName: "Mina Rei",
         handle: "@minarei",
         id: "creator_mina_rei",
+      },
+      engagement: {
+        likeCount: 0,
       },
       short: {
         caption: "",
@@ -142,6 +161,7 @@ describe("api short surface builders", () => {
         state: "unlock_available",
       },
       viewer: {
+        hasLiked: false,
         isFollowingCreator: false,
         isPinned: false,
       },

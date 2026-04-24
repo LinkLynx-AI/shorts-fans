@@ -178,6 +178,130 @@ describe("FeedReel", () => {
     expect(await screen.findByRole("button", { name: "Pinned short" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("likes a feed short and updates the local count", async () => {
+    const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            engagement: {
+              likeCount: 58,
+            },
+            viewer: {
+              hasLiked: true,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_like_put_success_001",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[surface]} />,
+      { hasSession: true },
+    );
+
+    expect(screen.getByText("57")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Like short" }));
+
+    await waitFor(() => {
+      expect(fetcher).toHaveBeenCalledWith(
+        createApiUrl(getClientEnv().NEXT_PUBLIC_API_BASE_URL, "/api/fan/shorts/short_softlight/like"),
+        {
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+          method: "PUT",
+        },
+      );
+    });
+
+    expect(await screen.findByRole("button", { name: "Liked short" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("58")).toBeInTheDocument();
+  });
+
+  it("syncs a locally liked feed short count when refreshed data catches up", async () => {
+    const user = userEvent.setup();
+    const surface = buildPublicFeedSurface("following", "short_softlight");
+    const fetcher = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            engagement: {
+              likeCount: 58,
+            },
+            viewer: {
+              hasLiked: true,
+            },
+          },
+          error: null,
+          meta: {
+            page: null,
+            requestId: "req_short_like_put_success_002",
+          },
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          status: 200,
+        },
+      ),
+    );
+    vi.stubGlobal("fetch", fetcher);
+
+    const { rerender } = renderWithViewerSession(
+      <FeedReel activeTab="following" surfaces={[surface]} />,
+      { hasSession: true },
+    );
+
+    await user.click(screen.getByRole("button", { name: "Like short" }));
+    expect(await screen.findByRole("button", { name: "Liked short" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("58")).toBeInTheDocument();
+
+    rerender(
+      <ViewerSessionProvider hasSession>
+        <CurrentViewerProvider currentViewer={null}>
+          <FanAuthDialogProvider>
+            <FeedReel
+              activeTab="following"
+              surfaces={[
+                {
+                  ...surface,
+                  engagement: {
+                    ...surface.engagement,
+                    likeCount: 62,
+                  },
+                  viewer: {
+                    ...surface.viewer,
+                    hasLiked: true,
+                  },
+                },
+              ]}
+            />
+          </FanAuthDialogProvider>
+        </CurrentViewerProvider>
+      </ViewerSessionProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: "Liked short" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("62")).toBeInTheDocument();
+  });
+
   it("syncs the pin state when refreshed feed data changes the same short", () => {
     const initialSurface = buildPublicFeedSurface("following", "short_softlight");
     const refreshedSurface = {

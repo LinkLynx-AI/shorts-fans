@@ -21,7 +21,10 @@ sql:
       - "db/migrations/000017_add_submission_review_intakes.up.sql"
       - "db/migrations/000018_add_submission_review_decisions.up.sql"
       - "db/migrations/000019_add_submission_review_notes.up.sql"
-      - "db/migrations/000020_expand_creator_registration_review_intake.up.sql"
+      - "db/migrations/000020_add_media_review_submit_retry_index.up.sql"
+      - "db/migrations/000021_add_short_likes.up.sql"
+      - "db/migrations/000022_add_short_comments.up.sql"
+      - "db/migrations/000023_expand_creator_registration_review_intake.up.sql"
     queries:
       - "db/queries/*.sql"
       - "db/queries/*/*.sql"

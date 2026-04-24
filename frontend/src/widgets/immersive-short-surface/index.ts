@@ -15,6 +15,7 @@ export type {
   DetailSurfaceViewerState,
   FeedShortSurface,
   FeedSurfaceViewerState,
+  ShortSurfaceEngagementState,
 } from "./model/short-surface";
 export { ImmersiveShortSurface } from "./ui/immersive-short-surface";
 export type { ImmersiveShortSurfaceProps } from "./ui/immersive-short-surface";

@@ -184,6 +184,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_follows", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.pinned_shorts", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.short_comments", len(shortComments))
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 
 	if _, err := pool.Exec(ctx, "UPDATE app.creator_profiles SET bio = $1 WHERE user_id = $2", "stale bio", creatorUserID); err != nil {
@@ -209,6 +210,7 @@ func TestRunSeedsBaselineDataIdempotently(t *testing.T) {
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.main_unlocks", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.creator_follows", 1)
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.pinned_shorts", 1)
+	assertCount(t, ctx, pool, "SELECT count(*) FROM app.short_comments", len(shortComments))
 	assertCount(t, ctx, pool, "SELECT count(*) FROM app.auth_sessions", 2)
 }
 

@@ -633,6 +633,200 @@ func TestSubmitPackageReturnsNotReadyError(t *testing.T) {
 	}
 }
 
+func TestSubmitPackageIfReadyIgnoresNotReadyPackage(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	mainID := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+
+	service := &Service{
+		beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) { return &txStub{}, nil }},
+		now:      time.Now,
+		newQueries: func(sqlc.DBTX) queries {
+			return queriesStub{
+				getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+				},
+				getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+					return sqlc.GetSubmissionReviewMainByIDForUpdateRow{
+						ID:                   postgres.UUIDToPG(mainID),
+						CreatorUserID:        postgres.UUIDToPG(viewerID),
+						State:                mainStateDraft,
+						PriceMinor:           1800,
+						OwnershipConfirmed:   true,
+						ConsentConfirmed:     true,
+						MediaProcessingState: "processing",
+					}, nil
+				},
+				getPendingSubmissionReviewIntakeByCanonicalMainID: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+					return sqlc.AppSubmissionReviewIntake{}, pgx.ErrNoRows
+				},
+				listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+					return []sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow{{
+						State:                shortStateDraft,
+						MediaProcessingState: mediaStateReady,
+					}}, nil
+				},
+				createSubmissionReviewIntake: func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error) {
+					t.Fatal("CreateSubmissionReviewIntake() called for not-ready package")
+					return sqlc.AppSubmissionReviewIntake{}, nil
+				},
+				createSubmissionReviewIntakeShort: func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error {
+					t.Fatal("CreateSubmissionReviewIntakeShort() called for not-ready package")
+					return nil
+				},
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+					t.Fatal("ResetSubmissionReviewMainToPending() called for not-ready package")
+					return sqlc.AppMain{}, nil
+				},
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+					t.Fatal("ResetSubmissionReviewShortToPending() called for not-ready package")
+					return sqlc.AppShort{}, nil
+				},
+			}
+		},
+	}
+
+	if err := service.SubmitPackageIfReady(context.Background(), viewerID, mainID); err != nil {
+		t.Fatalf("SubmitPackageIfReady() error = %v, want nil", err)
+	}
+}
+
+func TestSubmitPackageIfReadyPropagatesUnexpectedError(t *testing.T) {
+	t.Parallel()
+
+	beginErr := errors.New("begin failed")
+	service := &Service{
+		beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) {
+			return nil, beginErr
+		}},
+		now: time.Now,
+		newQueries: func(sqlc.DBTX) queries {
+			return queriesStub{}
+		},
+	}
+
+	err := service.SubmitPackageIfReady(context.Background(), uuid.New(), uuid.New())
+	if !errors.Is(err, beginErr) {
+		t.Fatalf("SubmitPackageIfReady() error got %v want %v", err, beginErr)
+	}
+}
+
+func TestSubmitInitialPackageIfReadyIgnoresWorkerOnlyNoOpStates(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("91919191-aaaa-aaaa-aaaa-919191919191")
+	ownerID := uuid.MustParse("92929292-aaaa-aaaa-aaaa-929292929292")
+	mainID := uuid.MustParse("93939393-aaaa-aaaa-aaaa-939393939393")
+
+	tests := []struct {
+		name  string
+		build func(t *testing.T) queriesStub
+	}{
+		{
+			name: "missing creator capability",
+			build: func(t *testing.T) queriesStub {
+				return queriesStub{
+					getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+						return sqlc.AppCreatorCapability{}, pgx.ErrNoRows
+					},
+					getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+						t.Fatal("GetSubmissionReviewMainByIDForUpdate() called for unavailable creator")
+						return sqlc.GetSubmissionReviewMainByIDForUpdateRow{}, nil
+					},
+				}
+			},
+		},
+		{
+			name: "non-approved creator capability",
+			build: func(t *testing.T) queriesStub {
+				return queriesStub{
+					getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+						return sqlc.AppCreatorCapability{State: "pending_review"}, nil
+					},
+					getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+						t.Fatal("GetSubmissionReviewMainByIDForUpdate() called for unavailable creator")
+						return sqlc.GetSubmissionReviewMainByIDForUpdateRow{}, nil
+					},
+				}
+			},
+		},
+		{
+			name: "missing package",
+			build: func(t *testing.T) queriesStub {
+				return queriesStub{
+					getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+						return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+					},
+					getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+						return sqlc.GetSubmissionReviewMainByIDForUpdateRow{}, pgx.ErrNoRows
+					},
+					listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+						t.Fatal("ListSubmissionReviewShortsByCanonicalMainIDForUpdate() called for missing package")
+						return nil, nil
+					},
+				}
+			},
+		},
+		{
+			name: "owner mismatch",
+			build: func(t *testing.T) queriesStub {
+				return queriesStub{
+					getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+						return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+					},
+					getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+						return sqlc.GetSubmissionReviewMainByIDForUpdateRow{
+							ID:            postgres.UUIDToPG(mainID),
+							CreatorUserID: postgres.UUIDToPG(ownerID),
+						}, nil
+					},
+					listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+						t.Fatal("ListSubmissionReviewShortsByCanonicalMainIDForUpdate() called for owner mismatch")
+						return nil, nil
+					},
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tx := &txStub{}
+			service := &Service{
+				beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) { return tx, nil }},
+				now:      time.Now,
+				newQueries: func(sqlc.DBTX) queries {
+					q := tt.build(t)
+					q.createSubmissionReviewIntake = func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error) {
+						t.Fatal("CreateSubmissionReviewIntake() called for worker no-op state")
+						return sqlc.AppSubmissionReviewIntake{}, nil
+					}
+					q.createSubmissionReviewIntakeShort = func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error {
+						t.Fatal("CreateSubmissionReviewIntakeShort() called for worker no-op state")
+						return nil
+					}
+					q.resetSubmissionReviewMainToPending = func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+						t.Fatal("ResetSubmissionReviewMainToPending() called for worker no-op state")
+						return sqlc.AppMain{}, nil
+					}
+					q.resetSubmissionReviewShortToPending = func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+						t.Fatal("ResetSubmissionReviewShortToPending() called for worker no-op state")
+						return sqlc.AppShort{}, nil
+					}
+					return q
+				},
+			}
+
+			if err := service.SubmitInitialPackageIfReady(context.Background(), viewerID, mainID); err != nil {
+				t.Fatalf("SubmitInitialPackageIfReady() error = %v, want nil", err)
+			}
+		})
+	}
+}
+
 func TestSubmitPackageResubmitKeepsApprovedObjects(t *testing.T) {
 	t.Parallel()
 
@@ -730,6 +924,93 @@ func TestSubmitPackageResubmitKeepsApprovedObjects(t *testing.T) {
 	}
 	if updateShorts != 1 {
 		t.Fatalf("SubmitPackage() updated shorts got %d want 1", updateShorts)
+	}
+}
+
+func TestSubmitInitialPackageIfReadyDoesNotResubmitRevisionPackage(t *testing.T) {
+	t.Parallel()
+
+	viewerID := uuid.MustParse("88888888-1111-1111-1111-888888888888")
+	mainID := uuid.MustParse("99999999-1111-1111-1111-999999999999")
+	mainAssetID := uuid.MustParse("aaaaaaaa-1111-1111-1111-aaaaaaaaaaaa")
+	shortApprovedID := uuid.MustParse("bbbbbbbb-1111-1111-1111-bbbbbbbbbbbb")
+	shortRevisionID := uuid.MustParse("cccccccc-1111-1111-1111-cccccccccccc")
+	latestIntakeID := uuid.MustParse("dddddddd-1111-1111-1111-dddddddddddd")
+	mutated := false
+
+	service := &Service{
+		beginner: txBeginnerStub{begin: func(context.Context) (pgx.Tx, error) { return &txStub{}, nil }},
+		now:      time.Now,
+		newQueries: func(sqlc.DBTX) queries {
+			return queriesStub{
+				getCreatorCapabilityByUserIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.AppCreatorCapability, error) {
+					return sqlc.AppCreatorCapability{State: capabilityStateApproved}, nil
+				},
+				getSubmissionReviewMainByIDForUpdate: func(context.Context, pgtype.UUID) (sqlc.GetSubmissionReviewMainByIDForUpdateRow, error) {
+					return sqlc.GetSubmissionReviewMainByIDForUpdateRow{
+						ID:                   postgres.UUIDToPG(mainID),
+						CreatorUserID:        postgres.UUIDToPG(viewerID),
+						MediaAssetID:         postgres.UUIDToPG(mainAssetID),
+						State:                mainStateApprovedForUnlock,
+						PriceMinor:           1800,
+						CurrencyCode:         "JPY",
+						OwnershipConfirmed:   true,
+						ConsentConfirmed:     true,
+						MediaProcessingState: mediaStateReady,
+					}, nil
+				},
+				listSubmissionReviewShortsByCanonicalMainIDForUpdate: func(context.Context, pgtype.UUID) ([]sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow, error) {
+					return []sqlc.ListSubmissionReviewShortsByCanonicalMainIDForUpdateRow{
+						{
+							ID:                   postgres.UUIDToPG(shortApprovedID),
+							CreatorUserID:        postgres.UUIDToPG(viewerID),
+							CanonicalMainID:      postgres.UUIDToPG(mainID),
+							State:                shortStateApprovedForPublish,
+							MediaProcessingState: mediaStateReady,
+						},
+						{
+							ID:                   postgres.UUIDToPG(shortRevisionID),
+							CreatorUserID:        postgres.UUIDToPG(viewerID),
+							CanonicalMainID:      postgres.UUIDToPG(mainID),
+							State:                shortStateRevisionRequested,
+							MediaProcessingState: mediaStateReady,
+						},
+					}, nil
+				},
+				getPendingSubmissionReviewIntakeByCanonicalMainID: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+					return sqlc.AppSubmissionReviewIntake{}, pgx.ErrNoRows
+				},
+				getLatestSubmissionReviewIntakeByCanonicalMainID: func(context.Context, pgtype.UUID) (sqlc.AppSubmissionReviewIntake, error) {
+					return sqlc.AppSubmissionReviewIntake{
+						ID:     postgres.UUIDToPG(latestIntakeID),
+						Status: intakeStatusDecisionApplied,
+					}, nil
+				},
+				createSubmissionReviewIntake: func(context.Context, sqlc.CreateSubmissionReviewIntakeParams) (sqlc.AppSubmissionReviewIntake, error) {
+					mutated = true
+					return sqlc.AppSubmissionReviewIntake{}, nil
+				},
+				createSubmissionReviewIntakeShort: func(context.Context, sqlc.CreateSubmissionReviewIntakeShortParams) error {
+					mutated = true
+					return nil
+				},
+				resetSubmissionReviewMainToPending: func(context.Context, pgtype.UUID) (sqlc.AppMain, error) {
+					mutated = true
+					return sqlc.AppMain{}, nil
+				},
+				resetSubmissionReviewShortToPending: func(context.Context, pgtype.UUID) (sqlc.AppShort, error) {
+					mutated = true
+					return sqlc.AppShort{}, nil
+				},
+			}
+		},
+	}
+
+	if err := service.SubmitInitialPackageIfReady(context.Background(), viewerID, mainID); err != nil {
+		t.Fatalf("SubmitInitialPackageIfReady() error = %v, want nil", err)
+	}
+	if mutated {
+		t.Fatal("SubmitInitialPackageIfReady() created a resubmit intake or changed state")
 	}
 }
 

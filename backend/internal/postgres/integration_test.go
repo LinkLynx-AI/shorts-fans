@@ -25,7 +25,7 @@ import (
 
 const (
 	integrationPostgresDSNEnv = "POSTGRES_DSN"
-	latestMigrationVersion    = 20
+	latestMigrationVersion    = 23
 )
 
 func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
@@ -481,10 +481,10 @@ func TestCreatorRegistrationReviewIntakeMigrationRoundTrip(t *testing.T) {
 	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
 	defer cleanup()
 
-	if err := migrator.Migrate(20); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		t.Fatalf("migrator.Migrate(20) error = %v, want nil", err)
+	if err := migrator.Migrate(23); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(23) error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 20)
+	assertMigrationVersion(t, migrator, 23)
 
 	queries := sqlc.New(conn)
 	user, err := queries.CreateUser(ctx)
@@ -536,7 +536,7 @@ func TestCreatorRegistrationReviewIntakeMigrationRoundTrip(t *testing.T) {
 		)`,
 		user.ID,
 	); err != nil {
-		t.Fatalf("Exec(insert creator_registration_intakes at migration 20) error = %v, want nil", err)
+		t.Fatalf("Exec(insert creator_registration_intakes at migration 23) error = %v, want nil", err)
 	}
 
 	_, err = conn.Exec(
@@ -579,13 +579,13 @@ func TestCreatorRegistrationReviewIntakeMigrationRoundTrip(t *testing.T) {
 		)`,
 		user.ID,
 	); err != nil {
-		t.Fatalf("Exec(insert identity_selfie evidence at migration 20) error = %v, want nil", err)
+		t.Fatalf("Exec(insert identity_selfie evidence at migration 23) error = %v, want nil", err)
 	}
 
 	if err := migrator.Steps(-1); err != nil {
 		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
 	}
-	assertMigrationVersion(t, migrator, 19)
+	assertMigrationVersion(t, migrator, 22)
 
 	var newEvidenceCount int
 	if err := conn.QueryRow(
@@ -2102,6 +2102,166 @@ func TestPaymentQueriesLatestRevision(t *testing.T) {
 	}
 	if gotAttempt.ID != attempt.ID {
 		t.Fatalf("GetMainPurchaseAttemptByProviderPurchaseRefForUpdate() id got %v want %v", gotAttempt.ID, attempt.ID)
+	}
+}
+
+func TestMediaProcessingReviewSubmitRetryQueries(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Up() error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, latestMigrationVersion)
+	assertRelationExists(t, ctx, conn, "app.idx_media_processing_jobs_review_submit_retry", true)
+
+	queries := sqlc.New(conn)
+	now := time.Now().UTC()
+
+	creator, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser(creator) error = %v, want nil", err)
+	}
+	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                  creator.ID,
+		State:                   "approved",
+		IsResubmitEligible:      false,
+		IsSupportReviewRequired: false,
+		SelfServeResubmitCount:  0,
+		ApprovedAt:              pgTime(now),
+	}); err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+
+	mainAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "review-submit-retry-main")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(main) error = %v, want nil", err)
+	}
+	shortAsset, err := createReadyMediaAsset(ctx, queries, creator.ID, "review-submit-retry-short")
+	if err != nil {
+		t.Fatalf("createReadyMediaAsset(short) error = %v, want nil", err)
+	}
+	main, err := queries.CreateMain(ctx, sqlc.CreateMainParams{
+		CreatorUserID:      creator.ID,
+		MediaAssetID:       mainAsset.ID,
+		State:              "draft",
+		PriceMinor:         1800,
+		CurrencyCode:       "JPY",
+		OwnershipConfirmed: true,
+		ConsentConfirmed:   true,
+	})
+	if err != nil {
+		t.Fatalf("CreateMain() error = %v, want nil", err)
+	}
+	if _, err := queries.CreateShort(ctx, sqlc.CreateShortParams{
+		CreatorUserID:   creator.ID,
+		CanonicalMainID: main.ID,
+		MediaAssetID:    shortAsset.ID,
+		State:           "draft",
+	}); err != nil {
+		t.Fatalf("CreateShort() error = %v, want nil", err)
+	}
+
+	for i := 0; i < 24; i++ {
+		asset, err := createReadyMediaAsset(ctx, queries, creator.ID, fmt.Sprintf("review-submit-retry-old-%02d", i))
+		if err != nil {
+			t.Fatalf("createReadyMediaAsset(old %d) error = %v, want nil", i, err)
+		}
+		if _, err := queries.CreateMediaProcessingJob(ctx, sqlc.CreateMediaProcessingJobParams{
+			CreatorUserID: creator.ID,
+			MediaAssetID:  asset.ID,
+			AssetRole:     "short",
+			Status:        "succeeded",
+			AttemptCount:  1,
+			CompletedAt:   pgTime(now.Add(-time.Duration(i+2) * time.Hour)),
+		}); err != nil {
+			t.Fatalf("CreateMediaProcessingJob(old %d) error = %v, want nil", i, err)
+		}
+	}
+
+	unmarkedJob, err := queries.CreateMediaProcessingJob(ctx, sqlc.CreateMediaProcessingJobParams{
+		CreatorUserID: creator.ID,
+		MediaAssetID:  mainAsset.ID,
+		AssetRole:     "main",
+		Status:        "succeeded",
+		AttemptCount:  1,
+		CompletedAt:   pgTime(now.Add(-90 * time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("CreateMediaProcessingJob(unmarked) error = %v, want nil", err)
+	}
+	markedJob, err := queries.CreateMediaProcessingJob(ctx, sqlc.CreateMediaProcessingJobParams{
+		CreatorUserID: creator.ID,
+		MediaAssetID:  shortAsset.ID,
+		AssetRole:     "short",
+		Status:        "succeeded",
+		AttemptCount:  1,
+		CompletedAt:   pgTime(now.Add(-30 * time.Minute)),
+	})
+	if err != nil {
+		t.Fatalf("CreateMediaProcessingJob(marked) error = %v, want nil", err)
+	}
+	markedJob, err = queries.MarkMediaProcessingJobReviewSubmitFailed(ctx, sqlc.MarkMediaProcessingJobReviewSubmitFailedParams{
+		ID:               markedJob.ID,
+		LastErrorMessage: pgText("submission review temporarily unavailable"),
+	})
+	if err != nil {
+		t.Fatalf("MarkMediaProcessingJobReviewSubmitFailed() error = %v, want nil", err)
+	}
+
+	ready, err := queries.GetInitialReviewReadyPackageByMainID(ctx, main.ID)
+	if err != nil {
+		t.Fatalf("GetInitialReviewReadyPackageByMainID() error = %v, want nil", err)
+	}
+	if ready.ID != main.ID || ready.CreatorUserID != creator.ID {
+		t.Fatalf("GetInitialReviewReadyPackageByMainID() got %#v want main=%v creator=%v", ready, main.ID, creator.ID)
+	}
+
+	candidate, err := queries.GetNextSucceededInitialReviewMediaProcessingJob(ctx)
+	if err != nil {
+		t.Fatalf("GetNextSucceededInitialReviewMediaProcessingJob() error = %v, want nil", err)
+	}
+	if candidate.ID != markedJob.ID {
+		t.Fatalf("GetNextSucceededInitialReviewMediaProcessingJob() id got %v want marked %v; unmarked was %v", candidate.ID, markedJob.ID, unmarkedJob.ID)
+	}
+
+	if _, err := conn.Exec(ctx, "SET enable_seqscan = off"); err != nil {
+		t.Fatalf("SET enable_seqscan error = %v, want nil", err)
+	}
+	defer conn.Exec(ctx, "RESET enable_seqscan")
+	rows, err := conn.Query(ctx, `EXPLAIN (FORMAT TEXT)
+SELECT j.id
+FROM app.media_processing_jobs AS j
+WHERE j.status = 'succeeded'
+    AND j.last_error_code = 'review_submit_failed'
+ORDER BY j.completed_at ASC NULLS LAST, j.updated_at ASC, j.id ASC
+LIMIT 1`)
+	if err != nil {
+		t.Fatalf("EXPLAIN retry query error = %v, want nil", err)
+	}
+	var planLines []string
+	for rows.Next() {
+		var line string
+		if err := rows.Scan(&line); err != nil {
+			rows.Close()
+			t.Fatalf("scan EXPLAIN row error = %v, want nil", err)
+		}
+		planLines = append(planLines, line)
+	}
+	if err := rows.Err(); err != nil {
+		rows.Close()
+		t.Fatalf("EXPLAIN rows error = %v, want nil", err)
+	}
+	rows.Close()
+	if !strings.Contains(strings.Join(planLines, "\n"), "idx_media_processing_jobs_review_submit_retry") {
+		t.Fatalf("EXPLAIN plan did not use review retry index:\n%s", strings.Join(planLines, "\n"))
+	}
+
+	if err := queries.ClearMediaProcessingJobReviewSubmitFailure(ctx, markedJob.ID); err != nil {
+		t.Fatalf("ClearMediaProcessingJobReviewSubmitFailure() error = %v, want nil", err)
+	}
+	if _, err := queries.GetNextSucceededInitialReviewMediaProcessingJob(ctx); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("GetNextSucceededInitialReviewMediaProcessingJob() after clear error got %v want pgx.ErrNoRows", err)
 	}
 }
 

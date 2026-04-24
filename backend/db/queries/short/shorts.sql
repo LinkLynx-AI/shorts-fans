@@ -130,3 +130,23 @@ ON CONFLICT (user_id, short_id) DO NOTHING;
 DELETE FROM app.pinned_shorts
 WHERE user_id = sqlc.arg(user_id)
   AND short_id = sqlc.arg(short_id);
+
+-- name: PutShortLike :exec
+INSERT INTO app.short_likes (
+    user_id,
+    short_id
+) VALUES (
+    sqlc.arg(user_id),
+    sqlc.arg(short_id)
+)
+ON CONFLICT (user_id, short_id) DO NOTHING;
+
+-- name: DeleteShortLike :exec
+DELETE FROM app.short_likes
+WHERE user_id = sqlc.arg(user_id)
+  AND short_id = sqlc.arg(short_id);
+
+-- name: CountShortLikesByShortID :one
+SELECT COUNT(*)::bigint
+FROM app.short_likes
+WHERE short_id = sqlc.arg(short_id);

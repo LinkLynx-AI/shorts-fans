@@ -205,7 +205,7 @@ describe("CreatorUploadForm", () => {
       ],
     });
     expect(await screen.findByText("処理開始を受け付けました。")).toBeInTheDocument();
-    expect(screen.getByText("main 1本 / short 1本 の処理を開始しました。公開や審査提出はまだ行われていません。")).toBeInTheDocument();
+    expect(screen.getByText("main 1本 / short 1本 の処理を開始しました。processing 完了後に自動で審査へ進みます。")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "処理開始完了" })).toBeDisabled();
   });
 

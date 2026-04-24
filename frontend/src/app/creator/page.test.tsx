@@ -6,6 +6,7 @@ import {
 import userEvent from "@testing-library/user-event";
 
 import { switchViewerActiveMode } from "@/features/creator-entry/api/switch-viewer-active-mode";
+import { createCreatorWorkspaceSubmissionReview } from "@/features/creator-workspace-submission-review";
 import { updateCreatorWorkspaceShortCaption } from "@/features/creator-workspace-short-caption/api/update-creator-workspace-short-caption";
 import { updateCreatorWorkspaceMainPrice } from "@/features/creator-main-price/api/update-creator-workspace-main-price";
 import { ApiError } from "@/shared/api";
@@ -62,6 +63,15 @@ vi.mock("@/features/fan-auth-gate", async () => {
 vi.mock("@/features/creator-entry/api/switch-viewer-active-mode", () => ({
   switchViewerActiveMode: vi.fn(),
 }));
+
+vi.mock("@/features/creator-workspace-submission-review", async () => {
+  const actual = await vi.importActual<typeof import("@/features/creator-workspace-submission-review")>("@/features/creator-workspace-submission-review");
+
+  return {
+    ...actual,
+    createCreatorWorkspaceSubmissionReview: vi.fn(),
+  };
+});
 
 vi.mock("@/features/creator-workspace-short-caption/api/update-creator-workspace-short-caption", () => ({
   updateCreatorWorkspaceShortCaption: vi.fn(),
@@ -366,6 +376,7 @@ describe("CreatorPage", () => {
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
     vi.mocked(switchViewerActiveMode).mockReset();
+    vi.mocked(createCreatorWorkspaceSubmissionReview).mockReset();
     vi.mocked(updateCreatorWorkspaceShortCaption).mockReset();
     vi.mocked(updateCreatorWorkspaceMainPrice).mockReset();
     vi.mocked(getCreatorWorkspaceSummary).mockReset();
@@ -396,6 +407,7 @@ describe("CreatorPage", () => {
       },
     }));
     vi.mocked(getCreatorWorkspaceShortReviewSurface).mockResolvedValue(createCreatorWorkspaceItemReviewSurface());
+    vi.mocked(createCreatorWorkspaceSubmissionReview).mockResolvedValue(undefined);
     vi.mocked(updateCreatorWorkspaceShortCaption).mockResolvedValue({
       requestId: "req_creator_workspace_short_caption_put_001",
       short: {
@@ -452,6 +464,12 @@ describe("CreatorPage", () => {
     );
     vi.mocked(getCreatorWorkspaceReviewSurface).mockResolvedValue(
       createCreatorWorkspaceReviewSurface({
+        mains: [
+          {
+            id: "main_quiet_rooftop",
+            state: "approved_for_unlock",
+          },
+        ],
         packages: [
           {
             blockers: [],
@@ -462,8 +480,34 @@ describe("CreatorPage", () => {
             submitAction: "resubmit",
           },
         ],
+        shorts: [
+          {
+            canonicalMainId: "main_quiet_rooftop",
+            id: "short_quiet_rooftop",
+            state: "approved_for_publish",
+          },
+        ],
       }),
     );
+    vi.mocked(getCreatorWorkspaceMainReviewSurface).mockResolvedValue(createCreatorWorkspaceItemReviewSurface({
+      package: {
+        blockers: [],
+        canonicalMainId: "main_quiet_rooftop",
+        linkedShortCount: 1,
+        readiness: "ready",
+        reviewStatus: "changes_requested",
+        submitAction: "resubmit",
+      },
+      review: {
+        reasonCode: "caption_context_missing",
+        state: "revision_requested",
+      },
+      target: {
+        canonicalMainId: "main_quiet_rooftop",
+        id: "main_quiet_rooftop",
+        kind: "main",
+      },
+    }));
 
     render(await CreatorPage());
 
@@ -474,20 +518,39 @@ describe("CreatorPage", () => {
     expect(screen.queryByText("@minarei")).not.toBeInTheDocument();
     expect(screen.getByText("contract-backed creator bio")).toBeInTheDocument();
     expect(screen.getByText("¥82,000")).toBeInTheDocument();
-    expect(screen.getByText("差し戻し対応が1件あります")).toBeInTheDocument();
-    expect(screen.getByText("1件の package が対象です。detail から修正後の再申請を進めてください。")).toBeInTheDocument();
+    expect(screen.getByText("差し戻し 1件")).toBeInTheDocument();
+    expect(screen.getByText("修正内容を確認")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /^Top main\b/ })).toBeEnabled();
     expect(screen.getByRole("button", { name: /^Top short\b/ })).toBeEnabled();
     expect(screen.getAllByText("238 unlocks")).toHaveLength(2);
     expect(await screen.findByTestId("creator-workspace-preview-tile")).toBeInTheDocument();
+    expect(screen.queryByText("承認済み")).not.toBeInTheDocument();
     expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
     expect(screen.queryByText("owner preview 一覧から取得したショートデータです。")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^Top main\b/ }));
 
     expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("審査状況")).not.toBeInTheDocument();
+    expect(screen.queryByText("現在の package は承認済みです。")).not.toBeInTheDocument();
+    expect(screen.queryByText("package 承認済み")).not.toBeInTheDocument();
+    expect(screen.queryByText("本編 承認済み")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "審査へ申請" })).not.toBeInTheDocument();
     expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
     expect(screen.getAllByText("12:00")).toHaveLength(2);
+
+    const mainReviewSurfaceCallsBeforeResubmit = vi.mocked(getCreatorWorkspaceMainReviewSurface).mock.calls.length;
+    await user.click(screen.getByRole("button", { name: "再申請する" }));
+
+    await waitFor(() => {
+      expect(createCreatorWorkspaceSubmissionReview).toHaveBeenCalledWith({
+        mainId: "main_quiet_rooftop",
+      });
+    });
+    await waitFor(() => {
+      expect(vi.mocked(getCreatorWorkspaceMainReviewSurface).mock.calls.length).toBeGreaterThan(mainReviewSurfaceCallsBeforeResubmit);
+      expect(vi.mocked(getCreatorWorkspaceReviewSurface).mock.calls.length).toBeGreaterThan(1);
+    });
 
     await user.click(screen.getByRole("button", { name: "Back" }));
 
@@ -755,6 +818,8 @@ describe("CreatorPage", () => {
     expect(await screen.findByText("0:16")).toBeInTheDocument();
     const previewTiles = screen.getAllByTestId("creator-workspace-preview-tile");
     expect(previewTiles).toHaveLength(1);
+    expect(previewTiles[0]).not.toHaveTextContent(/\bShort\b|\bMain\b/);
+    expect(previewTiles[0]?.closest("section")).toHaveClass("grid-cols-2");
 
     await user.click(screen.getByRole("button", { name: "ショート詳細を開く 1件目 0:16" }));
 
@@ -771,7 +836,7 @@ describe("CreatorPage", () => {
       "https://cdn.example.com/creator/preview/shorts/quiet-rooftop.mp4",
     );
 
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
 
     expect(screen.queryByText("asset_main_quiet_rooftop")).not.toBeInTheDocument();
     expect(screen.getByText("¥1,800")).toBeInTheDocument();
@@ -792,10 +857,11 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "Main" }));
 
     expect(await screen.findByText("12:00")).toBeInTheDocument();
-    expect(await screen.findByText("¥1,800")).toBeInTheDocument();
+    expect(screen.queryByText("¥1,800")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("creator-workspace-preview-tile")[0]).not.toHaveTextContent(/\bShort\b|\bMain\b/);
     expect(screen.queryByText("owner preview 一覧から取得した本編データです。")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
 
     expect(await screen.findByRole("button", { name: "本編を再生" })).toBeInTheDocument();
     expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
@@ -839,7 +905,7 @@ describe("CreatorPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Back" }));
     await user.click(screen.getByRole("button", { name: "Main" }));
-    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 ¥1,800 12:00" }));
+    await user.click(screen.getByRole("button", { name: "本編詳細を開く 1件目 12:00" }));
     await user.click(screen.getByRole("button", { name: "投稿操作" }));
 
     expect(screen.getByRole("button", { name: "priceの変更" })).toBeInTheDocument();

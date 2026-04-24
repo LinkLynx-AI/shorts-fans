@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS app.idx_media_processing_jobs_review_submit_retry;

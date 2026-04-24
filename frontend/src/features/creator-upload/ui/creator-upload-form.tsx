@@ -437,7 +437,7 @@ export function CreatorUploadForm() {
                 処理開始を受け付けました。
               </p>
               <p className="m-0 font-medium">
-                {`main 1本 / short ${successState.shortIds.length}本 の処理を開始しました。公開や審査提出はまだ行われていません。`}
+                {`main 1本 / short ${successState.shortIds.length}本 の処理を開始しました。processing 完了後に自動で審査へ進みます。`}
               </p>
             </section>
           ) : null}

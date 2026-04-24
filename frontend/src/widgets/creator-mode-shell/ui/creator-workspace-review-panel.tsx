@@ -1,6 +1,11 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import {
+  startTransition,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import {
   createCreatorWorkspaceSubmissionReview,
@@ -10,29 +15,84 @@ import { ApiError } from "@/shared/api";
 import { Button } from "@/shared/ui";
 
 import {
-  buildCreatorWorkspaceReviewActionLabel,
   buildCreatorWorkspaceReviewPackageHeadline,
+  hasCreatorWorkspaceReviewIssue,
   resolveCreatorWorkspaceObjectReviewBadge,
   resolveCreatorWorkspacePackageReviewBadge,
   resolveCreatorWorkspaceReviewBlockerLabel,
+  resolveCreatorWorkspaceReviewReasonCopy,
   type CreatorWorkspaceItemReviewSurfaceState,
   type CreatorWorkspaceReviewBadge,
 } from "../model/creator-workspace-review-surface";
 
-function getCreatorWorkspaceReviewBadgeClassName(tone: CreatorWorkspaceReviewBadge["tone"]): string {
+function getCreatorWorkspaceReviewPanelClassName(tone: CreatorWorkspaceReviewBadge["tone"]): string {
   switch (tone) {
     case "revision":
-      return "bg-[rgba(244,152,45,0.14)] text-[#8e4e0a]";
+      return "border-[rgba(244,152,45,0.24)] bg-[linear-gradient(180deg,rgba(255,251,245,0.98),rgba(253,245,232,0.94))]";
     case "removed":
-      return "bg-[rgba(217,77,77,0.12)] text-[#9f2437]";
+      return "border-[rgba(217,77,77,0.24)] bg-[linear-gradient(180deg,rgba(255,248,248,0.98),rgba(255,242,243,0.94))]";
     case "pending":
-      return "bg-[rgba(16,130,200,0.12)] text-[#0a5b8c]";
     case "paused":
-      return "bg-[rgba(16,130,200,0.12)] text-[#0a5b8c]";
-    case "approved":
-      return "bg-[rgba(52,168,83,0.12)] text-[#1d6f3a]";
     case "hidden":
-      return "bg-[rgba(7,19,29,0.12)] text-[#1b3f5a]";
+      return "border-[rgba(167,220,249,0.36)] bg-[linear-gradient(180deg,rgba(251,253,255,0.98),rgba(244,250,253,0.94))]";
+    case "approved":
+      return "border-[rgba(167,220,249,0.24)] bg-[rgba(248,251,253,0.9)]";
+  }
+}
+
+function getCreatorWorkspaceReviewAccentClassName(tone: CreatorWorkspaceReviewBadge["tone"]): string {
+  switch (tone) {
+    case "revision":
+      return "bg-[#f4982d]";
+    case "removed":
+      return "bg-[#d94d4d]";
+    case "pending":
+    case "paused":
+    case "hidden":
+      return "bg-[#1082c8]";
+    case "approved":
+      return "bg-[#34a853]";
+  }
+}
+
+function getCreatorWorkspaceReviewStatusClassName(tone: CreatorWorkspaceReviewBadge["tone"]): string {
+  switch (tone) {
+    case "revision":
+      return "text-[#8e4e0a]";
+    case "removed":
+      return "text-[#9f2437]";
+    case "pending":
+    case "paused":
+    case "hidden":
+      return "text-[#0a5b8c]";
+    case "approved":
+      return "text-[#1d6f3a]";
+  }
+}
+
+function getCreatorWorkspaceReviewPanelTone(
+  packageBadge: CreatorWorkspaceReviewBadge | null,
+  targetBadge: CreatorWorkspaceReviewBadge | null,
+): CreatorWorkspaceReviewBadge["tone"] {
+  if (packageBadge?.tone === "removed" || targetBadge?.tone === "removed") {
+    return "removed";
+  }
+
+  if (packageBadge?.tone === "revision" || targetBadge?.tone === "revision") {
+    return "revision";
+  }
+
+  return packageBadge?.tone ?? targetBadge?.tone ?? "paused";
+}
+
+function buildCreatorWorkspaceReviewIssueTitle(tone: CreatorWorkspaceReviewBadge["tone"]): string {
+  switch (tone) {
+    case "removed":
+      return "公開できません";
+    case "revision":
+      return "修正が必要です";
+    default:
+      return "確認が必要です";
   }
 }
 
@@ -40,24 +100,25 @@ function buildCreatorWorkspaceSubmissionReviewErrorMessage(error: unknown): stri
   if (error instanceof CreatorWorkspaceSubmissionReviewApiError) {
     switch (error.code) {
       case "auth_required":
+        return "ログイン状態を確認してから、もう一度再申請してください。";
       case "creator_mode_unavailable":
-        return "creator mode が利用できないため、申請を続けられません。";
+        return "creator mode の利用状態を確認してから、もう一度再申請してください。";
       case "not_found":
-        return "対象 package が見つからないため、最新状態を読み込み直してください。";
+        return "対象の package を確認できませんでした。最新の状態を再読み込みしてください。";
       case "review_state_conflict":
-        return "審査状態が更新されたため、いまは申請できません。最新状態を読み込み直します。";
+        return "審査状態が更新されています。最新の状態を確認してから再申請してください。";
       case "submission_not_ready":
-        return "申請条件を満たしていないため送信できません。必要項目を確認してください。";
+        return "再申請に必要な項目がまだ揃っていません。内容を確認してから再申請してください。";
       case "internal_error":
-        return "申請を完了できませんでした。少し時間を置いてからやり直してください。";
+        return "再申請できませんでした。少し時間を置いてからやり直してください。";
     }
   }
 
   if (error instanceof ApiError && error.code === "network") {
-    return "申請を完了できませんでした。通信環境を確認してからやり直してください。";
+    return "再申請できませんでした。通信環境を確認してからやり直してください。";
   }
 
-  return "申請を完了できませんでした。少し時間を置いてからやり直してください。";
+  return "再申請できませんでした。少し時間を置いてからやり直してください。";
 }
 
 function shouldSyncCreatorWorkspaceReviewState(error: unknown): boolean {
@@ -65,24 +126,39 @@ function shouldSyncCreatorWorkspaceReviewState(error: unknown): boolean {
     return false;
   }
 
-  switch (error.code) {
-    case "not_found":
-    case "review_state_conflict":
-    case "submission_not_ready":
-      return true;
-    default:
-      return false;
-  }
+  return error.code === "not_found"
+    || error.code === "review_state_conflict"
+    || error.code === "submission_not_ready";
 }
 
-function CreatorWorkspaceReviewPanelLoading() {
-  return (
-    <section className="grid gap-3 rounded-[24px] border border-[rgba(167,220,249,0.36)] bg-[rgba(248,251,253,0.9)] px-4 py-4">
-      <div aria-hidden="true" className="h-4 w-24 animate-pulse rounded-full bg-[rgba(167,220,249,0.32)]" />
-      <div aria-hidden="true" className="h-4 w-40 animate-pulse rounded-full bg-[rgba(167,220,249,0.22)]" />
-      <div aria-hidden="true" className="h-10 w-28 animate-pulse rounded-[999px] bg-[rgba(167,220,249,0.22)]" />
-    </section>
-  );
+function buildCreatorWorkspaceReviewScopeLabel({
+  packageBadge,
+  targetBadge,
+  targetKind,
+}: {
+  packageBadge: CreatorWorkspaceReviewBadge | null;
+  targetBadge: CreatorWorkspaceReviewBadge | null;
+  targetKind: "main" | "short";
+}): string {
+  const targetLabel = targetKind === "main" ? "本編" : "ショート";
+
+  if (packageBadge && targetBadge) {
+    if (packageBadge.label === targetBadge.label) {
+      return targetLabel;
+    }
+
+    return `${targetLabel}: ${targetBadge.label}`;
+  }
+
+  if (packageBadge) {
+    return targetLabel;
+  }
+
+  if (targetBadge) {
+    return targetLabel;
+  }
+
+  return targetLabel;
 }
 
 function CreatorWorkspaceReviewPanelError({
@@ -107,19 +183,33 @@ function CreatorWorkspaceReviewPanelError({
 }
 
 export function CreatorWorkspaceReviewPanel({
-  onRetry,
   onSync,
+  onRetry,
   state,
 }: {
-  onRetry: () => void;
   onSync: () => void;
+  onRetry: () => void;
   state: CreatorWorkspaceItemReviewSurfaceState;
 }) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const resetKey = state.kind === "ready"
-    ? `${state.surface.target.kind}:${state.surface.target.id}:${state.surface.package.reviewStatus}:${state.surface.review.state}`
+    ? [
+        state.surface.requestId,
+        state.surface.target.kind,
+        state.surface.target.id,
+        state.surface.package.canonicalMainId,
+        state.surface.package.linkedShortCount,
+        state.surface.package.readiness,
+        state.surface.package.reviewStatus,
+        state.surface.package.submitAction,
+        [...state.surface.package.blockers].sort().join(","),
+        state.surface.review.state,
+        state.surface.review.reasonCode ?? "",
+      ].join(":")
     : state.kind;
+  const latestResetKeyRef = useRef(resetKey);
+  latestResetKeyRef.current = resetKey;
 
   useEffect(() => {
     setErrorMessage(null);
@@ -131,7 +221,7 @@ export function CreatorWorkspaceReviewPanel({
   }
 
   if (state.kind === "loading") {
-    return <CreatorWorkspaceReviewPanelLoading />;
+    return null;
   }
 
   if (state.kind === "error") {
@@ -139,71 +229,106 @@ export function CreatorWorkspaceReviewPanel({
   }
 
   const surface = state.surface;
-  const packageBadge = resolveCreatorWorkspacePackageReviewBadge(surface.package.reviewStatus);
-  const targetBadge = resolveCreatorWorkspaceObjectReviewBadge(surface.review.state);
-  const submitActionLabel = buildCreatorWorkspaceReviewActionLabel(surface.package.submitAction);
-  const isShortTarget = surface.target.kind === "short";
+  if (!hasCreatorWorkspaceReviewIssue(surface)) {
+    return null;
+  }
 
-  async function handleSubmitReview() {
-    if (isSubmitting) {
+  const packageBadge = surface.package.reviewStatus === "changes_requested" || surface.package.reviewStatus === "rejected"
+    ? resolveCreatorWorkspacePackageReviewBadge(surface.package.reviewStatus)
+    : null;
+  const targetBadge = resolveCreatorWorkspaceObjectReviewBadge(surface.review.state);
+  const packageHeadline = buildCreatorWorkspaceReviewPackageHeadline(surface.package);
+  const reasonCopy = resolveCreatorWorkspaceReviewReasonCopy(surface.review.reasonCode);
+  const panelTone = getCreatorWorkspaceReviewPanelTone(packageBadge, targetBadge);
+  const scopeLabel = buildCreatorWorkspaceReviewScopeLabel({
+    packageBadge,
+    targetBadge,
+    targetKind: surface.target.kind,
+  });
+  const statusLabel = targetBadge?.label ?? packageBadge?.label ?? "要確認";
+  const canResubmit = surface.package.submitAction === "resubmit";
+
+  async function handleResubmit() {
+    if (!canResubmit) {
       return;
     }
 
-    setIsSubmitting(true);
-    setErrorMessage(null);
+    const requestResetKey = resetKey;
+    const isCurrentRequest = () => latestResetKeyRef.current === requestResetKey;
 
+    setErrorMessage(null);
+    setIsSubmitting(true);
     try {
       await createCreatorWorkspaceSubmissionReview({
-        mainId: surface.target.canonicalMainId,
+        mainId: surface.package.canonicalMainId,
       });
-
+      if (!isCurrentRequest()) {
+        return;
+      }
       startTransition(() => {
         onSync();
       });
     } catch (error) {
+      if (!isCurrentRequest()) {
+        return;
+      }
       setErrorMessage(buildCreatorWorkspaceSubmissionReviewErrorMessage(error));
-
       if (shouldSyncCreatorWorkspaceReviewState(error)) {
         startTransition(() => {
           onSync();
         });
       }
     } finally {
-      setIsSubmitting(false);
+      if (isCurrentRequest()) {
+        setIsSubmitting(false);
+      }
     }
   }
 
   return (
-    <section className="grid gap-3 rounded-[24px] border border-[rgba(167,220,249,0.36)] bg-[rgba(248,251,253,0.9)] px-4 py-4 text-foreground">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`inline-flex min-h-7 items-center justify-center rounded-full px-3 text-[10px] font-bold uppercase tracking-[0.14em] ${getCreatorWorkspaceReviewBadgeClassName(packageBadge.tone)}`}>
-          package {packageBadge.label}
-        </span>
-        {targetBadge ? (
-          <span className={`inline-flex min-h-7 items-center justify-center rounded-full px-3 text-[10px] font-bold uppercase tracking-[0.14em] ${getCreatorWorkspaceReviewBadgeClassName(targetBadge.tone)}`}>
-            {surface.target.kind === "main" ? "本編" : "ショート"} {targetBadge.label}
-          </span>
-        ) : null}
-      </div>
-
-      <div className="grid gap-1">
-        <h3 className="m-0 text-sm font-bold text-foreground">審査状況</h3>
-        <p className="m-0 text-[13px] leading-[1.6] text-muted">
-          {buildCreatorWorkspaceReviewPackageHeadline(surface.package)}
-        </p>
-      </div>
-
-      {surface.review.reasonCode ? (
-        <div className="grid gap-1 rounded-[18px] border border-[rgba(167,220,249,0.32)] bg-white/72 px-3 py-3">
-          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-strong">reason code</span>
-          <code className="text-[12px] text-foreground">{surface.review.reasonCode}</code>
+    <section className={`rounded-[18px] border px-4 py-4 text-foreground ${getCreatorWorkspaceReviewPanelClassName(panelTone)}`}>
+      <div className="flex items-start gap-3">
+        <span aria-hidden="true" className={`mt-[7px] size-2.5 shrink-0 rounded-full ${getCreatorWorkspaceReviewAccentClassName(panelTone)}`} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <h3 className="m-0 text-[15px] font-bold leading-[1.45] text-foreground">
+              {buildCreatorWorkspaceReviewIssueTitle(panelTone)}
+            </h3>
+            <span className={`text-[12px] font-bold leading-[1.45] ${getCreatorWorkspaceReviewStatusClassName(panelTone)}`}>
+              {statusLabel}
+            </span>
+          </div>
+          {packageHeadline ? (
+            <p className="m-0 mt-1 text-[13px] leading-[1.65] text-muted">
+              {packageHeadline}
+            </p>
+          ) : null}
         </div>
+      </div>
+
+      <dl className="m-0 mt-3 grid gap-2 border-t border-[rgba(7,19,29,0.08)] pt-3 text-[12px] leading-[1.55]">
+        <div className="flex items-center justify-between gap-3">
+          <dt className="text-muted">対象</dt>
+          <dd className="m-0 text-right font-bold text-foreground">{scopeLabel}</dd>
+        </div>
+        {reasonCopy ? (
+          <div className="flex items-start justify-between gap-3">
+            <dt className="text-muted">理由</dt>
+            <dd className="m-0 min-w-0 text-right font-bold text-foreground">{reasonCopy.label}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {reasonCopy ? (
+        <p className="m-0 mt-3 border-t border-[rgba(7,19,29,0.08)] pt-3 text-[12px] leading-[1.65] text-muted">
+          {reasonCopy.description}
+        </p>
       ) : null}
 
       {surface.package.blockers.length > 0 ? (
-        <div className="grid gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-strong">申請前の確認</span>
-          <ul className="m-0 grid gap-2 pl-5 text-[13px] leading-[1.6] text-muted">
+        <div className="mt-3 border-t border-[rgba(7,19,29,0.08)] pt-3">
+          <p className="m-0 text-[12px] font-bold text-foreground">審査投入前の確認</p>
+          <ul className="m-0 mt-2 grid gap-1.5 pl-4 text-[12px] leading-[1.6] text-muted">
             {surface.package.blockers.map((blockerCode) => (
               <li key={blockerCode}>{resolveCreatorWorkspaceReviewBlockerLabel(blockerCode)}</li>
             ))}
@@ -211,24 +336,16 @@ export function CreatorWorkspaceReviewPanel({
         </div>
       ) : null}
 
-      {isShortTarget ? (
-        <p className="m-0 text-[12px] leading-[1.6] text-muted">
-          このショートからの submit / resubmit は、linked main package 単位で反映されます。
-        </p>
-      ) : null}
-
       {errorMessage ? (
-        <p className="m-0 rounded-[18px] bg-[#fff0f1] px-4 py-3 text-[13px] leading-[1.6] text-[#b2394f]" role="alert">
+        <p className="m-0 mt-3 border-t border-[rgba(7,19,29,0.08)] pt-3 text-[12px] leading-[1.65] text-[#9f2437]" role="alert">
           {errorMessage}
         </p>
       ) : null}
 
-      {submitActionLabel ? (
-        <div>
-          <Button disabled={isSubmitting} onClick={() => {
-            void handleSubmitReview();
-          }} type="button">
-            {isSubmitting ? "送信中..." : submitActionLabel}
+      {canResubmit ? (
+        <div className="mt-4">
+          <Button disabled={isSubmitting} onClick={handleResubmit} type="button">
+            {isSubmitting ? "再申請中..." : "再申請する"}
           </Button>
         </div>
       ) : null}

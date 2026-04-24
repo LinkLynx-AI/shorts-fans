@@ -1,4 +1,5 @@
 import { ApiError } from "@/shared/api";
+import { getSubmissionReviewReasonOption } from "@/entities/submission-review";
 
 import type {
   CreatorWorkspaceItemReviewSurface,
@@ -18,6 +19,11 @@ export type CreatorWorkspaceReviewNotification = {
   key: string;
   label: string;
   tone: ApprovedCreatorWorkspaceManagedItemTone;
+};
+
+export type CreatorWorkspaceReviewReasonCopy = {
+  description: string;
+  label: string;
 };
 
 export type CreatorWorkspaceReviewSurfaceState =
@@ -137,19 +143,19 @@ function resolveCreatorWorkspaceReviewTone(
 
 function resolveCreatorWorkspaceReviewLabel(
   state: "approved" | "approved_for_publish" | "approved_for_unlock" | "changes_requested" | "draft" | "pending_review" | "rejected" | "revision_requested",
-): string {
+): string | null {
   switch (state) {
     case "approved":
     case "approved_for_publish":
     case "approved_for_unlock":
-      return "承認済み";
+      return null;
     case "changes_requested":
     case "revision_requested":
       return "差し戻し";
     case "pending_review":
       return "審査中";
     case "rejected":
-      return "却下";
+      return "公開不可";
     case "draft":
       return "未申請";
   }
@@ -159,26 +165,46 @@ export function resolveCreatorWorkspaceObjectReviewBadge(
   state: string,
 ): CreatorWorkspaceReviewBadge | null {
   switch (state) {
-    case "approved_for_publish":
-    case "approved_for_unlock":
-    case "draft":
-    case "pending_review":
     case "rejected":
-    case "revision_requested":
+    case "revision_requested": {
+      const label = resolveCreatorWorkspaceReviewLabel(state);
+      if (!label) {
+        return null;
+      }
+
       return {
-        label: resolveCreatorWorkspaceReviewLabel(state),
+        label,
         tone: resolveCreatorWorkspaceReviewTone(state),
       };
+    }
     default:
       return null;
   }
 }
 
+export function hasCreatorWorkspaceReviewIssue(surface: CreatorWorkspaceItemReviewSurface): boolean {
+  const isNormalPackageStatus = surface.package.reviewStatus === "approved"
+    || surface.package.reviewStatus === "pending_review";
+
+  return surface.package.blockers.length > 0
+    || surface.package.readiness === "blocked"
+    || (surface.package.readiness === "conflict" && !isNormalPackageStatus)
+    || surface.package.reviewStatus === "changes_requested"
+    || surface.package.reviewStatus === "rejected"
+    || surface.review.state === "rejected"
+    || surface.review.state === "revision_requested";
+}
+
 export function resolveCreatorWorkspacePackageReviewBadge(
   reviewStatus: CreatorWorkspaceReviewPackageSummary["reviewStatus"],
-): CreatorWorkspaceReviewBadge {
+): CreatorWorkspaceReviewBadge | null {
+  const label = resolveCreatorWorkspaceReviewLabel(reviewStatus);
+  if (!label) {
+    return null;
+  }
+
   return {
-    label: resolveCreatorWorkspaceReviewLabel(reviewStatus),
+    label,
     tone: resolveCreatorWorkspaceReviewTone(reviewStatus),
   };
 }
@@ -202,52 +228,56 @@ export function resolveCreatorWorkspaceReviewBlockerLabel(blockerCode: string): 
   }
 }
 
-export function buildCreatorWorkspaceReviewActionLabel(
-  action: CreatorWorkspaceReviewPackageSummary["submitAction"],
-): string | null {
-  switch (action) {
-    case "submit":
-      return "審査へ申請";
-    case "resubmit":
-      return "再申請する";
-    case "none":
-      return null;
+export function resolveCreatorWorkspaceReviewReasonCopy(reasonCode: string | null): CreatorWorkspaceReviewReasonCopy | null {
+  if (reasonCode === null) {
+    return null;
   }
+
+  const reasonOption = getSubmissionReviewReasonOption(reasonCode);
+  if (reasonOption) {
+    return {
+      description: reasonOption.description,
+      label: reasonOption.label,
+    };
+  }
+
+  return {
+    description: "詳細は運営からの案内を確認してください。",
+    label: "審査基準の確認が必要です",
+  };
 }
 
 export function buildCreatorWorkspaceReviewPackageHeadline(
   summary: CreatorWorkspaceReviewPackageSummary,
-): string {
+): string | null {
   switch (summary.reviewStatus) {
     case "changes_requested":
       switch (summary.readiness) {
         case "ready":
-          return summary.submitAction === "resubmit"
-            ? "修正後に再申請できます。"
-            : "修正内容を確認してください。";
+          return "修正内容を確認してください。";
         case "blocked":
-          return "再申請前に必要項目を満たしてください。";
+          return "再審査前に必要項目を満たしてください。";
         case "conflict":
-          return "現在の審査状態では再申請できません。";
+          return "現在の審査状態では再審査できません。";
         case "none":
           return "修正内容を確認してください。";
       }
     case "rejected":
-      return "却下されたため、この package は self-serve で再申請できません。";
+      return "審査で公開不可となったため、この動画は再申請できません。";
     case "pending_review":
-      return "審査結果を待っています。";
+      return null;
     case "approved":
-      return "現在の package は承認済みです。";
+      return null;
     case "draft":
       switch (summary.readiness) {
         case "ready":
-          return "この package は審査へ申請できます。";
+          return "自動審査投入の反映を待っています。";
         case "blocked":
-          return "申請前に必要項目を満たしてください。";
+          return "審査投入前に必要項目を満たしてください。";
         case "conflict":
-          return "現在の審査状態では申請できません。";
+          return "現在の審査状態では審査投入できません。";
         case "none":
-          return "この package はまだ申請待ちです。";
+          return "この動画はまだ審査投入待ちです。";
       }
   }
 }
@@ -256,18 +286,11 @@ function formatCount(value: number): string {
   return value.toLocaleString("ja-JP");
 }
 
-function buildNotificationDetail(count: number, detail: string): string {
-  return `${formatCount(count)}件の package が対象です。${detail}`;
-}
-
 export function deriveCreatorWorkspaceReviewNotifications(
   packages: readonly CreatorWorkspaceReviewPackageSummary[],
 ): readonly CreatorWorkspaceReviewNotification[] {
   let changesRequestedCount = 0;
   let rejectedCount = 0;
-  let readyDraftCount = 0;
-  let blockedDraftCount = 0;
-  let pendingReviewCount = 0;
 
   for (const item of packages) {
     switch (item.reviewStatus) {
@@ -277,57 +300,23 @@ export function deriveCreatorWorkspaceReviewNotifications(
       case "rejected":
         rejectedCount += 1;
         break;
-      case "draft":
-        switch (item.readiness) {
-          case "ready":
-            readyDraftCount += 1;
-            break;
-          case "blocked":
-            blockedDraftCount += 1;
-            break;
-        }
-        break;
-      case "pending_review":
-        pendingReviewCount += 1;
-        break;
     }
   }
 
   return [
     changesRequestedCount > 0 ? {
-      detail: buildNotificationDetail(changesRequestedCount, "detail から修正後の再申請を進めてください。"),
-      headline: `差し戻し対応が${formatCount(changesRequestedCount)}件あります`,
+      detail: "修正内容を確認",
+      headline: `差し戻し ${formatCount(changesRequestedCount)}件`,
       key: "changes_requested",
       label: "差し戻し",
       tone: "revision",
     } : null,
     rejectedCount > 0 ? {
-      detail: buildNotificationDetail(rejectedCount, "self-serve では再申請できないため、内容確認が必要です。"),
-      headline: `却下された package が${formatCount(rejectedCount)}件あります`,
+      detail: "該当動画の確認をお願いします",
+      headline: `公開不可 ${formatCount(rejectedCount)}件`,
       key: "rejected",
-      label: "却下",
+      label: "公開不可",
       tone: "removed",
-    } : null,
-    readyDraftCount > 0 ? {
-      detail: buildNotificationDetail(readyDraftCount, "detail からそのまま審査へ申請できます。"),
-      headline: `申請できる package が${formatCount(readyDraftCount)}件あります`,
-      key: "ready_draft",
-      label: "未申請",
-      tone: "paused",
-    } : null,
-    blockedDraftCount > 0 ? {
-      detail: buildNotificationDetail(blockedDraftCount, "申請前に価格や processing 状態を確認してください。"),
-      headline: `申請前の確認が必要な package が${formatCount(blockedDraftCount)}件あります`,
-      key: "blocked_draft",
-      label: "要確認",
-      tone: "paused",
-    } : null,
-    pendingReviewCount > 0 ? {
-      detail: buildNotificationDetail(pendingReviewCount, "審査結果が出るまで detail からの再申請はできません。"),
-      headline: `審査中の package が${formatCount(pendingReviewCount)}件あります`,
-      key: "pending_review",
-      label: "審査中",
-      tone: "pending",
     } : null,
   ].filter((item): item is CreatorWorkspaceReviewNotification => item !== null);
 }

@@ -15,6 +15,8 @@
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
 | `SHO-161` | `docs/contracts/fan-short-pin-api-contract.md` | `docs/contracts/fixtures/fan-short-pin.json` |
+| `short comments` | `docs/contracts/fan-short-comment-api-contract.md` | `docs/contracts/fixtures/fan-short-comments.json` |
+| `short-like` | `docs/contracts/fan-short-like-api-contract.md` | `docs/contracts/fixtures/fan-short-like.json` |
 | `SHO-113` | `docs/contracts/fan-creator-follow-api-contract.md` | `docs/contracts/fixtures/fan-creator-follow.json` |
 | `SHO-18` | `docs/contracts/fan-unlock-main-api-contract.md` | `docs/contracts/fixtures/fan-unlock-main.json` |
 | `SHO-19` | `docs/contracts/fan-profile-api-contract.md` | `docs/contracts/fixtures/fan-profile.json` |
@@ -34,17 +36,20 @@
 3. `SHO-161`
    - `PUT /api/fan/shorts/{shortId}/pin`
    - `DELETE /api/fan/shorts/{shortId}/pin`
-4. `SHO-113`
+4. `short-like`
+   - `PUT /api/fan/shorts/{shortId}/like`
+   - `DELETE /api/fan/shorts/{shortId}/like`
+5. `SHO-113`
    - `PUT /api/fan/creators/{creatorId}/follow`
    - `DELETE /api/fan/creators/{creatorId}/follow`
-5. `SHO-18`
+6. `SHO-18`
    - `GET /api/fan/shorts/{shortId}/unlock`
    - `POST /api/fan/mains/{mainId}/card-setup-session`
    - `POST /api/fan/mains/{mainId}/card-setup-token`
    - `POST /api/fan/mains/{mainId}/purchase`
    - `POST /api/fan/mains/{mainId}/access-entry`
    - `GET /api/fan/mains/{mainId}/playback`
-6. `SHO-19`
+7. `SHO-19`
    - `GET /api/fan/profile`
    - `GET /api/fan/profile/following`
    - `GET /api/fan/profile/pinned-shorts`
@@ -73,7 +78,11 @@
    - `PUT /api/fan/shorts/{shortId}/pin`
    - `DELETE /api/fan/shorts/{shortId}/pin`
    - bootstrap 済みの authenticated fan session を前提にし、success では `viewer.isPinned` だけを返す
-5. `SHO-113`
+5. `short-like`
+   - `PUT /api/fan/shorts/{shortId}/like`
+   - `DELETE /api/fan/shorts/{shortId}/like`
+   - bootstrap 済みの authenticated fan session を前提にし、success では `viewer.hasLiked` と `engagement.likeCount` だけを返す
+6. `SHO-113`
    - `PUT /api/fan/creators/{creatorId}/follow`
    - `DELETE /api/fan/creators/{creatorId}/follow`
    - bootstrap 済みの authenticated fan session を前提にし、success では relation state と `fanCount` だけを返す
@@ -88,6 +97,8 @@
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `following_ranked`, `following_empty`, `following_auth_required`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
+| `short comments` | `short comment sheet` | `fan-short-comment-api-contract.md` | `short_comments_first_page`, `short_comments_empty`, `short_comment_created`, `short_comment_auth_required`, `short_comment_validation_error` |
+| `short-like` | `feed / short detail like CTA` | `fan-short-like-api-contract.md` | `like_success`, `like_auth_required`, `like_not_found`, `like_repeat`, `unlike_success`, `unlike_auth_required`, `unlike_not_found`, `unlike_repeat` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-115` | `creator profile follow CTA` | `fan-creator-follow-api-contract.md` | `follow_success`, `follow_auth_required`, `follow_not_found`, `follow_repeat`, `unfollow_success`, `unfollow_auth_required`, `unfollow_not_found`, `unfollow_repeat` |
 | `SHO-8` | `mini setup / main player` | `fan-unlock-main-api-contract.md` | `setup_required`, `unlock_available`, `purchase_pending`, `already_purchased`, `owner`, `main_not_unlockable`, `not_found`, `purchase_required`, `auth_required`, `card_setup_session_issued`, `card_setup_session_main_not_unlockable`, `card_setup_token_issued`, `card_setup_token_main_not_unlockable`, `purchase_succeeded`, `purchase_failed_declined`, `purchase_failed_authentication`, `purchase_failed_card_brand_unsupported`, `entry_issued_after_purchase`, `entry_issued_already_purchased`, `entry_issued_owner`, `playback_purchased`, `playback_owner` |
@@ -97,6 +108,7 @@
 - `SHO-6` の short grid 追加取得では `GET /api/fan/creators/{creatorId}/shorts?cursor=...` だけを再度呼びます。
 - `SHO-169` の shared fan auth modal は primary entry を modal に固定し、auth success 後の behavior は current bootstrap refresh を正とします。
 - `SHO-163` の feed pin CTA は `PUT / DELETE /api/fan/shorts/{shortId}/pin` を使い、success body の `viewer.isPinned` で current surface state を更新できます。
+- `short-like` の feed / short detail like CTA は `PUT / DELETE /api/fan/shorts/{shortId}/like` を使い、success body の `viewer.hasLiked` と `engagement.likeCount` で current surface state を更新できます。
 - `SHO-115` の creator profile follow CTA は `PUT / DELETE /api/fan/creators/{creatorId}/follow` を使い、success body の `viewer.isFollowing` と `stats.fanCount` で header state を更新できます。
 - `SHO-8` の `Unlock` CTA は `GET /api/fan/shorts/{shortId}/unlock` で paywall state を読みます。`new_card` のときは `POST /api/fan/mains/{mainId}/card-setup-session` で widget 初期化情報と `sessionToken` を取得し、widget が返す `paymentTokenId` と `sessionToken` を `POST /api/fan/mains/{mainId}/card-setup-token` へ渡して opaque token に交換してから `POST /api/fan/mains/{mainId}/purchase` へ進みます。購入済みまたは owner なら `POST /api/fan/mains/{mainId}/access-entry` を経て main route へ遷移します。
 - `SHO-7` の初回表示では `GET /api/fan/profile` で counts を取得し、default tab の `GET /api/fan/profile/pinned-shorts` を別で呼びます。

@@ -22,6 +22,9 @@ var (
 	mainAssetID   = uuid.MustParse("66666666-6666-6666-6666-666666666666")
 	shortAAssetID = uuid.MustParse("77777777-7777-7777-7777-777777777777")
 	shortBAssetID = uuid.MustParse("88888888-8888-8888-8888-888888888888")
+	commentAID    = uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1")
+	commentBID    = uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa2")
+	commentCID    = uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa3")
 
 	creatorApprovedAt        = time.Date(2026, 1, 2, 9, 0, 0, 0, time.UTC)
 	creatorPublishedAt       = time.Date(2026, 1, 2, 9, 30, 0, 0, time.UTC)
@@ -33,6 +36,9 @@ var (
 	fanFollowedAt            = time.Date(2026, 1, 2, 12, 30, 0, 0, time.UTC)
 	fanUnlockedAt            = time.Date(2026, 1, 2, 13, 0, 0, 0, time.UTC)
 	fanPinnedShortAt         = time.Date(2026, 1, 2, 13, 30, 0, 0, time.UTC)
+	shortCommentAAt          = time.Date(2026, 1, 2, 14, 0, 0, 0, time.UTC)
+	shortCommentBAt          = time.Date(2026, 1, 2, 14, 5, 0, 0, time.UTC)
+	shortCommentCAt          = time.Date(2026, 1, 2, 14, 10, 0, 0, time.UTC)
 	fanSessionExpiresAt      = time.Date(2026, 12, 31, 0, 0, 0, 0, time.UTC)
 	creatorSessionExpiresAt  = time.Date(2026, 12, 31, 0, 5, 0, 0, time.UTC)
 	reviewSubmittedAt        = time.Date(2026, 4, 17, 8, 0, 0, 0, time.UTC)
@@ -82,6 +88,14 @@ type shortSeed struct {
 	publishedAt          time.Time
 }
 
+type shortCommentSeed struct {
+	body         string
+	id           uuid.UUID
+	shortID      uuid.UUID
+	authorUserID uuid.UUID
+	createdAt    time.Time
+}
+
 var mediaAssets = []mediaAssetSeed{
 	{
 		id:          mainAssetID,
@@ -117,6 +131,30 @@ var publicShorts = []shortSeed{
 		mediaAssetID:         shortBAssetID,
 		approvedForPublishAt: shortBApprovedAt,
 		publishedAt:          shortBPublishedAt,
+	},
+}
+
+var shortComments = []shortCommentSeed{
+	{
+		body:         "この preview の空気感、続きが気になります。",
+		id:           commentAID,
+		shortID:      shortAID,
+		authorUserID: fanUserID,
+		createdAt:    shortCommentAAt,
+	},
+	{
+		body:         "lighting がとてもきれいです。",
+		id:           commentBID,
+		shortID:      shortAID,
+		authorUserID: creatorUserID,
+		createdAt:    shortCommentBAt,
+	},
+	{
+		body:         "soft light の short も好きです。",
+		id:           commentCID,
+		shortID:      shortBID,
+		authorUserID: fanUserID,
+		createdAt:    shortCommentCAt,
 	},
 }
 
@@ -195,6 +233,11 @@ func Run(ctx context.Context, beginner postgres.TxBeginner) (Summary, error) {
 		}
 		if err := upsertPinnedShort(ctx, tx); err != nil {
 			return err
+		}
+		for _, comment := range shortComments {
+			if err := upsertShortComment(ctx, tx, comment); err != nil {
+				return err
+			}
 		}
 		if err := upsertAuthSession(ctx, tx, fanUserID, "fan", fanSessionToken, fanSessionExpiresAt); err != nil {
 			return err
@@ -766,6 +809,37 @@ func upsertPinnedShort(ctx context.Context, tx pgx.Tx) error {
 			pinned_at = EXCLUDED.pinned_at
 	`, fanUserID, shortAID, fanPinnedShortAt); err != nil {
 		return fmt.Errorf("pinned_shorts upsert user_id=%s short_id=%s: %w", fanUserID, shortAID, err)
+	}
+
+	return nil
+}
+
+func upsertShortComment(ctx context.Context, tx pgx.Tx, comment shortCommentSeed) error {
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO app.short_comments (
+			id,
+			short_id,
+			author_user_id,
+			body,
+			created_at,
+			updated_at
+		) VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$5
+		)
+		ON CONFLICT (id) DO UPDATE
+		SET
+			short_id = EXCLUDED.short_id,
+			author_user_id = EXCLUDED.author_user_id,
+			body = EXCLUDED.body,
+			created_at = EXCLUDED.created_at,
+			updated_at = EXCLUDED.updated_at
+	`, comment.id, comment.shortID, comment.authorUserID, comment.body, comment.createdAt); err != nil {
+		return fmt.Errorf("short_comments upsert comment_id=%s short_id=%s: %w", comment.id, comment.shortID, err)
 	}
 
 	return nil
