@@ -166,6 +166,7 @@ func TestFanFeedRecommendedRoute(t *testing.T) {
 			response.Data.Items[0].Viewer.IsFollowingCreator,
 		)
 	}
+	assertResponseOmitsCommentFields(t, rec.Body.String())
 	if !strings.Contains(rec.Body.String(), `"caption":"quiet rooftop preview"`) {
 		t.Fatalf("response body got %q want caption", rec.Body.String())
 	}
@@ -332,6 +333,7 @@ func TestFanShortDetailRoute(t *testing.T) {
 	if response.Data.Detail.UnlockCta.State != "continue_main" {
 		t.Fatalf("response.Data.Detail.UnlockCta.State got %q want %q", response.Data.Detail.UnlockCta.State, "continue_main")
 	}
+	assertResponseOmitsCommentFields(t, rec.Body.String())
 }
 
 func TestFanFeedRecommendedRouteRemembersRecommendationExposureForAuthenticatedViewer(t *testing.T) {
@@ -431,6 +433,16 @@ func TestFanFeedRecommendedRouteRemembersRecommendationExposureForAuthenticatedV
 	}
 	if len(rememberedCreators) != 1 || rememberedCreators[0] != creatorID {
 		t.Fatalf("RememberCreatorExposures() creatorIDs got %v want [%s]", rememberedCreators, creatorID)
+	}
+}
+
+func assertResponseOmitsCommentFields(t *testing.T, body string) {
+	t.Helper()
+
+	for _, field := range []string{`"comments"`, `"commentCount"`, `"commentsCount"`} {
+		if strings.Contains(body, field) {
+			t.Fatalf("response body got %q, want no %s field", body, field)
+		}
 	}
 }
 

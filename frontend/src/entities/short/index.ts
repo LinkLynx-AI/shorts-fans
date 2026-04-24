@@ -8,8 +8,18 @@ export {
   getPublicShortDetail,
 } from "./api/get-public-short-detail";
 export {
+  getShortComments,
+} from "./api/get-short-comments";
+export type {
+  ShortCommentsPage,
+} from "./api/get-short-comments";
+export {
   getShortPinErrorMessage,
 } from "./api/get-short-pin-error-message";
+export {
+  createShortComment,
+  ShortCommentApiError,
+} from "./api/create-short-comment";
 export {
   getShortLikeErrorMessage,
 } from "./api/get-short-like-error-message";
@@ -25,7 +35,11 @@ export type {
   FanFeedItem,
   FanFeedTab,
   PublicShortDetail,
+  ShortComment,
 } from "./api/contracts";
+export type {
+  ShortCommentApiErrorCode,
+} from "./api/create-short-comment";
 export type {
   ShortPinAction,
   ShortPinApiErrorCode,

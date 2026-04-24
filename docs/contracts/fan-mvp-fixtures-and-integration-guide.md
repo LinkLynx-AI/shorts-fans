@@ -15,6 +15,7 @@
 | `SHO-16` | `docs/contracts/fan-mvp-common-transport-contract.md` | `docs/contracts/fixtures/fan-mvp-common.json` |
 | `SHO-17` | `docs/contracts/fan-public-surface-api-contract.md` | `docs/contracts/fixtures/fan-public-surfaces.json` |
 | `SHO-161` | `docs/contracts/fan-short-pin-api-contract.md` | `docs/contracts/fixtures/fan-short-pin.json` |
+| `short comments` | `docs/contracts/fan-short-comment-api-contract.md` | `docs/contracts/fixtures/fan-short-comments.json` |
 | `short-like` | `docs/contracts/fan-short-like-api-contract.md` | `docs/contracts/fixtures/fan-short-like.json` |
 | `SHO-113` | `docs/contracts/fan-creator-follow-api-contract.md` | `docs/contracts/fixtures/fan-creator-follow.json` |
 | `SHO-18` | `docs/contracts/fan-unlock-main-api-contract.md` | `docs/contracts/fixtures/fan-unlock-main.json` |
@@ -96,6 +97,7 @@
 | `SHO-39` | `app shell bootstrap` | `viewer-bootstrap-api-contract.md` | `authenticatedFan`, `authenticatedCreator`, `unauthenticated` |
 | `SHO-5` | `feed / short detail` | `fan-public-surface-api-contract.md` | `recommended_public`, `recommended_unlocked`, `following_ranked`, `following_empty`, `following_auth_required`, `short_detail_public`, `short_detail_unlocked`, `short_detail_owner`, `short_detail_not_found` |
 | `SHO-163` | `feed pin CTA` | `fan-short-pin-api-contract.md` | `pin_success`, `pin_auth_required`, `pin_not_found`, `pin_repeat`, `unpin_success`, `unpin_auth_required`, `unpin_not_found`, `unpin_repeat` |
+| `short comments` | `short comment sheet` | `fan-short-comment-api-contract.md` | `short_comments_first_page`, `short_comments_empty`, `short_comment_created`, `short_comment_auth_required`, `short_comment_validation_error` |
 | `short-like` | `feed / short detail like CTA` | `fan-short-like-api-contract.md` | `like_success`, `like_auth_required`, `like_not_found`, `like_repeat`, `unlike_success`, `unlike_auth_required`, `unlike_not_found`, `unlike_repeat` |
 | `SHO-6` | `creator search / creator profile` | `fan-public-surface-api-contract.md` | `search_recent`, `search_filtered`, `creator_profile_header_normal`, `creator_profile_header_not_found`, `creator_profile_shorts_normal`, `creator_profile_shorts_empty`, `creator_profile_shorts_not_found`, `creator_profile_shorts_next_page` |
 | `SHO-115` | `creator profile follow CTA` | `fan-creator-follow-api-contract.md` | `follow_success`, `follow_auth_required`, `follow_not_found`, `follow_repeat`, `unfollow_success`, `unfollow_auth_required`, `unfollow_not_found`, `unfollow_repeat` |

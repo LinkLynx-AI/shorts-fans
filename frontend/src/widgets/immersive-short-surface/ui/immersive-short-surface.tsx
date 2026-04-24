@@ -2,8 +2,23 @@
 
 import Link from "next/link";
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { startTransition, useCallback, useEffect, useEffectEvent, useRef, useState } from "react";
-import { ArrowLeft, Heart } from "lucide-react";
+import {
+  lazy,
+  memo,
+  startTransition,
+  Suspense,
+  useCallback,
+  useEffect,
+  useEffectEvent,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ArrowLeft,
+  Heart,
+  MessageCircle,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -43,6 +58,14 @@ const feedSurfaceStyle = {
   "--short-tile-mid": "#4cc0eb",
   "--short-tile-top": "#d8f3ff",
 } as CSSProperties;
+
+const LazyShortCommentsSheet = lazy(async () => {
+  const commentsModule = await import("@/features/short-comments");
+
+  return {
+    default: commentsModule.ShortCommentsSheet,
+  };
+});
 
 const sharedFanNavigationBaseInsetPx = 76;
 const feedActionRailOffsetPx = 152;
@@ -305,6 +328,62 @@ function PinRail({ disabled = false, onToggle, pinned, variant = "default" }: Pi
   );
 }
 
+type CommentRailButtonProps = {
+  hasViewerSession: boolean;
+  onAuthRequired: () => void;
+  shortId: string;
+  variant?: "default" | "feed";
+};
+
+/**
+ * short comment sheet を開く action rail button を表示する。
+ */
+const CommentRailButton = memo(function CommentRailButton({
+  hasViewerSession,
+  onAuthRequired,
+  shortId,
+  variant = "default",
+}: CommentRailButtonProps) {
+  const isFeedVariant = variant === "feed";
+  const [isSheetMounted, setIsSheetMounted] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const trigger = (
+    <button
+      aria-label="Open comments"
+      className={cn(
+        isFeedVariant
+          ? "inline-flex size-11 items-center justify-center bg-transparent p-0 text-white drop-shadow-lg transition-transform hover:scale-110"
+          : "inline-flex size-11 items-center justify-center rounded-full bg-transparent p-0 text-accent-strong/72 transition hover:text-accent",
+      )}
+      onClick={() => {
+        setIsSheetMounted(true);
+        setIsSheetOpen(true);
+      }}
+      type="button"
+    >
+      <MessageCircle aria-hidden="true" className={cn("size-[22px]", isFeedVariant && "h-7 w-7")} strokeWidth={2} />
+      <span className="sr-only">Open comments</span>
+    </button>
+  );
+
+  if (!isSheetMounted) {
+    return trigger;
+  }
+
+  return (
+    <Suspense fallback={trigger}>
+      <LazyShortCommentsSheet
+        hasViewerSession={hasViewerSession}
+        onAuthRequired={onAuthRequired}
+        onOpenChange={setIsSheetOpen}
+        open={isSheetOpen}
+        shortId={shortId}
+        trigger={trigger}
+      />
+    </Suspense>
+  );
+});
+
 type CreatorBlockProps = {
   creator: FeedShortSurface["creator"];
   followState?:
@@ -354,9 +433,11 @@ function FeedCreatorAvatar({
 }
 
 function FeedActionRail({
+  comments,
   like,
   pin,
 }: {
+  comments: CommentRailButtonProps | null;
   like: LikeRailProps;
   pin: PinRailProps;
 }) {
@@ -368,6 +449,7 @@ function FeedActionRail({
     >
       <LikeRail {...like} variant="feed" />
       <PinRail {...pin} variant="feed" />
+      {comments ? <CommentRailButton {...comments} variant="feed" /> : null}
     </div>
   );
 }
@@ -636,6 +718,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
   const { creator, short, unlock, viewer } = surface;
   const viewerIdentityKey = currentViewer?.id ?? null;
   const usesApiBackedUnlockFlow = short.id.startsWith("short_");
+  const hasCommentSurface = usesApiBackedUnlockFlow;
   const [isRecommendationSurfaceReady, setIsRecommendationSurfaceReady] = useState(
     () => viewerIdentityKey !== null || !usesApiBackedUnlockFlow,
   );
@@ -768,6 +851,11 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       postAuthNavigation: "none",
     });
   };
+  const openCommentAuthDialog = useCallback(() => {
+    openFanAuthDialog({
+      postAuthNavigation: "none",
+    });
+  }, [openFanAuthDialog]);
 
   const {
     acceptAge,
@@ -967,6 +1055,16 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
           disabled: detailPinState.isPending,
           onToggle: detailPinState.onToggle,
         };
+  const commentButtonProps = useMemo<CommentRailButtonProps | null>(() => (hasCommentSurface ? {
+    hasViewerSession,
+    onAuthRequired: openCommentAuthDialog,
+    shortId: short.id,
+  } : null), [
+    hasCommentSurface,
+    hasViewerSession,
+    openCommentAuthDialog,
+    short.id,
+  ]);
   const likeProps =
     mode === "feed"
       ? props.like
@@ -1014,6 +1112,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
       >
         <h1 className="sr-only">{mode === "feed" ? "Feed" : "Short detail"}</h1>
         <FeedActionRail
+          comments={commentButtonProps}
           like={likeProps}
           pin={{
             pinned,
@@ -1122,6 +1221,7 @@ export function ImmersiveShortSurface(props: ImmersiveShortSurfaceProps) {
         <div className="absolute right-4 z-20 flex flex-col items-center gap-6" style={{ bottom: "204px" }}>
           <LikeRail {...likeProps} />
           <PinRail pinned={pinned} {...pinProps} />
+          {commentButtonProps ? <CommentRailButton {...commentButtonProps} /> : null}
         </div>
         {interactionErrorMessage ? (
           <p

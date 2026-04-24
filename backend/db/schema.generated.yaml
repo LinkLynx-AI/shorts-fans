@@ -21,7 +21,11 @@ source:
         - 000015_add_recommendation_foundation.up.sql
         - 000016_add_payment_purchase_state.up.sql
         - 000017_add_submission_review_intakes.up.sql
-        - 000020_add_short_likes.up.sql
+        - 000018_add_submission_review_decisions.up.sql
+        - 000019_add_submission_review_notes.up.sql
+        - 000020_add_media_review_submit_retry_index.up.sql
+        - 000021_add_short_likes.up.sql
+        - 000022_add_short_comments.up.sql
 schemas:
     - name: app
       tables:
@@ -885,6 +889,15 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: review_decision_source
+              type: text
+              nullable: true
+            - name: review_decisioned_at
+              type: timestamp with time zone
+              nullable: true
+            - name: review_note
+              type: text
+              nullable: true
           primary_key:
             - id
           foreign_keys:
@@ -925,6 +938,10 @@ schemas:
               expression: CHECK (post_report_state IS NULL OR (post_report_state = ANY (ARRAY['under_review'::text, 'temporarily_limited'::text, 'removed'::text, 'restored'::text])))
             - name: mains_price_minor_check
               expression: CHECK (price_minor > 0)
+            - name: mains_review_decision_source_check
+              expression: CHECK (review_decision_source IS NULL OR (review_decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text])))
+            - name: mains_review_decisioned_at_pair_check
+              expression: CHECK (review_decision_source IS NULL AND review_decisioned_at IS NULL OR review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
             - name: mains_state_check
               expression: CHECK (state = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved_for_unlock'::text, 'revision_requested'::text, 'rejected'::text, 'suspended'::text, 'removed'::text]))
           indexes:
@@ -1094,6 +1111,13 @@ schemas:
               columns:
                 - creator_user_id
               definition: CREATE INDEX idx_media_processing_jobs_creator_user_id ON app.media_processing_jobs USING btree (creator_user_id)
+            - name: idx_media_processing_jobs_review_submit_retry
+              columns:
+                - completed_at
+                - updated_at
+                - id
+              predicate: ((status = 'succeeded'::text) AND (last_error_code = 'review_submit_failed'::text))
+              definition: CREATE INDEX idx_media_processing_jobs_review_submit_retry ON app.media_processing_jobs USING btree (completed_at, updated_at, id) WHERE ((status = 'succeeded'::text) AND (last_error_code = 'review_submit_failed'::text))
             - name: idx_media_processing_jobs_status
               columns:
                 - status
@@ -1784,6 +1808,58 @@ schemas:
                 - creator_user_id
                 - canonical_main_id
               definition: CREATE INDEX recommendation_viewer_short_features_short_identity_idx ON app.recommendation_viewer_short_features USING btree (short_id, creator_user_id, canonical_main_id)
+        - name: short_comments
+          columns:
+            - name: id
+              type: uuid
+              nullable: false
+              default: gen_random_uuid()
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: author_user_id
+              type: uuid
+              nullable: false
+            - name: body
+              type: text
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: updated_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+          primary_key:
+            - id
+          foreign_keys:
+            - name: short_comments_author_user_id_fkey
+              columns:
+                - author_user_id
+              references:
+                schema: app
+                table: users
+                columns:
+                    - id
+            - name: short_comments_short_id_fkey
+              columns:
+                - short_id
+              references:
+                schema: app
+                table: shorts
+                columns:
+                    - id
+          check_constraints:
+            - name: short_comments_body_check
+              expression: CHECK (length(btrim(body)) >= 1 AND length(btrim(body)) <= 500)
+          indexes:
+            - name: idx_short_comments_short_created
+              columns:
+                - short_id
+                - created_at
+                - id
+              definition: CREATE INDEX idx_short_comments_short_created ON app.short_comments USING btree (short_id, created_at DESC, id DESC)
         - name: short_likes
           columns:
             - name: user_id
@@ -1866,6 +1942,15 @@ schemas:
             - name: caption
               type: text
               nullable: true
+            - name: review_decision_source
+              type: text
+              nullable: true
+            - name: review_decisioned_at
+              type: timestamp with time zone
+              nullable: true
+            - name: review_note
+              type: text
+              nullable: true
           primary_key:
             - id
           foreign_keys:
@@ -1919,6 +2004,10 @@ schemas:
               expression: CHECK (published_at IS NULL OR published_at >= approved_for_publish_at)
             - name: shorts_post_report_state_check
               expression: CHECK (post_report_state IS NULL OR (post_report_state = ANY (ARRAY['under_review'::text, 'temporarily_limited'::text, 'removed'::text, 'restored'::text])))
+            - name: shorts_review_decision_source_check
+              expression: CHECK (review_decision_source IS NULL OR (review_decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text])))
+            - name: shorts_review_decisioned_at_pair_check
+              expression: CHECK (review_decision_source IS NULL AND review_decisioned_at IS NULL OR review_decision_source IS NOT NULL AND review_decisioned_at IS NOT NULL)
             - name: shorts_state_check
               expression: CHECK (state = ANY (ARRAY['draft'::text, 'pending_review'::text, 'approved_for_publish'::text, 'revision_requested'::text, 'rejected'::text, 'removed'::text]))
           indexes:
@@ -2102,6 +2191,134 @@ schemas:
               unique: true
               predicate: (previous_intake_id IS NOT NULL)
               definition: CREATE UNIQUE INDEX uq_submission_review_intakes_previous_intake_id ON app.submission_review_intakes USING btree (previous_intake_id) WHERE (previous_intake_id IS NOT NULL)
+        - name: submission_review_main_decisions
+          columns:
+            - name: submission_review_intake_id
+              type: uuid
+              nullable: false
+            - name: main_id
+              type: uuid
+              nullable: false
+            - name: target_state
+              type: text
+              nullable: false
+            - name: reason_code
+              type: text
+              nullable: true
+            - name: decision_source
+              type: text
+              nullable: false
+            - name: decisioned_at
+              type: timestamp with time zone
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: review_note
+              type: text
+              nullable: true
+          primary_key:
+            - submission_review_intake_id
+            - main_id
+          foreign_keys:
+            - name: submission_review_main_decisi_submission_review_intake_id__fkey
+              columns:
+                - submission_review_intake_id
+                - main_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+                    - canonical_main_id
+              on_delete: CASCADE
+            - name: submission_review_main_decisio_submission_review_intake_id_fkey
+              columns:
+                - submission_review_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: submission_review_main_decisions_check
+              expression: CHECK (target_state = 'approved_for_unlock'::text AND reason_code IS NULL OR (target_state = ANY (ARRAY['revision_requested'::text, 'rejected'::text])) AND reason_code IS NOT NULL)
+            - name: submission_review_main_decisions_decision_source_check
+              expression: CHECK (decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text]))
+            - name: submission_review_main_decisions_target_state_check
+              expression: CHECK (target_state = ANY (ARRAY['approved_for_unlock'::text, 'revision_requested'::text, 'rejected'::text]))
+          indexes:
+            - name: idx_submission_review_main_decisions_main_id
+              columns:
+                - main_id
+                - decisioned_at
+              definition: CREATE INDEX idx_submission_review_main_decisions_main_id ON app.submission_review_main_decisions USING btree (main_id, decisioned_at DESC)
+        - name: submission_review_short_decisions
+          columns:
+            - name: submission_review_intake_id
+              type: uuid
+              nullable: false
+            - name: short_id
+              type: uuid
+              nullable: false
+            - name: target_state
+              type: text
+              nullable: false
+            - name: reason_code
+              type: text
+              nullable: true
+            - name: decision_source
+              type: text
+              nullable: false
+            - name: decisioned_at
+              type: timestamp with time zone
+              nullable: false
+            - name: created_at
+              type: timestamp with time zone
+              nullable: false
+              default: CURRENT_TIMESTAMP
+            - name: review_note
+              type: text
+              nullable: true
+          primary_key:
+            - submission_review_intake_id
+            - short_id
+          foreign_keys:
+            - name: submission_review_short_decis_submission_review_intake_id__fkey
+              columns:
+                - submission_review_intake_id
+                - short_id
+              references:
+                schema: app
+                table: submission_review_intake_shorts
+                columns:
+                    - submission_review_intake_id
+                    - short_id
+              on_delete: CASCADE
+            - name: submission_review_short_decisi_submission_review_intake_id_fkey
+              columns:
+                - submission_review_intake_id
+              references:
+                schema: app
+                table: submission_review_intakes
+                columns:
+                    - id
+              on_delete: CASCADE
+          check_constraints:
+            - name: submission_review_short_decisions_check
+              expression: CHECK (target_state = 'approved_for_publish'::text AND reason_code IS NULL OR (target_state = ANY (ARRAY['revision_requested'::text, 'rejected'::text])) AND reason_code IS NOT NULL)
+            - name: submission_review_short_decisions_decision_source_check
+              expression: CHECK (decision_source = ANY (ARRAY['manual'::text, 'auto'::text, 'manual_override'::text]))
+            - name: submission_review_short_decisions_target_state_check
+              expression: CHECK (target_state = ANY (ARRAY['approved_for_publish'::text, 'revision_requested'::text, 'rejected'::text]))
+          indexes:
+            - name: idx_submission_review_short_decisions_short_id
+              columns:
+                - short_id
+                - decisioned_at
+              definition: CREATE INDEX idx_submission_review_short_decisions_short_id ON app.submission_review_short_decisions USING btree (short_id, decisioned_at DESC)
         - name: user_payment_methods
           columns:
             - name: id
@@ -2327,13 +2544,14 @@ schemas:
                 s.review_reason_code,
                 s.post_report_state,
                 s.approved_for_publish_at,
-                s.published_at,
+                COALESCE(s.published_at, GREATEST(s.approved_for_publish_at, m.approved_for_unlock_at)) AS published_at,
                 s.created_at,
                 s.updated_at
                FROM app.shorts s
                  JOIN app.unlockable_mains m ON m.id = s.canonical_main_id
                  JOIN app.creator_capabilities c ON c.user_id = s.creator_user_id
-              WHERE c.state = 'approved'::text AND s.state = 'approved_for_publish'::text AND s.published_at IS NOT NULL AND (s.post_report_state IS NULL OR (s.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
+                 JOIN app.media_assets short_asset ON short_asset.id = s.media_asset_id
+              WHERE c.state = 'approved'::text AND short_asset.processing_state = 'ready'::text AND s.state = 'approved_for_publish'::text AND COALESCE(s.published_at, GREATEST(s.approved_for_publish_at, m.approved_for_unlock_at)) IS NOT NULL AND (s.post_report_state IS NULL OR (s.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
         - name: unlockable_mains
           columns:
             - name: id
@@ -2391,4 +2609,5 @@ schemas:
                 m.updated_at
                FROM app.mains m
                  JOIN app.creator_capabilities c ON c.user_id = m.creator_user_id
-              WHERE c.state = 'approved'::text AND m.state = 'approved_for_unlock'::text AND (m.post_report_state IS NULL OR (m.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
+                 JOIN app.media_assets main_asset ON main_asset.id = m.media_asset_id
+              WHERE c.state = 'approved'::text AND main_asset.processing_state = 'ready'::text AND m.state = 'approved_for_unlock'::text AND m.ownership_confirmed = true AND m.consent_confirmed = true AND (m.post_report_state IS NULL OR (m.post_report_state <> ALL (ARRAY['temporarily_limited'::text, 'removed'::text])));
