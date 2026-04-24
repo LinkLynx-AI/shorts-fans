@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { ApiError } from "@/shared/api";
 import { Button, SurfacePanel } from "@/shared/ui";
 import {
-  applyCreatorReviewDecision,
   creatorReviewReasonOptions,
   creatorReviewRejectHandlingOptions,
   getCreatorReviewAvailableDecisions,
@@ -19,7 +18,16 @@ import {
 } from "@/entities/creator-review";
 
 type CreatorReviewDecisionFormProps = {
+  onSubmitDecision: (input: SubmitCreatorReviewDecisionInput) => Promise<void>;
   reviewCase: CreatorReviewCase;
+};
+
+type SubmitCreatorReviewDecisionInput = {
+  decision: CreatorReviewDecision;
+  isResubmitEligible: boolean;
+  isSupportReviewRequired: boolean;
+  reasonCode: string;
+  userId: string;
 };
 
 function getDefaultDecision(reviewCase: CreatorReviewCase): CreatorReviewDecision {
@@ -55,6 +63,7 @@ function getCreatorReviewDecisionErrorMessage(error: unknown): string {
  * admin creator review detail から decision mutation を実行する。
  */
 export function CreatorReviewDecisionForm({
+  onSubmitDecision,
   reviewCase,
 }: CreatorReviewDecisionFormProps) {
   const router = useRouter();
@@ -98,7 +107,7 @@ export function CreatorReviewDecisionForm({
     const rejectHandling = getCreatorReviewRejectHandling(rejectHandlingMode);
 
     try {
-      await applyCreatorReviewDecision({
+      await onSubmitDecision({
         decision,
         isResubmitEligible: requiresReason ? rejectHandling.isResubmitEligible : false,
         isSupportReviewRequired: requiresReason ? rejectHandling.isSupportReviewRequired : false,

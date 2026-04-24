@@ -7,6 +7,7 @@ import type { CreatorReviewCase } from "@/entities/creator-review";
 
 import { getCreatorReviewCase } from "@/entities/creator-review";
 
+import { assertAdminUiAccess } from "../../_lib/admin-ui-access";
 import AdminCreatorReviewCasePage from "./page";
 
 const { notFound } = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ vi.mock("next/navigation", async () => {
 });
 
 vi.mock("../../_lib/admin-ui-access", () => ({
-  assertAdminUiEnabled: vi.fn(),
+  assertAdminUiAccess: vi.fn(),
 }));
 
 vi.mock("@/features/creator-review-decision", () => ({
@@ -46,12 +47,20 @@ function createReviewCase(): CreatorReviewCase {
     creatorBio: "quiet rooftop",
     evidences: [],
     intake: {
+      acceptsAdultBusinessCompliance: true,
+      acceptsAppearanceVerification: true,
       acceptsConsentResponsibility: true,
+      acceptsCoPerformerConsentResponsibility: false,
       birthDate: "2000-01-01",
+      confirmsInformationMatchesDocuments: true,
       declaresNoProhibitedCategory: true,
+      hasCoPerformers: false,
+      identityDocumentType: "driver_license",
+      legalAddress: "Tokyo-to Shibuya-ku 1-2-3",
       legalName: "Mina Rei",
       payoutRecipientName: "Mina Rei",
       payoutRecipientType: "self",
+      targetAudienceCategory: "general_adult",
     },
     rejection: null,
     review: {
@@ -73,6 +82,7 @@ function createReviewCase(): CreatorReviewCase {
 describe("AdminCreatorReviewCasePage", () => {
   beforeEach(() => {
     notFound.mockReset();
+    vi.mocked(assertAdminUiAccess).mockReset();
     vi.mocked(getCreatorReviewCase).mockReset();
   });
 
@@ -85,6 +95,10 @@ describe("AdminCreatorReviewCasePage", () => {
       searchParams: Promise.resolve({}),
     }));
 
+    expect(getCreatorReviewCase).toHaveBeenCalledWith({
+      fetcher: expect.any(Function),
+      userId: reviewCase.userId,
+    });
     expect(screen.getByRole("link", { name: /Creator 審査 登録申請/i })).toHaveAttribute(
       "aria-current",
       "page",
@@ -97,5 +111,24 @@ describe("AdminCreatorReviewCasePage", () => {
       "data-prefetch",
       "false",
     );
+    expect(screen.getByText("Tokyo-to Shibuya-ku 1-2-3")).toBeInTheDocument();
+    expect(screen.getByText("運転免許証")).toBeInTheDocument();
+    expect(screen.getByText("成人向け")).toBeInTheDocument();
+    expect(screen.getByText("document match")).toBeInTheDocument();
+    expect(screen.getByText("appearance verification")).toBeInTheDocument();
+    expect(screen.getByText("adult business compliance")).toBeInTheDocument();
+    expect(screen.getByText("co performers")).toBeInTheDocument();
+  });
+
+  it("does not fetch the review case when admin access is rejected", async () => {
+    const reviewCase = createReviewCase();
+    vi.mocked(assertAdminUiAccess).mockRejectedValue(new Error("blocked"));
+
+    await expect(AdminCreatorReviewCasePage({
+      params: Promise.resolve({ userId: reviewCase.userId }),
+      searchParams: Promise.resolve({}),
+    })).rejects.toThrow("blocked");
+
+    expect(getCreatorReviewCase).not.toHaveBeenCalled();
   });
 });

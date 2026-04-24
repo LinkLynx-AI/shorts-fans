@@ -532,7 +532,12 @@ func normalizeEvidenceMetadata(kind string, fileName string, mimeType string, fi
 func normalizeEvidenceKind(value string) (string, error) {
 	normalized := strings.TrimSpace(value)
 	switch normalized {
-	case EvidenceKindGovernmentID, EvidenceKindPayoutProof:
+	case EvidenceKindGovernmentID,
+		EvidenceKindPayoutProof,
+		EvidenceKindIdentitySelfie,
+		EvidenceKindAddressProof,
+		EvidenceKindBusinessRegistration,
+		EvidenceKindCoPerformerConsent:
 		return normalized, nil
 	default:
 		return "", newValidationError("invalid_evidence_kind", "evidence kind is invalid")

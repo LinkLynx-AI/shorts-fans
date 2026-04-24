@@ -27,13 +27,21 @@ const (
 type viewerCreatorRegistrationRequest struct{}
 
 type viewerCreatorRegistrationIntakeRequest struct {
-	AcceptsConsentResponsibility bool   `json:"acceptsConsentResponsibility"`
-	BirthDate                    string `json:"birthDate"`
-	CreatorBio                   string `json:"creatorBio"`
-	DeclaresNoProhibitedCategory bool   `json:"declaresNoProhibitedCategory"`
-	LegalName                    string `json:"legalName"`
-	PayoutRecipientName          string `json:"payoutRecipientName"`
-	PayoutRecipientType          string `json:"payoutRecipientType"`
+	AcceptsAdultBusinessCompliance          bool   `json:"acceptsAdultBusinessCompliance"`
+	AcceptsAppearanceVerification           bool   `json:"acceptsAppearanceVerification"`
+	AcceptsConsentResponsibility            bool   `json:"acceptsConsentResponsibility"`
+	AcceptsCoPerformerConsentResponsibility bool   `json:"acceptsCoPerformerConsentResponsibility"`
+	BirthDate                               string `json:"birthDate"`
+	ConfirmsInformationMatchesDocuments     bool   `json:"confirmsInformationMatchesDocuments"`
+	CreatorBio                              string `json:"creatorBio"`
+	DeclaresNoProhibitedCategory            bool   `json:"declaresNoProhibitedCategory"`
+	HasCoPerformers                         bool   `json:"hasCoPerformers"`
+	IdentityDocumentType                    string `json:"identityDocumentType"`
+	LegalAddress                            string `json:"legalAddress"`
+	LegalName                               string `json:"legalName"`
+	PayoutRecipientName                     string `json:"payoutRecipientName"`
+	PayoutRecipientType                     string `json:"payoutRecipientType"`
+	TargetAudienceCategory                  string `json:"targetAudienceCategory"`
 }
 
 type viewerCreatorRegistrationEvidenceUploadCreateRequest struct {
@@ -83,18 +91,26 @@ type viewerCreatorRegistrationGetResponseData struct {
 }
 
 type viewerCreatorRegistrationIntakePayload struct {
-	AcceptsConsentResponsibility bool                                       `json:"acceptsConsentResponsibility"`
-	BirthDate                    *string                                    `json:"birthDate"`
-	CanSubmit                    bool                                       `json:"canSubmit"`
-	CreatorBio                   string                                     `json:"creatorBio"`
-	DeclaresNoProhibitedCategory bool                                       `json:"declaresNoProhibitedCategory"`
-	Evidences                    []viewerCreatorRegistrationEvidencePayload `json:"evidences"`
-	IsReadOnly                   bool                                       `json:"isReadOnly"`
-	LegalName                    string                                     `json:"legalName"`
-	PayoutRecipientName          string                                     `json:"payoutRecipientName"`
-	PayoutRecipientType          *string                                    `json:"payoutRecipientType"`
-	RegistrationState            *string                                    `json:"registrationState"`
-	SharedProfile                viewerProfilePayload                       `json:"sharedProfile"`
+	AcceptsAdultBusinessCompliance          bool                                       `json:"acceptsAdultBusinessCompliance"`
+	AcceptsAppearanceVerification           bool                                       `json:"acceptsAppearanceVerification"`
+	AcceptsConsentResponsibility            bool                                       `json:"acceptsConsentResponsibility"`
+	AcceptsCoPerformerConsentResponsibility bool                                       `json:"acceptsCoPerformerConsentResponsibility"`
+	BirthDate                               *string                                    `json:"birthDate"`
+	CanSubmit                               bool                                       `json:"canSubmit"`
+	ConfirmsInformationMatchesDocuments     bool                                       `json:"confirmsInformationMatchesDocuments"`
+	CreatorBio                              string                                     `json:"creatorBio"`
+	DeclaresNoProhibitedCategory            bool                                       `json:"declaresNoProhibitedCategory"`
+	Evidences                               []viewerCreatorRegistrationEvidencePayload `json:"evidences"`
+	HasCoPerformers                         bool                                       `json:"hasCoPerformers"`
+	IdentityDocumentType                    *string                                    `json:"identityDocumentType"`
+	IsReadOnly                              bool                                       `json:"isReadOnly"`
+	LegalAddress                            string                                     `json:"legalAddress"`
+	LegalName                               string                                     `json:"legalName"`
+	PayoutRecipientName                     string                                     `json:"payoutRecipientName"`
+	PayoutRecipientType                     *string                                    `json:"payoutRecipientType"`
+	RegistrationState                       *string                                    `json:"registrationState"`
+	SharedProfile                           viewerProfilePayload                       `json:"sharedProfile"`
+	TargetAudienceCategory                  *string                                    `json:"targetAudienceCategory"`
 }
 
 type viewerCreatorRegistrationIntakeResponseData struct {
@@ -324,14 +340,22 @@ func handleViewerCreatorRegistrationIntakePut(c *gin.Context, service ViewerCrea
 	}
 
 	intake, err := service.SaveIntake(c.Request.Context(), creatorregistration.SaveIntakeInput{
-		AcceptsConsentResponsibility: request.AcceptsConsentResponsibility,
-		BirthDate:                    request.BirthDate,
-		CreatorBio:                   request.CreatorBio,
-		DeclaresNoProhibitedCategory: request.DeclaresNoProhibitedCategory,
-		LegalName:                    request.LegalName,
-		PayoutRecipientName:          request.PayoutRecipientName,
-		PayoutRecipientType:          request.PayoutRecipientType,
-		UserID:                       viewerUserID,
+		AcceptsAdultBusinessCompliance:          request.AcceptsAdultBusinessCompliance,
+		AcceptsAppearanceVerification:           request.AcceptsAppearanceVerification,
+		AcceptsConsentResponsibility:            request.AcceptsConsentResponsibility,
+		AcceptsCoPerformerConsentResponsibility: request.AcceptsCoPerformerConsentResponsibility,
+		BirthDate:                               request.BirthDate,
+		ConfirmsInformationMatchesDocuments:     request.ConfirmsInformationMatchesDocuments,
+		CreatorBio:                              request.CreatorBio,
+		DeclaresNoProhibitedCategory:            request.DeclaresNoProhibitedCategory,
+		HasCoPerformers:                         request.HasCoPerformers,
+		IdentityDocumentType:                    request.IdentityDocumentType,
+		LegalAddress:                            request.LegalAddress,
+		LegalName:                               request.LegalName,
+		PayoutRecipientName:                     request.PayoutRecipientName,
+		PayoutRecipientType:                     request.PayoutRecipientType,
+		TargetAudienceCategory:                  request.TargetAudienceCategory,
+		UserID:                                  viewerUserID,
 	})
 	if err != nil {
 		if writeViewerCreatorRegistrationError(c, err, viewerCreatorRegistrationIntakePutRequestScope) {
@@ -576,18 +600,26 @@ func buildViewerCreatorRegistrationIntakePayload(intake creatorregistration.Inta
 	}
 
 	return viewerCreatorRegistrationIntakePayload{
-		AcceptsConsentResponsibility: intake.AcceptsConsentResponsibility,
-		BirthDate:                    nullableTrimmedString(intake.BirthDate),
-		CanSubmit:                    intake.CanSubmit,
-		CreatorBio:                   intake.CreatorBio,
-		DeclaresNoProhibitedCategory: intake.DeclaresNoProhibitedCategory,
-		Evidences:                    evidences,
-		IsReadOnly:                   intake.IsReadOnly,
-		LegalName:                    intake.LegalName,
-		PayoutRecipientName:          intake.PayoutRecipientName,
-		PayoutRecipientType:          nullableTrimmedString(intake.PayoutRecipientType),
-		RegistrationState:            intake.RegistrationState,
-		SharedProfile:                sharedProfile,
+		AcceptsAdultBusinessCompliance:          intake.AcceptsAdultBusinessCompliance,
+		AcceptsAppearanceVerification:           intake.AcceptsAppearanceVerification,
+		AcceptsConsentResponsibility:            intake.AcceptsConsentResponsibility,
+		AcceptsCoPerformerConsentResponsibility: intake.AcceptsCoPerformerConsentResponsibility,
+		BirthDate:                               nullableTrimmedString(intake.BirthDate),
+		CanSubmit:                               intake.CanSubmit,
+		ConfirmsInformationMatchesDocuments:     intake.ConfirmsInformationMatchesDocuments,
+		CreatorBio:                              intake.CreatorBio,
+		DeclaresNoProhibitedCategory:            intake.DeclaresNoProhibitedCategory,
+		Evidences:                               evidences,
+		HasCoPerformers:                         intake.HasCoPerformers,
+		IdentityDocumentType:                    nullableTrimmedString(intake.IdentityDocumentType),
+		IsReadOnly:                              intake.IsReadOnly,
+		LegalAddress:                            intake.LegalAddress,
+		LegalName:                               intake.LegalName,
+		PayoutRecipientName:                     intake.PayoutRecipientName,
+		PayoutRecipientType:                     nullableTrimmedString(intake.PayoutRecipientType),
+		RegistrationState:                       intake.RegistrationState,
+		SharedProfile:                           sharedProfile,
+		TargetAudienceCategory:                  nullableTrimmedString(intake.TargetAudienceCategory),
 	}, nil
 }
 
@@ -714,6 +746,12 @@ func writeViewerCreatorRegistrationError(c *gin.Context, err error, requestScope
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_handle", "handle is invalid", requestScope)
 	case errors.Is(err, creatorregistration.ErrInvalidLegalName):
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_legal_name", "legal name is invalid", requestScope)
+	case errors.Is(err, creatorregistration.ErrInvalidLegalAddress):
+		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_legal_address", "legal address is invalid", requestScope)
+	case errors.Is(err, creatorregistration.ErrInvalidIdentityDocumentType):
+		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_identity_document_type", "identity document type is invalid", requestScope)
+	case errors.Is(err, creatorregistration.ErrInvalidTargetAudienceCategory):
+		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_target_audience_category", "target audience category is invalid", requestScope)
 	case errors.Is(err, creatorregistration.ErrInvalidPayoutRecipient):
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, "invalid_payout_recipient_name", "payout recipient name is invalid", requestScope)
 	case errors.Is(err, creatorregistration.ErrInvalidPayoutRecipientTyp):

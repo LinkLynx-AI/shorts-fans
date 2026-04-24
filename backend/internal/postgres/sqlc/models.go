@@ -96,15 +96,23 @@ type AppCreatorRegistrationEvidence struct {
 }
 
 type AppCreatorRegistrationIntake struct {
-	UserID                       pgtype.UUID
-	LegalName                    string
-	BirthDate                    pgtype.Date
-	PayoutRecipientType          pgtype.Text
-	PayoutRecipientName          string
-	DeclaresNoProhibitedCategory bool
-	AcceptsConsentResponsibility bool
-	CreatedAt                    pgtype.Timestamptz
-	UpdatedAt                    pgtype.Timestamptz
+	UserID                                  pgtype.UUID
+	LegalName                               string
+	BirthDate                               pgtype.Date
+	PayoutRecipientType                     pgtype.Text
+	PayoutRecipientName                     string
+	DeclaresNoProhibitedCategory            bool
+	AcceptsConsentResponsibility            bool
+	CreatedAt                               pgtype.Timestamptz
+	UpdatedAt                               pgtype.Timestamptz
+	LegalAddress                            string
+	IdentityDocumentType                    pgtype.Text
+	TargetAudienceCategory                  pgtype.Text
+	HasCoPerformers                         bool
+	AcceptsAppearanceVerification           bool
+	AcceptsCoPerformerConsentResponsibility bool
+	AcceptsAdultBusinessCompliance          bool
+	ConfirmsInformationMatchesDocuments     bool
 }
 
 type AppMain struct {

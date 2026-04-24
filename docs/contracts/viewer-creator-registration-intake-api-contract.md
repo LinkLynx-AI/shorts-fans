@@ -9,7 +9,7 @@
 ## Goals
 
 - shared viewer profile を preview しながら creator 固有の `bio` と審査 intake を保存できるようにする。
-- `government_id` と `payout_proof` の private evidence upload を 1 kind = 1 active file で扱えるようにする。
+- `government_id / identity_selfie / address_proof / payout_proof` と条件付き evidence の private upload を 1 kind = 1 active file で扱えるようにする。
 - `POST /api/viewer/creator-registration` が completeness を判定できるよう、required fields と validation boundary を固定する。
 
 ## Non-goals
@@ -18,6 +18,7 @@
 - shared viewer profile の更新
 - evidence の public URL 発行
 - KYC provider / payout provider への外部送信
+- 銀行口座情報の登録、または CCBill payout account 連携
 
 ## Canonical Sources
 
@@ -44,7 +45,9 @@
 - intake / evidence の編集は `draft` と eligible な `rejected` だけに許可します。
 - `submitted / approved / suspended`、および `rejected` でも `isReadOnly=true` / `isSupportReviewRequired=true` な case は `409 registration_state_conflict` を返します。
 - evidence object は private bucket に保存し、この contract では download URL や public asset URL を返しません。
-- required evidence kind は `government_id` と `payout_proof` の 2 種類です。
+- required evidence kind は通常 `government_id`、`identity_selfie`、`address_proof`、`payout_proof` の 4 種類です。
+- `payoutRecipientType=business` の場合は `business_registration` も required evidence とします。
+- `hasCoPerformers=true` の場合は `co_performer_consent` も required evidence とし、`acceptsCoPerformerConsentResponsibility=true` を required field とします。
 - allowed mime type は `image/jpeg`、`image/png`、`image/webp`、`application/pdf` です。
 - file size 上限は `10MB` です。
 
@@ -73,10 +76,18 @@
       "creatorBio": "quiet rooftop の continuation を中心に投稿します。",
       "legalName": "Mina Rei",
       "birthDate": "1999-04-02",
+      "legalAddress": "東京都渋谷区...",
+      "identityDocumentType": "driver_license",
+      "targetAudienceCategory": "general_adult",
+      "hasCoPerformers": false,
       "payoutRecipientType": "self",
       "payoutRecipientName": "Mina Rei",
       "declaresNoProhibitedCategory": true,
       "acceptsConsentResponsibility": true,
+      "acceptsAppearanceVerification": true,
+      "acceptsCoPerformerConsentResponsibility": false,
+      "acceptsAdultBusinessCompliance": true,
+      "confirmsInformationMatchesDocuments": true,
       "registrationState": "draft",
       "isReadOnly": false,
       "canSubmit": true,
@@ -89,8 +100,22 @@
           "uploadedAt": "2026-04-17T01:15:00Z"
         },
         {
+          "kind": "identity_selfie",
+          "fileName": "selfie.png",
+          "mimeType": "image/png",
+          "fileSizeBytes": 102400,
+          "uploadedAt": "2026-04-17T01:16:00Z"
+        },
+        {
+          "kind": "address_proof",
+          "fileName": "address-proof.pdf",
+          "mimeType": "application/pdf",
+          "fileSizeBytes": 84512,
+          "uploadedAt": "2026-04-17T01:16:30Z"
+        },
+        {
           "kind": "payout_proof",
-          "fileName": "bank-proof.pdf",
+          "fileName": "payout-proof.pdf",
           "mimeType": "application/pdf",
           "fileSizeBytes": 84512,
           "uploadedAt": "2026-04-17T01:17:00Z"
@@ -113,11 +138,19 @@
 | `sharedProfile` | `ViewerProfilePreview` | shared viewer profile の preview。編集不可 |
 | `creatorBio` | `string` | creator 固有の bio draft |
 | `legalName` | `string` | 本人確認に使う氏名 |
-| `birthDate` | `string \| null` | `YYYY-MM-DD` |
+| `birthDate` | `string \| null` | `YYYY-MM-DD`。creator は 18 歳以上である必要があります |
+| `legalAddress` | `string` | 本人確認・住所確認に使う現住所。trim 後 1-500 文字 |
+| `identityDocumentType` | `"driver_license" \| "my_number_card" \| "residence_card" \| "basic_resident_register_card" \| "passport" \| "student_or_employee_id" \| "disability_certificate" \| "other_government_photo_id" \| null` | 提出する本人確認書類の種類 |
+| `targetAudienceCategory` | `"all_ages" \| "general_adult" \| "gay_bl" \| null` | 申請時の対象区分 |
+| `hasCoPerformers` | `boolean` | 共演者の有無 |
 | `payoutRecipientType` | `"self" \| "business" \| null` | 売上受取名義の種別 |
 | `payoutRecipientName` | `string` | 売上受取名義 |
 | `declaresNoProhibitedCategory` | `boolean` | prohibited category 非該当確認 |
 | `acceptsConsentResponsibility` | `boolean` | consent / ownership responsibility 確認 |
+| `acceptsAppearanceVerification` | `boolean` | 本人確認書類と本人照合用写真の照合への同意 |
+| `acceptsCoPerformerConsentResponsibility` | `boolean` | `hasCoPerformers=true` のとき required |
+| `acceptsAdultBusinessCompliance` | `boolean` | 成人向け事業に関する法令・運用ルール確認 |
+| `confirmsInformationMatchesDocuments` | `boolean` | 入力情報と提出書類が一致することの確認 |
 | `registrationState` | `string \| null` | onboarding case 未開始なら `null` |
 | `isReadOnly` | `boolean` | `draft` と eligible `rejected` は `false`、それ以外は `true` |
 | `canSubmit` | `boolean` | required fields + required evidence が揃っていて editable なときだけ `true` |
@@ -132,10 +165,18 @@
   "creatorBio": "quiet rooftop の continuation を中心に投稿します。",
   "legalName": "Mina Rei",
   "birthDate": "1999-04-02",
+  "legalAddress": "東京都渋谷区...",
+  "identityDocumentType": "driver_license",
+  "targetAudienceCategory": "general_adult",
+  "hasCoPerformers": false,
   "payoutRecipientType": "self",
   "payoutRecipientName": "Mina Rei",
   "declaresNoProhibitedCategory": true,
-  "acceptsConsentResponsibility": true
+  "acceptsConsentResponsibility": true,
+  "acceptsAppearanceVerification": true,
+  "acceptsCoPerformerConsentResponsibility": false,
+  "acceptsAdultBusinessCompliance": true,
+  "confirmsInformationMatchesDocuments": true
 }
 ```
 
@@ -152,7 +193,10 @@
 | --- | --- | --- |
 | `400` | `invalid_request` | malformed JSON / extra payload |
 | `400` | `invalid_legal_name` | legal name が不正 |
-| `400` | `invalid_birth_date` | `birthDate` が `YYYY-MM-DD` でない |
+| `400` | `invalid_legal_address` | legal address が不正 |
+| `400` | `invalid_birth_date` | `birthDate` が `YYYY-MM-DD` でない、未来日、または 18 歳未満 |
+| `400` | `invalid_identity_document_type` | allowed identity document type 以外 |
+| `400` | `invalid_target_audience_category` | allowed target audience category 以外 |
 | `400` | `invalid_payout_recipient_type` | `self / business` 以外 |
 | `400` | `invalid_payout_recipient_name` | payout recipient name が不正 |
 | `401` | `auth_required` | session 不在 |
@@ -269,8 +313,17 @@
 - shared viewer profile の `displayName / handle` が存在する
 - `creatorBio` が空でない
 - `legalName` が空でない
-- `birthDate` が存在する
+- `birthDate` が存在し、18 歳以上である
+- `legalAddress` が空でなく、500 文字以内である
+- `identityDocumentType` が allowed value のいずれかである
+- `targetAudienceCategory` が allowed value のいずれかである
 - `payoutRecipientType / payoutRecipientName` が存在する
 - `declaresNoProhibitedCategory = true`
 - `acceptsConsentResponsibility = true`
-- `government_id` と `payout_proof` の両 evidence が存在する
+- `acceptsAppearanceVerification = true`
+- `acceptsAdultBusinessCompliance = true`
+- `confirmsInformationMatchesDocuments = true`
+- `hasCoPerformers=true` の場合は `acceptsCoPerformerConsentResponsibility = true`
+- `government_id / identity_selfie / address_proof / payout_proof` の evidence が存在する
+- `payoutRecipientType=business` の場合は `business_registration` の evidence が存在する
+- `hasCoPerformers=true` の場合は `co_performer_consent` の evidence が存在する

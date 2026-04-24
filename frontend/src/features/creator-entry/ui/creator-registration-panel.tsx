@@ -7,7 +7,6 @@ import { useRef } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/shared/ui";
 
 import {
-  creatorRegistrationEvidenceKinds,
   type CreatorRegistrationEvidence,
   type CreatorRegistrationEvidenceKind,
   type CreatorRegistrationStatus,
@@ -21,9 +20,25 @@ import {
 } from "./creator-registration-ui-primitives";
 
 const evidenceFieldLabels = {
+  address_proof: {
+    description: "現住所が確認できる書類です。画像またはPDFで提出できます。10MBまでです。",
+    label: "住所確認書類",
+  },
+  business_registration: {
+    description: "事業名義で受け取る場合の登記・事業確認書類です。画像またはPDFで提出できます。10MBまでです。",
+    label: "事業確認書類",
+  },
+  co_performer_consent: {
+    description: "共演者がいる場合の同意・契約を確認する書類です。画像またはPDFで提出できます。10MBまでです。",
+    label: "共演者の同意確認書類",
+  },
   government_id: {
     description: "顔写真付きの確認書類です。画像またはPDFで提出できます。10MBまでです。",
     label: "本人確認書類",
+  },
+  identity_selfie: {
+    description: "本人確認書類と同一人物か確認するための本人写真です。画像またはPDFで提出できます。10MBまでです。",
+    label: "本人照合用の写真",
   },
   payout_proof: {
     description: "売上を受け取る名義が分かる書類です。画像またはPDFで提出できます。10MBまでです。",
@@ -32,11 +47,32 @@ const evidenceFieldLabels = {
 } as const;
 
 const onboardingChecklist = [
-  "本人確認に必要な書類をそろえる",
+  "氏名、生年月日、現住所、本人確認書類の種類を確認する",
+  "本人確認書類、本人照合用の写真、住所確認書類をそろえる",
   "売上の受取名義が分かる書類を用意する",
+  "共演者がいる場合は同意確認書類を用意する",
   "禁止された内容を扱わないことを確認する",
   "確認が終わるまでは投稿や管理画面は使えません",
 ] as const;
+
+const identityDocumentTypeOptions = [
+  { label: "運転免許証", value: "driver_license" },
+  { label: "マイナンバーカード", value: "my_number_card" },
+  { label: "在留カード", value: "residence_card" },
+  { label: "住民基本台帳カード", value: "basic_resident_register_card" },
+  { label: "パスポート", value: "passport" },
+  { label: "学生証・社員証", value: "student_or_employee_id" },
+  { label: "障害者手帳", value: "disability_certificate" },
+  { label: "その他の公的顔写真付き身分証", value: "other_government_photo_id" },
+] as const;
+
+const targetAudienceCategoryOptions = [
+  { label: "全年齢向け", value: "all_ages" },
+  { label: "成人向け", value: "general_adult" },
+  { label: "ゲイ・BL", value: "gay_bl" },
+] as const;
+
+const legalAddressMaxLength = 500;
 
 type RegistrationSurfaceKind =
   | "draft"
@@ -338,8 +374,9 @@ function resolveStatusCard(
 function resolveResubmitIssueSummary(
   reasonCode: string | null,
   evidences: Record<CreatorRegistrationEvidenceKind, RegistrationEvidenceFieldState>,
+  requiredEvidenceKinds: readonly CreatorRegistrationEvidenceKind[],
 ): ResubmitIssueSummary {
-  const missingKinds = creatorRegistrationEvidenceKinds.filter((kind) => evidences[kind].evidence === null);
+  const missingKinds = requiredEvidenceKinds.filter((kind) => evidences[kind].evidence === null);
 
   if (reasonCode === "payout_info_incomplete") {
     return {
@@ -439,35 +476,52 @@ export function CreatorRegistrationPanel({
   const evidenceInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const formRef = useRef<HTMLFormElement | null>(null);
   const {
+    acceptsAdultBusinessCompliance,
+    acceptsAppearanceVerification,
     acceptsConsentResponsibility,
+    acceptsCoPerformerConsentResponsibility,
     birthDate,
+    confirmsInformationMatchesDocuments,
     creatorBio,
     declaresNoProhibitedCategory,
     errorMessage,
     evidences,
+    hasCoPerformers,
     hasLoaded,
+    identityDocumentType,
     isBusy,
     isLoading,
     isReadOnly,
     isSaving,
     isSubmitting,
+    legalAddress,
     legalName,
     payoutRecipientName,
     payoutRecipientType,
     registration,
     registrationState,
+    requiredEvidenceKinds,
     saveDraft,
+    setAcceptsAdultBusinessCompliance,
+    setAcceptsAppearanceVerification,
     setAcceptsConsentResponsibility,
+    setAcceptsCoPerformerConsentResponsibility,
     setBirthDate,
+    setConfirmsInformationMatchesDocuments,
     setCreatorBio,
     setDeclaresNoProhibitedCategory,
+    setHasCoPerformers,
+    setIdentityDocumentType,
+    setLegalAddress,
     setLegalName,
     setPayoutRecipientName,
     setPayoutRecipientType,
+    setTargetAudienceCategory,
     sharedProfile,
     submit,
     submitDisabled,
     successMessage,
+    targetAudienceCategory,
     uploadEvidence,
   } = useCreatorRegistration(initialRegistration);
 
@@ -482,6 +536,7 @@ export function CreatorRegistrationPanel({
   const resubmitIssueSummary = resolveResubmitIssueSummary(
     registration?.rejection?.reasonCode ?? null,
     evidences,
+    requiredEvidenceKinds,
   );
   const resubmitRemaining = registration?.rejection?.selfServeResubmitRemaining ?? null;
 
@@ -623,6 +678,111 @@ export function CreatorRegistrationPanel({
                   </div>
 
                   <div>
+                    <label
+                      className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                      htmlFor="creator-registration-legal-address"
+                    >
+                      現住所
+                    </label>
+                    <textarea
+                      autoComplete="street-address"
+                      className="mt-2 h-24 w-full resize-none rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                      disabled={isBusy || isReadOnly}
+                      id="creator-registration-legal-address"
+                      maxLength={legalAddressMaxLength}
+                      onChange={(event) => setLegalAddress(event.target.value)}
+                      placeholder="東京都渋谷区..."
+                      value={legalAddress}
+                    />
+                  </div>
+
+                  <div>
+                    <label
+                      className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                      htmlFor="creator-registration-identity-document-type"
+                    >
+                      本人確認書類の種類
+                    </label>
+                    <select
+                      className="mt-2 w-full rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                      disabled={isBusy || isReadOnly}
+                      id="creator-registration-identity-document-type"
+                      onChange={(event) => setIdentityDocumentType(event.target.value)}
+                      value={identityDocumentType}
+                    >
+                      <option value="">選択してください</option>
+                      {identityDocumentTypeOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                      htmlFor="creator-registration-target-category"
+                    >
+                      対象区分
+                    </label>
+                    <select
+                      className="mt-2 w-full rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                      disabled={isBusy || isReadOnly}
+                      id="creator-registration-target-category"
+                      onChange={(event) => setTargetAudienceCategory(event.target.value)}
+                      value={targetAudienceCategory}
+                    >
+                      <option value="">選択してください</option>
+                      {targetAudienceCategoryOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]">
+                      共演者の有無
+                    </label>
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      {[
+                        { label: "いない", value: false },
+                        { label: "いる", value: true },
+                      ].map((option) => {
+                        const isChecked = hasCoPerformers === option.value;
+
+                        return (
+                          <label
+                            className={`flex cursor-pointer items-center justify-center rounded-[20px] border-2 px-4 py-3.5 transition-colors ${
+                              isChecked
+                                ? "border-[#dcebff] bg-[#eef6ff] text-[#134b80]"
+                                : "border-transparent bg-[#f6f7fb] text-foreground hover:bg-[#eef2f7]"
+                            }`}
+                            htmlFor={`creator-registration-co-performers-${option.value ? "yes" : "no"}`}
+                            key={String(option.value)}
+                          >
+                            <input
+                              checked={isChecked}
+                              className="size-4 border-gray-300"
+                              disabled={isBusy || isReadOnly}
+                              id={`creator-registration-co-performers-${option.value ? "yes" : "no"}`}
+                              name="creator-registration-co-performers"
+                              onChange={() => setHasCoPerformers(option.value)}
+                              style={{ accentColor: "#4DA8DA" }}
+                              type="radio"
+                            />
+                            <span className="ml-2 text-[14px] font-bold">
+                              {option.label}
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
                     <label className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]">
                       受取名義の種類
                     </label>
@@ -686,7 +846,7 @@ export function CreatorRegistrationPanel({
                 </p>
 
                 <div className="mt-4 space-y-5">
-                  {creatorRegistrationEvidenceKinds.map((kind) => {
+                  {requiredEvidenceKinds.map((kind) => {
                     const field = evidences[kind];
                     const config = evidenceFieldLabels[kind];
                     const isAttention = resubmitIssueSummary.needsAttentionKind === kind;
@@ -810,6 +970,54 @@ export function CreatorRegistrationPanel({
 
                   <label className="flex cursor-pointer items-start gap-3 p-1">
                     <input
+                      checked={confirmsInformationMatchesDocuments}
+                      className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                      disabled={isBusy || isReadOnly}
+                      onChange={(event) => setConfirmsInformationMatchesDocuments(event.target.checked)}
+                      style={{ accentColor: "#4DA8DA" }}
+                      type="checkbox"
+                    />
+                    <span className="text-[13px] font-medium leading-snug text-gray-700">
+                      入力した本人確認情報が提出書類と一致していることを確認しました。
+                    </span>
+                  </label>
+
+                  <div className="h-px w-full bg-gray-100" />
+
+                  <label className="flex cursor-pointer items-start gap-3 p-1">
+                    <input
+                      checked={acceptsAppearanceVerification}
+                      className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                      disabled={isBusy || isReadOnly}
+                      onChange={(event) => setAcceptsAppearanceVerification(event.target.checked)}
+                      style={{ accentColor: "#4DA8DA" }}
+                      type="checkbox"
+                    />
+                    <span className="text-[13px] font-medium leading-snug text-gray-700">
+                      本人確認書類と本人照合用の写真を照合されることに同意します。
+                    </span>
+                  </label>
+
+                  <div className="h-px w-full bg-gray-100" />
+
+                  <label className="flex cursor-pointer items-start gap-3 p-1">
+                    <input
+                      checked={acceptsAdultBusinessCompliance}
+                      className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                      disabled={isBusy || isReadOnly}
+                      onChange={(event) => setAcceptsAdultBusinessCompliance(event.target.checked)}
+                      style={{ accentColor: "#4DA8DA" }}
+                      type="checkbox"
+                    />
+                    <span className="text-[13px] font-medium leading-snug text-gray-700">
+                      成人向け事業に関する法令・運用ルールを確認し、必要な届出や義務を自分で確認します。
+                    </span>
+                  </label>
+
+                  <div className="h-px w-full bg-gray-100" />
+
+                  <label className="flex cursor-pointer items-start gap-3 p-1">
+                    <input
                       checked={acceptsConsentResponsibility}
                       className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
                       disabled={isBusy || isReadOnly}
@@ -821,6 +1029,26 @@ export function CreatorRegistrationPanel({
                       出演者の同意と権利確認の責任を自分で負うことを確認しました。
                     </span>
                   </label>
+
+                  {hasCoPerformers ? (
+                    <>
+                      <div className="h-px w-full bg-gray-100" />
+
+                      <label className="flex cursor-pointer items-start gap-3 p-1">
+                        <input
+                          checked={acceptsCoPerformerConsentResponsibility}
+                          className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                          disabled={isBusy || isReadOnly}
+                          onChange={(event) => setAcceptsCoPerformerConsentResponsibility(event.target.checked)}
+                          style={{ accentColor: "#4DA8DA" }}
+                          type="checkbox"
+                        />
+                        <span className="text-[13px] font-medium leading-snug text-gray-700">
+                          共演者全員の同意・契約確認書類を提出し、権利確認の責任を自分で負うことを確認しました。
+                        </span>
+                      </label>
+                    </>
+                  ) : null}
                 </div>
               </section>
             </form>
@@ -1093,6 +1321,111 @@ export function CreatorRegistrationPanel({
                 </div>
 
                 <div>
+                  <label
+                    className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                    htmlFor="creator-registration-legal-address"
+                  >
+                    現住所
+                  </label>
+                  <textarea
+                    autoComplete="street-address"
+                    className="mt-2 h-24 w-full resize-none rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                    disabled={isBusy || isReadOnly}
+                    id="creator-registration-legal-address"
+                    maxLength={legalAddressMaxLength}
+                    onChange={(event) => setLegalAddress(event.target.value)}
+                    placeholder="東京都渋谷区..."
+                    value={legalAddress}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                    htmlFor="creator-registration-identity-document-type"
+                  >
+                    本人確認書類の種類
+                  </label>
+                  <select
+                    className="mt-2 w-full rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                    disabled={isBusy || isReadOnly}
+                    id="creator-registration-identity-document-type"
+                    onChange={(event) => setIdentityDocumentType(event.target.value)}
+                    value={identityDocumentType}
+                  >
+                    <option value="">選択してください</option>
+                    {identityDocumentTypeOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label
+                    className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]"
+                    htmlFor="creator-registration-target-category"
+                  >
+                    対象区分
+                  </label>
+                  <select
+                    className="mt-2 w-full rounded-[20px] border-2 border-transparent bg-[#f6f7fb] px-5 py-4 text-[15px] font-bold text-foreground outline-none transition focus:border-[#dcebff] focus:bg-white"
+                    disabled={isBusy || isReadOnly}
+                    id="creator-registration-target-category"
+                    onChange={(event) => setTargetAudienceCategory(event.target.value)}
+                    value={targetAudienceCategory}
+                  >
+                    <option value="">選択してください</option>
+                    {targetAudienceCategoryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]">
+                    共演者の有無
+                  </label>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {[
+                      { label: "いない", value: false },
+                      { label: "いる", value: true },
+                    ].map((option) => {
+                      const isChecked = hasCoPerformers === option.value;
+
+                      return (
+                        <label
+                          className={`flex cursor-pointer items-center justify-center rounded-[20px] border-2 px-4 py-3.5 transition-colors ${
+                            isChecked
+                              ? "border-[#dcebff] bg-[#eef6ff] text-[#134b80]"
+                              : "border-transparent bg-[#f6f7fb] text-foreground hover:bg-[#eef2f7]"
+                          }`}
+                          htmlFor={`creator-registration-co-performers-${option.value ? "yes" : "no"}`}
+                          key={String(option.value)}
+                        >
+                          <input
+                            checked={isChecked}
+                            className="size-4 border-gray-300"
+                            disabled={isBusy || isReadOnly}
+                            id={`creator-registration-co-performers-${option.value ? "yes" : "no"}`}
+                            name="creator-registration-co-performers"
+                            onChange={() => setHasCoPerformers(option.value)}
+                            style={{ accentColor: "#4DA8DA" }}
+                            type="radio"
+                          />
+                          <span className="ml-2 text-[14px] font-bold">
+                            {option.label}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
                   <label className="ml-1 block text-[12px] font-black tracking-[0.08em] text-[#a3adbc]">
                     受取名義の種類
                   </label>
@@ -1156,7 +1489,7 @@ export function CreatorRegistrationPanel({
               </p>
 
               <div className="mt-4 space-y-5">
-                {creatorRegistrationEvidenceKinds.map((kind) => {
+                {requiredEvidenceKinds.map((kind) => {
                   const field = evidences[kind];
                   const config = evidenceFieldLabels[kind];
                   const evidenceUploadDisabled = isBusy || isReadOnly || field.isUploading;
@@ -1275,6 +1608,54 @@ export function CreatorRegistrationPanel({
 
                 <label className="flex cursor-pointer items-start gap-3 p-1">
                   <input
+                    checked={confirmsInformationMatchesDocuments}
+                    className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                    disabled={isBusy || isReadOnly}
+                    onChange={(event) => setConfirmsInformationMatchesDocuments(event.target.checked)}
+                    style={{ accentColor: "#4DA8DA" }}
+                    type="checkbox"
+                  />
+                  <span className="text-[13px] font-medium leading-snug text-gray-700">
+                    入力した本人確認情報が提出書類と一致していることを確認しました。
+                  </span>
+                </label>
+
+                <div className="h-px w-full bg-gray-100" />
+
+                <label className="flex cursor-pointer items-start gap-3 p-1">
+                  <input
+                    checked={acceptsAppearanceVerification}
+                    className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                    disabled={isBusy || isReadOnly}
+                    onChange={(event) => setAcceptsAppearanceVerification(event.target.checked)}
+                    style={{ accentColor: "#4DA8DA" }}
+                    type="checkbox"
+                  />
+                  <span className="text-[13px] font-medium leading-snug text-gray-700">
+                    本人確認書類と本人照合用の写真を照合されることに同意します。
+                  </span>
+                </label>
+
+                <div className="h-px w-full bg-gray-100" />
+
+                <label className="flex cursor-pointer items-start gap-3 p-1">
+                  <input
+                    checked={acceptsAdultBusinessCompliance}
+                    className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                    disabled={isBusy || isReadOnly}
+                    onChange={(event) => setAcceptsAdultBusinessCompliance(event.target.checked)}
+                    style={{ accentColor: "#4DA8DA" }}
+                    type="checkbox"
+                  />
+                  <span className="text-[13px] font-medium leading-snug text-gray-700">
+                    成人向け事業に関する法令・運用ルールを確認し、必要な届出や義務を自分で確認します。
+                  </span>
+                </label>
+
+                <div className="h-px w-full bg-gray-100" />
+
+                <label className="flex cursor-pointer items-start gap-3 p-1">
+                  <input
                     checked={acceptsConsentResponsibility}
                     className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
                     disabled={isBusy || isReadOnly}
@@ -1286,6 +1667,26 @@ export function CreatorRegistrationPanel({
                     出演者の同意と権利確認の責任を自分で負うことを確認しました。
                   </span>
                 </label>
+
+                {hasCoPerformers ? (
+                  <>
+                    <div className="h-px w-full bg-gray-100" />
+
+                    <label className="flex cursor-pointer items-start gap-3 p-1">
+                      <input
+                        checked={acceptsCoPerformerConsentResponsibility}
+                        className="mt-0.5 size-5 rounded border-gray-300 bg-[#f6f7fb]"
+                        disabled={isBusy || isReadOnly}
+                        onChange={(event) => setAcceptsCoPerformerConsentResponsibility(event.target.checked)}
+                        style={{ accentColor: "#4DA8DA" }}
+                        type="checkbox"
+                      />
+                      <span className="text-[13px] font-medium leading-snug text-gray-700">
+                        共演者全員の同意・契約確認書類を提出し、権利確認の責任を自分で負うことを確認しました。
+                      </span>
+                    </label>
+                  </>
+                ) : null}
               </div>
             </section>
           </form>

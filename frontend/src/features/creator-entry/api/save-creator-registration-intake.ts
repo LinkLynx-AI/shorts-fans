@@ -6,13 +6,21 @@ import {
 } from "./contracts";
 
 type SaveCreatorRegistrationIntakeInput = {
+  acceptsAdultBusinessCompliance: boolean;
+  acceptsAppearanceVerification: boolean;
   acceptsConsentResponsibility: boolean;
+  acceptsCoPerformerConsentResponsibility: boolean;
   birthDate: string;
+  confirmsInformationMatchesDocuments: boolean;
   creatorBio: string;
   declaresNoProhibitedCategory: boolean;
+  hasCoPerformers: boolean;
+  identityDocumentType: string;
+  legalAddress: string;
   legalName: string;
   payoutRecipientName: string;
   payoutRecipientType: string;
+  targetAudienceCategory: string;
 };
 
 type SaveCreatorRegistrationIntakeOptions = {

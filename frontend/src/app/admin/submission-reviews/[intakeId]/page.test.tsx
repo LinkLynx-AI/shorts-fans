@@ -7,6 +7,7 @@ import type { SubmissionReviewCase } from "@/entities/submission-review";
 
 import { getSubmissionReviewCase } from "@/entities/submission-review";
 
+import { assertAdminUiAccess } from "../../_lib/admin-ui-access";
 import AdminSubmissionReviewCasePage from "./page";
 
 const { notFound } = vi.hoisted(() => ({
@@ -23,7 +24,7 @@ vi.mock("next/navigation", async () => {
 });
 
 vi.mock("../../_lib/admin-ui-access", () => ({
-  assertAdminUiEnabled: vi.fn(),
+  assertAdminUiAccess: vi.fn(),
 }));
 
 vi.mock("@/features/submission-review-decision", () => ({
@@ -133,6 +134,7 @@ function getFixtureShort(reviewCase: SubmissionReviewCase) {
 describe("AdminSubmissionReviewCasePage", () => {
   beforeEach(() => {
     notFound.mockReset();
+    vi.mocked(assertAdminUiAccess).mockReset();
     vi.mocked(getSubmissionReviewCase).mockReset();
   });
 
@@ -144,6 +146,10 @@ describe("AdminSubmissionReviewCasePage", () => {
       params: Promise.resolve({ intakeId: reviewCase.intake.id }),
     }));
 
+    expect(getSubmissionReviewCase).toHaveBeenCalledWith({
+      fetcher: expect.any(Function),
+      intakeId: reviewCase.intake.id,
+    });
     expect(screen.getByRole("link", { name: /Video 審査 main \/ short/i })).toHaveAttribute(
       "aria-current",
       "page",
@@ -190,5 +196,16 @@ describe("AdminSubmissionReviewCasePage", () => {
 
     expect(screen.getAllByText("未記録")).toHaveLength(8);
     expect(screen.getAllByText("この intake ではまだ decision log がありません。")).toHaveLength(2);
+  });
+
+  it("does not fetch the review case when admin access is rejected", async () => {
+    const reviewCase = createReviewCase();
+    vi.mocked(assertAdminUiAccess).mockRejectedValue(new Error("blocked"));
+
+    await expect(AdminSubmissionReviewCasePage({
+      params: Promise.resolve({ intakeId: reviewCase.intake.id }),
+    })).rejects.toThrow("blocked");
+
+    expect(getSubmissionReviewCase).not.toHaveBeenCalled();
   });
 });

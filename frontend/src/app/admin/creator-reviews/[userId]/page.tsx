@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ApiError } from "@/shared/api";
-import { assertAdminUiEnabled } from "../../_lib/admin-ui-access";
+import { createAdminAPIFetcher } from "../../_lib/admin-api";
+import { assertAdminUiAccess } from "../../_lib/admin-ui-access";
 import { AdminReviewNavigation } from "../../_ui/admin-review-navigation";
 import {
   Avatar,
@@ -21,6 +22,7 @@ import {
   normalizeCreatorReviewState,
 } from "@/entities/creator-review";
 import { CreatorReviewDecisionForm } from "@/features/creator-review-decision";
+import { applyCreatorReviewDecisionFromAdmin } from "./actions";
 
 function getStateBadgeClass(state: string) {
   switch (state) {
@@ -40,6 +42,35 @@ function isNotFoundApiError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 404;
 }
 
+const identityDocumentTypeLabels: Record<string, string> = {
+  basic_resident_register_card: "住民基本台帳カード",
+  disability_certificate: "障害者手帳",
+  driver_license: "運転免許証",
+  my_number_card: "マイナンバーカード",
+  other_government_photo_id: "その他の公的顔写真付き身分証",
+  passport: "パスポート",
+  residence_card: "在留カード",
+  student_or_employee_id: "学生証・社員証",
+};
+
+const targetAudienceCategoryLabels: Record<string, string> = {
+  all_ages: "全年齢向け",
+  gay_bl: "ゲイ・BL",
+  general_adult: "成人向け",
+};
+
+function formatBooleanCheck(value: boolean, checkedLabel = "確認済み") {
+  return value ? checkedLabel : "未確認";
+}
+
+function formatOptionalLabel(value: string | null, labels: Record<string, string>) {
+  if (!value) {
+    return "未入力";
+  }
+
+  return labels[value] ?? value;
+}
+
 export default async function AdminCreatorReviewCasePage({
   params,
   searchParams,
@@ -47,7 +78,7 @@ export default async function AdminCreatorReviewCasePage({
   params: Promise<{ userId: string }>;
   searchParams: Promise<{ state?: string | string[] }>;
 }) {
-  assertAdminUiEnabled();
+  await assertAdminUiAccess();
   const [{ userId }, { state }] = await Promise.all([params, searchParams]);
   const activeState = normalizeCreatorReviewState(state);
   if (!isCreatorReviewUserId(userId)) {
@@ -56,7 +87,10 @@ export default async function AdminCreatorReviewCasePage({
 
   let reviewCase;
   try {
-    reviewCase = await getCreatorReviewCase({ userId });
+    reviewCase = await getCreatorReviewCase({
+      fetcher: createAdminAPIFetcher(),
+      userId,
+    });
   } catch (error) {
     if (isNotFoundApiError(error)) {
       notFound();
@@ -158,6 +192,22 @@ export default async function AdminCreatorReviewCasePage({
               <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">birth date</dt>
               <dd className="mt-1 text-foreground">{reviewCase.intake.birthDate ?? "未入力"}</dd>
             </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3 sm:col-span-2">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">legal address</dt>
+              <dd className="mt-1 whitespace-pre-wrap text-foreground">{reviewCase.intake.legalAddress || "未入力"}</dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">identity document</dt>
+              <dd className="mt-1 text-foreground">
+                {formatOptionalLabel(reviewCase.intake.identityDocumentType, identityDocumentTypeLabels)}
+              </dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">target category</dt>
+              <dd className="mt-1 text-foreground">
+                {formatOptionalLabel(reviewCase.intake.targetAudienceCategory, targetAudienceCategoryLabels)}
+              </dd>
+            </div>
             <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
               <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">payout type</dt>
               <dd className="mt-1 text-foreground">{reviewCase.intake.payoutRecipientType ?? "未入力"}</dd>
@@ -169,13 +219,41 @@ export default async function AdminCreatorReviewCasePage({
             <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
               <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">consent</dt>
               <dd className="mt-1 text-foreground">
-                {reviewCase.intake.acceptsConsentResponsibility ? "確認済み" : "未確認"}
+                {formatBooleanCheck(reviewCase.intake.acceptsConsentResponsibility)}
               </dd>
             </div>
             <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
               <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">prohibited category</dt>
               <dd className="mt-1 text-foreground">
-                {reviewCase.intake.declaresNoProhibitedCategory ? "非該当を宣言済み" : "未確認"}
+                {formatBooleanCheck(reviewCase.intake.declaresNoProhibitedCategory, "非該当を宣言済み")}
+              </dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">document match</dt>
+              <dd className="mt-1 text-foreground">
+                {formatBooleanCheck(reviewCase.intake.confirmsInformationMatchesDocuments)}
+              </dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">appearance verification</dt>
+              <dd className="mt-1 text-foreground">
+                {formatBooleanCheck(reviewCase.intake.acceptsAppearanceVerification)}
+              </dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">adult business compliance</dt>
+              <dd className="mt-1 text-foreground">
+                {formatBooleanCheck(reviewCase.intake.acceptsAdultBusinessCompliance)}
+              </dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">co performers</dt>
+              <dd className="mt-1 text-foreground">{reviewCase.intake.hasCoPerformers ? "あり" : "なし"}</dd>
+            </div>
+            <div className="rounded-[18px] border border-border bg-[#f8fbfe] px-4 py-3 sm:col-span-2">
+              <dt className="text-[11px] font-bold uppercase tracking-[0.18em] text-accent-ink">co performer consent</dt>
+              <dd className="mt-1 text-foreground">
+                {formatBooleanCheck(reviewCase.intake.acceptsCoPerformerConsentResponsibility)}
               </dd>
             </div>
           </dl>
@@ -242,6 +320,7 @@ export default async function AdminCreatorReviewCasePage({
 
           <CreatorReviewDecisionForm
             key={`${reviewCase.userId}:${reviewCase.state}`}
+            onSubmitDecision={applyCreatorReviewDecisionFromAdmin}
             reviewCase={reviewCase}
           />
         </div>

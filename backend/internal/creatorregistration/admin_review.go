@@ -28,12 +28,20 @@ type ReviewQueueItem struct {
 
 // ReviewCaseIntake は admin detail に表示する intake 情報です。
 type ReviewCaseIntake struct {
-	AcceptsConsentResponsibility bool
-	BirthDate                    string
-	DeclaresNoProhibitedCategory bool
-	LegalName                    string
-	PayoutRecipientName          string
-	PayoutRecipientType          string
+	AcceptsAdultBusinessCompliance          bool
+	AcceptsAppearanceVerification           bool
+	AcceptsConsentResponsibility            bool
+	AcceptsCoPerformerConsentResponsibility bool
+	BirthDate                               string
+	ConfirmsInformationMatchesDocuments     bool
+	DeclaresNoProhibitedCategory            bool
+	HasCoPerformers                         bool
+	IdentityDocumentType                    string
+	LegalAddress                            string
+	LegalName                               string
+	PayoutRecipientName                     string
+	PayoutRecipientType                     string
+	TargetAudienceCategory                  string
 }
 
 // ReviewEvidence は admin detail で参照できる signed URL 付き evidence です。
@@ -133,14 +141,16 @@ func (s *ReviewService) ApplyDecision(ctx context.Context, input ReviewDecisionI
 	if s == nil || s.repository == nil {
 		return ReviewCase{}, fmt.Errorf("creator registration review service が初期化されていません")
 	}
-	if _, err := s.loadReviewCaseSnapshot(ctx, input.UserID, false); err != nil {
+	includeEvidences := strings.TrimSpace(input.Decision) == StateApproved
+	snapshot, err := s.loadReviewCaseSnapshot(ctx, input.UserID, includeEvidences)
+	if err != nil {
 		return ReviewCase{}, err
+	}
+	if includeEvidences && snapshot.capability != nil && snapshot.capability.State == StateSubmitted && !isSnapshotComplete(snapshot) {
+		return ReviewCase{}, ErrRegistrationIncomplete
 	}
 
 	if _, err := s.repository.ApplyReviewDecision(ctx, input); err != nil {
-		if errors.Is(err, ErrRegistrationIncomplete) {
-			return ReviewCase{}, ErrReviewCaseNotFound
-		}
 		return ReviewCase{}, err
 	}
 
@@ -251,12 +261,20 @@ func buildReviewCase(snapshot registrationSnapshot, evidenceAccessURLs map[strin
 	}
 
 	intake := ReviewCaseIntake{
-		AcceptsConsentResponsibility: snapshot.intake != nil && snapshot.intake.AcceptsConsentResponsibility,
-		BirthDate:                    dateStringFromPG(optionalDate(snapshot.intake)),
-		DeclaresNoProhibitedCategory: snapshot.intake != nil && snapshot.intake.DeclaresNoProhibitedCategory,
-		LegalName:                    stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalName }),
-		PayoutRecipientName:          stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.PayoutRecipientName }),
-		PayoutRecipientType:          optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.PayoutRecipientType }),
+		AcceptsAdultBusinessCompliance:          snapshot.intake != nil && snapshot.intake.AcceptsAdultBusinessCompliance,
+		AcceptsAppearanceVerification:           snapshot.intake != nil && snapshot.intake.AcceptsAppearanceVerification,
+		AcceptsConsentResponsibility:            snapshot.intake != nil && snapshot.intake.AcceptsConsentResponsibility,
+		AcceptsCoPerformerConsentResponsibility: snapshot.intake != nil && snapshot.intake.AcceptsCoPerformerConsentResponsibility,
+		BirthDate:                               dateStringFromPG(optionalDate(snapshot.intake)),
+		ConfirmsInformationMatchesDocuments:     snapshot.intake != nil && snapshot.intake.ConfirmsInformationMatchesDocuments,
+		DeclaresNoProhibitedCategory:            snapshot.intake != nil && snapshot.intake.DeclaresNoProhibitedCategory,
+		HasCoPerformers:                         snapshot.intake != nil && snapshot.intake.HasCoPerformers,
+		IdentityDocumentType:                    optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.IdentityDocumentType }),
+		LegalAddress:                            stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalAddress }),
+		LegalName:                               stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.LegalName }),
+		PayoutRecipientName:                     stringOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) string { return row.PayoutRecipientName }),
+		PayoutRecipientType:                     optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.PayoutRecipientType }),
+		TargetAudienceCategory:                  optionalTextOrEmpty(snapshot.intake, func(row sqlc.AppCreatorRegistrationIntake) pgtype.Text { return row.TargetAudienceCategory }),
 	}
 
 	return ReviewCase{

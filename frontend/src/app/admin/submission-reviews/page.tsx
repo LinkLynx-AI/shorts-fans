@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { assertAdminUiEnabled } from "../_lib/admin-ui-access";
+import { createAdminAPIFetcher } from "../_lib/admin-api";
+import { assertAdminUiAccess } from "../_lib/admin-ui-access";
 import { AdminReviewNavigation } from "../_ui/admin-review-navigation";
 import {
   Avatar,
@@ -16,8 +17,10 @@ import {
 } from "@/entities/submission-review";
 
 export default async function AdminSubmissionReviewsPage() {
-  assertAdminUiEnabled();
-  const queue = await getSubmissionReviewQueue();
+  await assertAdminUiAccess();
+  const queue = await getSubmissionReviewQueue({
+    fetcher: createAdminAPIFetcher(),
+  });
 
   return (
     <main className="mx-auto flex min-h-full w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">

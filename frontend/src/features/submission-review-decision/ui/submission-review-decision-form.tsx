@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { ApiError } from "@/shared/api";
 import { Button, SurfacePanel } from "@/shared/ui";
 import {
-  applySubmissionReviewDecision,
   doesSubmissionReviewDecisionRequireReason,
   getSubmissionReviewDecisionLabel,
   submissionReviewReasonOptions,
@@ -15,7 +14,23 @@ import {
 } from "@/entities/submission-review";
 
 type SubmissionReviewDecisionFormProps = {
+  onSubmitDecision: (input: SubmitSubmissionReviewDecisionInput) => Promise<void>;
   reviewCase: SubmissionReviewCase;
+};
+
+type SubmitSubmissionReviewDecisionInput = {
+  intakeId: string;
+  mainDecision?: {
+    decision: SubmissionReviewDecision;
+    reasonCode?: string;
+    reviewNote?: string;
+  };
+  shortDecisions: Array<{
+    decision: SubmissionReviewDecision;
+    reasonCode?: string;
+    reviewNote?: string;
+    shortId: string;
+  }>;
 };
 
 type DecisionDraft = {
@@ -179,6 +194,7 @@ function DecisionPicker({
  * admin submission review detail から object-level decision を実行する。
  */
 export function SubmissionReviewDecisionForm({
+  onSubmitDecision,
   reviewCase,
 }: SubmissionReviewDecisionFormProps) {
   const router = useRouter();
@@ -256,7 +272,7 @@ export function SubmissionReviewDecisionForm({
         }),
       };
 
-      await applySubmissionReviewDecision(request);
+      await onSubmitDecision(request);
 
       startTransition(() => {
         router.replace("/admin/submission-reviews");

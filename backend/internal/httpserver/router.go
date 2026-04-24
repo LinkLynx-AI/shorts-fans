@@ -232,6 +232,7 @@ type FanProfileLibraryReader interface {
 // HandlerConfig は router が依存する read model をまとめます。
 type HandlerConfig struct {
 	AppEnv                           string
+	AdminAPIToken                    string
 	AdminCreatorReview               AdminCreatorReviewService
 	AdminSubmissionReview            AdminSubmissionReviewService
 	CreatorSearch                    CreatorSearchReader
@@ -391,8 +392,8 @@ func NewHandler(config HandlerConfig) *gin.Engine {
 		config.ViewerActiveMode,
 		config.ViewerBootstrap,
 	)
-	registerAdminCreatorReviewRoutes(router, config.AppEnv, config.AdminCreatorReview)
-	registerAdminSubmissionReviewRoutes(router, config.AppEnv, config.AdminSubmissionReview)
+	registerAdminCreatorReviewRoutes(router, config.AppEnv, config.AdminAPIToken, config.AdminCreatorReview)
+	registerAdminSubmissionReviewRoutes(router, config.AppEnv, config.AdminAPIToken, config.AdminSubmissionReview)
 
 	return router
 }

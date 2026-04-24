@@ -41,11 +41,12 @@ func (r *Repository) ApplyReviewDecision(ctx context.Context, input ReviewDecisi
 	var registration Registration
 	err := postgres.RunInTx(ctx, r.txBeginner, func(tx pgx.Tx) error {
 		q := r.newQueries(tx)
-		snapshot, err := r.loadSnapshot(ctx, q, input.UserID, false, true)
+		includeEvidences := strings.TrimSpace(input.Decision) == StateApproved
+		snapshot, err := r.loadSnapshot(ctx, q, input.UserID, includeEvidences, true)
 		if err != nil {
 			return err
 		}
-		if err := validateReviewDecisionInput(snapshot.capability, input); err != nil {
+		if err := validateReviewDecisionInput(snapshot, input); err != nil {
 			return err
 		}
 
@@ -133,19 +134,22 @@ func buildReviewDecisionUpdateParams(
 	}
 }
 
-func validateReviewDecisionInput(capability *sqlc.AppCreatorCapability, input ReviewDecisionInput) error {
-	if capability == nil {
+func validateReviewDecisionInput(snapshot registrationSnapshot, input ReviewDecisionInput) error {
+	if snapshot.capability == nil {
 		return ErrRegistrationIncomplete
 	}
 
 	switch strings.TrimSpace(input.Decision) {
 	case StateApproved:
-		if capability.State != StateSubmitted {
+		if snapshot.capability.State != StateSubmitted {
 			return ErrRegistrationStateConflict
+		}
+		if !isSnapshotComplete(snapshot) {
+			return ErrRegistrationIncomplete
 		}
 		return nil
 	case StateRejected:
-		if capability.State != StateSubmitted {
+		if snapshot.capability.State != StateSubmitted {
 			return ErrRegistrationStateConflict
 		}
 		if trimmedOptionalString(input.ReasonCode) == nil {
@@ -156,7 +160,7 @@ func validateReviewDecisionInput(capability *sqlc.AppCreatorCapability, input Re
 		}
 		return nil
 	case StateSuspended:
-		if capability.State != StateApproved {
+		if snapshot.capability.State != StateApproved {
 			return ErrRegistrationStateConflict
 		}
 		return nil

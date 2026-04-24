@@ -244,6 +244,7 @@ func main() {
 		logger,
 		httpserver.HandlerConfig{
 			AppEnv:                           cfg.AppEnv,
+			AdminAPIToken:                    cfg.AdminAPIToken,
 			AdminCreatorReview:               adminCreatorReviewService,
 			AdminSubmissionReview:            adminSubmissionReviewService,
 			CreatorSearch:                    creatorRepository,

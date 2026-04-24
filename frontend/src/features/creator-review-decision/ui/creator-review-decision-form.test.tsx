@@ -7,7 +7,6 @@ import {
 
 import type { CreatorReviewCase } from "@/entities/creator-review";
 
-import { applyCreatorReviewDecision } from "@/entities/creator-review";
 import { CreatorReviewDecisionForm } from "./creator-review-decision-form";
 
 const mockedRouter = vi.hoisted(() => ({
@@ -28,26 +27,25 @@ vi.mock("next/navigation", async () => {
   };
 });
 
-vi.mock("@/entities/creator-review", async () => {
-  const actual = await vi.importActual<typeof import("@/entities/creator-review")>("@/entities/creator-review");
-
-  return {
-    ...actual,
-    applyCreatorReviewDecision: vi.fn(),
-  };
-});
-
 function createReviewCase(state: CreatorReviewCase["state"]): CreatorReviewCase {
   return {
     creatorBio: "quiet rooftop",
     evidences: [],
     intake: {
+      acceptsAdultBusinessCompliance: true,
+      acceptsAppearanceVerification: true,
       acceptsConsentResponsibility: true,
+      acceptsCoPerformerConsentResponsibility: false,
       birthDate: "1999-04-02",
+      confirmsInformationMatchesDocuments: true,
       declaresNoProhibitedCategory: true,
+      hasCoPerformers: false,
+      identityDocumentType: "driver_license",
+      legalAddress: "Tokyo-to Shibuya-ku 1-2-3",
       legalName: "Mina Rei",
       payoutRecipientName: "Mina Rei",
       payoutRecipientType: "self",
+      targetAudienceCategory: "general_adult",
     },
     rejection: null,
     review: {
@@ -74,15 +72,18 @@ describe("CreatorReviewDecisionForm", () => {
     mockedRouter.push.mockReset();
     mockedRouter.refresh.mockReset();
     mockedRouter.replace.mockReset();
-    vi.mocked(applyCreatorReviewDecision).mockReset();
   });
 
   it("submits the selected reject reason and refreshes the route", async () => {
     const user = userEvent.setup();
+    const onSubmitDecision = vi.fn().mockResolvedValue(undefined);
 
-    vi.mocked(applyCreatorReviewDecision).mockResolvedValue(createReviewCase("rejected"));
-
-    render(<CreatorReviewDecisionForm reviewCase={createReviewCase("submitted")} />);
+    render(
+      <CreatorReviewDecisionForm
+        onSubmitDecision={onSubmitDecision}
+        reviewCase={createReviewCase("submitted")}
+      />,
+    );
 
     await user.click(screen.getAllByRole("button", { name: "却下する" })[0]!);
     await user.selectOptions(screen.getByRole("combobox"), "documents_blurry");
@@ -90,7 +91,7 @@ describe("CreatorReviewDecisionForm", () => {
     await user.click(screen.getAllByRole("button", { name: "却下する" })[1]!);
 
     await waitFor(() => {
-      expect(applyCreatorReviewDecision).toHaveBeenCalledWith({
+      expect(onSubmitDecision).toHaveBeenCalledWith({
         decision: "rejected",
         isResubmitEligible: false,
         isSupportReviewRequired: true,
@@ -103,10 +104,14 @@ describe("CreatorReviewDecisionForm", () => {
 
   it("shows a single suspend action for approved cases", async () => {
     const user = userEvent.setup();
+    const onSubmitDecision = vi.fn().mockResolvedValue(undefined);
 
-    vi.mocked(applyCreatorReviewDecision).mockResolvedValue(createReviewCase("suspended"));
-
-    render(<CreatorReviewDecisionForm reviewCase={createReviewCase("approved")} />);
+    render(
+      <CreatorReviewDecisionForm
+        onSubmitDecision={onSubmitDecision}
+        reviewCase={createReviewCase("approved")}
+      />,
+    );
 
     expect(screen.getByRole("button", { name: "停止する" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "却下する" })).not.toBeInTheDocument();
@@ -114,7 +119,7 @@ describe("CreatorReviewDecisionForm", () => {
     await user.click(screen.getByRole("button", { name: "停止する" }));
 
     await waitFor(() => {
-      expect(applyCreatorReviewDecision).toHaveBeenCalledWith({
+      expect(onSubmitDecision).toHaveBeenCalledWith({
         decision: "suspended",
         isResubmitEligible: false,
         isSupportReviewRequired: false,
@@ -125,7 +130,12 @@ describe("CreatorReviewDecisionForm", () => {
   });
 
   it("renders a read-only note when no decision is available", () => {
-    render(<CreatorReviewDecisionForm reviewCase={createReviewCase("rejected")} />);
+    render(
+      <CreatorReviewDecisionForm
+        onSubmitDecision={vi.fn()}
+        reviewCase={createReviewCase("rejected")}
+      />,
+    );
 
     expect(screen.getByText("この状態では追加の admin decision はありません。")).toBeInTheDocument();
   });

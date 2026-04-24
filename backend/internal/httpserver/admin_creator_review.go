@@ -1,6 +1,7 @@
 package httpserver
 
 import (
+	"crypto/subtle"
 	"errors"
 	"net"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 )
 
 const (
+	adminAPITokenHeader                    = "X-Shorts-Fans-Admin-Token"
 	adminCreatorReviewCaseRequestScope     = "admin_creator_review_case_get"
 	adminCreatorReviewDecisionRequestScope = "admin_creator_review_decision_post"
 	adminCreatorReviewQueueRequestScope    = "admin_creator_review_queue_get"
@@ -35,12 +37,20 @@ type adminCreatorReviewEvidencePayload struct {
 }
 
 type adminCreatorReviewIntakePayload struct {
-	AcceptsConsentResponsibility bool    `json:"acceptsConsentResponsibility"`
-	BirthDate                    *string `json:"birthDate"`
-	DeclaresNoProhibitedCategory bool    `json:"declaresNoProhibitedCategory"`
-	LegalName                    string  `json:"legalName"`
-	PayoutRecipientName          string  `json:"payoutRecipientName"`
-	PayoutRecipientType          *string `json:"payoutRecipientType"`
+	AcceptsAdultBusinessCompliance          bool    `json:"acceptsAdultBusinessCompliance"`
+	AcceptsAppearanceVerification           bool    `json:"acceptsAppearanceVerification"`
+	AcceptsConsentResponsibility            bool    `json:"acceptsConsentResponsibility"`
+	AcceptsCoPerformerConsentResponsibility bool    `json:"acceptsCoPerformerConsentResponsibility"`
+	BirthDate                               *string `json:"birthDate"`
+	ConfirmsInformationMatchesDocuments     bool    `json:"confirmsInformationMatchesDocuments"`
+	DeclaresNoProhibitedCategory            bool    `json:"declaresNoProhibitedCategory"`
+	HasCoPerformers                         bool    `json:"hasCoPerformers"`
+	IdentityDocumentType                    *string `json:"identityDocumentType"`
+	LegalAddress                            string  `json:"legalAddress"`
+	LegalName                               string  `json:"legalName"`
+	PayoutRecipientName                     string  `json:"payoutRecipientName"`
+	PayoutRecipientType                     *string `json:"payoutRecipientType"`
+	TargetAudienceCategory                  *string `json:"targetAudienceCategory"`
 }
 
 type adminCreatorReviewQueueItemPayload struct {
@@ -75,6 +85,7 @@ type adminCreatorReviewCaseResponseData struct {
 func registerAdminCreatorReviewRoutes(
 	router gin.IRouter,
 	appEnv string,
+	adminAPIToken string,
 	service AdminCreatorReviewService,
 ) {
 	if appEnv != developmentAppEnv || service == nil {
@@ -82,7 +93,7 @@ func registerAdminCreatorReviewRoutes(
 	}
 
 	adminGroup := router.Group("/api/admin")
-	adminGroup.Use(requireAdminLoopback())
+	adminGroup.Use(requireAdminLocalAccess(adminAPIToken))
 	adminGroup.GET("/creator-reviews", func(c *gin.Context) {
 		handleAdminCreatorReviewQueueGet(c, service)
 	})
@@ -94,15 +105,29 @@ func registerAdminCreatorReviewRoutes(
 	})
 }
 
-func requireAdminLoopback() gin.HandlerFunc {
+func requireAdminLocalAccess(adminAPIToken string) gin.HandlerFunc {
+	expectedToken := strings.TrimSpace(adminAPIToken)
+
 	return func(c *gin.Context) {
-		if !isLoopbackRemoteAddr(c.Request.RemoteAddr) {
+		if !isLoopbackRemoteAddr(c.Request.RemoteAddr) || !isAdminTokenMatch(c.GetHeader(adminAPITokenHeader), expectedToken) {
 			c.AbortWithStatus(http.StatusNotFound)
 			return
 		}
 
 		c.Next()
 	}
+}
+
+func isAdminTokenMatch(actual string, expected string) bool {
+	actual = strings.TrimSpace(actual)
+	if actual == "" || expected == "" {
+		return false
+	}
+	if len(actual) != len(expected) {
+		return false
+	}
+
+	return subtle.ConstantTimeCompare([]byte(actual), []byte(expected)) == 1
 }
 
 func isLoopbackRemoteAddr(remoteAddr string) bool {
@@ -291,12 +316,20 @@ func buildAdminCreatorReviewCasePayload(reviewCase creatorregistration.ReviewCas
 		CreatorBio: reviewCase.CreatorBio,
 		Evidences:  evidences,
 		Intake: adminCreatorReviewIntakePayload{
-			AcceptsConsentResponsibility: reviewCase.Intake.AcceptsConsentResponsibility,
-			BirthDate:                    nullableTrimmedString(reviewCase.Intake.BirthDate),
-			DeclaresNoProhibitedCategory: reviewCase.Intake.DeclaresNoProhibitedCategory,
-			LegalName:                    reviewCase.Intake.LegalName,
-			PayoutRecipientName:          reviewCase.Intake.PayoutRecipientName,
-			PayoutRecipientType:          nullableTrimmedString(reviewCase.Intake.PayoutRecipientType),
+			AcceptsAdultBusinessCompliance:          reviewCase.Intake.AcceptsAdultBusinessCompliance,
+			AcceptsAppearanceVerification:           reviewCase.Intake.AcceptsAppearanceVerification,
+			AcceptsConsentResponsibility:            reviewCase.Intake.AcceptsConsentResponsibility,
+			AcceptsCoPerformerConsentResponsibility: reviewCase.Intake.AcceptsCoPerformerConsentResponsibility,
+			BirthDate:                               nullableTrimmedString(reviewCase.Intake.BirthDate),
+			ConfirmsInformationMatchesDocuments:     reviewCase.Intake.ConfirmsInformationMatchesDocuments,
+			DeclaresNoProhibitedCategory:            reviewCase.Intake.DeclaresNoProhibitedCategory,
+			HasCoPerformers:                         reviewCase.Intake.HasCoPerformers,
+			IdentityDocumentType:                    nullableTrimmedString(reviewCase.Intake.IdentityDocumentType),
+			LegalAddress:                            reviewCase.Intake.LegalAddress,
+			LegalName:                               reviewCase.Intake.LegalName,
+			PayoutRecipientName:                     reviewCase.Intake.PayoutRecipientName,
+			PayoutRecipientType:                     nullableTrimmedString(reviewCase.Intake.PayoutRecipientType),
+			TargetAudienceCategory:                  nullableTrimmedString(reviewCase.Intake.TargetAudienceCategory),
 		},
 		Rejection: buildViewerCreatorRegistrationRejectionPayload(reviewCase.Rejection),
 		Review: viewerCreatorRegistrationReviewPayload{
@@ -323,6 +356,8 @@ func writeAdminCreatorReviewError(c *gin.Context, err error, requestScope string
 		writeViewerCreatorEntryError(c, http.StatusBadRequest, "review_decision_metadata_conflict", "review decision metadata is invalid", requestScope)
 	case errors.Is(err, creatorregistration.ErrRegistrationStateConflict):
 		writeViewerCreatorEntryError(c, http.StatusConflict, "review_state_conflict", "review case is not in a valid state for this action", requestScope)
+	case errors.Is(err, creatorregistration.ErrRegistrationIncomplete):
+		writeViewerCreatorEntryError(c, http.StatusConflict, "registration_incomplete", "review case is missing required creator registration intake", requestScope)
 	case errors.Is(err, creatorregistration.ErrReviewCaseNotFound), errors.Is(err, creatorregistration.ErrSharedProfileNotFound):
 		writeViewerCreatorEntryError(c, http.StatusNotFound, "not_found", "review case was not found", requestScope)
 	default:

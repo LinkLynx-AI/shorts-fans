@@ -25,7 +25,7 @@ import (
 
 const (
 	integrationPostgresDSNEnv = "POSTGRES_DSN"
-	latestMigrationVersion    = 20
+	latestMigrationVersion    = 23
 )
 
 func TestCreatorProfileMigrationsRoundTrip(t *testing.T) {
@@ -475,6 +475,154 @@ func TestAuthTablesMigrationLatestRevision(t *testing.T) {
 		LastAuthenticatedAt: pgTime(now),
 	})
 	assertPgConstraintError(t, err, "23505", "idx_auth_identities_email_normalized")
+}
+
+func TestCreatorRegistrationReviewIntakeMigrationRoundTrip(t *testing.T) {
+	ctx, conn, migrator, cleanup := newIntegrationEnvironment(t)
+	defer cleanup()
+
+	if err := migrator.Migrate(23); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		t.Fatalf("migrator.Migrate(23) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 23)
+
+	queries := sqlc.New(conn)
+	user, err := queries.CreateUser(ctx)
+	if err != nil {
+		t.Fatalf("CreateUser() error = %v, want nil", err)
+	}
+	if _, err := queries.CreateCreatorCapability(ctx, sqlc.CreateCreatorCapabilityParams{
+		UserID:                 user.ID,
+		State:                  "draft",
+		SelfServeResubmitCount: 0,
+	}); err != nil {
+		t.Fatalf("CreateCreatorCapability() error = %v, want nil", err)
+	}
+
+	if _, err := conn.Exec(
+		ctx,
+		`INSERT INTO app.creator_registration_intakes (
+			user_id,
+			legal_name,
+			birth_date,
+			legal_address,
+			identity_document_type,
+			target_audience_category,
+			has_co_performers,
+			payout_recipient_type,
+			payout_recipient_name,
+			declares_no_prohibited_category,
+			accepts_consent_responsibility,
+			accepts_appearance_verification,
+			accepts_co_performer_consent_responsibility,
+			accepts_adult_business_compliance,
+			confirms_information_matches_documents
+		) VALUES (
+			$1,
+			'Creator Legal',
+			'1999-04-02',
+			'Tokyo-to Shibuya-ku 1-2-3',
+			'driver_license',
+			'general_adult',
+			TRUE,
+			'self',
+			'Creator Legal',
+			TRUE,
+			TRUE,
+			TRUE,
+			TRUE,
+			TRUE,
+			TRUE
+		)`,
+		user.ID,
+	); err != nil {
+		t.Fatalf("Exec(insert creator_registration_intakes at migration 23) error = %v, want nil", err)
+	}
+
+	_, err = conn.Exec(
+		ctx,
+		`UPDATE app.creator_registration_intakes
+		SET identity_document_type = 'library_card'
+		WHERE user_id = $1`,
+		user.ID,
+	)
+	assertPgConstraintError(t, err, "23514", "creator_registration_intakes_identity_document_type_check")
+
+	_, err = conn.Exec(
+		ctx,
+		`UPDATE app.creator_registration_intakes
+		SET legal_address = $2
+		WHERE user_id = $1`,
+		user.ID,
+		strings.Repeat("a", 501),
+	)
+	assertPgConstraintError(t, err, "23514", "creator_registration_intakes_legal_address_length_check")
+
+	if _, err := conn.Exec(
+		ctx,
+		`INSERT INTO app.creator_registration_evidences (
+			user_id,
+			kind,
+			file_name,
+			mime_type,
+			file_size_bytes,
+			storage_bucket,
+			storage_key
+		) VALUES (
+			$1,
+			'identity_selfie',
+			'identity-selfie.png',
+			'image/png',
+			1024,
+			'review-bucket',
+			'creator-registration/evidence/identity-selfie.png'
+		)`,
+		user.ID,
+	); err != nil {
+		t.Fatalf("Exec(insert identity_selfie evidence at migration 23) error = %v, want nil", err)
+	}
+
+	if err := migrator.Steps(-1); err != nil {
+		t.Fatalf("migrator.Steps(-1) error = %v, want nil", err)
+	}
+	assertMigrationVersion(t, migrator, 22)
+
+	var newEvidenceCount int
+	if err := conn.QueryRow(
+		ctx,
+		`SELECT count(*)
+		FROM app.creator_registration_evidences
+		WHERE user_id = $1 AND kind = 'identity_selfie'`,
+		user.ID,
+	).Scan(&newEvidenceCount); err != nil {
+		t.Fatalf("QueryRow(identity_selfie count after down) error = %v, want nil", err)
+	}
+	if newEvidenceCount != 0 {
+		t.Fatalf("identity_selfie count after down got %d want 0", newEvidenceCount)
+	}
+
+	_, err = conn.Exec(
+		ctx,
+		`INSERT INTO app.creator_registration_evidences (
+			user_id,
+			kind,
+			file_name,
+			mime_type,
+			file_size_bytes,
+			storage_bucket,
+			storage_key
+		) VALUES (
+			$1,
+			'identity_selfie',
+			'identity-selfie.png',
+			'image/png',
+			1024,
+			'review-bucket',
+			'creator-registration/evidence/identity-selfie-after-down.png'
+		)`,
+		user.ID,
+	)
+	assertPgConstraintError(t, err, "23514", "creator_registration_evidences_kind_check")
 }
 
 func TestAcquireMainPurchaseLockQueryLatestRevision(t *testing.T) {

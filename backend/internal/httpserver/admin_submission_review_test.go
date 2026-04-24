@@ -64,7 +64,8 @@ func TestAdminSubmissionReviewRoutesRejectNonLoopbackRequests(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			listCases: func(context.Context) ([]submissionreview.AdminReviewQueueItem, error) {
 				t.Fatal("ListCases() called, want loopback guard to block request first")
@@ -75,6 +76,7 @@ func TestAdminSubmissionReviewRoutesRejectNonLoopbackRequests(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/api/admin/submission-reviews", nil)
 	req.RemoteAddr = "203.0.113.10:4321"
+	req.Header.Set(adminAPITokenHeader, testAdminAPIToken)
 	rec := httptest.NewRecorder()
 
 	router.ServeHTTP(rec, req)
@@ -92,7 +94,8 @@ func TestAdminSubmissionReviewQueueGetReturnsItems(t *testing.T) {
 	submittedAt := time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC)
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			listCases: func(context.Context) ([]submissionreview.AdminReviewQueueItem, error) {
 				return []submissionreview.AdminReviewQueueItem{
@@ -135,7 +138,8 @@ func TestAdminSubmissionReviewCaseGetMapsNotFound(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			getCase: func(context.Context, uuid.UUID) (submissionreview.AdminReviewCase, error) {
 				return submissionreview.AdminReviewCase{}, submissionreview.ErrAdminReviewCaseNotFound
@@ -160,7 +164,8 @@ func TestAdminSubmissionReviewCaseGetRejectsInvalidIntakeID(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			getCase: func(context.Context, uuid.UUID) (submissionreview.AdminReviewCase, error) {
 				t.Fatal("GetCase() called, want invalid request to fail first")
@@ -190,7 +195,8 @@ func TestAdminSubmissionReviewDecisionPostReturnsUpdatedCase(t *testing.T) {
 	var gotInput submissionreview.ReviewDecisionInput
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			applyDecision: func(_ context.Context, input submissionreview.ReviewDecisionInput) error {
 				gotInput = input
@@ -252,7 +258,8 @@ func TestAdminSubmissionReviewDecisionPostRejectsInvalidShortID(t *testing.T) {
 	t.Parallel()
 
 	router := NewHandler(HandlerConfig{
-		AppEnv: developmentAppEnv,
+		AppEnv:        developmentAppEnv,
+		AdminAPIToken: testAdminAPIToken,
 		AdminSubmissionReview: adminSubmissionReviewServiceStub{
 			applyDecision: func(context.Context, submissionreview.ReviewDecisionInput) error {
 				t.Fatal("ApplyDecision() called, want invalid request to fail first")

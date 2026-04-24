@@ -12,7 +12,7 @@ import (
 )
 
 const getCreatorRegistrationIntakeByUserID = `-- name: GetCreatorRegistrationIntakeByUserID :one
-SELECT user_id, legal_name, birth_date, payout_recipient_type, payout_recipient_name, declares_no_prohibited_category, accepts_consent_responsibility, created_at, updated_at
+SELECT user_id, legal_name, birth_date, payout_recipient_type, payout_recipient_name, declares_no_prohibited_category, accepts_consent_responsibility, created_at, updated_at, legal_address, identity_document_type, target_audience_category, has_co_performers, accepts_appearance_verification, accepts_co_performer_consent_responsibility, accepts_adult_business_compliance, confirms_information_matches_documents
 FROM app.creator_registration_intakes
 WHERE user_id = $1
 LIMIT 1
@@ -31,6 +31,14 @@ func (q *Queries) GetCreatorRegistrationIntakeByUserID(ctx context.Context, user
 		&i.AcceptsConsentResponsibility,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LegalAddress,
+		&i.IdentityDocumentType,
+		&i.TargetAudienceCategory,
+		&i.HasCoPerformers,
+		&i.AcceptsAppearanceVerification,
+		&i.AcceptsCoPerformerConsentResponsibility,
+		&i.AcceptsAdultBusinessCompliance,
+		&i.ConfirmsInformationMatchesDocuments,
 	)
 	return i, err
 }
@@ -220,10 +228,18 @@ INSERT INTO app.creator_registration_intakes (
     user_id,
     legal_name,
     birth_date,
+    legal_address,
+    identity_document_type,
+    target_audience_category,
+    has_co_performers,
     payout_recipient_type,
     payout_recipient_name,
     declares_no_prohibited_category,
-    accepts_consent_responsibility
+    accepts_consent_responsibility,
+    accepts_appearance_verification,
+    accepts_co_performer_consent_responsibility,
+    accepts_adult_business_compliance,
+    confirms_information_matches_documents
 ) VALUES (
     $1,
     $2,
@@ -231,28 +247,52 @@ INSERT INTO app.creator_registration_intakes (
     $4,
     $5,
     $6,
-    $7
+    $7,
+    $8,
+    $9,
+    $10,
+    $11,
+    $12,
+    $13,
+    $14,
+    $15
 )
 ON CONFLICT (user_id) DO UPDATE
 SET
     legal_name = EXCLUDED.legal_name,
     birth_date = EXCLUDED.birth_date,
+    legal_address = EXCLUDED.legal_address,
+    identity_document_type = EXCLUDED.identity_document_type,
+    target_audience_category = EXCLUDED.target_audience_category,
+    has_co_performers = EXCLUDED.has_co_performers,
     payout_recipient_type = EXCLUDED.payout_recipient_type,
     payout_recipient_name = EXCLUDED.payout_recipient_name,
     declares_no_prohibited_category = EXCLUDED.declares_no_prohibited_category,
     accepts_consent_responsibility = EXCLUDED.accepts_consent_responsibility,
+    accepts_appearance_verification = EXCLUDED.accepts_appearance_verification,
+    accepts_co_performer_consent_responsibility = EXCLUDED.accepts_co_performer_consent_responsibility,
+    accepts_adult_business_compliance = EXCLUDED.accepts_adult_business_compliance,
+    confirms_information_matches_documents = EXCLUDED.confirms_information_matches_documents,
     updated_at = CURRENT_TIMESTAMP
-RETURNING user_id, legal_name, birth_date, payout_recipient_type, payout_recipient_name, declares_no_prohibited_category, accepts_consent_responsibility, created_at, updated_at
+RETURNING user_id, legal_name, birth_date, payout_recipient_type, payout_recipient_name, declares_no_prohibited_category, accepts_consent_responsibility, created_at, updated_at, legal_address, identity_document_type, target_audience_category, has_co_performers, accepts_appearance_verification, accepts_co_performer_consent_responsibility, accepts_adult_business_compliance, confirms_information_matches_documents
 `
 
 type UpsertCreatorRegistrationIntakeParams struct {
-	UserID                       pgtype.UUID
-	LegalName                    string
-	BirthDate                    pgtype.Date
-	PayoutRecipientType          pgtype.Text
-	PayoutRecipientName          string
-	DeclaresNoProhibitedCategory bool
-	AcceptsConsentResponsibility bool
+	UserID                                  pgtype.UUID
+	LegalName                               string
+	BirthDate                               pgtype.Date
+	LegalAddress                            string
+	IdentityDocumentType                    pgtype.Text
+	TargetAudienceCategory                  pgtype.Text
+	HasCoPerformers                         bool
+	PayoutRecipientType                     pgtype.Text
+	PayoutRecipientName                     string
+	DeclaresNoProhibitedCategory            bool
+	AcceptsConsentResponsibility            bool
+	AcceptsAppearanceVerification           bool
+	AcceptsCoPerformerConsentResponsibility bool
+	AcceptsAdultBusinessCompliance          bool
+	ConfirmsInformationMatchesDocuments     bool
 }
 
 func (q *Queries) UpsertCreatorRegistrationIntake(ctx context.Context, arg UpsertCreatorRegistrationIntakeParams) (AppCreatorRegistrationIntake, error) {
@@ -260,10 +300,18 @@ func (q *Queries) UpsertCreatorRegistrationIntake(ctx context.Context, arg Upser
 		arg.UserID,
 		arg.LegalName,
 		arg.BirthDate,
+		arg.LegalAddress,
+		arg.IdentityDocumentType,
+		arg.TargetAudienceCategory,
+		arg.HasCoPerformers,
 		arg.PayoutRecipientType,
 		arg.PayoutRecipientName,
 		arg.DeclaresNoProhibitedCategory,
 		arg.AcceptsConsentResponsibility,
+		arg.AcceptsAppearanceVerification,
+		arg.AcceptsCoPerformerConsentResponsibility,
+		arg.AcceptsAdultBusinessCompliance,
+		arg.ConfirmsInformationMatchesDocuments,
 	)
 	var i AppCreatorRegistrationIntake
 	err := row.Scan(
@@ -276,6 +324,14 @@ func (q *Queries) UpsertCreatorRegistrationIntake(ctx context.Context, arg Upser
 		&i.AcceptsConsentResponsibility,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LegalAddress,
+		&i.IdentityDocumentType,
+		&i.TargetAudienceCategory,
+		&i.HasCoPerformers,
+		&i.AcceptsAppearanceVerification,
+		&i.AcceptsCoPerformerConsentResponsibility,
+		&i.AcceptsAdultBusinessCompliance,
+		&i.ConfirmsInformationMatchesDocuments,
 	)
 	return i, err
 }

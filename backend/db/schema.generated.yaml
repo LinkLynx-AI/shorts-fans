@@ -26,6 +26,7 @@ source:
         - 000020_add_media_review_submit_retry_index.up.sql
         - 000021_add_short_likes.up.sql
         - 000022_add_short_comments.up.sql
+        - 000023_expand_creator_registration_review_intake.up.sql
 schemas:
     - name: app
       tables:
@@ -506,7 +507,7 @@ schemas:
             - name: creator_registration_evidences_file_size_bytes_check
               expression: CHECK (file_size_bytes > 0 AND file_size_bytes <= 10485760)
             - name: creator_registration_evidences_kind_check
-              expression: CHECK (kind = ANY (ARRAY['government_id'::text, 'payout_proof'::text]))
+              expression: CHECK (kind = ANY (ARRAY['government_id'::text, 'payout_proof'::text, 'identity_selfie'::text, 'address_proof'::text, 'business_registration'::text, 'co_performer_consent'::text]))
             - name: creator_registration_evidences_mime_type_check
               expression: CHECK (mime_type = ANY (ARRAY['image/jpeg'::text, 'image/png'::text, 'image/webp'::text, 'application/pdf'::text]))
           indexes:
@@ -549,6 +550,36 @@ schemas:
               type: timestamp with time zone
               nullable: false
               default: CURRENT_TIMESTAMP
+            - name: legal_address
+              type: text
+              nullable: false
+              default: '''''::text'
+            - name: identity_document_type
+              type: text
+              nullable: true
+            - name: target_audience_category
+              type: text
+              nullable: true
+            - name: has_co_performers
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_appearance_verification
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_co_performer_consent_responsibility
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: accepts_adult_business_compliance
+              type: boolean
+              nullable: false
+              default: "false"
+            - name: confirms_information_matches_documents
+              type: boolean
+              nullable: false
+              default: "false"
           primary_key:
             - user_id
           foreign_keys:
@@ -562,8 +593,14 @@ schemas:
                     - user_id
               on_delete: CASCADE
           check_constraints:
+            - name: creator_registration_intakes_identity_document_type_check
+              expression: CHECK (identity_document_type IS NULL OR (identity_document_type = ANY (ARRAY['driver_license'::text, 'my_number_card'::text, 'residence_card'::text, 'basic_resident_register_card'::text, 'passport'::text, 'student_or_employee_id'::text, 'disability_certificate'::text, 'other_government_photo_id'::text])))
+            - name: creator_registration_intakes_legal_address_length_check
+              expression: CHECK (char_length(legal_address) <= 500)
             - name: creator_registration_intakes_payout_recipient_type_check
               expression: CHECK (payout_recipient_type IS NULL OR (payout_recipient_type = ANY (ARRAY['self'::text, 'business'::text])))
+            - name: creator_registration_intakes_target_audience_category_check
+              expression: CHECK (target_audience_category IS NULL OR (target_audience_category = ANY (ARRAY['all_ages'::text, 'general_adult'::text, 'gay_bl'::text])))
         - name: main_playback_progress
           columns:
             - name: user_id

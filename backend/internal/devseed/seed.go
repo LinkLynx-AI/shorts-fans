@@ -54,14 +54,15 @@ const (
 	fanDisplayName = "Kana Mori"
 	fanHandle      = "kanamori"
 
-	reviewDisplayName = "Mina Rei"
-	reviewHandle      = "minarei_review"
-	reviewAvatarURL   = "https://cdn.example.com/mock/review/mina-rei-avatar.jpg"
-	reviewCreatorBio  = "quiet rooftop と low light preview を中心に投稿予定です。"
-	reviewLegalName   = "Mina Rei"
-	reviewBirthDate   = "1999-04-02"
-	reviewPayoutName  = "Mina Rei"
-	reviewPayoutType  = "self"
+	reviewDisplayName  = "Mina Rei"
+	reviewHandle       = "minarei_review"
+	reviewAvatarURL    = "https://cdn.example.com/mock/review/mina-rei-avatar.jpg"
+	reviewCreatorBio   = "quiet rooftop と low light preview を中心に投稿予定です。"
+	reviewLegalName    = "Mina Rei"
+	reviewBirthDate    = "1999-04-02"
+	reviewLegalAddress = "東京都渋谷区..."
+	reviewPayoutName   = "Mina Rei"
+	reviewPayoutType   = "self"
 
 	mainPriceMinor = int64(1200)
 	mainCurrency   = "JPY"
@@ -480,16 +481,32 @@ func upsertSubmittedReviewIntake(ctx context.Context, tx pgx.Tx) error {
 			user_id,
 			legal_name,
 			birth_date,
+			legal_address,
+			identity_document_type,
+			target_audience_category,
+			has_co_performers,
 			payout_recipient_type,
 			payout_recipient_name,
 			declares_no_prohibited_category,
-			accepts_consent_responsibility
+			accepts_consent_responsibility,
+			accepts_appearance_verification,
+			accepts_co_performer_consent_responsibility,
+			accepts_adult_business_compliance,
+			confirms_information_matches_documents
 		) VALUES (
 			$1,
 			$2,
 			$3,
 			$4,
 			$5,
+			$6,
+			FALSE,
+			$7,
+			$8,
+			TRUE,
+			TRUE,
+			TRUE,
+			FALSE,
 			TRUE,
 			TRUE
 		)
@@ -497,12 +514,20 @@ func upsertSubmittedReviewIntake(ctx context.Context, tx pgx.Tx) error {
 		SET
 			legal_name = EXCLUDED.legal_name,
 			birth_date = EXCLUDED.birth_date,
+			legal_address = EXCLUDED.legal_address,
+			identity_document_type = EXCLUDED.identity_document_type,
+			target_audience_category = EXCLUDED.target_audience_category,
+			has_co_performers = EXCLUDED.has_co_performers,
 			payout_recipient_type = EXCLUDED.payout_recipient_type,
 			payout_recipient_name = EXCLUDED.payout_recipient_name,
 			declares_no_prohibited_category = EXCLUDED.declares_no_prohibited_category,
 			accepts_consent_responsibility = EXCLUDED.accepts_consent_responsibility,
+			accepts_appearance_verification = EXCLUDED.accepts_appearance_verification,
+			accepts_co_performer_consent_responsibility = EXCLUDED.accepts_co_performer_consent_responsibility,
+			accepts_adult_business_compliance = EXCLUDED.accepts_adult_business_compliance,
+			confirms_information_matches_documents = EXCLUDED.confirms_information_matches_documents,
 			updated_at = CURRENT_TIMESTAMP
-	`, reviewUserID, reviewLegalName, reviewBirthDate, reviewPayoutType, reviewPayoutName); err != nil {
+	`, reviewUserID, reviewLegalName, reviewBirthDate, reviewLegalAddress, "driver_license", "general_adult", reviewPayoutType, reviewPayoutName); err != nil {
 		return fmt.Errorf("creator_registration_intakes upsert user_id=%s: %w", reviewUserID, err)
 	}
 
@@ -533,12 +558,32 @@ func upsertSubmittedReviewEvidences(ctx context.Context, tx pgx.Tx) error {
 			),
 			(
 				$1,
-				'payout_proof',
+				'identity_selfie',
 				$5,
+				'image/png',
+				102400,
+				'mock-private-evidence-bucket',
+				$6,
+				$4
+			),
+			(
+				$1,
+				'address_proof',
+				$7,
 				'application/pdf',
 				84512,
 				'mock-private-evidence-bucket',
-				$6,
+				$8,
+				$4
+			),
+			(
+				$1,
+				'payout_proof',
+				$9,
+				'application/pdf',
+				84512,
+				'mock-private-evidence-bucket',
+				$10,
 				$4
 			)
 		ON CONFLICT (user_id, kind) DO UPDATE
@@ -550,7 +595,12 @@ func upsertSubmittedReviewEvidences(ctx context.Context, tx pgx.Tx) error {
 			storage_key = EXCLUDED.storage_key,
 			uploaded_at = EXCLUDED.uploaded_at,
 			updated_at = CURRENT_TIMESTAMP
-	`, reviewUserID, "government-id.png", "mock/review/mina-rei/government-id.png", reviewEvidenceUploadedAt, "bank-proof.pdf", "mock/review/mina-rei/bank-proof.pdf"); err != nil {
+	`, reviewUserID,
+		"government-id.png", "mock/review/mina-rei/government-id.png", reviewEvidenceUploadedAt,
+		"selfie.png", "mock/review/mina-rei/selfie.png",
+		"address-proof.pdf", "mock/review/mina-rei/address-proof.pdf",
+		"payout-proof.pdf", "mock/review/mina-rei/payout-proof.pdf",
+	); err != nil {
 		return fmt.Errorf("creator_registration_evidences upsert user_id=%s: %w", reviewUserID, err)
 	}
 

@@ -4,6 +4,7 @@ import "testing"
 
 func TestLoadReadsProcessEnvironment(t *testing.T) {
 	t.Setenv("APP_ENV", "production")
+	t.Setenv("ADMIN_API_TOKEN", "admin-token")
 	t.Setenv("API_ADDR", ":9090")
 	t.Setenv("POSTGRES_DSN", "postgres://example")
 	t.Setenv("REDIS_ADDR", "redis:6379")
@@ -25,6 +26,9 @@ func TestLoadReadsProcessEnvironment(t *testing.T) {
 
 	if cfg.AppEnv != "production" {
 		t.Fatalf("Load() app env got %q want %q", cfg.AppEnv, "production")
+	}
+	if cfg.AdminAPIToken != "admin-token" {
+		t.Fatalf("Load() admin api token got %q want %q", cfg.AdminAPIToken, "admin-token")
 	}
 	if cfg.APIAddr != ":9090" {
 		t.Fatalf("Load() api addr got %q want %q", cfg.APIAddr, ":9090")
