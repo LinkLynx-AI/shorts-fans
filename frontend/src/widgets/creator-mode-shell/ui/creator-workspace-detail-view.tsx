@@ -79,7 +79,6 @@ type CreatorWorkspacePostActionMenuItem = {
   action?: "change-price" | "edit-caption";
   disabled?: boolean;
   label: string;
-  tone?: "danger" | "default";
 };
 
 function canChangeCreatorWorkspaceMainPrice(
@@ -104,16 +103,11 @@ function resolveCreatorWorkspacePostActionMenu(
       description: "creator workspace でショート投稿の操作を選ぶメニュー",
       items: [
         { action: "edit-caption", disabled: !canEditShortCaption, label: "captionの変更" },
-        { label: "動画の非公開" },
-        { label: "削除", tone: "danger" },
       ],
     };
   }
 
-  const items: CreatorWorkspacePostActionMenuItem[] = [
-    { label: "非公開" },
-    { label: "削除", tone: "danger" },
-  ];
+  const items: CreatorWorkspacePostActionMenuItem[] = [];
 
   if (canChangeCreatorWorkspaceMainPrice(detailSelection)) {
     items.unshift({ action: "change-price", label: "priceの変更" });
@@ -529,49 +523,50 @@ export function CreatorWorkspaceDetailView({
           <span className="sr-only">Back</span>
           <ArrowLeft className="size-5" strokeWidth={2.1} />
         </Button>
-        <BottomSheetMenu
-          description={postActionMenu.description}
-          title="投稿操作"
-          trigger={
-            <CreatorWorkspaceActionButton
-              ariaLabel="投稿操作"
-              className="inline-flex min-h-8 min-w-7 items-center justify-center gap-1 bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
-              disabled={false}
-            >
-              <span className="size-1 rounded-full bg-current" />
-              <span className="size-1 rounded-full bg-current" />
-              <span className="size-1 rounded-full bg-current" />
-            </CreatorWorkspaceActionButton>
-          }
-        >
-          <BottomSheetMenuGroup>
-            {postActionMenu.items.map((item, index) => (
-              <BottomSheetMenuClose asChild key={item.label}>
-                <BottomSheetMenuAction
-                  disabled={item.disabled}
-                  onClick={() => {
-                    if (item.action === "change-price" && canChangeCreatorWorkspaceMainPrice(detailSelection)) {
-                      onOpenMainPriceDialog(detailSelection);
-                      return;
-                    }
+        {postActionMenu.items.length > 0 ? (
+          <BottomSheetMenu
+            description={postActionMenu.description}
+            title="投稿操作"
+            trigger={
+              <CreatorWorkspaceActionButton
+                ariaLabel="投稿操作"
+                className="inline-flex min-h-8 min-w-7 items-center justify-center gap-1 bg-transparent text-[#1082c8] disabled:cursor-default disabled:opacity-100"
+                disabled={false}
+              >
+                <span className="size-1 rounded-full bg-current" />
+                <span className="size-1 rounded-full bg-current" />
+                <span className="size-1 rounded-full bg-current" />
+              </CreatorWorkspaceActionButton>
+            }
+          >
+            <BottomSheetMenuGroup>
+              {postActionMenu.items.map((item, index) => (
+                <BottomSheetMenuClose asChild key={item.label}>
+                  <BottomSheetMenuAction
+                    disabled={item.disabled}
+                    onClick={() => {
+                      if (item.action === "change-price" && canChangeCreatorWorkspaceMainPrice(detailSelection)) {
+                        onOpenMainPriceDialog(detailSelection);
+                        return;
+                      }
 
-                    if (item.action !== "edit-caption" || editableShortId === null) {
-                      return;
-                    }
+                      if (item.action !== "edit-caption" || editableShortId === null) {
+                        return;
+                      }
 
-                    queueMicrotask(() => {
-                      setIsCaptionDialogOpen(true);
-                    });
-                  }}
-                  {...(item.tone ? { tone: item.tone } : {})}
-                  withDivider={index > 0}
-                >
-                  <span>{item.label}</span>
-                </BottomSheetMenuAction>
-              </BottomSheetMenuClose>
-            ))}
-          </BottomSheetMenuGroup>
-        </BottomSheetMenu>
+                      queueMicrotask(() => {
+                        setIsCaptionDialogOpen(true);
+                      });
+                    }}
+                    withDivider={index > 0}
+                  >
+                    <span>{item.label}</span>
+                  </BottomSheetMenuAction>
+                </BottomSheetMenuClose>
+              ))}
+            </BottomSheetMenuGroup>
+          </BottomSheetMenu>
+        ) : null}
       </div>
 
       <section className="mt-[18px] grid gap-[18px] pb-10">

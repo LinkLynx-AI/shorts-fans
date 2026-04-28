@@ -867,7 +867,7 @@ describe("CreatorPage", () => {
     expect(screen.queryByLabelText("本編動画")).not.toBeInTheDocument();
   });
 
-  it("shows post actions that match the detail kind and opens the caption dialog only for short detail", async () => {
+  it("shows implemented post actions that match the detail kind and opens the caption dialog only for short detail", async () => {
     const { getFanAuthGateState } = await import("@/features/fan-auth-gate");
     const user = userEvent.setup();
 
@@ -887,8 +887,8 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "投稿操作" }));
 
     expect(screen.getByRole("button", { name: "captionの変更" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "動画の非公開" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "動画の非公開" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "captionの変更" }));
@@ -909,8 +909,8 @@ describe("CreatorPage", () => {
     await user.click(screen.getByRole("button", { name: "投稿操作" }));
 
     expect(screen.getByRole("button", { name: "priceの変更" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "非公開" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "非公開" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "captionの変更" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "priceの変更" }));
@@ -1031,11 +1031,10 @@ describe("CreatorPage", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "投稿操作" }));
-
+    expect(screen.queryByRole("button", { name: "投稿操作" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "priceの変更" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "非公開" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "削除" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "非公開" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "削除" })).not.toBeInTheDocument();
   });
 
   it("shows a retryable lower-list error without hiding the rest of the workspace", async () => {
