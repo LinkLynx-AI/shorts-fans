@@ -6,6 +6,8 @@
 - 対象は `infra/terraform/dev` に追加した fan auth 用 Cognito slice です。
 - `docs/contracts/fan-auth-api-contract.md` が固定した `email + password` / custom modal 前提を、AWS コンソール手作業なしで再現できるようにすることを目的にします。
 - media / avatar sandbox と同じ Terraform root を使いますが、mail verification / password reset / auth runtime handoff だけをこの文書で扱います。
+- full dev app environment では [dev-app-environment.md](dev-app-environment.md) が同じ Cognito resources を backend API service から利用します。
+- 現在の `infra/terraform/dev` root をそのまま `terraform apply` すると full dev app environment も作成されます。Cognito slice だけを個別に作る手順は現時点では分離していません。
 
 ## 固定した前提
 

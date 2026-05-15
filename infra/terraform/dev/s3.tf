@@ -69,7 +69,7 @@ resource "aws_s3_bucket_cors_configuration" "raw" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["PUT"]
-    allowed_origins = var.allowed_app_origins
+    allowed_origins = local.dev_allowed_app_origins
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }
@@ -165,7 +165,7 @@ resource "aws_s3_bucket_cors_configuration" "creator_avatar_upload" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["HEAD", "PUT"]
-    allowed_origins = var.allowed_app_origins
+    allowed_origins = local.dev_allowed_app_origins
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }
@@ -362,7 +362,7 @@ resource "aws_s3_bucket_cors_configuration" "creator_review_evidence" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["HEAD", "PUT"]
-    allowed_origins = var.allowed_app_origins
+    allowed_origins = local.dev_allowed_app_origins
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }
@@ -556,7 +556,7 @@ resource "aws_s3_bucket_cors_configuration" "main_private" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD"]
-    allowed_origins = var.allowed_app_origins
+    allowed_origins = local.dev_allowed_app_origins
     expose_headers  = ["ETag"]
     max_age_seconds = 300
   }

@@ -8,3 +8,24 @@ allowed_app_origins = [
   "http://localhost:3000",
   "http://127.0.0.1:3000",
 ]
+
+dev_allowed_cidr_blocks = [
+  "203.0.113.10/32",
+]
+
+backend_image_tag  = "dev"
+frontend_image_tag = "dev"
+
+db_instance_class = "db.t4g.micro"
+redis_node_type   = "cache.t4g.micro"
+
+backend_ecs_cpu    = 512
+backend_ecs_memory = 1024
+frontend_ecs_cpu   = 512
+frontend_ecs_memory = 1024
+
+backend_desired_count  = 1
+frontend_desired_count = 1
+worker_desired_count   = 1
+
+admin_api_token = "replace-with-dev-admin-token"

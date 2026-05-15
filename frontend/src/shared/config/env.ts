@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 const clientEnvSchema = z.object({
-  NEXT_PUBLIC_API_BASE_URL: z.string().url(),
+  NEXT_PUBLIC_API_BASE_URL: z.string().url().or(z.literal("__same_origin__")),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;

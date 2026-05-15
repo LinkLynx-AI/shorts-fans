@@ -5,7 +5,7 @@ SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
 
-.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-media-smoke backend-dev-seed backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt
+.PHONY: help codex codex-worktree backend-dev-up backend-dev-down backend-run backend-worker backend-media-smoke backend-dev-seed backend-migrate-up backend-migrate-down backend-generate backend-schema backend-test backend-coverage-check backend-vet backend-fmt aws-dev-ecr-bootstrap aws-dev-build-push aws-dev-apply aws-dev-force-deploy aws-dev-migrate aws-dev-seed
 
 BACKEND_DIR := backend
 BACKEND_APP_ENV ?= development
@@ -30,6 +30,9 @@ BACKEND_CREATOR_REVIEW_EVIDENCE_BUCKET_NAME ?=
 BACKEND_COVERAGE_MIN ?=
 BACKEND_COVERAGE_PROFILE ?=
 SQLC_VERSION := v1.27.0
+AWS_DEV_TF_DIR := infra/terraform/dev
+AWS_DEV_TFVARS ?= terraform.tfvars
+AWS_DEV_IMAGE_TAG ?= dev
 
 help:
 	@printf '%s\n' \
@@ -43,6 +46,10 @@ help:
 		'  make backend-media-smoke' \
 		'  make backend-schema' \
 		'  make backend-coverage-check [BACKEND_COVERAGE_MIN=<min-percent>]' \
+		'  make aws-dev-build-push [AWS_DEV_IMAGE_TAG=dev]' \
+		'  make aws-dev-apply' \
+		'  make aws-dev-migrate' \
+		'  make aws-dev-seed' \
 		'' \
 		'Examples:' \
 		'  make codex branch=frontend-shell          # branch: codex/frontend-shell' \
@@ -163,3 +170,57 @@ backend-vet:
 
 backend-fmt:
 	cd $(BACKEND_DIR) && gofmt -w $$(find . -name '*.go' -not -path './vendor/*')
+
+aws-dev-ecr-bootstrap:
+	terraform -chdir=$(AWS_DEV_TF_DIR) apply \
+		-var-file=$(AWS_DEV_TFVARS) \
+		-target=aws_ecr_repository.backend \
+		-target=aws_ecr_repository.frontend
+
+aws-dev-build-push: aws-dev-ecr-bootstrap
+	@region="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw aws_region)"; \
+	account_id="$$(aws sts get-caller-identity --query Account --output text)"; \
+	registry="$$account_id.dkr.ecr.$$region.amazonaws.com"; \
+	backend_repo="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw backend_ecr_repository_url)"; \
+	frontend_repo="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw frontend_ecr_repository_url)"; \
+	aws ecr get-login-password --region "$$region" | docker login --username AWS --password-stdin "$$registry"; \
+	docker build --platform linux/amd64 -t "$$backend_repo:$(AWS_DEV_IMAGE_TAG)" backend; \
+	docker push "$$backend_repo:$(AWS_DEV_IMAGE_TAG)"; \
+	docker build --platform linux/amd64 -t "$$frontend_repo:$(AWS_DEV_IMAGE_TAG)" frontend; \
+	docker push "$$frontend_repo:$(AWS_DEV_IMAGE_TAG)"
+
+aws-dev-apply:
+	terraform -chdir=$(AWS_DEV_TF_DIR) apply -var-file=$(AWS_DEV_TFVARS)
+
+aws-dev-force-deploy:
+	@cluster="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw ecs_cluster_name)"; \
+	backend_service="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw backend_service_name)"; \
+	frontend_service="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw frontend_service_name)"; \
+	worker_service="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw worker_service_name)"; \
+	aws ecs update-service --cluster "$$cluster" --service "$$backend_service" --force-new-deployment >/dev/null; \
+	aws ecs update-service --cluster "$$cluster" --service "$$frontend_service" --force-new-deployment >/dev/null; \
+	aws ecs update-service --cluster "$$cluster" --service "$$worker_service" --force-new-deployment >/dev/null
+
+aws-dev-migrate:
+	@cluster="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw ecs_cluster_name)"; \
+	task_definition="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw backend_maintenance_task_definition_arn)"; \
+	security_group="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw ecs_task_security_group_id)"; \
+	subnets="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -json ecs_public_subnet_ids)"; \
+	network_configuration="$$(printf '{"awsvpcConfiguration":{"subnets":%s,"securityGroups":["%s"],"assignPublicIp":"ENABLED"}}' "$$subnets" "$$security_group")"; \
+	overrides='{"containerOverrides":[{"name":"backend-maintenance","command":["/app/migrate","up"]}]}'; \
+	task_arn="$$(aws ecs run-task --cluster "$$cluster" --task-definition "$$task_definition" --launch-type FARGATE --network-configuration "$$network_configuration" --overrides "$$overrides" --query 'tasks[0].taskArn' --output text)"; \
+	aws ecs wait tasks-stopped --cluster "$$cluster" --tasks "$$task_arn"; \
+	exit_code="$$(aws ecs describe-tasks --cluster "$$cluster" --tasks "$$task_arn" --query 'tasks[0].containers[0].exitCode' --output text)"; \
+	test "$$exit_code" = "0"
+
+aws-dev-seed:
+	@cluster="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw ecs_cluster_name)"; \
+	task_definition="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw backend_maintenance_task_definition_arn)"; \
+	security_group="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -raw ecs_task_security_group_id)"; \
+	subnets="$$(terraform -chdir=$(AWS_DEV_TF_DIR) output -json ecs_public_subnet_ids)"; \
+	network_configuration="$$(printf '{"awsvpcConfiguration":{"subnets":%s,"securityGroups":["%s"],"assignPublicIp":"ENABLED"}}' "$$subnets" "$$security_group")"; \
+	overrides='{"containerOverrides":[{"name":"backend-maintenance","command":["/app/devseed"]}]}'; \
+	task_arn="$$(aws ecs run-task --cluster "$$cluster" --task-definition "$$task_definition" --launch-type FARGATE --network-configuration "$$network_configuration" --overrides "$$overrides" --query 'tasks[0].taskArn' --output text)"; \
+	aws ecs wait tasks-stopped --cluster "$$cluster" --tasks "$$task_arn"; \
+	exit_code="$$(aws ecs describe-tasks --cluster "$$cluster" --tasks "$$task_arn" --query 'tasks[0].containers[0].exitCode' --output text)"; \
+	test "$$exit_code" = "0"
