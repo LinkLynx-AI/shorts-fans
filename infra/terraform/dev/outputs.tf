@@ -182,3 +182,73 @@ output "creator_review_evidence_app_access_policy_arn" {
   description = "Managed policy ARN to attach manually to the app principal for creator registration evidence uploads."
   value       = aws_iam_policy.creator_review_evidence_app_access.arn
 }
+
+output "dev_app_url" {
+  description = "Public HTTP URL for the AWS dev app ALB."
+  value       = "http://${aws_lb.dev.dns_name}"
+}
+
+output "backend_ecr_repository_url" {
+  description = "Backend ECR repository URL."
+  value       = aws_ecr_repository.backend.repository_url
+}
+
+output "frontend_ecr_repository_url" {
+  description = "Frontend ECR repository URL."
+  value       = aws_ecr_repository.frontend.repository_url
+}
+
+output "rds_endpoint" {
+  description = "RDS PostgreSQL endpoint for dev."
+  value       = aws_db_instance.dev.endpoint
+}
+
+output "redis_endpoint" {
+  description = "ElastiCache Redis endpoint for dev."
+  value       = "${aws_elasticache_cluster.dev.cache_nodes[0].address}:${local.redis_port}"
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name for the dev app."
+  value       = aws_ecs_cluster.dev.name
+}
+
+output "backend_service_name" {
+  description = "Backend API ECS service name."
+  value       = aws_ecs_service.backend_api.name
+}
+
+output "frontend_service_name" {
+  description = "Frontend ECS service name."
+  value       = aws_ecs_service.frontend.name
+}
+
+output "worker_service_name" {
+  description = "Backend worker ECS service name."
+  value       = aws_ecs_service.backend_worker.name
+}
+
+output "backend_maintenance_task_definition_arn" {
+  description = "Backend maintenance task definition ARN for migration and seed one-off tasks."
+  value       = aws_ecs_task_definition.backend_maintenance.arn
+}
+
+output "ecs_task_security_group_id" {
+  description = "Security group ID used by backend maintenance ECS tasks."
+  value       = aws_security_group.backend_ecs_tasks.id
+}
+
+output "backend_ecs_task_security_group_id" {
+  description = "Security group ID used by backend API, worker, and maintenance ECS tasks."
+  value       = aws_security_group.backend_ecs_tasks.id
+}
+
+output "frontend_ecs_task_security_group_id" {
+  description = "Security group ID used by frontend ECS tasks."
+  value       = aws_security_group.frontend_ecs_tasks.id
+}
+
+output "ecs_public_subnet_ids" {
+  description = "Public subnet IDs used by dev ECS tasks."
+  value       = local.dev_public_subnet_ids
+}

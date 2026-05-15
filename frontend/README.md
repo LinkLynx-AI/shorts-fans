@@ -53,6 +53,7 @@ pnpm dev:admin
 - 追加の設計ルールは repo 直下の `AGENTS.md` と `docs/TYPESCRIPT.md` に従います。
 - UI は `Tailwind CSS v4 + shadcn/ui 互換 primitive + Radix Primitives` を前提にします。
 - `.env.example` に frontend 起動時の最小 env 契約を定義しています。
+- AWS dev では `NEXT_PUBLIC_API_BASE_URL=__same_origin__` と `API_BASE_URL_INTERNAL` を Terraform から注入します。local 開発では通常どおり `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` を使います。
 - Playwright E2E は既定の review/CI 経路には含めず、必要時だけ明示的に実行します。
 
 ## Deploy on Vercel

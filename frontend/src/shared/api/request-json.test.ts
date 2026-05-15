@@ -1,11 +1,31 @@
 import { z } from "zod";
 
-import { createApiUrl, requestJson } from "@/shared/api";
+import { createApiUrl, requestJson, resolveAPIBaseURL } from "@/shared/api";
 
 describe("createApiUrl", () => {
   it("joins the API base URL and path", () => {
     expect(createApiUrl("https://api.example.com", "/v1/feed").toString()).toBe(
       "https://api.example.com/v1/feed",
+    );
+  });
+
+  it("resolves same-origin API URLs in browser runtime", () => {
+    expect(createApiUrl("__same_origin__", "/api/fan/feed").toString()).toBe(
+      "http://localhost:3000/api/fan/feed",
+    );
+  });
+
+  it("resolves same-origin API URLs from server runtime env before browser origin", () => {
+    vi.stubEnv("API_BASE_URL_INTERNAL", "http://backend.internal");
+
+    expect(resolveAPIBaseURL("__same_origin__")).toBe("http://backend.internal");
+  });
+
+  it("throws a controlled error when server runtime API URL is malformed", () => {
+    vi.stubEnv("API_BASE_URL_INTERNAL", "not-a-url");
+
+    expect(() => resolveAPIBaseURL("__same_origin__")).toThrowError(
+      "API_BASE_URL_INTERNAL must be a valid URL.",
     );
   });
 });

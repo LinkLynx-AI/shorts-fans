@@ -8,6 +8,8 @@
 - 対象は cycle1 の local 開発から使う最小の dev media 基盤です。
 - `short` の public delivery には `CloudFront` を含めます。
 - remote state、GitHub Actions 連携、principal への policy attach 自動化はこの文書の対象外です。
+- full dev app environment では [dev-app-environment.md](dev-app-environment.md) が同じ Terraform root の media / avatar / review evidence resources を再利用し、ECS task role に app access policy を attach します。
+- 現在の `infra/terraform/dev` root をそのまま `terraform apply` すると full dev app environment も作成されます。media sandbox だけを個別に作る手順は現時点では分離していません。
 
 ## 依存前提
 
@@ -71,6 +73,7 @@
   - 任意
   - default は `http://localhost:3000` と `http://127.0.0.1:3000`
   - raw upload bucket の direct `PUT`、creator avatar upload bucket の direct `PUT`、creator review evidence bucket の direct `PUT`、`main` の private S3 delivery bucket CORS に使います
+  - full dev app environment では、この list に加えて dev ALB origin も Terraform が CORS に追加します
 
 ## 使い方
 

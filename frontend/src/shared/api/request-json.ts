@@ -4,6 +4,10 @@ import { getClientEnv } from "@/shared/config";
 
 import { ApiError } from "./errors";
 
+const sameOriginAPIBaseURL = "__same_origin__";
+const serverAPIBaseURLEnv = "API_BASE_URL_INTERNAL";
+const serverAPIBaseURLSchema = z.string().url();
+
 export type RequestJsonOptions<TSchema extends z.ZodTypeAny> = {
   baseUrl?: string;
   fetcher?: typeof fetch;
@@ -20,9 +24,40 @@ export function createApiUrl(baseUrl: string, path: `/${string}` | URL): URL {
     return path;
   }
 
-  const normalizedBaseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  const resolvedBaseUrl = resolveAPIBaseURL(baseUrl);
+  const normalizedBaseUrl = resolvedBaseUrl.endsWith("/") ? resolvedBaseUrl : `${resolvedBaseUrl}/`;
 
   return new URL(path.slice(1), normalizedBaseUrl);
+}
+
+export function resolveAPIBaseURL(baseUrl: string | undefined): string {
+  if (baseUrl && baseUrl !== sameOriginAPIBaseURL) {
+    return baseUrl;
+  }
+
+  const serverBaseURL = parseServerAPIBaseURL(process.env[serverAPIBaseURLEnv]);
+  if (serverBaseURL !== undefined) {
+    return serverBaseURL;
+  }
+
+  if (typeof window === "undefined") {
+    throw new Error(`${serverAPIBaseURLEnv} is required when resolving a same-origin API base URL on the server.`);
+  }
+
+  return window.location.origin;
+}
+
+function parseServerAPIBaseURL(value: string | undefined): string | undefined {
+  if (value === undefined || value.trim() === "") {
+    return undefined;
+  }
+
+  const parsed = serverAPIBaseURLSchema.safeParse(value.trim());
+  if (!parsed.success) {
+    throw new Error(`${serverAPIBaseURLEnv} must be a valid URL.`);
+  }
+
+  return parsed.data;
 }
 
 /**

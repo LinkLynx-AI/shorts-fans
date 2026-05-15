@@ -10,6 +10,19 @@ locals {
   creator_review_evidence_bucket_name = "${local.resource_prefix}-review-evidence-${local.bucket_suffix}"
   short_public_bucket_name            = "${local.resource_prefix}-short-public-${local.bucket_suffix}"
   main_private_bucket_name            = "${local.resource_prefix}-main-private-${local.bucket_suffix}"
+  backend_ecr_repository_name         = "${local.resource_prefix}-backend"
+  frontend_ecr_repository_name        = "${local.resource_prefix}-frontend"
+  ecs_cluster_name                    = "${local.resource_prefix}-cluster"
+  backend_log_group_name              = "/ecs/${local.resource_prefix}/backend"
+  frontend_log_group_name             = "/ecs/${local.resource_prefix}/frontend"
+  worker_log_group_name               = "/ecs/${local.resource_prefix}/worker"
+  migration_log_group_name            = "/ecs/${local.resource_prefix}/migration"
+  db_name                             = "shorts_fans"
+  db_username                         = "shorts_fans"
+  db_port                             = 5432
+  redis_port                          = 6379
+  dev_app_origin                      = "http://${aws_lb.dev.dns_name}"
+  dev_allowed_app_origins             = distinct(concat(var.allowed_app_origins, [local.dev_app_origin]))
   cognito_user_pool_name              = "${local.resource_prefix}-fan-auth"
   cognito_user_pool_client_name       = "${local.resource_prefix}-fan-auth-app-client"
   cognito_email_from_display_name     = "shortsfans"
@@ -22,6 +35,6 @@ locals {
     Project     = local.project_name
     Environment = local.environment
     ManagedBy   = "terraform"
-    Scope       = "media-sandbox"
+    Scope       = "dev-environment"
   }
 }

@@ -30,6 +30,7 @@
 - [docs/GO.md](docs/GO.md): Go 実装ルール、package 設計、並行処理、テスト、依存管理の運用ルール
 - [docs/TYPESCRIPT.md](docs/TYPESCRIPT.md): TypeScript フロントエンド実装ルールと FSD 運用ルール
 - [docs/infra/dev-cognito-sandbox.md](docs/infra/dev-cognito-sandbox.md): dev 用 Cognito fan auth sandbox の Terraform 構成、mail 前提、backend env handoff
+- [docs/infra/dev-app-environment.md](docs/infra/dev-app-environment.md): AWS 上で dev full app を動かす Terraform 構成、deploy 手順、smoke 確認
 - [docs/infra/dev-media-sandbox.md](docs/infra/dev-media-sandbox.md): dev 用 AWS media sandbox の Terraform 構成、guardrail、適用手順、backend 接続用 env 対応
 - [docs/infra/dev-media-smoke.md](docs/infra/dev-media-smoke.md): dev media smoke の再現手順、切り分け、manual recovery、quota/cost 注意点
 - [docs/contracts/mvp-core-domain-contract.md](docs/contracts/mvp-core-domain-contract.md): MVP core 永続化タスク向けの実装用ドメイン契約
